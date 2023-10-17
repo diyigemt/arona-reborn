@@ -1,0 +1,29 @@
+<configuration debug="false" scan="false">
+    <property name="log.root" value="logs" />
+    <property name="log.file" value="log" />
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${log.root}/${log.file}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${log.root}/${log.file}-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <!-- each archived file's size will be max 10MB -->
+            <maxFileSize>10MB</maxFileSize>
+            <!-- total size of all archive files, if total size > 100GB, it will delete old archived file -->
+            <totalSizeCap>100GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <root level="info">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
+    </root>
+    <logger name="default" level="INFO"/>
+    <logger name="admin" level="INFO"/>
+    <logger name="main" level="INFO"/>
+</configuration>

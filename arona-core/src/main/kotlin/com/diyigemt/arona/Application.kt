@@ -1,7 +1,9 @@
 package com.diyigemt.arona
 
 import com.diyigemt.arona.commandline.CommandMain
+import com.diyigemt.arona.communication.TencentBotClient
 import com.diyigemt.arona.plugins.PluginManager
+import com.diyigemt.arona.utils.aronaConfig
 import com.diyigemt.arona.webui.plugins.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -9,6 +11,7 @@ import io.ktor.server.netty.*
 import kotlinx.coroutines.*
 
 fun main() {
+  TencentBotClient.invoke(aronaConfig.bot).auth()
   CoroutineScope(Dispatchers.IO).launch {
     while (true) {
       val input = readlnOrNull() ?: ""

@@ -71,7 +71,7 @@ object LoggerInterceptor {
 @AronaBackendEndpoint("/admin")
 object AdminLoggerInterceptor {
   private val adminLogger = KtorSimpleLogger("admin")
-  private val adminToken = aronaBackendConfig.adminToken
+  private val adminToken = aronaConfig.adminToken
 
   @AronaBackendAdminRouteInterceptor
   suspend fun PipelineContext<Unit, ApplicationCall>.adminAccessLogging() {

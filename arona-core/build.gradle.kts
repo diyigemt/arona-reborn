@@ -1,5 +1,3 @@
-import java.net.URI
-
 val kotlinVersion: String by project
 val exposedVersion: String by project
 plugins {

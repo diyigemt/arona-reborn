@@ -12,4 +12,15 @@ class CommonTest {
     println(currentTime())
     println(currentDateTime())
   }
+
+  @Test
+  fun testApply() {
+    fun a(block: () -> Unit) {
+      block.apply {
+        println("b")
+        this()
+      }
+    }
+
+  }
 }

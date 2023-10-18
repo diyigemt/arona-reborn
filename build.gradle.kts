@@ -1,7 +1,11 @@
 import java.net.URI
 
+plugins {
+  kotlin("jvm") version "1.9.10" apply false
+}
+
 allprojects {
-  group = "com.diyigemt"
+  group = "com.diyigemt.arona"
   version = "0.0.1"
 
   gradle.taskGraph.whenReady {
@@ -11,8 +15,8 @@ allprojects {
       }
     }
   }
-
 }
+
 subprojects {
   repositories {
     mavenCentral()

@@ -8,16 +8,17 @@ import com.github.ajalt.clikt.core.subcommands
 import io.ktor.util.logging.*
 import kotlin.system.exitProcess
 
-annotation class SubCommand
+annotation class CommandLineSubCommand
 
 class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invokeWithoutSubcommand = true) {
   @Suppress("UNCHECKED_CAST")
   companion object {
     private val instance = CommandMain().subcommands(ReflectionUtil
-      .scanTypeAnnotatedClass(SubCommand::class)
+      .scanTypeAnnotatedClass(CommandLineSubCommand::class)
       .map { Class.forName(it) }
       .map { it.getDeclaredConstructor().newInstance() }
         as List<CliktCommand>)
+
     fun run(argv: List<String>) {
       runCatching {
         instance.parse(argv)
@@ -29,14 +30,29 @@ class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invo
       }
     }
   }
+
   override fun run() {}
 }
 
-@SubCommand
+@CommandLineSubCommand
 class ExitCommand : CliktCommand(name = "exit", help = "安全退出程序") {
   override fun run() {
-    echo("exiting")
-    exitProcess(0)
+    waitInput("confirm exit? (y/N): ")
+      .onSuccess {
+        echo("exiting")
+        exitProcess(0)
+      }.onFailure {
+        echo("cancel")
+      }
   }
 }
 
+internal fun waitInput(tip: String?): Result<String> {
+  if (tip != null) {
+    print(tip)
+  }
+  val result = readlnOrNull()
+  return if (result == null) {
+    Result.failure(Exception(""))
+  } else Result.success(result)
+}

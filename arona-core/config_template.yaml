@@ -1,5 +1,9 @@
+bot:
+  appId: ""
+  token: ""
+  secret: ""
 adminToken: ''
 redis:
-  host: ''
+  host: '172.18.100.39'
   port: 6379
   db: 0

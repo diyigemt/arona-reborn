@@ -8,13 +8,13 @@ allprojects {
   group = "com.diyigemt.arona"
   version = "0.0.1"
 
-  gradle.taskGraph.whenReady {
-    tasks.forEach { task ->
-      if (task.name.contains("test")) {
-        task.enabled = false
-      }
-    }
-  }
+//  gradle.taskGraph.whenReady {
+//    tasks.forEach { task ->
+//      if (task.name.contains("test")) {
+//        task.enabled = false
+//      }
+//    }
+//  }
 }
 
 subprojects {

@@ -30,19 +30,19 @@ tasks.withType<Jar> {
     }
 }
 
-task("copyToPlugins") {
-    val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/plugins"
-    val buildJar = file(project.buildDir.path + "/libs")
-        .listFiles { it -> it.isFile && it.name.contains(version.toString()) }
-        ?.firstOrNull()
-    if (buildJar == null) {
-        logger.error("build file not found: ${project.name}")
-    } else {
-        // 删除旧版本插件
-        file(pluginDir)
-            .listFiles { it -> it.isFile && it.name.startsWith(project.name) }
-            ?.forEach { it.delete() }
-        buildJar.copyTo(file(pluginDir + "./" + buildJar.name), true)
-        logger.error("copy ${buildJar.name} to plugin folder")
-    }
-}
+//task("copyToPlugins") {
+//    val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/plugins"
+//    val buildJar = file(project.buildDir.path + "/libs")
+//        .listFiles { it -> it.isFile && it.name.contains(version.toString()) }
+//        ?.firstOrNull()
+//    if (buildJar == null) {
+//        logger.error("build file not found: ${project.name}")
+//    } else {
+//        // 删除旧版本插件
+//        file(pluginDir)
+//            .listFiles { it -> it.isFile && it.name.startsWith(project.name) }
+//            ?.forEach { it.delete() }
+//        buildJar.copyTo(file(pluginDir + "./" + buildJar.name), true)
+//        logger.error("copy ${buildJar.name} to plugin folder")
+//    }
+//}

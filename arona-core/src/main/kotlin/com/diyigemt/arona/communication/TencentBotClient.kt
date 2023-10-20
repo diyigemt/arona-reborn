@@ -2,20 +2,22 @@ package com.diyigemt.arona.communication
 
 import com.diyigemt.arona.communication.TencentWebsocketOperationManager.handleTencentOperation
 import com.diyigemt.arona.utils.runSuspend
-import com.diyigemt.arona.utils.userLogger
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.util.logging.*
 import io.ktor.utils.io.core.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.slf4j.Logger
 import java.util.*
 import kotlin.concurrent.scheduleAtFixedRate
 
@@ -32,7 +34,8 @@ internal class TencentBotClientConnectionMaintainer
     append("Authorization", botToken)
     append("X-Union-Appid", bot.config.appId)
   }
-  val botToken = "QQBot $accessToken"
+  val botToken
+    get() = "QQBot $accessToken"
 
   suspend fun auth() {
     val resp = client.post("https://bots.qq.com/app/getAppAccessToken") {
@@ -69,9 +72,9 @@ internal class TencentBotClientConnectionMaintainer
 internal interface TencentBot {
   val client: HttpClient
   val json: Json
-  var serialNumber: Long
   val connectionMaintainer: TencentBotClientConnectionMaintainer
   val openapiSignHeader: HeadersBuilder.() -> Unit
+  val logger: Logger
 }
 
 internal open class TencentBotClient private constructor(val config: TencentBotConfig) : Closeable, TencentBot {
@@ -81,11 +84,11 @@ internal open class TencentBotClient private constructor(val config: TencentBotC
   override val json = Json {
     ignoreUnknownKeys = true
   }
-  override var serialNumber: Long = 0L // websocket 最后一次通信消息序号
   final override val connectionMaintainer by lazy {
     TencentBotClientConnectionMaintainer(this, client)
   }
   override val openapiSignHeader = connectionMaintainer.openapiSignHeader
+  override val logger = KtorSimpleLogger("Bot.${config.appId}")
 
   companion object {
     operator fun invoke(config: TencentBotConfig): TencentBotClient {
@@ -101,32 +104,21 @@ internal open class TencentBotClient private constructor(val config: TencentBotC
   private suspend fun connectWs() {
     callOpenapi<TencentWebsocketEndpointResp>(TencentEndpoint.WebSocket) {
       method = HttpMethod.Get
-    }.collect {
-      client.ws({
-        method = HttpMethod.Get
-        url(it.url)
-        headers(openapiSignHeader)
-      }) {
-        val cxt = this@TencentBotClient.toWebSocketSession(call, this)
-        while (true) {
-          cxt.handleTencentOperation()
+    }.catch {
+        logger.error("get websocket endpoint failed.")
+      }
+      .collect {
+        client.ws({
+          method = HttpMethod.Get
+          url(it.url)
+          headers(openapiSignHeader)
+        }) {
+          val cxt = this@TencentBotClient.toWebSocketSession(call, this)
+          while (true) {
+            cxt.handleTencentOperation()
+          }
         }
       }
-    }
-  }
-
-  private suspend fun DefaultWebSocketSession.authWebsocketConnection() {
-    outgoing.send(
-      Frame.Text(
-        Json.encodeToString(
-          TencentWebsocketSessionReq(
-            token = connectionMaintainer.botToken,
-            intents = 1,
-            shard = listOf(0, 0)
-          )
-        )
-      )
-    )
   }
 
   private suspend inline fun <reified T> callOpenapi(

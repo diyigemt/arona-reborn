@@ -44,10 +44,11 @@ internal object TencentWebsocketEventTypeAsStringSerializer : KSerializer<Tencen
 }
 
 @Serializable(with = TencentWebsocketEventTypeAsStringSerializer::class)
-internal enum class TencentWebsocketEventType(val type: String, val decoder: KSerializer<*>) {
-  NULL("NULL", Int.serializer()),
-  HELLO("HELLO", TencentWebsocketHelloResp.serializer()),
-  C2C_MESSAGE_CREATE("C2C_MESSAGE_CREATE", PrivateMessage.serializer());
+internal enum class TencentWebsocketEventType(val type: String) {
+  NULL("NULL"),
+  READY("READY"), // websocket鉴权成功
+  MESSAGE_CREATE("MESSAGE_CREATE"), // 频道消息发送
+  C2C_MESSAGE_CREATE("C2C_MESSAGE_CREATE"); // 私聊消息发送
   companion object {
     private val TypeMap = entries.associateBy { it.type }
     fun fromValue(type: String) = TypeMap[type] ?: NULL

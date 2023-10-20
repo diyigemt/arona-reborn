@@ -21,6 +21,11 @@ class CommonTest {
         this()
       }
     }
+  }
 
+  @Test
+  fun testBitOp() {
+    val a = 1 shl 0 or 1 shl 9 or 1 shl 1
+    println(1 shl 0 or 1 shl 9 or 1 shl 1)
   }
 }

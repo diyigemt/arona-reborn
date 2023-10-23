@@ -56,5 +56,6 @@ internal enum class TencentWebsocketEventType(val type: String) {
 }
 
 enum class TencentEndpoint(val path: String) {
-  WebSocket("/gateway")
+  WebSocket("/gateway"),
+  PostGuildMessage("/channels/{channel_id}/messages")
 }

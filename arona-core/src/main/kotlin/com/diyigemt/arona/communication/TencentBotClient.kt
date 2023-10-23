@@ -4,22 +4,23 @@ import com.diyigemt.arona.communication.TencentWebsocketOperationManager.handleT
 import com.diyigemt.arona.utils.runSuspend
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.logging.*
 import io.ktor.utils.io.core.*
-import io.ktor.websocket.*
-import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import java.util.*
 import kotlin.concurrent.scheduleAtFixedRate
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 internal class TencentBotClientConnectionMaintainer
   (
@@ -69,17 +70,26 @@ internal class TencentBotClientConnectionMaintainer
   }
 }
 
-internal interface TencentBot {
+internal interface TencentBot : CoroutineScope {
   val client: HttpClient
   val json: Json
   val connectionMaintainer: TencentBotClientConnectionMaintainer
   val openapiSignHeader: HeadersBuilder.() -> Unit
   val logger: Logger
+  suspend fun <T> callOpenapi(
+    endpoint: TencentEndpoint,
+    decoder: KSerializer<T>,
+    urlPlaceHolder: Map<String, String> = mapOf(),
+    block: HttpRequestBuilder.() -> Unit
+  ): Result<T>
 }
 
 internal open class TencentBotClient private constructor(val config: TencentBotConfig) : Closeable, TencentBot {
   override val client = HttpClient(CIO) {
     install(WebSockets)
+    install(ContentNegotiation) {
+      json
+    }
   }
   override val json = Json {
     ignoreUnknownKeys = true
@@ -102,54 +112,61 @@ internal open class TencentBotClient private constructor(val config: TencentBotC
   }
 
   private suspend fun connectWs() {
-    callOpenapi<TencentWebsocketEndpointResp>(TencentEndpoint.WebSocket) {
+    callOpenapi(TencentEndpoint.WebSocket, TencentWebsocketEndpointResp.serializer()) {
       method = HttpMethod.Get
-    }.catch {
-        logger.error("get websocket endpoint failed.")
-      }
-      .collect {
-        client.ws({
-          method = HttpMethod.Get
-          url(it.url)
-          headers(openapiSignHeader)
-        }) {
-          val cxt = this@TencentBotClient.toWebSocketSession(call, this)
-          while (true) {
-            cxt.handleTencentOperation()
-          }
+    }.onSuccess {
+      client.ws({
+        method = HttpMethod.Get
+        url(it.url)
+        headers(openapiSignHeader)
+      }) {
+        val cxt = this@TencentBotClient.toWebSocketSession(call, this)
+        while (true) {
+          cxt.handleTencentOperation()
         }
       }
+    }.onFailure {
+      logger.error("get websocket endpoint failed.")
+    }
   }
 
-  private suspend inline fun <reified T> callOpenapi(
+  override suspend fun <T> callOpenapi(
     endpoint: TencentEndpoint,
-    noinline block: HttpRequestBuilder.() -> Unit
+    decoder: KSerializer<T>,
+    urlPlaceHolder: Map<String, String>,
+    block: HttpRequestBuilder.() -> Unit
   ) =
-    flow<T> {
+    runCatching {
       val resp = client.request {
-        block.apply {
-          headers(openapiSignHeader)
-          url("https://sandbox.api.sgroup.qq.com${endpoint.path}")
+        headers(openapiSignHeader).apply {
+          // TODO 删掉兼容用的header
+          if (endpoint != TencentEndpoint.WebSocket) {
+            remove("Authorization")
+            append("Authorization", "Bot ${config.appId}.${config.token}")
+          }
         }
+        contentType(ContentType.Application.Json)
+        url(
+          "https://sandbox.api.sgroup.qq.com${endpoint.path}".let {
+            var base = it
+            urlPlaceHolder.forEach { (k, v) ->
+              base = it.replace("{$k}", v)
+            }
+            base
+          }
+        )
+        block.invoke(this)
       }
       if (resp.status == HttpStatusCode.OK) {
-        emit(json.decodeFromString(resp.bodyAsText()))
+        json.decodeFromString(decoder, resp.bodyAsText())
       } else {
-        throw Exception()
+        throw Exception(resp.bodyAsText())
       }
     }
 
-  private suspend fun ReceiveChannel<Frame>.receiveText() = (receive() as? Frame.Text)?.readText()
-
-  suspend fun <T> ReceiveChannel<Frame>.receiveTencentWebsocketPayload(
-    decoder: KSerializer<T>
-  ): TencentWebsocketPayload<T>? {
-    val textFrame = receiveText() ?: return null
-    return json.decodeFromString(TencentWebsocketPayload.serializer(decoder), textFrame)
-  }
+  override val coroutineContext: CoroutineContext = EmptyCoroutineContext
 
   override fun close() {
-    connectionMaintainer.close()
     client.close()
   }
 }

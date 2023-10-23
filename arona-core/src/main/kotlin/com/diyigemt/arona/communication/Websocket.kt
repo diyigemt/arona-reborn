@@ -1,9 +1,11 @@
 package com.diyigemt.arona.communication
 
+import com.diyigemt.arona.communication.TencentWebsocketDispatchEventManager.handleTencentDispatchEvent
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.client.call.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.websocket.*
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -14,7 +16,8 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlin.math.log
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
@@ -149,22 +152,7 @@ internal object TencentWebsocketDispatchHandler : TencentWebsocketOperationHandl
     source: String
   ) {
     val preData = json.decodeFromString<TencentWebsocketPayload0>(source)
-    if (preData.type == TencentWebsocketEventType.READY) {
-      logger.info("ready")
-      // 开始心跳
-      connectionMaintainer.startWebsocketHeartbeat(heartbeatInterval) {
-        sendApiData(
-          TencentWebsocketPayload(
-            operation = TencentWebsocketOperationType.Heartbeat,
-            serialNumber = 0,
-            type = TencentWebsocketEventType.NULL,
-            data = if (serialNumber == 0L) null else serialNumber
-          )
-        )
-      }
-    } else {
-      logger.info("dispatch: $source")
-    }
+    handleTencentDispatchEvent(preData.type, source)
   }
 }
 
@@ -208,6 +196,8 @@ internal class TencentBotClientWebSocketSession(
   bot: TencentBotClient
 ) : ClientWebSocketSession, DefaultWebSocketSession by delegate, TencentBot by bot {
   var serialNumber: Long = 0L // websocket 最后一次通信消息序号
-  var heartbeatInterval = 41000L
+  var heartbeatInterval = 41000L // websocket心跳周期(毫秒)
+  lateinit var sessionId: String
+  override val coroutineContext = delegate.coroutineContext + bot.coroutineContext
   suspend inline fun <reified T> sendApiData(payload: TencentWebsocketPayload<T>) = send(json.encodeToString(payload))
 }

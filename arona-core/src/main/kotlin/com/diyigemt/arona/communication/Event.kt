@@ -2,10 +2,11 @@ package com.diyigemt.arona.communication
 
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.util.logging.*
+import io.ktor.util.reflect.*
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlin.reflect.full.callSuspend
@@ -19,17 +20,7 @@ internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHand
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketIdentifyResp) {
     logger.info("websocket receive hello from server")
     sessionId = payload.sessionId
-    // 开始心跳
-    connectionMaintainer.startWebsocketHeartbeat(heartbeatInterval) {
-      sendApiData(
-        TencentWebsocketPayload(
-          operation = TencentWebsocketOperationType.Heartbeat,
-          serialNumber = 0,
-          type = TencentWebsocketEventType.NULL,
-          data = if (serialNumber == 0L) null else serialNumber
-        )
-      )
-    }
+    EventChannelToEventDispatcherAdapter.instance.broadcastEventImpl(TencentBotWebsocketAuthSuccessEvent(this, payload))
   }
 }
 
@@ -82,4 +73,22 @@ internal object TencentWebsocketDispatchEventManager {
   }
 }
 
-interface TencentEvent
+@Serializable
+enum class TencentMessageEventFrom {
+  PRIVATE_MESSAGE, GROUP_MESSAGE, GUILD_MESSAGE, PRIVATE_GUILD_MESSAGE
+}
+
+abstract class AbstractEvent
+
+abstract class TencentEvent : AbstractEvent() {
+  abstract val bot: TencentBot
+}
+
+abstract class TencentMessageEvent : TencentEvent() {
+  abstract val from: TencentMessageEventFrom
+}
+
+internal class TencentBotWebsocketAuthSuccessEvent(
+  override val bot: TencentBot,
+  val payload: TencentWebsocketIdentifyResp
+) : TencentEvent()

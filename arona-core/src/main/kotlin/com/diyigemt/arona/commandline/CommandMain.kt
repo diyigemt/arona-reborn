@@ -5,6 +5,8 @@ import com.diyigemt.arona.utils.commandLineLogger
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.convert
 import io.ktor.util.logging.*
 import kotlin.system.exitProcess
 
@@ -47,12 +49,10 @@ class ExitCommand : CliktCommand(name = "exit", help = "安全退出程序") {
   }
 }
 
-internal fun waitInput(tip: String?): Result<String> {
-  if (tip != null) {
-    print(tip)
-  }
+internal fun waitInput(tip: String = "confirm? ", expect: String? = null, default: String = "y"): Result<String> {
+  print(tip)
   val result = readlnOrNull()
-  return if (result == null) {
-    Result.failure(Exception(""))
-  } else Result.success(result)
+  return if (result == expect || (result ?: default).lowercase() == expect) {
+    Result.success(result ?: default)
+  } else Result.failure(Exception())
 }

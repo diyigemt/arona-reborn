@@ -4,9 +4,11 @@ import com.diyigemt.arona.communication.TencentWebsocketDispatchEventManager.han
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.client.call.*
 import io.ktor.client.plugins.websocket.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -16,10 +18,25 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
+
+internal data class TencentWebsocketInteractionNotifyReq(
+  /**
+   * 0: 成功
+   *
+   * 1: 操作失败
+   *
+   * 2: 操作频繁
+   *
+   * 3: 重复操作
+   *
+   * 4: 没有权限
+   *
+   * 5: 仅管理员操作
+   */
+  val code: Int
+)
 
 @Serializable
 internal data class TencentWebsocketHelloResp(
@@ -53,6 +70,7 @@ internal data class TencentWebsocketIdentifyResp(
 
 @Serializable
 internal data class TencentWebsocketPayload<T>(
+  val id: String? = null, // interactions下发伴随的id, 如果有, 则需要调用openapi的接口通知后台消息收到
   @SerialName("op")
   val operation: TencentWebsocketOperationType = TencentWebsocketOperationType.Null,
   @SerialName("s")
@@ -64,9 +82,10 @@ internal data class TencentWebsocketPayload<T>(
 )
 
 @Serializable
-internal data class TencentWebsocketPayload0(
+internal open class TencentWebsocketPayload0(
+  val id: String? = null, // interactions下发伴随的id, 如果有, 则需要调用openapi的接口通知后台消息收到
   @SerialName("op")
-  val operation: TencentWebsocketOperationType,
+  val operation: TencentWebsocketOperationType = TencentWebsocketOperationType.Null,
   @SerialName("s")
   val serialNumber: Long = 0L,
   @SerialName("t")
@@ -114,19 +133,7 @@ internal object TencentWebsocketHelloHandler : TencentWebsocketOperationHandler<
   ) {
     payload ?: return
     heartbeatInterval = payload.data.heartbeatInterval
-    // 发送鉴权
-    sendApiData(
-      TencentWebsocketPayload(
-        operation = TencentWebsocketOperationType.Identify,
-        data = TencentWebsocketIdentifyReq(
-          token = connectionMaintainer.botToken,
-          intents = TencentMessageIntentsBuilder()
-            .append(TencentMessageIntentSuperType.GUILD_MESSAGES)
-            .build(),
-          shard = listOf(0, 1)
-        )
-      )
-    )
+    TencentBotWebsocketHandshakeSuccessEvent(bot).broadcast()
   }
 }
 
@@ -152,6 +159,18 @@ internal object TencentWebsocketDispatchHandler : TencentWebsocketOperationHandl
     source: String
   ) {
     val preData = json.decodeFromString<TencentWebsocketPayload0>(source)
+    // 通知后台interaction下发成功
+    if (preData.id != null) {
+      withContext(coroutineContext) {
+        bot.callOpenapi(
+          TencentEndpoint.Interactions,
+          urlPlaceHolder = mapOf("interaction_id" to preData.id)
+        ) {
+          method = HttpMethod.Put
+          setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(0)))
+        }
+      }
+    }
     handleTencentDispatchEvent(preData.type, source)
   }
 }
@@ -188,16 +207,18 @@ internal object TencentWebsocketOperationManager {
 }
 
 internal fun TencentBotClient.toWebSocketSession(call: HttpClientCall, ctx: DefaultWebSocketSession) =
-  TencentBotClientWebSocketSession(call, ctx, this)
+  TencentBotClientWebSocketSession(call, this, ctx)
 
 internal class TencentBotClientWebSocketSession(
   override val call: HttpClientCall,
+  val bot: TencentBotClient,
   delegate: DefaultWebSocketSession,
-  bot: TencentBotClient
-) : ClientWebSocketSession, DefaultWebSocketSession by delegate, TencentBot by bot {
+) : ClientWebSocketSession, DefaultWebSocketSession by delegate {
   var serialNumber: Long = 0L // websocket 最后一次通信消息序号
   var heartbeatInterval = 41000L // websocket心跳周期(毫秒)
   lateinit var sessionId: String
   override val coroutineContext = delegate.coroutineContext + bot.coroutineContext
+  val logger = bot.logger
+  val json = bot.json
   suspend inline fun <reified T> sendApiData(payload: TencentWebsocketPayload<T>) = send(json.encodeToString(payload))
 }

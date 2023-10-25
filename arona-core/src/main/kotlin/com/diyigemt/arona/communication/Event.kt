@@ -5,6 +5,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.util.logging.*
 import io.ktor.util.reflect.*
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
@@ -20,7 +21,7 @@ internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHand
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketIdentifyResp) {
     logger.info("websocket receive hello from server")
     sessionId = payload.sessionId
-    EventChannelToEventDispatcherAdapter.instance.broadcastEventImpl(TencentBotWebsocketAuthSuccessEvent(this, payload))
+    TencentBotWebsocketAuthSuccessEvent(bot, payload).broadcast()
   }
 }
 
@@ -30,17 +31,7 @@ internal object TencentWebsocketMessageCreateHandler : TencentWebsocketDispatchE
   override val decoder = TencentGuildMessage.serializer()
 
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildMessage) {
-    callOpenapi(TencentEndpoint.PostGuildMessage, Unit.serializer(), mapOf("channel_id" to payload.channelId)) {
-      method = HttpMethod.Post
-      setBody(json.encodeToString(TencentMessageBuilder().append("测试回复").build().apply {
-        messageId = payload.id
-        image = "https://arona.cdn.diyigemt.com/image/some/%E9%95%BF%E8%8D%89.png"
-      }))
-    }.onSuccess {
-      logger.info("post message success")
-    }.onFailure {
-      logger.error(it)
-    }
+    TencentGuildMessageEvent(bot, payload).broadcast()
   }
 }
 
@@ -73,6 +64,11 @@ internal object TencentWebsocketDispatchEventManager {
   }
 }
 
+suspend fun <E : AbstractEvent> E.broadcast(): E {
+  EventChannelToEventDispatcherAdapter.instance.broadcastEventImpl(this)
+  return this
+}
+
 @Serializable
 enum class TencentMessageEventFrom {
   PRIVATE_MESSAGE, GROUP_MESSAGE, GUILD_MESSAGE, PRIVATE_GUILD_MESSAGE
@@ -82,13 +78,42 @@ abstract class AbstractEvent
 
 abstract class TencentEvent : AbstractEvent() {
   abstract val bot: TencentBot
+  val logger get() = bot.logger
 }
+
+internal data class TencentBotWebsocketHandshakeSuccessEvent(override val bot: TencentBot) : TencentEvent()
 
 abstract class TencentMessageEvent : TencentEvent() {
   abstract val from: TencentMessageEventFrom
+  suspend fun sendMessage(message: String) = sendMessage(message.toPlainText())
+  suspend fun sendMessage(message: Message) = sendMessage(TencentMessageBuilder().append(message).build())
+  abstract suspend fun sendMessage(message: TencentMessage)
 }
 
-internal class TencentBotWebsocketAuthSuccessEvent(
+class TencentGuildMessageEvent internal constructor(
+  override val bot: TencentBot,
+  private val sourceMessage: TencentGuildMessage
+) : TencentMessageEvent() {
+  override val from: TencentMessageEventFrom = TencentMessageEventFrom.GUILD_MESSAGE
+  override suspend fun sendMessage(message: TencentMessage) {
+    bot.callOpenapi(TencentEndpoint.PostGuildMessage, Unit.serializer(), mapOf("channel_id" to sourceMessage.channelId)) {
+      method = HttpMethod.Post
+      setBody(bot.json.encodeToString(message.apply {
+        messageId = sourceMessage.id
+      }))
+    }.onSuccess {
+      logger.info("post message success")
+    }.onFailure {
+      logger.error(it)
+    }
+  }
+}
+
+internal data class TencentBotWebsocketAuthSuccessEvent(
   override val bot: TencentBot,
   val payload: TencentWebsocketIdentifyResp
+) : TencentEvent()
+
+data class TencentBotOnlineEvent(
+  override val bot: TencentBot,
 ) : TencentEvent()

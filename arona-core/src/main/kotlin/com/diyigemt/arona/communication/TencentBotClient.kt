@@ -1,6 +1,16 @@
 package com.diyigemt.arona.communication
 
-import com.diyigemt.arona.communication.TencentWebsocketOperationManager.handleTencentOperation
+import com.diyigemt.arona.communication.message.TencentWebsocketOperationManager.handleTencentOperation
+import com.diyigemt.arona.communication.event.*
+import com.diyigemt.arona.communication.event.TencentBotWebsocketAuthSuccessEvent
+import com.diyigemt.arona.communication.event.TencentBotWebsocketHandshakeSuccessEvent
+import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.communication.message.TencentBotClientWebSocketSession
+import com.diyigemt.arona.communication.message.TencentMessageIntentSuperType
+import com.diyigemt.arona.communication.message.TencentMessageIntentsBuilder
+import com.diyigemt.arona.communication.message.TencentWebsocketIdentifyReq
+import com.diyigemt.arona.communication.message.TencentWebsocketOperationType
+import com.diyigemt.arona.communication.message.TencentWebsocketPayload
 import com.diyigemt.arona.utils.runSuspend
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*

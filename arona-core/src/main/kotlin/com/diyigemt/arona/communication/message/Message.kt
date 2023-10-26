@@ -1,5 +1,6 @@
-package com.diyigemt.arona.communication
+package com.diyigemt.arona.communication.message
 
+import com.diyigemt.arona.communication.event.TencentMessageEvent
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -231,6 +232,14 @@ internal data class TencentGuildMessage(
   val messageReference: TencentMessageReference? = null
 )
 
+internal fun TencentGuildMessage.toMessageChain() = ""
+
+sealed class MessageChain(
+  private val sourceMessage: TencentGuildMessage
+) : Message {
+  val sourceId = sourceMessage.id
+}
+
 interface Message {
   /**
    * 给出可读的字符串
@@ -250,6 +259,13 @@ data class PlainText(
   override fun serialization() = content
 }
 
+data class TencentImage(
+  val url: String,
+) : Message {
+  override fun toString() = url
+  override fun serialization() = "{tencent:image:$url}"
+}
+
 @Suppress("NOTHING_TO_INLINE")
 inline fun String.toPlainText(): PlainText = PlainText(this)
 
@@ -260,7 +276,11 @@ internal object TencentMessageTypeAsIntSerializer : KSerializer<TencentMessageTy
 }
 
 enum class TencentMessageType(val code: Int) {
-  PLAIN_TEXT(0);
+  PLAIN_TEXT(0), // 纯文本
+  IMAGE(1), // 图文
+  MARKDOWN(2), // markdown
+  ARK(3), // 卡片
+  EMBED(4); // 小程序
   companion object {
     private val TypeMap = entries.associateBy { it.code }
     fun fromValue(code: Int) = TypeMap[code] ?: PLAIN_TEXT
@@ -272,7 +292,7 @@ class TencentMessage(
   val content: String,
   @SerialName("msg_type")
   @Serializable(with = TencentMessageTypeAsIntSerializer::class)
-  val messageType: TencentMessageType,
+  var messageType: TencentMessageType,
   var image: String? = null,
   val markdown: String? = null,
   val keyboard: String? = null,
@@ -281,9 +301,11 @@ class TencentMessage(
   var messageId: String? = null,
 )
 class TencentMessageBuilder private constructor(
-  private val container: MutableList<Message>
+  private val container: MutableList<Message>,
+  messageSource: TencentMessageEvent? = null
 ) : MutableList<Message> by container {
-  constructor() : this(mutableListOf())
+  private val sourceMessageId: String? = messageSource?.messageId
+  constructor(messageSource: TencentMessageEvent? = null) : this(mutableListOf(), messageSource)
   fun append(text: String) = this.apply {
     container.add(PlainText(text))
   }
@@ -295,6 +317,12 @@ class TencentMessageBuilder private constructor(
       TencentMessageType.PLAIN_TEXT -> {
         append(PlainText(message.content))
       }
+      TencentMessageType.IMAGE -> {
+        if (message.image != null) {
+          append(TencentImage(message.image!!))
+        }
+      }
+      else -> {}
     }
   }
   // TODO
@@ -304,6 +332,13 @@ class TencentMessageBuilder private constructor(
   // TODO build其他类型消息
   fun build() = TencentMessage(
     content = container.filterIsInstance<PlainText>().joinToString("") { it.toString() },
-    messageType = TencentMessageType.PLAIN_TEXT
-  )
+    messageType = TencentMessageType.PLAIN_TEXT,
+    messageId = sourceMessageId
+  ).apply {
+    val im = container.filterIsInstance<TencentImage>().firstOrNull()
+    if (im != null) {
+      messageType = TencentMessageType.IMAGE
+      image = im.url
+    }
+  }
 }

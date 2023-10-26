@@ -1,12 +1,11 @@
 package com.diyigemt.arona.plugins
 
-import com.diyigemt.arona.communication.AbstractEvent
-import com.diyigemt.arona.communication.EventChannel
-import com.diyigemt.arona.communication.GlobalEventChannel
+import com.diyigemt.arona.communication.event.AbstractEvent
+import com.diyigemt.arona.communication.event.EventChannel
+import com.diyigemt.arona.communication.event.GlobalEventChannel
 import com.diyigemt.arona.utils.SemVersion
 import io.github.z4kn4fein.semver.toVersion
 import io.ktor.util.logging.*
-import io.ktor.utils.io.*
 import io.ktor.utils.io.CancellationException
 import kotlinx.coroutines.*
 import org.slf4j.Logger
@@ -91,6 +90,7 @@ data class AronaPluginDescription(
 }
 
 object PluginManager {
+  private val logger = KtorSimpleLogger("PluginManager")
   private val plugins = mutableListOf<AronaPlugin>()
   private val pluginFolder by lazy {
     File("./plugins").apply { mkdir() }
@@ -101,7 +101,11 @@ object PluginManager {
       ?.forEach { loadPluginFromFile(it) }
   }
   fun initPlugin() {
-    plugins.forEach { it.onLoad() }
+    plugins.forEach {
+      logger.info("loading plugin: ${it.description.name}")
+      it.onLoad()
+      logger.info("plugin: ${it.description.name} loaded")
+    }
   }
   private fun loadPluginFromFile(jarFile: File) {
     val jarURL = jarFile.toURI().toURL()

@@ -1,4 +1,4 @@
-package com.diyigemt.arona.communication
+package com.diyigemt.arona.communication.event
 
 import com.diyigemt.arona.utils.userLogger
 import io.ktor.util.logging.*

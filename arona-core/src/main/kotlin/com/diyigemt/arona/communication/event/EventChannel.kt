@@ -1,7 +1,6 @@
-package com.diyigemt.arona.communication
+package com.diyigemt.arona.communication.event
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.Flow
 import org.jetbrains.annotations.Contract
 import java.util.function.Consumer
 import kotlin.contracts.ExperimentalContracts

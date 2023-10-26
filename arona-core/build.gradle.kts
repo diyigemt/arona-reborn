@@ -45,6 +45,9 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
   implementation("ch.qos.logback:logback-classic:1.4.11")
 
+  api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+  api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
+
   testImplementation("io.ktor:ktor-server-tests-jvm")
   testImplementation("io.ktor:ktor-server-test-host-jvm:2.3.3")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")

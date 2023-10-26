@@ -1,14 +1,19 @@
-package com.diyigemt.arona.communication
+package com.diyigemt.arona.communication.event
 
+import com.diyigemt.arona.communication.*
+import com.diyigemt.arona.communication.message.TencentBotClientWebSocketSession
+import com.diyigemt.arona.communication.TencentWebsocketEventType
+import com.diyigemt.arona.communication.contact.*
+import com.diyigemt.arona.communication.message.TencentWebsocketIdentifyResp
+import com.diyigemt.arona.communication.message.TencentWebsocketPayload
+import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.communication.message.TencentGuildMessage
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.util.logging.*
-import io.ktor.util.reflect.*
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
@@ -83,31 +88,66 @@ abstract class TencentEvent : AbstractEvent() {
 
 internal data class TencentBotWebsocketHandshakeSuccessEvent(override val bot: TencentBot) : TencentEvent()
 
-abstract class TencentMessageEvent : TencentEvent() {
-  abstract val from: TencentMessageEventFrom
-  suspend fun sendMessage(message: String) = sendMessage(message.toPlainText())
-  suspend fun sendMessage(message: Message) = sendMessage(TencentMessageBuilder().append(message).build())
-  abstract suspend fun sendMessage(message: TencentMessage)
+abstract class TencentMessageEvent(
+  override val bot: TencentBot
+) : TencentEvent() {
+  abstract val subject: Contact
+  abstract val sender: User
+  abstract val message: MessageChain
 }
 
+//abstract class TencentMessageEvent1(
+//  val messageId: String
+//) : TencentEvent() {
+//  suspend fun sendMessage(message: String) = sendMessage(message.toPlainText())
+//  suspend fun sendMessage(message: Message) = sendMessage(TencentMessageBuilder(this).append(message).build())
+//  private suspend fun sendMessage(
+//    message: TencentMessage
+//  ): Result<Unit> {
+//    val bodyString = bot.json.encodeToString(message)
+//    return when(this) {
+//      is TencentGuildMessageEvent -> {
+//        postOpenapi(
+//          TencentEndpoint.PostGuildMessage,
+//          bodyString,
+//          mapOf("channel_id" to this.sourceMessage.channelId)
+//        )
+//      }
+//      else -> {
+//        Result.failure(Exception("no implement"))
+//      }
+//    }
+//  }
+//  private suspend fun postOpenapi(
+//    endpoint: TencentEndpoint,
+//    content: String,
+//    urlPlaceHolder: Map<String, String> = mapOf()
+//  ): Result<Unit> {
+//    return bot.callOpenapi(endpoint, urlPlaceHolder) {
+//      method = HttpMethod.Post
+//      contentType(ContentType.Application.Json)
+//      setBody(content)
+//    }
+//  }
+//}
+
+// 频道消息事件
 class TencentGuildMessageEvent internal constructor(
-  override val bot: TencentBot,
-  private val sourceMessage: TencentGuildMessage
-) : TencentMessageEvent() {
-  override val from: TencentMessageEventFrom = TencentMessageEventFrom.GUILD_MESSAGE
-  override suspend fun sendMessage(message: TencentMessage) {
-    bot.callOpenapi(TencentEndpoint.PostGuildMessage, Unit.serializer(), mapOf("channel_id" to sourceMessage.channelId)) {
-      method = HttpMethod.Post
-      setBody(bot.json.encodeToString(message.apply {
-        messageId = sourceMessage.id
-      }))
-    }.onSuccess {
-      logger.info("post message success")
-    }.onFailure {
-      logger.error(it)
-    }
-  }
-}
+  bot: TencentBot,
+  override val subject: Channel,
+  override val message: MessageChain,
+  override val sender: GuildMember,
+  internal val sourceMessage: TencentGuildMessage
+) : TencentMessageEvent(bot)
+
+// 频道私聊消息事件
+class TencentGuildPrivateMessageEvent internal constructor(
+  bot: TencentBot,
+  override val subject: Guild,
+  override val message: MessageChain,
+  override val sender: GuildUser,
+  internal val sourceMessage: TencentGuildMessage
+) : TencentMessageEvent(bot)
 
 internal data class TencentBotWebsocketAuthSuccessEvent(
   override val bot: TencentBot,

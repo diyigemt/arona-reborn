@@ -8,6 +8,17 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 
+public fun CoroutineScope.childScope(
+  name: String? = null,
+  context: CoroutineContext = EmptyCoroutineContext
+): CoroutineScope =
+  CoroutineScope(this.childScopeContext(name, context))
+
+public fun CoroutineContext.childScope(
+  name: String? = null,
+  context: CoroutineContext = EmptyCoroutineContext
+): CoroutineScope =
+  CoroutineScope(this.childScopeContext(name, context))
 
 fun CoroutineScope.childScopeContext(
   name: String? = null,

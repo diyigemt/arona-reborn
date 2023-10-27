@@ -5,7 +5,16 @@ package com.diyigemt.arona.communication.command
 import com.diyigemt.arona.AronaApplication
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.contact.*
+import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
+import com.diyigemt.arona.communication.event.TencentGuildPrivateMessageEvent
+import com.diyigemt.arona.communication.event.TencentMessageEvent
+import com.diyigemt.arona.communication.message.Message
+import com.diyigemt.arona.communication.message.MessageReceipt
+import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.utils.childScope
 import com.diyigemt.arona.utils.childScopeContext
+import com.diyigemt.arona.utils.commandLineLogger
+import com.diyigemt.arona.utils.qualifiedNameOrTip
 import kotlinx.coroutines.CoroutineScope
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
@@ -16,8 +25,19 @@ interface CommandSender : CoroutineScope {
   val bot: TencentBot?
   val subject: Contact?
   val user: User?
+  suspend fun sendMessage(message: String): MessageReceipt
+  suspend fun sendMessage(message: Message): MessageReceipt
+  suspend fun sendMessageActive(message: String): MessageReceipt
+  suspend fun sendMessageActive(message: Message): MessageReceipt
   companion object {
-
+    fun TencentGuildMessageEvent.toCommandSender() = GuildChannelCommandSender(sender)
+    fun TencentGuildPrivateMessageEvent.toCommandSender() = GuildUserCommandSender(sender)
+    fun <T : TencentMessageEvent> T.toCommandSender() = when(this) {
+      is TencentGuildMessageEvent -> toCommandSender()
+      is TencentGuildPrivateMessageEvent -> toCommandSender()
+      else -> throw IllegalArgumentException("Unsupported MessageEvent: ${this::class.qualifiedNameOrTip}")
+    }
+    fun SingleUser.asCommandSender() = SingleUserCommandSender(this)
   }
 }
 
@@ -27,30 +47,72 @@ sealed class AbstractCommandSender : CommandSender {
   abstract override val user: User?
 }
 
+sealed class AbstractUserCommandSender: UserCommandSender, AbstractCommandSender() {
+  override val bot: TencentBot get() = user.bot
+  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+}
+
 interface UserCommandSender : CommandSender {
   override val bot: TencentBot
   override val subject: Contact
   override val user: User
 }
 
-interface SingleUserCommandSender : UserCommandSender {
+/**
+ * 单聊
+ */
+class SingleUserCommandSender internal constructor(
   override val user: SingleUser
-  override val subject: SingleUser
+) : AbstractUserCommandSender(), CoroutineScope by user.childScope("SingleUserCommandSender") {
+  override val subject get() = user
+  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+  override suspend fun sendMessageActive(message: Message) = user.sendMessageActive(message)
+  override suspend fun sendMessageActive(message: String) = user.sendMessageActive(PlainText(message))
 }
 
-interface GroupCommandSender : CommandSender {
+/**
+ * 群聊
+ */
+class GroupCommandSender internal constructor(
   override val user: GroupMember
-  override val subject: Group
+) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GroupCommandSender") {
+  override val subject get() = user.group
+  val group get() = user.group
+  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+  override suspend fun sendMessageActive(message: Message) = subject.sendMessageActive(message)
+  override suspend fun sendMessageActive(message: String) = subject.sendMessageActive(PlainText(message))
 }
 
-interface GuildChannelCommandSender : CommandSender {
-  override val user: GuildMember
-  override val subject: Channel
+/**
+ * 文字频道聊天
+ */
+class GuildChannelCommandSender internal constructor(
+  override val user: GuildMember,
+): AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildChannelCommandSender") {
+  override val subject get() = user.channel
+  val channel get() = user.channel
+  val guild get() = user.guild
+  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+  override suspend fun sendMessageActive(message: Message) = subject.sendMessageActive(message)
+  override suspend fun sendMessageActive(message: String) = subject.sendMessageActive(PlainText(message))
 }
 
-interface GuildUserCommandSender : CommandSender {
-  override val user: GuildUser
-  override val subject: Guild
+/**
+ * 通过频道发起的私聊
+ */
+class GuildUserCommandSender internal constructor(
+  override val user: GuildUser,
+): AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildUserCommandSender") {
+  override val subject get() = user.guild
+  val guild get() = user.guild
+  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+  override suspend fun sendMessageActive(message: Message) = user.sendMessageActive(message)
+  override suspend fun sendMessageActive(message: String) = user.sendMessageActive(PlainText(message))
 }
 
 object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
@@ -58,6 +120,18 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val bot: TencentBot? = null
   override val subject: Contact? = null
   override val user: User? = null
+  override suspend fun sendMessage(message: String) {
+    commandLineLogger.info(message)
+  }
+
+  override suspend fun sendMessage(message: Message) {
+    commandLineLogger.info(message.serialization())
+  }
+
+  override suspend fun sendMessageActive(message: String) = sendMessage(message)
+
+  override suspend fun sendMessageActive(message: Message) = sendMessage(message)
+
   override val coroutineContext: CoroutineContext = AronaApplication.childScopeContext(NAME)
 }
 

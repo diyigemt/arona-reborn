@@ -232,12 +232,20 @@ internal data class TencentGuildMessage(
   val messageReference: TencentMessageReference? = null
 )
 
-internal fun TencentGuildMessage.toMessageChain() = ""
+internal fun TencentGuildMessage.toMessageChain() = MessageChainImpl(this)
 
-sealed class MessageChain(
+sealed interface MessageChain : Message {
+  val sourceId: String
+}
+
+internal class MessageChainImpl(
   private val sourceMessage: TencentGuildMessage
-) : Message {
-  val sourceId = sourceMessage.id
+) : MessageChain {
+  override val sourceId = sourceMessage.id
+  // TODO
+  override fun toString(): String = sourceMessage.content
+  // TODO
+  override fun serialization() = sourceMessage.content
 }
 
 interface Message {
@@ -304,7 +312,7 @@ class TencentMessageBuilder private constructor(
   private val container: MutableList<Message>,
   messageSource: TencentMessageEvent? = null
 ) : MutableList<Message> by container {
-  private val sourceMessageId: String? = messageSource?.messageId
+  private val sourceMessageId: String? = messageSource?.message?.sourceId
   constructor(messageSource: TencentMessageEvent? = null) : this(mutableListOf(), messageSource)
   fun append(text: String) = this.apply {
     container.add(PlainText(text))
@@ -342,3 +350,5 @@ class TencentMessageBuilder private constructor(
     }
   }
 }
+
+typealias MessageReceipt = Unit

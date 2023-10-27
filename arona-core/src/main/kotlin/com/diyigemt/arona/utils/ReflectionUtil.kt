@@ -37,3 +37,5 @@ object ReflectionUtil : ReflectionUtils() {
     listOf()
   }
 }
+
+internal val KClass<*>.qualifiedNameOrTip: String get() = this.qualifiedName ?: "<anonymous class>"

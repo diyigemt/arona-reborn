@@ -1,5 +1,9 @@
 package com.diyigemt.arona.communication
 
+import com.diyigemt.arona.communication.contact.ContactList
+import com.diyigemt.arona.communication.contact.Group
+import com.diyigemt.arona.communication.contact.Guild
+import com.diyigemt.arona.communication.contact.SingleUser
 import com.diyigemt.arona.communication.message.TencentWebsocketOperationManager.handleTencentOperation
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.event.TencentBotWebsocketAuthSuccessEvent
@@ -40,6 +44,9 @@ interface TencentBot : CoroutineScope {
   val logger: Logger
   val eventChannel: EventChannel<TencentEvent>
   val id: String
+  val guilds: ContactList<Guild>
+  val groups: ContactList<Group>
+  val friends: ContactList<SingleUser>
   suspend fun <T> callOpenapi(
     endpoint: TencentEndpoint,
     decoder: KSerializer<T>,
@@ -71,6 +78,9 @@ internal class TencentBotClient private constructor(private val config: TencentB
   override val eventChannel =
     GlobalEventChannel.filterIsInstance<TencentEvent>().filter { it.bot === this@TencentBotClient }
   override val coroutineContext: CoroutineContext = EmptyCoroutineContext + CoroutineName("Bot.${config.appId}")
+  override val guilds: ContactList<Guild> = ContactList()
+  override val groups: ContactList<Group> = ContactList()
+  override val friends: ContactList<SingleUser> = ContactList()
 
   private val timer = Timer("Bot.${config.appId}", true)
   private var accessToken: String = ""

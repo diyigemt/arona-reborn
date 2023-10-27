@@ -1,20 +1,13 @@
 package com.diyigemt.arona.communication.event
 
-import com.diyigemt.arona.communication.*
-import com.diyigemt.arona.communication.message.TencentBotClientWebSocketSession
+import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.communication.contact.*
-import com.diyigemt.arona.communication.message.TencentWebsocketIdentifyResp
-import com.diyigemt.arona.communication.message.TencentWebsocketPayload
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.communication.message.TencentGuildMessage
 import com.diyigemt.arona.utils.ReflectionUtil
-import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
@@ -36,7 +29,7 @@ internal object TencentWebsocketMessageCreateHandler : TencentWebsocketDispatchE
   override val decoder = TencentGuildMessage.serializer()
 
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildMessage) {
-    TencentGuildMessageEvent(bot, payload).broadcast()
+    TencentGuildMessageEvent(MessageChainImpl(payload), null).broadcast()
   }
 }
 
@@ -89,11 +82,11 @@ abstract class TencentEvent : AbstractEvent() {
 internal data class TencentBotWebsocketHandshakeSuccessEvent(override val bot: TencentBot) : TencentEvent()
 
 abstract class TencentMessageEvent(
-  override val bot: TencentBot
+  override val bot: TencentBot,
+  val message: MessageChain
 ) : TencentEvent() {
   abstract val subject: Contact
   abstract val sender: User
-  abstract val message: MessageChain
 }
 
 //abstract class TencentMessageEvent1(
@@ -133,21 +126,39 @@ abstract class TencentMessageEvent(
 
 // 频道消息事件
 class TencentGuildMessageEvent internal constructor(
-  bot: TencentBot,
-  override val subject: Channel,
-  override val message: MessageChain,
+  message: MessageChain,
   override val sender: GuildMember,
-  internal val sourceMessage: TencentGuildMessage
-) : TencentMessageEvent(bot)
+) : TencentMessageEvent(sender.bot, message) {
+  override val subject get() = sender.channel
+}
 
 // 频道私聊消息事件
 class TencentGuildPrivateMessageEvent internal constructor(
   bot: TencentBot,
-  override val subject: Guild,
-  override val message: MessageChain,
+  message: MessageChain,
   override val sender: GuildUser,
   internal val sourceMessage: TencentGuildMessage
-) : TencentMessageEvent(bot)
+) : TencentMessageEvent(bot, message) {
+  override val subject get() = sender.guild
+}
+
+class TencentSingleMessageEvent internal constructor(
+  bot: TencentBot,
+  message: MessageChain,
+  override val sender: SingleUser,
+  internal val sourceMessage: TencentGuildMessage
+) : TencentMessageEvent(bot, message) {
+  override val subject get() = sender
+}
+
+class TencentGroupMessageEvent internal constructor(
+  bot: TencentBot,
+  message: MessageChain,
+  override val sender: GroupMember,
+  internal val sourceMessage: TencentGuildMessage
+) : TencentMessageEvent(bot, message) {
+  override val subject get() = sender.group
+}
 
 internal data class TencentBotWebsocketAuthSuccessEvent(
   override val bot: TencentBot,

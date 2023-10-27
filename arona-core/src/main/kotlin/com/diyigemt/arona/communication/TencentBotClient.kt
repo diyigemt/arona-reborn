@@ -1,9 +1,6 @@
 package com.diyigemt.arona.communication
 
-import com.diyigemt.arona.communication.contact.ContactList
-import com.diyigemt.arona.communication.contact.Group
-import com.diyigemt.arona.communication.contact.Guild
-import com.diyigemt.arona.communication.contact.SingleUser
+import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.message.TencentWebsocketOperationManager.handleTencentOperation
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.event.TencentBotWebsocketAuthSuccessEvent
@@ -28,7 +25,10 @@ import io.ktor.utils.io.core.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.MissingFieldException
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -125,8 +125,11 @@ internal class TencentBotClient private constructor(private val config: TencentB
       with(websocketContext) {
         startWebsocketHeartbeat()
       }
-      // 通知插件端登录成功
-      TencentBotOnlineEvent(this@TencentBotClient).broadcast()
+      // 获取频道列表
+      fetchGuildList().onSuccess {
+        // 通知插件端登录成功
+        TencentBotOnlineEvent(this@TencentBotClient).broadcast()
+      }
     }
     doAuth()
     connectWs()
@@ -168,13 +171,35 @@ internal class TencentBotClient private constructor(private val config: TencentB
     }
   }
 
+  /**
+   * 获取加入的频道列表
+   */
+  private suspend fun fetchGuildList(): Result<List<TencentGuildInternal>> {
+    return callOpenapi(TencentEndpoint.GetBotGuildList, ListSerializer(TencentGuildInternal.serializer())) {
+      method = HttpMethod.Get
+      contentType(ContentType.Application.Json)
+    }.onSuccess {
+      guilds.delegate.addAll(
+        it.map { guild ->
+          GuildImpl(
+            this,
+            coroutineContext,
+            guild
+          )
+        }
+      )
+    }
+  }
+
+  @OptIn(ExperimentalSerializationApi::class)
   override suspend fun <T> callOpenapi(
     endpoint: TencentEndpoint,
     decoder: KSerializer<T>,
     urlPlaceHolder: Map<String, String>,
     block: HttpRequestBuilder.() -> Unit
-  ) =
-    runCatching {
+  ): Result<T> {
+    var bodyTmp = ""
+    return runCatching {
       val resp = client.request {
         headers(openapiSignHeader).apply {
           // TODO 删掉兼容用的header
@@ -196,11 +221,25 @@ internal class TencentBotClient private constructor(private val config: TencentB
         block.invoke(this)
       }
       if (resp.status == HttpStatusCode.OK) {
-        json.decodeFromString(decoder, resp.bodyAsText())
+        bodyTmp = resp.bodyAsText()
+        json.decodeFromString(decoder, bodyTmp)
       } else {
-        throw Exception(resp.bodyAsText())
+        throw HttpNotOkException(resp.bodyAsText())
       }
+    }.onFailure {
+      when (it) {
+        is MissingFieldException -> {
+          logger.error("call endpoint failed, endpoint: {}, placeHolder: {}, body: {}",
+            endpoint, urlPlaceHolder, bodyTmp)
+        }
+        is HttpNotOkException -> {
+          logger.error("call endpoint failed, endpoint: {}, placeHolder: {}, body: {}",
+            endpoint, urlPlaceHolder, it.message)
+        }
+      }
+      logger.error(it)
     }
+  }
 
   override suspend fun callOpenapi(
     endpoint: TencentEndpoint,
@@ -235,3 +274,5 @@ internal class TencentBotClient private constructor(private val config: TencentB
     client.close()
   }
 }
+
+class HttpNotOkException(message: String) : Exception(message)

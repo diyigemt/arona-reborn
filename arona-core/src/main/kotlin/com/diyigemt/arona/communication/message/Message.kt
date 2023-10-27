@@ -1,6 +1,8 @@
 package com.diyigemt.arona.communication.message
 
+import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.event.TencentMessageEvent
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -8,6 +10,8 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import java.util.concurrent.ConcurrentLinkedQueue
+
 internal class TencentMessageIntentsBuilder {
   private val offsets = mutableListOf<TencentMessageIntentSuperType>()
   fun append(intent: TencentMessageIntentSuperType) = this.apply {
@@ -43,7 +47,7 @@ internal enum class TencentMessageIntentSuperType(val offset: Int) {
 }
 
 @Serializable
-internal data class TencentGuildUser(
+internal data class TencentGuildUserInternal(
   val id: String,
   val bot: Boolean,
   val avatar: String,
@@ -55,12 +59,14 @@ internal data class TencentGuildUser(
 )
 
 @Serializable
-internal data class TencentGuildMember(
+internal data class TencentGuildMemberInternal(
   val nick: String,
   val roles: List<String>,
   @SerialName("joined_at")
   val joinedAt: String,
-  val user: TencentGuildUser? = null
+  val user: TencentGuildUserInternal? = null,
+  @SerialName("guild_id")
+  val guildIid: String = "",
 )
 
 @Serializable
@@ -144,7 +150,48 @@ internal data class TencentMessageReference(
 )
 
 @Serializable
-internal data class TencentGuildMessage(
+internal data class TencentGuildInternal(
+  val id: String,
+  val name: String,
+  val icon: String,
+  @SerialName("owner_id")
+  val ownerId: String,
+  val owner: Boolean,
+  @SerialName("member_count")
+  val memberCount: Int,
+  @SerialName("max_members")
+  val maxMembers: Int,
+  val description: String,
+  @SerialName("joined_at")
+  val joinedAt: String
+)
+
+@Serializable
+internal data class TencentGuildChannelInternal(
+  val id: String,
+  @SerialName("guild_id")
+  val guildId: String,
+  val name: String,
+  val type: TencentGuildChannelType,
+  @SerialName("sub_type")
+  val subType: TencentGuildChannelSubType = TencentGuildChannelSubType.CHAT,
+  val position: Int,
+  @SerialName("parent_id")
+  val parentId: String,
+  @SerialName("owner_id")
+  val ownerId: String,
+  @SerialName("private_type")
+  val privateType: TencentGuildChannelPrivateType = TencentGuildChannelPrivateType.OPEN,
+  @SerialName("speak_permission")
+  val speakPermission: TencentGuildChannelSpeakPermissionType = TencentGuildChannelSpeakPermissionType.ANY,
+  @SerialName("application_id")
+  val applicationId: TencentGuildChannelApplicationType = TencentGuildChannelApplicationType.NULL,
+  // TODO 处理权限序列化和反序列化
+  val permissions: String = ""
+)
+
+@Serializable
+internal data class TencentGuildMessageInternal(
   /**
    * 消息id
    */
@@ -204,15 +251,15 @@ internal data class TencentGuildMessage(
   /**
    * 消息创建者
    */
-  val author: TencentGuildUser,
+  val author: TencentGuildUserInternal,
   /**
    * 消息创建者的member信息
    */
-  val member: TencentGuildMember,
+  val member: TencentGuildMemberInternal,
   /**
    * 消息中@到的人
    */
-  val mentions: List<TencentGuildUser>? = null,
+  val mentions: List<TencentGuildUserInternal>? = null,
   /**
    * 附件
    */
@@ -232,20 +279,34 @@ internal data class TencentGuildMessage(
   val messageReference: TencentMessageReference? = null
 )
 
-internal fun TencentGuildMessage.toMessageChain() = MessageChainImpl(this)
+internal fun TencentGuildMessageInternal.toMessageChain(): MessageChain {
+  val messageChain = MessageChainImpl(this.id)
+  if (this.content.isNotBlank()) {
+    messageChain.delegate.add(PlainText(this.content))
+  }
+  if (this.attachments?.isNotEmpty() == true) {
+    messageChain.delegate.addAll(
+      this.attachments.map { im ->
+        TencentImage(im.url)
+      }
+    )
+  }
+  return messageChain
+}
 
-sealed interface MessageChain : Message {
+sealed interface MessageChain : Message, Collection<Message> {
   val sourceId: String
 }
 
 internal class MessageChainImpl(
-  private val sourceMessage: TencentGuildMessage
-) : MessageChain {
-  override val sourceId = sourceMessage.id
+  override val sourceId: String,
+  internal val delegate: MutableCollection<Message>
+) : MessageChain, Collection<Message> by delegate {
+  constructor(sourceId: String) : this(sourceId, ConcurrentLinkedQueue())
   // TODO
-  override fun toString(): String = sourceMessage.content
+  override fun toString(): String = ""
   // TODO
-  override fun serialization() = sourceMessage.content
+  override fun serialization() = ""
 }
 
 interface Message {
@@ -312,13 +373,20 @@ class TencentMessageBuilder private constructor(
   private val container: MutableList<Message>,
   messageSource: TencentMessageEvent? = null
 ) : MutableList<Message> by container {
-  private val sourceMessageId: String? = messageSource?.message?.sourceId
+  private var sourceMessageId: String? = messageSource?.message?.sourceId
   constructor(messageSource: TencentMessageEvent? = null) : this(mutableListOf(), messageSource)
   fun append(text: String) = this.apply {
     container.add(PlainText(text))
   }
   fun append(element: Message) = this.apply {
-    container.add(element)
+    when (element) {
+      is MessageChain -> append(element)
+      else -> container.add(element)
+    }
+  }
+  fun append(element: MessageChain) = this.apply {
+    sourceMessageId = element.sourceId
+    container.addAll(element)
   }
   fun append(message: TencentMessage) = this.apply {
     when (message.messageType) {
@@ -348,6 +416,47 @@ class TencentMessageBuilder private constructor(
       messageType = TencentMessageType.IMAGE
       image = im.url
     }
+  }
+}
+
+class MessageChainBuilder private constructor(
+  private val container: MutableList<Message>,
+  private var sourceMessageId: String? = null
+) : MutableList<Message> by container {
+  constructor(sourceMessageId: String? = null) : this(mutableListOf(), sourceMessageId)
+  fun append(text: String) = this.apply {
+    container.add(PlainText(text))
+  }
+  fun append(element: Message) = this.apply {
+    when (element) {
+      is MessageChain -> append(element)
+      else -> container.add(element)
+    }
+  }
+  fun append(element: MessageChain) = this.apply {
+    sourceMessageId = element.sourceId
+    container.addAll(element)
+  }
+  fun append(message: TencentMessage) = this.apply {
+    when (message.messageType) {
+      TencentMessageType.PLAIN_TEXT -> {
+        append(PlainText(message.content))
+      }
+      TencentMessageType.IMAGE -> {
+        if (message.image != null) {
+          append(TencentImage(message.image!!))
+        }
+      }
+      else -> {}
+    }
+  }
+  // TODO
+  fun append(other: TencentMessageBuilder) = this.apply {
+    other.build().also { append(it) }
+  }
+  // TODO build其他类型消息
+  fun build(): MessageChain {
+    return MessageChainImpl(sourceMessageId ?: "", this)
   }
 }
 

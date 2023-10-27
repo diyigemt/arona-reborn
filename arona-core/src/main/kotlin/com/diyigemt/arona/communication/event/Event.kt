@@ -24,12 +24,17 @@ internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHand
 }
 
 @Suppress("UNUSED")
-internal object TencentWebsocketMessageCreateHandler : TencentWebsocketDispatchEventHandler<TencentGuildMessage>() {
+internal object TencentWebsocketMessageCreateHandler : TencentWebsocketDispatchEventHandler<TencentGuildMessageInternal>() {
   override val type = TencentWebsocketEventType.MESSAGE_CREATE
-  override val decoder = TencentGuildMessage.serializer()
+  override val decoder = TencentGuildMessageInternal.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildMessage) {
-    TencentGuildMessageEvent(MessageChainImpl(payload), null).broadcast()
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildMessageInternal) {
+    val tmp = GuildChannelMemberImpl(
+      coroutineContext,
+      bot.guilds[payload.guildId]!!.channels[payload.channelId]!!,
+      bot.guilds[payload.guildId]!!.members[payload.author.id]!!
+      )
+    TencentGuildMessageEvent(payload.toMessageChain(), tmp).broadcast()
   }
 }
 
@@ -127,7 +132,7 @@ abstract class TencentMessageEvent(
 // 频道消息事件
 class TencentGuildMessageEvent internal constructor(
   message: MessageChain,
-  override val sender: GuildMember,
+  override val sender: GuildChannelMember,
 ) : TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.channel
 }
@@ -136,8 +141,8 @@ class TencentGuildMessageEvent internal constructor(
 class TencentGuildPrivateMessageEvent internal constructor(
   bot: TencentBot,
   message: MessageChain,
-  override val sender: GuildUser,
-  internal val sourceMessage: TencentGuildMessage
+  override val sender: GuildMember,
+  internal val sourceMessage: TencentGuildMessageInternal
 ) : TencentMessageEvent(bot, message) {
   override val subject get() = sender.guild
 }
@@ -146,7 +151,7 @@ class TencentSingleMessageEvent internal constructor(
   bot: TencentBot,
   message: MessageChain,
   override val sender: SingleUser,
-  internal val sourceMessage: TencentGuildMessage
+  internal val sourceMessage: TencentGuildMessageInternal
 ) : TencentMessageEvent(bot, message) {
   override val subject get() = sender
 }
@@ -155,7 +160,7 @@ class TencentGroupMessageEvent internal constructor(
   bot: TencentBot,
   message: MessageChain,
   override val sender: GroupMember,
-  internal val sourceMessage: TencentGuildMessage
+  internal val sourceMessage: TencentGuildMessageInternal
 ) : TencentMessageEvent(bot, message) {
   override val subject get() = sender.group
 }

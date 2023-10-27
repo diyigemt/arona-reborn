@@ -58,5 +58,8 @@ internal enum class TencentWebsocketEventType(val type: String) {
 enum class TencentEndpoint(val path: String) {
   WebSocket("/gateway"),
   Interactions("/interactions/{interaction_id}"), // 通知后台接收到websocket推送的消息
-  PostGuildMessage("/channels/{channel_id}/messages")
+  PostGuildMessage("/channels/{channel_id}/messages"), // 向子频道发送消息
+  GetBotGuildList("/users/@me/guilds"), // 获取机器人/创建者加入的频道列表
+  GetGuildMemberList("/guilds/{guild_id}/members"), // 获取频道的成员列表
+  GetGuildChannelList("/guilds/{guild_id}/channels"), // 获取频道的子频道列表
 }

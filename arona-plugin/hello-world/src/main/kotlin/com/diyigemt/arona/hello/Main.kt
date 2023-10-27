@@ -1,6 +1,7 @@
 package com.diyigemt.arona.hello
 
 import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
+import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 object PluginMain : AronaPlugin(AronaPluginDescription(
@@ -12,7 +13,7 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
 )) {
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentGuildMessageEvent> {
-      it.sendMessage("hello world!")
+      it.subject.sendMessage(MessageChainBuilder(it.message.sourceId).append("hello world!").build())
     }
   }
 }

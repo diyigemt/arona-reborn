@@ -25,19 +25,20 @@ interface CommandSender : CoroutineScope {
   val bot: TencentBot?
   val subject: Contact?
   val user: User?
+  val sourceId: String?
   suspend fun sendMessage(message: String): MessageReceipt
   suspend fun sendMessage(message: Message): MessageReceipt
   suspend fun sendMessageActive(message: String): MessageReceipt
   suspend fun sendMessageActive(message: Message): MessageReceipt
   companion object {
-    fun TencentGuildMessageEvent.toCommandSender() = GuildChannelCommandSender(sender)
-    fun TencentGuildPrivateMessageEvent.toCommandSender() = GuildUserCommandSender(sender)
+    fun TencentGuildMessageEvent.toCommandSender() = GuildChannelCommandSender(sender, message.sourceId)
+    fun TencentGuildPrivateMessageEvent.toCommandSender() = GuildUserCommandSender(sender, message.sourceId)
     fun <T : TencentMessageEvent> T.toCommandSender() = when(this) {
       is TencentGuildMessageEvent -> toCommandSender()
       is TencentGuildPrivateMessageEvent -> toCommandSender()
       else -> throw IllegalArgumentException("Unsupported MessageEvent: ${this::class.qualifiedNameOrTip}")
     }
-    fun SingleUser.asCommandSender() = SingleUserCommandSender(this)
+    fun SingleUser.asCommandSender() = SingleUserCommandSender(this, "")
   }
 }
 
@@ -57,13 +58,15 @@ interface UserCommandSender : CommandSender {
   override val bot: TencentBot
   override val subject: Contact
   override val user: User
+  override val sourceId: String
 }
 
 /**
  * 单聊
  */
 class SingleUserCommandSender internal constructor(
-  override val user: SingleUser
+  override val user: SingleUser,
+  override val sourceId: String
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("SingleUserCommandSender") {
   override val subject get() = user
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
@@ -76,7 +79,8 @@ class SingleUserCommandSender internal constructor(
  * 群聊
  */
 class GroupCommandSender internal constructor(
-  override val user: GroupMember
+  override val user: GroupMember,
+  override val sourceId: String
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GroupCommandSender") {
   override val subject get() = user.group
   val group get() = user.group
@@ -90,13 +94,14 @@ class GroupCommandSender internal constructor(
  * 文字频道聊天
  */
 class GuildChannelCommandSender internal constructor(
-  override val user: GuildMember,
+  override val user: GuildChannelMember,
+  override val sourceId: String
 ): AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildChannelCommandSender") {
   override val subject get() = user.channel
   val channel get() = user.channel
   val guild get() = user.guild
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+  override suspend fun sendMessage(message: Message) = channel.sendMessage(message)
   override suspend fun sendMessageActive(message: Message) = subject.sendMessageActive(message)
   override suspend fun sendMessageActive(message: String) = subject.sendMessageActive(PlainText(message))
 }
@@ -105,7 +110,8 @@ class GuildChannelCommandSender internal constructor(
  * 通过频道发起的私聊
  */
 class GuildUserCommandSender internal constructor(
-  override val user: GuildUser,
+  override val user: GuildMember,
+  override val sourceId: String
 ): AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildUserCommandSender") {
   override val subject get() = user.guild
   val guild get() = user.guild
@@ -120,6 +126,7 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val bot: TencentBot? = null
   override val subject: Contact? = null
   override val user: User? = null
+  override val sourceId: String = ""
   override suspend fun sendMessage(message: String) {
     commandLineLogger.info(message)
   }

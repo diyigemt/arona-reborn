@@ -1,26 +1,36 @@
 package com.diyigemt.arona.communication.contact
 
 import com.diyigemt.arona.communication.TencentBot
-import com.diyigemt.arona.communication.message.Message
+import com.diyigemt.arona.communication.TencentEndpoint
+import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.communication.message.TencentGuildInternal
+import com.diyigemt.arona.communication.message.TencentGuildMemberInternal
 import com.diyigemt.arona.utils.childScopeContext
-import kotlinx.coroutines.CoroutineName
+import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.encodeToString
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.cancellation.CancellationException
 
 interface Contact : CoroutineScope {
   val bot: TencentBot // 与之关联的bot
   val id: String // 特定id
   val unionOpenid: String? // 统一id
 
+  suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
+
   /**
    * 被动回复消息, 消息体中需要带有messageId回执
    */
   suspend fun sendMessage(message: Message)
+
+  /**
+   * 回复消息, 如果包含messageId就是被动消息, 不是就是主动消息
+   */
+  suspend fun sendMessage(message: MessageChain)
 
   /**
    * 主队回复消息, 消息体中可以没有messageId回执
@@ -37,18 +47,75 @@ internal abstract class AbstractContact(
   final override val coroutineContext: CoroutineContext = parentCoroutineContext.childScopeContext()
 }
 
-interface Guild : Contact
+interface Guild : Contact {
+  val members: ContactList<GuildMember>
+  val channels: ContactList<Channel>
+}
 
 internal class GuildImpl (
   bot: TencentBot,
   parentCoroutineContext: CoroutineContext,
-  override val id: String,
-  override val unionOpenid: String? = null
+  private val internalGuild: TencentGuildInternal,
 ): Guild, AbstractContact(bot, parentCoroutineContext) {
+  override val id get() = internalGuild.id
+  override val unionOpenid: String? = null
+  override val members: ContactList<GuildMember> = ContactList()
+  override val channels: ContactList<Channel> = ContactList()
   override suspend fun sendMessage(message: Message) = sendMessageActive(message)
+  override suspend fun sendMessage(message: MessageChain) = sendMessageActive(message)
 
   override suspend fun sendMessageActive(message: Message) {
     TODO("Not yet implemented")
+  }
+
+  init {
+    this.launch {
+      fetchMemberList()
+      fetchChannelList()
+    }
+  }
+  private suspend fun fetchMemberList() {
+    bot.callOpenapi(
+      TencentEndpoint.GetGuildMemberList,
+      ListSerializer(TencentGuildMemberInternal.serializer()),
+      mapOf("guild_id" to id)
+    ) {
+      method = HttpMethod.Get
+      url {
+        parameters.append("limit", "400")
+      }
+    }.onSuccess {
+      members.delegate.addAll(
+        it.map { member ->
+          GuildMemberImpl(
+            coroutineContext,
+            this@GuildImpl,
+            member
+          )
+        }
+      )
+    }
+  }
+
+  private suspend fun fetchChannelList() {
+    bot.callOpenapi(
+      TencentEndpoint.GetGuildChannelList,
+      ListSerializer(TencentGuildChannelInternal.serializer()),
+      mapOf("guild_id" to id)
+    ) {
+      method = HttpMethod.Get
+    }.onSuccess {
+      channels.delegate.addAll(
+        it.map { ch ->
+          ChannelImpl(
+            bot,
+            coroutineContext,
+            this@GuildImpl,
+            ch
+          )
+        }
+      )
+    }
   }
 }
 
@@ -59,11 +126,32 @@ interface Channel : Contact {
 internal class ChannelImpl(
   bot: TencentBot,
   parentCoroutineContext: CoroutineContext,
-  override val id: String,
   override val guild: Guild,
-  override val unionOpenid: String? = null
+  private val internalChannel: TencentGuildChannelInternal
 ) : Channel, AbstractContact(bot, parentCoroutineContext) {
-  override suspend fun sendMessage(message: Message) = sendMessageActive(message)
+  override val id get() = internalChannel.id
+  override val unionOpenid: String? = null
+  override suspend fun sendMessage(message: Message) = when(message) {
+    is MessageChain -> {
+      sendMessage(message)
+    }
+    else -> sendMessageActive(message)
+  }
+  override suspend fun sendMessage(message: MessageChain) {
+    bot.callOpenapi(
+      TencentEndpoint.PostGuildMessage,
+      mapOf("channel_id" to id)
+    ) {
+      method = HttpMethod.Post
+      contentType(ContentType.Application.Json)
+      setBody(
+        bot.json.encodeToString(
+          TencentMessageBuilder().append(message).build()
+        )
+      )
+    }
+  }
+
   override suspend fun sendMessageActive(message: Message) {
     TODO("Not yet implemented")
   }
@@ -78,6 +166,9 @@ internal class GroupImpl(
   override val unionOpenid: String? = null
 ) : Group, AbstractContact(bot, parentCoroutineContext) {
   override suspend fun sendMessage(message: Message) = sendMessageActive(message)
+  override suspend fun sendMessage(message: MessageChain) {
+    TODO("Not yet implemented")
+  }
   override suspend fun sendMessageActive(message: Message) {
     TODO("Not yet implemented")
   }
@@ -98,13 +189,13 @@ interface GroupMember : User {
 }
 
 // 频道成员 频道聊天情况下
-interface GuildMember : User {
+interface GuildChannelMember : User {
   val channel: Channel
   val guild: Guild
-  fun asGuildUser(): GuildUser
+  fun asGuildMember(): GuildMember
 }
 // 频道成员 私聊情况下
-interface GuildUser : User {
+interface GuildMember : User {
   val guild: Guild
 }
 internal class SingleUserImpl(
@@ -114,9 +205,11 @@ internal class SingleUserImpl(
   override val unionOpenid: String?
 ) : SingleUser, AbstractContact(bot, parentCoroutineContext) {
   override suspend fun sendMessage(message: Message) {
-    // TODO 主动发送消息
+    TODO("Not yet implemented")
   }
-
+  override suspend fun sendMessage(message: MessageChain) {
+    TODO("Not yet implemented")
+  }
   override suspend fun sendMessageActive(message: Message) {
     TODO("Not yet implemented")
   }
@@ -131,7 +224,9 @@ internal class GroupMemberImpl(
   override fun asSingleUser(): SingleUser {
     TODO("Not yet implemented")
   }
-
+  override suspend fun sendMessage(message: MessageChain) {
+    TODO("Not yet implemented")
+  }
   override suspend fun sendMessage(message: Message) {
     TODO("Not yet implemented")
   }
@@ -140,42 +235,42 @@ internal class GroupMemberImpl(
 
 }
 
-internal class GuildMemberImpl(
+internal class GuildChannelMemberImpl(
   parentCoroutineContext: CoroutineContext,
-  override val id: String,
-  override val guild: Guild,
   override val channel: Channel,
-  override val unionOpenid: String? = null,
-) : GuildMember, AbstractContact(channel.bot, parentCoroutineContext) {
-  override fun asGuildUser(): GuildUser {
-    TODO("Not yet implemented")
-  }
+  private val internalMember: GuildMember
+) : GuildChannelMember, AbstractContact(channel.bot, parentCoroutineContext) {
+  override val id get() = internalMember.id
+  override val guild get() = internalMember.guild
+  override val unionOpenid: String? = null
+  override fun asGuildMember(): GuildMember = channel.guild.members[id]!!
 
-  override suspend fun sendMessage(message: Message) {
-    TODO("Not yet implemented")
-  }
-
+  override suspend fun sendMessage(message: Message) = channel.sendMessage(message)
+  override suspend fun sendMessage(message: MessageChain) = channel.sendMessage(message)
   override suspend fun sendMessageActive(message: Message) = channel.sendMessageActive(message)
 
 }
 
-internal class GuildUserImpl(
+internal class GuildMemberImpl(
   parentCoroutineContext: CoroutineContext,
-  override val id: String,
   override val guild: Guild,
+  private val internalGuildUser: TencentGuildMemberInternal,
   override val unionOpenid: String? = null,
-) : GuildUser, AbstractContact(guild.bot, parentCoroutineContext) {
+) : GuildMember, AbstractContact(guild.bot, parentCoroutineContext) {
+  override val id get() = internalGuildUser.user?.id ?: ""
   override suspend fun sendMessage(message: Message) {
     TODO("Not yet implemented")
   }
-
+  override suspend fun sendMessage(message: MessageChain) {
+    TODO("Not yet implemented")
+  }
   override suspend fun sendMessageActive(message: Message) {
     TODO("Not yet implemented")
   }
 }
 
-class ContactList<out C : Contact> constructor(
-  @JvmField val delegate: MutableCollection<@UnsafeVariance C>
+class ContactList<out C : Contact> (
+  internal val delegate: MutableCollection<@UnsafeVariance C>
 ) : Collection<C> by delegate {
   constructor() : this(ConcurrentLinkedQueue())
   operator fun get(id: String): C? = delegate.firstOrNull { it.id == id }

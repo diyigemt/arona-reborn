@@ -26,6 +26,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
+@Serializable
 internal data class TencentWebsocketInteractionNotifyReq(
   /**
    * 0: 成功
@@ -164,18 +165,19 @@ internal object TencentWebsocketDispatchHandler : TencentWebsocketOperationHandl
     source: String
   ) {
     val preData = json.decodeFromString<TencentWebsocketPayload0>(source)
+    // TODO 为啥不让我通知后台
     // 通知后台interaction下发成功
-    if (preData.id != null) {
-      withContext(coroutineContext) {
-        bot.callOpenapi(
-          TencentEndpoint.Interactions,
-          urlPlaceHolder = mapOf("interaction_id" to preData.id)
-        ) {
-          method = HttpMethod.Put
-          setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(0)))
-        }
-      }
-    }
+//    if (preData.id != null) {
+//      withContext(coroutineContext) {
+//        bot.callOpenapi(
+//          TencentEndpoint.Interactions,
+//          urlPlaceHolder = mapOf("interaction_id" to preData.id)
+//        ) {
+//          method = HttpMethod.Put
+//          setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(0)))
+//        }
+//      }
+//    }
     handleTencentDispatchEvent(preData.type, source)
   }
 }

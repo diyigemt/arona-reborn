@@ -1,5 +1,6 @@
 package com.diyigemt.arona
 
+import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.commandline.CommandMain
 import com.diyigemt.arona.communication.TencentBotClient
 import com.diyigemt.arona.plugins.PluginManager
@@ -14,6 +15,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
+    CommandManager.init()
     TencentBotClient.invoke(aronaConfig.bot).auth()
     CoroutineScope(Dispatchers.IO).launch {
       while (true) {

@@ -7,7 +7,6 @@ plugins {
 val projectMainClass = "com.diyigemt.arona.hello.PluginMain"
 version = "0.1.0"
 dependencies {
-    implementation("org.slf4j:slf4j-api:2.0.7")
     compileOnly(project(":arona-core"))
     testImplementation(kotlin("test"))
 }

@@ -11,6 +11,7 @@ import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.Message
 import com.diyigemt.arona.communication.message.MessageReceipt
 import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.communication.message.toMessageChain
 import com.diyigemt.arona.utils.childScope
 import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
@@ -101,7 +102,7 @@ class GuildChannelCommandSender internal constructor(
   val channel get() = user.channel
   val guild get() = user.guild
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = channel.sendMessage(message)
+  override suspend fun sendMessage(message: Message) = channel.sendMessage(message.toMessageChain(sourceId))
   override suspend fun sendMessageActive(message: Message) = subject.sendMessageActive(message)
   override suspend fun sendMessageActive(message: String) = subject.sendMessageActive(PlainText(message))
 }

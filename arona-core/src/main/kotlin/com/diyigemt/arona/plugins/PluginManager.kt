@@ -1,5 +1,8 @@
 package com.diyigemt.arona.plugins
 
+import com.diyigemt.arona.command.AbstractCommand
+import com.diyigemt.arona.command.CommandManager
+import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.communication.event.AbstractEvent
 import com.diyigemt.arona.communication.event.EventChannel
 import com.diyigemt.arona.communication.event.GlobalEventChannel
@@ -24,7 +27,7 @@ interface AronaAbstractPlugin {
 
 abstract class AbstractPlugin(
   parentCoroutineContext: EmptyCoroutineContext = EmptyCoroutineContext
-) : AronaAbstractPlugin, CoroutineScope {
+) : AronaAbstractPlugin, CommandOwner, CoroutineScope {
   final override val logger by lazy {
     KtorSimpleLogger(description.id)
   }
@@ -118,6 +121,22 @@ object PluginManager {
 
     if (AronaPlugin::class.java.isAssignableFrom(pluginClass)) {
       val pluginInstance = pluginClass.kotlin.objectInstance as AronaPlugin
+      // 注册指令
+      val pluginClassLoader = pluginInstance::class.java.classLoader
+      val reflections = org.reflections.Reflections(
+        org.reflections.util.ConfigurationBuilder()
+          .forPackage(
+            pluginInstance::class.java.packageName,
+            pluginClassLoader
+          )
+      )
+      val query = org.reflections.scanners.Scanners.SubTypes
+        .of(AbstractCommand::class.java)
+        .asClass<AbstractCommand>(pluginClassLoader)
+      query.apply(reflections.store).forEach { clazz ->
+        clazz as Class<AbstractCommand>
+        CommandManager.registerCommand(clazz.kotlin.objectInstance!!, false)
+      }
       plugins.add(pluginInstance)
     }
   }

@@ -461,3 +461,10 @@ class MessageChainBuilder private constructor(
 }
 
 typealias MessageReceipt = Unit
+
+fun Message.toMessageChain(): MessageChain = when (this) {
+  is MessageChain -> this
+  else -> MessageChainImpl("", mutableListOf(this))
+}
+
+fun Message.toMessageChain(sourceId0: String): MessageChain = MessageChainBuilder(sourceId0).append(this).build()

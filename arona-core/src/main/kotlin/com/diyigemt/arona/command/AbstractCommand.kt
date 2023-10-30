@@ -120,6 +120,7 @@ abstract class AbstractCommand(
   override val description: String = "<no description available>",
   help: String = "",
 ) : CliktCommand(name = primaryName, help = help, epilog = description), Command {
+  private val commandSender by requireObject<CommandSender>()
   private val reflector by lazy {
     CommandReflector(this)
   }
@@ -137,9 +138,8 @@ abstract class AbstractCommand(
   }
 
   final override fun run() {
-    val receiver = currentContext.findObject<CommandSender>()!!
-    runBlocking(receiver.coroutineContext) {
-      targetExtensionFunction.callSuspend(this@AbstractCommand, receiver)
+    runBlocking(commandSender.coroutineContext) {
+      targetExtensionFunction.callSuspend(this@AbstractCommand, commandSender)
     }
   }
 }

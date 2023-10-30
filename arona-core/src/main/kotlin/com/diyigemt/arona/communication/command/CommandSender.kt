@@ -27,8 +27,6 @@ interface CommandSender : CoroutineScope {
   val sourceId: String?
   suspend fun sendMessage(message: String): MessageReceipt
   suspend fun sendMessage(message: Message): MessageReceipt
-  suspend fun sendMessageActive(message: String): MessageReceipt
-  suspend fun sendMessageActive(message: Message): MessageReceipt
   companion object {
     fun TencentGuildMessageEvent.toCommandSender() = GuildChannelCommandSender(sender, message.sourceId)
     fun TencentGuildPrivateMessageEvent.toCommandSender() = GuildUserCommandSender(sender, message.sourceId)
@@ -70,8 +68,6 @@ class SingleUserCommandSender internal constructor(
   override val subject get() = user
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
   override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId))
-  override suspend fun sendMessageActive(message: Message) = user.sendMessageActive(message)
-  override suspend fun sendMessageActive(message: String) = user.sendMessageActive(PlainText(message))
 }
 
 /**
@@ -85,8 +81,6 @@ class GroupCommandSender internal constructor(
   val group get() = user.group
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
   override suspend fun sendMessage(message: Message) = user.sendMessage(message)
-  override suspend fun sendMessageActive(message: Message) = subject.sendMessageActive(message)
-  override suspend fun sendMessageActive(message: String) = subject.sendMessageActive(PlainText(message))
 }
 
 /**
@@ -101,8 +95,6 @@ class GuildChannelCommandSender internal constructor(
   val guild get() = user.guild
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
   override suspend fun sendMessage(message: Message) = subject.sendMessage(message.toMessageChain(sourceId))
-  override suspend fun sendMessageActive(message: Message) = subject.sendMessageActive(message)
-  override suspend fun sendMessageActive(message: String) = subject.sendMessageActive(PlainText(message))
 }
 
 /**
@@ -116,8 +108,6 @@ class GuildUserCommandSender internal constructor(
   val guild get() = user.guild
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
   override suspend fun sendMessage(message: Message) = user.sendMessage(message)
-  override suspend fun sendMessageActive(message: Message) = user.sendMessageActive(message)
-  override suspend fun sendMessageActive(message: String) = user.sendMessageActive(PlainText(message))
 }
 
 object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
@@ -126,17 +116,15 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val subject: Contact? = null
   override val user: User? = null
   override val sourceId: String = EmptyMessageId
-  override suspend fun sendMessage(message: String) {
+  override suspend fun sendMessage(message: String): MessageReceipt {
     commandLineLogger.info(message)
+    TODO()
   }
 
-  override suspend fun sendMessage(message: Message) {
+  override suspend fun sendMessage(message: Message): MessageReceipt {
     commandLineLogger.info(message.serialization())
+    TODO()
   }
-
-  override suspend fun sendMessageActive(message: String) = sendMessage(message)
-
-  override suspend fun sendMessageActive(message: Message) = sendMessage(message)
 
   override val coroutineContext: CoroutineContext = AronaApplication.childScopeContext(NAME)
 }

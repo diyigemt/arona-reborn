@@ -68,6 +68,12 @@ object CommandManager {
 
   internal fun init() {
     GlobalEventChannel.subscribeAlways<TencentMessageEvent> {
+      // 命令必须以 "/" 开头
+      val text = it.message.filterIsInstance<PlainText>().firstOrNull() ?: return@subscribeAlways
+      val commandText = text.toString()
+      if (!commandText.startsWith("/")) {
+        return@subscribeAlways
+      }
       val result = executeCommand(it.toCommandSender(), it.message)
       // TODO exception print
       if (result !is CommandExecuteResult.Success) {
@@ -144,10 +150,11 @@ internal suspend fun executeCommandImpl(
   val commandStr =
     call.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return CommandExecuteResult.UnresolvedCommand()
   val command = CommandManager.matchCommand(commandStr) ?: return CommandExecuteResult.UnresolvedCommand()
+  val arg = call.toString()
   return try {
     (command as CliktCommand).context {
       obj = caller
-    }.parse(emptyArray())
+    }.parse(arg.split(" "))
     CommandExecuteResult.Success(command)
   } catch (e: Throwable) {
     CommandExecuteResult.ExecutionFailed(e, command)

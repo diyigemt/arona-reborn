@@ -8,10 +8,8 @@ import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
 import com.diyigemt.arona.communication.event.TencentGuildPrivateMessageEvent
 import com.diyigemt.arona.communication.event.TencentMessageEvent
-import com.diyigemt.arona.communication.message.Message
-import com.diyigemt.arona.communication.message.MessageReceipt
-import com.diyigemt.arona.communication.message.PlainText
-import com.diyigemt.arona.communication.message.toMessageChain
+import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.communication.message.EmptyMessageId
 import com.diyigemt.arona.utils.childScope
 import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
@@ -39,7 +37,7 @@ interface CommandSender : CoroutineScope {
       is TencentGuildPrivateMessageEvent -> toCommandSender()
       else -> throw IllegalArgumentException("Unsupported MessageEvent: ${this::class.qualifiedNameOrTip}")
     }
-    fun SingleUser.asCommandSender() = SingleUserCommandSender(this, "")
+    fun SingleUser.asCommandSender() = SingleUserCommandSender(this, EmptyMessageId)
   }
 }
 
@@ -71,7 +69,7 @@ class SingleUserCommandSender internal constructor(
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("SingleUserCommandSender") {
   override val subject get() = user
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId))
   override suspend fun sendMessageActive(message: Message) = user.sendMessageActive(message)
   override suspend fun sendMessageActive(message: String) = user.sendMessageActive(PlainText(message))
 }
@@ -102,7 +100,7 @@ class GuildChannelCommandSender internal constructor(
   val channel get() = user.channel
   val guild get() = user.guild
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = channel.sendMessage(message.toMessageChain(sourceId))
+  override suspend fun sendMessage(message: Message) = subject.sendMessage(message.toMessageChain(sourceId))
   override suspend fun sendMessageActive(message: Message) = subject.sendMessageActive(message)
   override suspend fun sendMessageActive(message: String) = subject.sendMessageActive(PlainText(message))
 }
@@ -127,7 +125,7 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val bot: TencentBot? = null
   override val subject: Contact? = null
   override val user: User? = null
-  override val sourceId: String = ""
+  override val sourceId: String = EmptyMessageId
   override suspend fun sendMessage(message: String) {
     commandLineLogger.info(message)
   }

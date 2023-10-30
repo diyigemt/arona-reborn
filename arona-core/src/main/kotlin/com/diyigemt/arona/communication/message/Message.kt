@@ -294,6 +294,8 @@ internal fun TencentGuildMessageInternal.toMessageChain(): MessageChain {
   return messageChain
 }
 
+internal val EmptyMessageId = ""
+
 sealed interface MessageChain : Message, Collection<Message> {
   val sourceId: String
 }
@@ -304,7 +306,8 @@ internal class MessageChainImpl(
 ) : MessageChain, Collection<Message> by delegate {
   constructor(sourceId: String) : this(sourceId, ConcurrentLinkedQueue())
   // TODO
-  override fun toString(): String = ""
+  override fun toString() = delegate.joinToString(" ") { it.toString() }
+
   // TODO
   override fun serialization() = ""
 }
@@ -407,7 +410,7 @@ class TencentMessageBuilder private constructor(
   }
   // TODO build其他类型消息
   fun build() = TencentMessage(
-    content = container.filterIsInstance<PlainText>().joinToString("") { it.toString() },
+    content = container.filterIsInstance<PlainText>().joinToString("\n") { it.toString() },
     messageType = TencentMessageType.PLAIN_TEXT,
     messageId = sourceMessageId
   ).apply {
@@ -456,11 +459,15 @@ class MessageChainBuilder private constructor(
   }
   // TODO build其他类型消息
   fun build(): MessageChain {
-    return MessageChainImpl(sourceMessageId ?: "", this)
+    return MessageChainImpl(sourceMessageId ?: EmptyMessageId, this)
   }
 }
 
-typealias MessageReceipt = Unit
+@Serializable
+data class MessageReceipt(
+  val id: String,
+  val timestamp: Int
+)
 
 fun Message.toMessageChain(): MessageChain = when (this) {
   is MessageChain -> this

@@ -2,12 +2,11 @@ package com.diyigemt.arona.communication.event
 
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentWebsocketEventType
-import com.diyigemt.arona.communication.contact.*
+import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
@@ -24,17 +23,37 @@ internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHand
 }
 
 @Suppress("UNUSED")
-internal object TencentWebsocketMessageCreateHandler : TencentWebsocketDispatchEventHandler<TencentGuildMessageInternal>() {
+internal object TencentWebsocketMessageCreateHandler :
+  TencentWebsocketDispatchEventHandler<TencentChannelMessageRaw>() {
   override val type = TencentWebsocketEventType.MESSAGE_CREATE
-  override val decoder = TencentGuildMessageInternal.serializer()
+  override val decoder = TencentChannelMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildMessageInternal) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
     val tmp = GuildChannelMemberImpl(
       coroutineContext,
       bot.guilds[payload.guildId]!!.channels[payload.channelId]!!,
       bot.guilds[payload.guildId]!!.members[payload.author.id]!!
-      )
+    )
     TencentGuildMessageEvent(payload.toMessageChain(), tmp).broadcast()
+  }
+}
+
+@Suppress("UNUSED")
+internal object TencentWebsocketAtMessageCreateHandler :
+  TencentWebsocketDispatchEventHandler<TencentChannelMessageRaw>() {
+  override val type = TencentWebsocketEventType.AT_MESSAGE_CREATE
+  override val decoder = TencentChannelMessageRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
+    val tmp = GuildChannelMemberImpl(
+      coroutineContext,
+      bot.guilds[payload.guildId]!!.channels[payload.channelId]!!,
+      bot.guilds[payload.guildId]!!.members[payload.author.id]!!
+    )
+    TencentGuildMessageEvent(
+      payload.toMessageChain().let { MessageChainBuilder(it).append(TencentAt(bot)).build() },
+      tmp
+    ).broadcast()
   }
 }
 
@@ -52,7 +71,7 @@ internal object TencentWebsocketDispatchEventManager {
 
   internal suspend fun TencentBotClientWebSocketSession.handleTencentDispatchEvent(
     event: TencentWebsocketEventType,
-    source: String
+    source: String,
   ) {
     val handler = map[event] ?: return
     logger.debug("recev dispatch event: {}, data: {}", event, source)
@@ -67,17 +86,12 @@ internal object TencentWebsocketDispatchEventManager {
   }
 }
 
+abstract class AbstractEvent
+
 suspend fun <E : AbstractEvent> E.broadcast(): E {
   EventChannelToEventDispatcherAdapter.instance.broadcastEventImpl(this)
   return this
 }
-
-@Serializable
-enum class TencentMessageEventFrom {
-  PRIVATE_MESSAGE, GROUP_MESSAGE, GUILD_MESSAGE, PRIVATE_GUILD_MESSAGE
-}
-
-abstract class AbstractEvent
 
 abstract class TencentEvent : AbstractEvent() {
   abstract val bot: TencentBot
@@ -86,88 +100,9 @@ abstract class TencentEvent : AbstractEvent() {
 
 internal data class TencentBotWebsocketHandshakeSuccessEvent(override val bot: TencentBot) : TencentEvent()
 
-abstract class TencentMessageEvent(
-  override val bot: TencentBot,
-  val message: MessageChain
-) : TencentEvent() {
-  abstract val subject: Contact
-  abstract val sender: User
-}
-
-//abstract class TencentMessageEvent1(
-//  val messageId: String
-//) : TencentEvent() {
-//  suspend fun sendMessage(message: String) = sendMessage(message.toPlainText())
-//  suspend fun sendMessage(message: Message) = sendMessage(TencentMessageBuilder(this).append(message).build())
-//  private suspend fun sendMessage(
-//    message: TencentMessage
-//  ): Result<Unit> {
-//    val bodyString = bot.json.encodeToString(message)
-//    return when(this) {
-//      is TencentGuildMessageEvent -> {
-//        postOpenapi(
-//          TencentEndpoint.PostGuildMessage,
-//          bodyString,
-//          mapOf("channel_id" to this.sourceMessage.channelId)
-//        )
-//      }
-//      else -> {
-//        Result.failure(Exception("no implement"))
-//      }
-//    }
-//  }
-//  private suspend fun postOpenapi(
-//    endpoint: TencentEndpoint,
-//    content: String,
-//    urlPlaceHolder: Map<String, String> = mapOf()
-//  ): Result<Unit> {
-//    return bot.callOpenapi(endpoint, urlPlaceHolder) {
-//      method = HttpMethod.Post
-//      contentType(ContentType.Application.Json)
-//      setBody(content)
-//    }
-//  }
-//}
-
-// 频道消息事件
-class TencentGuildMessageEvent internal constructor(
-  message: MessageChain,
-  override val sender: GuildChannelMember,
-) : TencentMessageEvent(sender.bot, message) {
-  override val subject get() = sender.channel
-}
-
-// 频道私聊消息事件
-class TencentGuildPrivateMessageEvent internal constructor(
-  bot: TencentBot,
-  message: MessageChain,
-  override val sender: GuildMember,
-  internal val sourceMessage: TencentGuildMessageInternal
-) : TencentMessageEvent(bot, message) {
-  override val subject get() = sender.guild
-}
-
-class TencentSingleMessageEvent internal constructor(
-  bot: TencentBot,
-  message: MessageChain,
-  override val sender: SingleUser,
-  internal val sourceMessage: TencentGuildMessageInternal
-) : TencentMessageEvent(bot, message) {
-  override val subject get() = sender
-}
-
-class TencentGroupMessageEvent internal constructor(
-  bot: TencentBot,
-  message: MessageChain,
-  override val sender: GroupMember,
-  internal val sourceMessage: TencentGuildMessageInternal
-) : TencentMessageEvent(bot, message) {
-  override val subject get() = sender.group
-}
-
 internal data class TencentBotWebsocketAuthSuccessEvent(
   override val bot: TencentBot,
-  val payload: TencentWebsocketIdentifyResp
+  val payload: TencentWebsocketIdentifyResp,
 ) : TencentEvent()
 
 data class TencentBotOnlineEvent(

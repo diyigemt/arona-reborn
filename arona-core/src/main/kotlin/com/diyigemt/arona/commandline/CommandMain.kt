@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.arguments.convert
 import io.ktor.util.logging.*
 import kotlin.system.exitProcess
 
+@Target(AnnotationTarget.CLASS)
 annotation class CommandLineSubCommand
 
 class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invokeWithoutSubcommand = true) {

@@ -38,12 +38,12 @@ import kotlin.concurrent.scheduleAtFixedRate
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
-interface TencentBot : CoroutineScope {
+interface TencentBot : Contact, CoroutineScope {
   val client: HttpClient
   val json: Json
   val logger: Logger
   val eventChannel: EventChannel<TencentEvent>
-  val id: String
+  override val id: String
   val guilds: ContactList<Guild>
   val groups: ContactList<Group>
   val friends: ContactList<SingleUser>
@@ -61,8 +61,9 @@ interface TencentBot : CoroutineScope {
   ): Result<Unit>
 }
 
-internal class TencentBotClient private constructor(private val config: TencentBotConfig) : Closeable, TencentBot,
-  CoroutineScope {
+internal class TencentBotClient
+private constructor(private val config: TencentBotConfig)
+  : Closeable, TencentBot, CoroutineScope {
   override val id = config.appId
   override val client = HttpClient(CIO) {
     install(WebSockets)
@@ -174,8 +175,8 @@ internal class TencentBotClient private constructor(private val config: TencentB
   /**
    * 获取加入的频道列表
    */
-  private suspend fun fetchGuildList(): Result<List<TencentGuildInternal>> {
-    return callOpenapi(TencentEndpoint.GetBotGuildList, ListSerializer(TencentGuildInternal.serializer())) {
+  private suspend fun fetchGuildList(): Result<List<TencentGuildRaw>> {
+    return callOpenapi(TencentEndpoint.GetBotGuildList, ListSerializer(TencentGuildRaw.serializer())) {
       method = HttpMethod.Get
       contentType(ContentType.Application.Json)
     }.onSuccess {
@@ -246,6 +247,12 @@ internal class TencentBotClient private constructor(private val config: TencentB
     urlPlaceHolder: Map<String, String>,
     block: HttpRequestBuilder.() -> Unit
   ) = callOpenapi(endpoint, Unit.serializer(), urlPlaceHolder, block)
+
+  override val bot: TencentBot = this
+  override val unionOpenid: String = config.appId
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
+    TODO("Not yet implemented")
+  }
 
   private fun TencentBotClientWebSocketSession.startWebsocketHeartbeat() {
     (timer.scheduleAtFixedRate(0, heartbeatInterval) {

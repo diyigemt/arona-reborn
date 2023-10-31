@@ -109,6 +109,7 @@ internal class CommandReflector(
 /**
  * 标记一个子指令对象
  */
+@Target(AnnotationTarget.CLASS)
 annotation class SubCommand(
   val value: String = ""
 )

@@ -11,7 +11,7 @@ import org.jetbrains.exposed.dao.id.IdTable
 import org.jetbrains.exposed.sql.Column
 import java.util.*
 
-@AronaBackendDatabase
+@AronaDatabase
 object UserTable : IdTable<UUID>(name = "user") {
   override val id: Column<EntityID<UUID>> = uuid("uuid").autoGenerate().entityId() // 唯一标识符
   val uuid get() = id

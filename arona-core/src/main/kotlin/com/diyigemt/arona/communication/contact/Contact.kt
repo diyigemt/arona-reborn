@@ -65,7 +65,7 @@ interface Guild : Contact {
 internal class GuildImpl(
   bot: TencentBot,
   parentCoroutineContext: CoroutineContext,
-  private val internalGuild: TencentGuildInternal,
+  private val internalGuild: TencentGuildRaw,
 ) : Guild, AbstractContact(bot, parentCoroutineContext) {
   override val id get() = internalGuild.id
   override val unionOpenid: String? = null
@@ -86,7 +86,7 @@ internal class GuildImpl(
   private suspend fun fetchMemberList() {
     bot.callOpenapi(
       TencentEndpoint.GetGuildMemberList,
-      ListSerializer(TencentGuildMemberInternal.serializer()),
+      ListSerializer(TencentGuildMemberRaw.serializer()),
       mapOf("guild_id" to id)
     ) {
       method = HttpMethod.Get
@@ -109,7 +109,7 @@ internal class GuildImpl(
   private suspend fun fetchChannelList() {
     bot.callOpenapi(
       TencentEndpoint.GetGuildChannelList,
-      ListSerializer(TencentGuildChannelInternal.serializer()),
+      ListSerializer(TencentGuildChannelRaw.serializer()),
       mapOf("guild_id" to id)
     ) {
       method = HttpMethod.Get
@@ -136,7 +136,7 @@ internal class ChannelImpl(
   bot: TencentBot,
   parentCoroutineContext: CoroutineContext,
   override val guild: Guild,
-  private val internalChannel: TencentGuildChannelInternal,
+  private val internalChannel: TencentGuildChannelRaw,
 ) : Channel, AbstractContact(bot, parentCoroutineContext) {
   override val id get() = internalChannel.id
   override val unionOpenid: String? = null
@@ -234,7 +234,7 @@ internal class GuildChannelMemberImpl(
 internal class GuildMemberImpl(
   parentCoroutineContext: CoroutineContext,
   override val guild: Guild,
-  private val internalGuildUser: TencentGuildMemberInternal,
+  private val internalGuildUser: TencentGuildMemberRaw,
   override val unionOpenid: String? = null,
 ) : GuildMember, AbstractContact(guild.bot, parentCoroutineContext) {
   override val id get() = internalGuildUser.user?.id ?: EmptyMessageId

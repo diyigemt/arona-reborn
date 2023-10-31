@@ -12,7 +12,7 @@ object DatabaseProvider {
   private val database: Database by lazy {
     val database = Database.connect("jdbc:sqlite:./database.db", "org.sqlite.JDBC")
     transaction(database) {
-      ReflectionUtil.scanTypeAnnotatedObjectInstance(AronaBackendDatabase::class).forEach {
+      ReflectionUtil.scanTypeAnnotatedObjectInstance(AronaDatabase::class).forEach {
         SchemaUtils.create(it as Table)
       }
     }
@@ -25,4 +25,5 @@ object DatabaseProvider {
   fun <T> dbQuery(block: () -> T): T = transaction(database) { block() }
 }
 
-annotation class AronaBackendDatabase
+@Target(AnnotationTarget.CLASS)
+annotation class AronaDatabase

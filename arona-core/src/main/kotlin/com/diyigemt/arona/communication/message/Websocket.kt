@@ -1,7 +1,6 @@
 package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.TencentBotClient
-import com.diyigemt.arona.communication.TencentEndpoint
 import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.communication.event.TencentBotWebsocketHandshakeSuccessEvent
 import com.diyigemt.arona.communication.event.TencentWebsocketDispatchEventManager.handleTencentDispatchEvent
@@ -9,11 +8,8 @@ import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.client.call.*
 import io.ktor.client.plugins.websocket.*
-import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

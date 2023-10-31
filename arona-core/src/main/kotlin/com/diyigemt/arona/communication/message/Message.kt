@@ -1,8 +1,8 @@
 package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.*
+import com.diyigemt.arona.communication.contact.Contact
 import com.diyigemt.arona.communication.event.TencentMessageEvent
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -47,8 +47,8 @@ internal enum class TencentMessageIntentSuperType(val offset: Int) {
 }
 
 @Serializable
-internal data class TencentGuildUserInternal(
-  val id: String,
+internal data class TencentGuildUserRaw(
+  override val id: String,
   val bot: Boolean,
   val avatar: String,
   val username: String,
@@ -56,26 +56,26 @@ internal data class TencentGuildUserInternal(
   val unionOpenid: String = "",
   @SerialName("union_user_account")
   val unionUserAccount: String = ""
-)
+) : ContactRaw
 
 @Serializable
-internal data class TencentGuildMemberInternal(
+internal data class TencentGuildMemberRaw(
   val nick: String,
   val roles: List<String>,
   @SerialName("joined_at")
   val joinedAt: String,
-  val user: TencentGuildUserInternal? = null,
+  val user: TencentGuildUserRaw? = null,
   @SerialName("guild_id")
   val guildIid: String = "",
 )
 
 @Serializable
-internal data class TencentMessageAttachment(
+internal data class TencentMessageAttachmentRaw(
   val url: String // 下载地址
 )
 
 @Serializable
-internal data class TencentMessageEmbed(
+internal data class TencentMessageEmbedRaw(
   /**
    * 标题
    */
@@ -87,7 +87,7 @@ internal data class TencentMessageEmbed(
   /**
    * 缩略图
    */
-  val thumbnail: TencentMessageEmbedThumbnail,
+  val thumbnail: TencentMessageEmbedThumbnailRaw,
   /**
    * embed 字段数据
    */
@@ -95,7 +95,7 @@ internal data class TencentMessageEmbed(
 )
 
 @Serializable
-internal data class TencentMessageEmbedThumbnail(
+internal data class TencentMessageEmbedThumbnailRaw(
   val url: String // 图片地址
 )
 
@@ -108,7 +108,7 @@ internal data class TencentMessageEmbedField(
  * 小程序模板
  */
 @Serializable
-internal data class TencentMessageArk(
+internal data class TencentMessageArkRaw(
   /**
    * ark模板id
    */
@@ -150,8 +150,8 @@ internal data class TencentMessageReference(
 )
 
 @Serializable
-internal data class TencentGuildInternal(
-  val id: String,
+internal data class TencentGuildRaw(
+  override val id: String,
   val name: String,
   val icon: String,
   @SerialName("owner_id")
@@ -164,11 +164,11 @@ internal data class TencentGuildInternal(
   val description: String,
   @SerialName("joined_at")
   val joinedAt: String
-)
+) : ContactRaw
 
 @Serializable
-internal data class TencentGuildChannelInternal(
-  val id: String,
+internal data class TencentGuildChannelRaw(
+  override val id: String,
   @SerialName("guild_id")
   val guildId: String,
   val name: String,
@@ -188,14 +188,51 @@ internal data class TencentGuildChannelInternal(
   val applicationId: TencentGuildChannelApplicationType = TencentGuildChannelApplicationType.NULL,
   // TODO 处理权限序列化和反序列化
   val permissions: String = ""
-)
+) : ContactRaw
+
+internal interface ContactRaw {
+  val id: String
+}
+
+internal interface TencentMessageRaw : ContactRaw {
+  /**
+   * 消息创建者
+   */
+  val author: ContactRaw
+  /**
+   * 消息内容
+   */
+  val content: String
+  /**
+   * 消息创建时间 ISO8601 timestamp
+   */
+  val timestamp: String
+  /**
+   * 附件 大部分情况下是图片
+   */
+  val attachments: List<TencentMessageAttachmentRaw>?
+  fun toMessageChain(): MessageChain {
+    val messageChain = MessageChainImpl(this.id)
+    if (this.content.isNotBlank()) {
+      messageChain.delegate.add(PlainText(this.content))
+    }
+    if (this.attachments?.isNotEmpty() == true) {
+      messageChain.delegate.addAll(
+        this.attachments!!.map { im ->
+          TencentImage(im.url)
+        }
+      )
+    }
+    return messageChain
+  }
+}
 
 @Serializable
-internal data class TencentGuildMessageInternal(
+internal data class TencentChannelMessageRaw(
   /**
    * 消息id
    */
-  val id: String,
+  override val id: String,
   /**
    * 频道id
    */
@@ -214,7 +251,7 @@ internal data class TencentGuildMessageInternal(
   /**
    * 消息内容
    */
-  val content: String,
+  override val content: String,
   /**
    * 用于消息间的排序，
    *
@@ -237,7 +274,7 @@ internal data class TencentGuildMessageInternal(
   /**
    * 消息创建时间 ISO8601 timestamp
    */
-  val timestamp: String,
+  override val timestamp: String,
   /**
    * 消息编辑时间 ISO8601 timestamp
    */
@@ -251,50 +288,59 @@ internal data class TencentGuildMessageInternal(
   /**
    * 消息创建者
    */
-  val author: TencentGuildUserInternal,
+  override val author: TencentGuildUserRaw,
   /**
    * 消息创建者的member信息
    */
-  val member: TencentGuildMemberInternal,
+  val member: TencentGuildMemberRaw,
   /**
    * 消息中@到的人
    */
-  val mentions: List<TencentGuildUserInternal>? = null,
+  val mentions: List<TencentGuildUserRaw>? = null,
   /**
    * 附件
    */
-  val attachments: List<TencentMessageAttachment>? = null,
+  override val attachments: List<TencentMessageAttachmentRaw>? = null,
   /**
    * embed
    */
-  val embeds: List<TencentMessageEmbed>? = null,
+  val embeds: List<TencentMessageEmbedRaw>? = null,
   /**
    * ark
    */
-  val ark: List<TencentMessageArk>? = null,
+  val ark: List<TencentMessageArkRaw>? = null,
   /**
    * 引用消息对象
    */
   @SerialName("message_reference")
   val messageReference: TencentMessageReference? = null
-)
+) : TencentMessageRaw
 
-internal fun TencentGuildMessageInternal.toMessageChain(): MessageChain {
-  val messageChain = MessageChainImpl(this.id)
-  if (this.content.isNotBlank()) {
-    messageChain.delegate.add(PlainText(this.content))
-  }
-  if (this.attachments?.isNotEmpty() == true) {
-    messageChain.delegate.addAll(
-      this.attachments.map { im ->
-        TencentImage(im.url)
-      }
-    )
-  }
-  return messageChain
-}
+/**
+ * 频道私聊消息原始结构
+ */
+internal typealias TencentGuildPrivateMessageRaw = TencentChannelMessageRaw
 
-internal val EmptyMessageId = ""
+@Serializable
+internal data class TencentPrivateMessageAuthorRaw(
+  override val id: String
+) : ContactRaw
+
+@Serializable
+internal data class TencentPrivateMessageRaw(
+  override val id: String,
+  override val author: TencentPrivateMessageAuthorRaw,
+  override val content: String,
+  override val timestamp: String,
+  override val attachments: List<TencentMessageAttachmentRaw>?,
+  @SerialName("group_id")
+  val groupId: String = "0"
+) : TencentMessageRaw
+
+// TODO 更详细地定义群聊原始消息?
+internal typealias TencentGroupMessageRaw = TencentPrivateMessageRaw
+
+internal const val EmptyMessageId = ""
 
 sealed interface MessageChain : Message, Collection<Message> {
   val sourceId: String
@@ -336,6 +382,13 @@ data class TencentImage(
 ) : Message {
   override fun toString() = url
   override fun serialization() = "{tencent:image:$url}"
+}
+
+data class TencentAt(
+  val contact: Contact
+) : Message {
+  override fun toString() = "@${contact.id}"
+  override fun serialization() = "{tencent:at:${contact.id}}"
 }
 
 @Suppress("NOTHING_TO_INLINE")
@@ -427,6 +480,9 @@ class MessageChainBuilder private constructor(
   private var sourceMessageId: String? = null
 ) : MutableList<Message> by container {
   constructor(sourceMessageId: String? = null) : this(mutableListOf(), sourceMessageId)
+  constructor(messageChain: MessageChain) : this(mutableListOf(), "") {
+    append(messageChain)
+  }
   fun append(text: String) = this.apply {
     container.add(PlainText(text))
   }

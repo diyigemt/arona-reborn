@@ -47,8 +47,11 @@ internal object TencentWebsocketEventTypeAsStringSerializer : KSerializer<Tencen
 internal enum class TencentWebsocketEventType(val type: String) {
   NULL("NULL"),
   READY("READY"), // websocket鉴权成功
-  MESSAGE_CREATE("MESSAGE_CREATE"), // 频道消息发送
-  C2C_MESSAGE_CREATE("C2C_MESSAGE_CREATE"); // 私聊消息发送
+  MESSAGE_CREATE("MESSAGE_CREATE"), // 频道全量消息发送
+  AT_MESSAGE_CREATE("AT_MESSAGE_CREATE"), // 频道@机器人消息
+  DIRECT_MESSAGE_CREATE("DIRECT_MESSAGE_CREATE"), // 频道私聊消息
+  C2C_MESSAGE_CREATE("C2C_MESSAGE_CREATE"), // 私聊消息发送
+  GROUP_AT_MESSAGE_CREATE("GROUP_AT_MESSAGE_CREATE"); // 群聊@机器人消息
   companion object {
     private val TypeMap = entries.associateBy { it.type }
     fun fromValue(type: String) = TypeMap[type] ?: NULL

@@ -1,11 +1,15 @@
 package com.diyigemt.arona.hello
 
 import com.diyigemt.arona.command.AbstractCommand
+import com.diyigemt.arona.command.parser.image
 import com.diyigemt.arona.communication.command.GuildChannelCommandSender
 import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.types.int
+
 object PluginMain : AronaPlugin(AronaPluginDescription(
   id = "com.diyigemt.arona.hello",
   name = "hello",
@@ -24,7 +28,8 @@ object TestCommand : AbstractCommand(
   PluginMain,
   "测试"
 ) {
+  val arg by argument()
   suspend fun GuildChannelCommandSender.test() {
-    sendMessage("这是通过指令触发的消息")
+    sendMessage("这是通过指令触发的消息, 参数是 $arg")
   }
 }

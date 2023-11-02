@@ -381,14 +381,21 @@ data class TencentImage(
   val url: String,
 ) : Message {
   override fun toString() = url
-  override fun serialization() = "{tencent:image:$url}"
+  override fun serialization() = "[tencent:image:$url]"
+  companion object {
+    private val matcher = Regex("^\\[tencent:image:(\\w+)]$")
+    fun String.toTencentImage(): TencentImage? {
+      val matchResult = matcher.matchEntire(this) ?: return null
+      return TencentImage(matchResult.groupValues[1])
+    }
+  }
 }
 
 data class TencentAt(
   val contact: Contact
 ) : Message {
   override fun toString() = "@${contact.id}"
-  override fun serialization() = "{tencent:at:${contact.id}}"
+  override fun serialization() = "[tencent:at:${contact.id}]"
 }
 
 @Suppress("NOTHING_TO_INLINE")
@@ -522,7 +529,7 @@ class MessageChainBuilder private constructor(
 @Serializable
 data class MessageReceipt(
   val id: String,
-  val timestamp: Int
+  val timestamp: String
 )
 
 fun Message.toMessageChain(): MessageChain = when (this) {

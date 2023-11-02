@@ -171,3 +171,10 @@ inline fun <R> CommandSender.fold(
     else -> otherwise(sender)
   }
 }
+
+suspend inline fun <reified C : CommandSender> C.nextMessage(
+  timeoutMillis: Long,
+  block: C.(C) -> Unit
+) {
+
+}

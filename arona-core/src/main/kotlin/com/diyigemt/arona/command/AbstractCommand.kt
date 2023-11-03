@@ -2,6 +2,7 @@ package com.diyigemt.arona.command
 
 import com.diyigemt.arona.communication.command.CommandSender
 import com.github.ajalt.clikt.core.*
+import com.github.ajalt.clikt.parameters.arguments.argument
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlin.reflect.KClass
@@ -121,6 +122,7 @@ abstract class AbstractCommand(
   override val description: String = "<no description available>",
   help: String = "",
 ) : CliktCommand(name = primaryName, help = help, epilog = description), Command {
+  private val commandNameInternal by argument()
   private val commandSender by requireObject<CommandSender>()
   private val reflector by lazy {
     CommandReflector(this)

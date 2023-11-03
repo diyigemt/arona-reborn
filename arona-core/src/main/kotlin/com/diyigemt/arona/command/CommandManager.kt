@@ -7,7 +7,10 @@ import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.Message
 import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.toMessageChain
+import com.diyigemt.arona.utils.isDebug
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.CliktError
+import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.context
 import io.ktor.util.logging.*
 import java.util.concurrent.locks.ReentrantLock
@@ -69,15 +72,26 @@ object CommandManager {
   internal fun init() {
     GlobalEventChannel.subscribeAlways<TencentMessageEvent> {
       // 命令必须以 "/" 开头
+      // TODO 正式环境上线
       val text = it.message.filterIsInstance<PlainText>().firstOrNull() ?: return@subscribeAlways
       val commandText = text.toString()
-      if (!commandText.startsWith("/")) {
+      if (!isDebug && !commandText.startsWith("/")) {
         return@subscribeAlways
       }
-      val result = executeCommand(it.toCommandSender(), it.message)
+      val commandSender = it.toCommandSender()
       // TODO exception print
-      if (result !is CommandExecuteResult.Success) {
-        result.exception?.let { it1 -> logger.error(it1) }
+      when(val result = executeCommand(commandSender, it.message)) {
+        is CommandExecuteResult.Success -> {
+
+        }
+        is CommandExecuteResult.UnmatchedSignature -> {
+          // 发送错误处理
+          val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@subscribeAlways
+          commandSender.sendMessage(helpMessage)
+        }
+        else -> {
+          result.exception?.let { it1 -> logger.error(it1) }
+        }
       }
     }
   }
@@ -92,11 +106,11 @@ object CommandManager {
 sealed class CommandExecuteResult {
   abstract val exception: Throwable?
 
-  abstract val command: Command?
+  abstract val command: AbstractCommand?
 
   /** 指令执行成功 */
   class Success(
-    override val command: Command,
+    override val command: AbstractCommand,
   ) : CommandExecuteResult() {
     override val exception: Nothing? get() = null
   }
@@ -106,7 +120,7 @@ sealed class CommandExecuteResult {
   /** 指令方法调用过程出现了错误 */
   class ExecutionFailed(
     override val exception: Throwable,
-    override val command: Command,
+    override val command: AbstractCommand,
   ) : Failure()
 
   class UnresolvedCommand : Failure() {
@@ -116,7 +130,7 @@ sealed class CommandExecuteResult {
 
   /** 没有匹配的指令 */
   class Intercepted(
-    override val command: Command?,
+    override val command: AbstractCommand?,
   ) : Failure() {
     override val exception: Nothing? get() = null
   }
@@ -124,20 +138,17 @@ sealed class CommandExecuteResult {
   /** 权限不足 */
   class PermissionDenied(
     /** 尝试执行的指令 */
-    override val command: Command,
+    override val command: AbstractCommand,
   ) : Failure() {
     /** 指令执行时发生的错误, 总是 `null` */
     override val exception: Nothing? get() = null
   }
 
-  /** 没有匹配的指令 */
+  /** 参数不匹配 */
   class UnmatchedSignature(
-    /** 尝试执行的指令 */
-    override val command: Command,
-  ) : Failure() {
-    /** 指令执行时发生的错误, 总是 `null` */
-    override val exception: Nothing? get() = null
-  }
+    override val exception: Throwable,
+    override val command: AbstractCommand,
+  ) : Failure()
 }
 
 internal suspend fun executeCommandImpl(
@@ -149,14 +160,19 @@ internal suspend fun executeCommandImpl(
   val call = message.toMessageChain()
   val commandStr =
     call.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return CommandExecuteResult.UnresolvedCommand()
-  val command = CommandManager.matchCommand(commandStr) ?: return CommandExecuteResult.UnresolvedCommand()
+  val command = CommandManager.matchCommand(commandStr.replace("/", "")) ?: return CommandExecuteResult
+    .UnresolvedCommand()
+  if (command !is AbstractCommand) return CommandExecuteResult.UnresolvedCommand()
   val arg = call.toString()
-  return try {
+  return runCatching {
     (command as CliktCommand).context {
       obj = caller
     }.parse(arg.split(" "))
     CommandExecuteResult.Success(command)
-  } catch (e: Throwable) {
-    CommandExecuteResult.ExecutionFailed(e, command)
-  }
+  }.onFailure {
+    when (it) {
+      is MissingArgument -> CommandExecuteResult.UnmatchedSignature(it, command)
+      else -> CommandExecuteResult.ExecutionFailed(it, command)
+    }
+  }.getOrThrow()
 }

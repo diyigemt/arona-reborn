@@ -14,13 +14,16 @@ data class RedisConfig(
 )
 @Serializable
 data class AronaConfig(
+  val debug: Boolean = false,
   val bot: TencentBotConfig,
   val adminToken: String,
   val redis: RedisConfig
 )
 
-val aronaConfig: AronaConfig by lazy {
+internal val aronaConfig: AronaConfig by lazy {
   val reader = File("config.yaml").bufferedReader(Charset.forName("UTF-8"))
   val input = reader.use { it.readText() }
   Yaml.default.decodeFromString(AronaConfig.serializer(), input)
 }
+
+internal val isDebug = aronaConfig.debug

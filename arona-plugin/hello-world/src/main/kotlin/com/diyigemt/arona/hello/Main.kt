@@ -28,7 +28,7 @@ object TestCommand : AbstractCommand(
   PluginMain,
   "测试"
 ) {
-  private val arg by argument()
+  private val arg by argument("参数1")
   suspend fun GuildChannelCommandSender.test() {
     sendMessage("这是通过指令触发的消息, 参数是 $arg")
   }

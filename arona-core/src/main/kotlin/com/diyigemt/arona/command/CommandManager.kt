@@ -12,6 +12,9 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.output.Localization
+import com.github.ajalt.mordant.rendering.AnsiLevel
+import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.util.logging.*
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -151,6 +154,15 @@ sealed class CommandExecuteResult {
   ) : Failure()
 }
 
+internal val commandTerminal = Terminal(ansiLevel = AnsiLevel.NONE, interactive = false)
+internal val crsiveLocalization = object: Localization {
+  override fun usageError() = "错误:"
+  override fun usageTitle() = "用例:"
+  override fun optionsTitle() = "可选参数"
+  override fun optionsMetavar() = "可选参数"
+  override fun missingArgument(paramName: String) = "缺少参数 $paramName"
+}
+
 internal suspend fun executeCommandImpl(
   message: Message,
   caller: CommandSender,
@@ -158,8 +170,9 @@ internal suspend fun executeCommandImpl(
 ): CommandExecuteResult {
 
   val call = message.toMessageChain()
-  val commandStr =
+  val messageString =
     call.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return CommandExecuteResult.UnresolvedCommand()
+  val commandStr = messageString.split(" ").toMutableList().removeFirstOrNull() ?: return CommandExecuteResult.UnresolvedCommand()
   val command = CommandManager.matchCommand(commandStr.replace("/", "")) ?: return CommandExecuteResult
     .UnresolvedCommand()
   if (command !is AbstractCommand) return CommandExecuteResult.UnresolvedCommand()
@@ -167,12 +180,14 @@ internal suspend fun executeCommandImpl(
   return runCatching {
     (command as CliktCommand).context {
       obj = caller
-    }.parse(arg.split(" "))
+      terminal = commandTerminal
+      localization = crsiveLocalization
+    }.parse(arg.split(" ").toMutableList().apply { removeFirstOrNull() })
     CommandExecuteResult.Success(command)
-  }.onFailure {
+  }.getOrElse {
     when (it) {
       is MissingArgument -> CommandExecuteResult.UnmatchedSignature(it, command)
       else -> CommandExecuteResult.ExecutionFailed(it, command)
     }
-  }.getOrThrow()
+  }
 }

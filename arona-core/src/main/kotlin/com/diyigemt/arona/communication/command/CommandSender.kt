@@ -5,9 +5,7 @@ package com.diyigemt.arona.communication.command
 import com.diyigemt.arona.AronaApplication
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.contact.*
-import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
-import com.diyigemt.arona.communication.event.TencentGuildPrivateMessageEvent
-import com.diyigemt.arona.communication.event.TencentMessageEvent
+import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.communication.message.EmptyMessageId
 import com.diyigemt.arona.utils.childScope
@@ -15,10 +13,13 @@ import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.qualifiedNameOrTip
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.time.withTimeout
+import kotlinx.coroutines.withTimeout
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 import kotlin.coroutines.CoroutineContext
+import kotlin.reflect.KClass
 
 interface CommandSender : CoroutineScope {
   val bot: TencentBot?
@@ -170,11 +171,4 @@ inline fun <R> CommandSender.fold(
     is UserCommandSender -> ifIsUser(sender)
     else -> otherwise(sender)
   }
-}
-
-suspend inline fun <reified C : CommandSender> C.nextMessage(
-  timeoutMillis: Long,
-  block: C.(C) -> Unit
-) {
-
 }

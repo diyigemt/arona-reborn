@@ -1,12 +1,8 @@
 package com.diyigemt.arona.communication.event
 
-import com.diyigemt.arona.communication.command.AbstractUserCommandSender
-import com.diyigemt.arona.communication.command.CommandSender
-import com.diyigemt.arona.communication.command.CommandSender.Companion.toCommandSender
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.reflect.KClass
 
 suspend inline fun <reified E : TencentEvent, R : Any> EventChannel<*>.syncFromEvent(
   noinline mapper: suspend (E) -> R?

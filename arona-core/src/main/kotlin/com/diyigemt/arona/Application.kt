@@ -15,7 +15,6 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
-    CommandManager.init()
     TencentBotClient.invoke(aronaConfig.bot).auth()
     CoroutineScope(Dispatchers.IO).launch {
       while (true) {

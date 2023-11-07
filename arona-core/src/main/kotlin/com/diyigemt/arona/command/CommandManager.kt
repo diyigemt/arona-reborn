@@ -1,21 +1,19 @@
 package com.diyigemt.arona.command
 
-import com.diyigemt.arona.communication.command.CommandSender
+import com.diyigemt.arona.communication.command.*
 import com.diyigemt.arona.communication.command.CommandSender.Companion.toCommandSender
-import com.diyigemt.arona.communication.event.GlobalEventChannel
-import com.diyigemt.arona.communication.event.TencentMessageEvent
+import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.Message
 import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.toMessageChain
-import com.diyigemt.arona.utils.isDebug
 import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.util.logging.*
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -71,33 +69,6 @@ object CommandManager {
 
   private val Command.name
     get() = primaryName.lowercase()
-
-  internal fun init() {
-    GlobalEventChannel.subscribeAlways<TencentMessageEvent> {
-      // 命令必须以 "/" 开头
-      // TODO 正式环境上线
-      val text = it.message.filterIsInstance<PlainText>().firstOrNull() ?: return@subscribeAlways
-      val commandText = text.toString()
-      if (!isDebug && !commandText.startsWith("/")) {
-        return@subscribeAlways
-      }
-      val commandSender = it.toCommandSender()
-      // TODO exception print
-      when(val result = executeCommand(commandSender, it.message)) {
-        is CommandExecuteResult.Success -> {
-
-        }
-        is CommandExecuteResult.UnmatchedSignature -> {
-          // 发送错误处理
-          val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@subscribeAlways
-          commandSender.sendMessage(helpMessage)
-        }
-        else -> {
-          result.exception?.let { it1 -> logger.error(it1) }
-        }
-      }
-    }
-  }
 
   @Suppress("NOTHING_TO_INLINE")
   inline fun Command.register(override: Boolean = false): Boolean = registerCommand(this, override)
@@ -155,7 +126,7 @@ sealed class CommandExecuteResult {
 }
 
 internal val commandTerminal = Terminal(ansiLevel = AnsiLevel.NONE, interactive = false)
-internal val crsiveLocalization = object: Localization {
+internal val crsiveLocalization = object : Localization {
   override fun usageError() = "错误:"
   override fun usageTitle() = "用例:"
   override fun optionsTitle() = "可选参数"
@@ -172,7 +143,8 @@ internal suspend fun executeCommandImpl(
   val call = message.toMessageChain()
   val messageString =
     call.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return CommandExecuteResult.UnresolvedCommand()
-  val commandStr = messageString.split(" ").toMutableList().removeFirstOrNull() ?: return CommandExecuteResult.UnresolvedCommand()
+  val commandStr =
+    messageString.split(" ").toMutableList().removeFirstOrNull() ?: return CommandExecuteResult.UnresolvedCommand()
   val command = CommandManager.matchCommand(commandStr.replace("/", "")) ?: return CommandExecuteResult
     .UnresolvedCommand()
   if (command !is AbstractCommand) return CommandExecuteResult.UnresolvedCommand()
@@ -190,4 +162,90 @@ internal suspend fun executeCommandImpl(
       else -> CommandExecuteResult.ExecutionFailed(it, command)
     }
   }
+}
+
+
+suspend inline fun GuildUserCommandSender.nextMessage(
+  timeoutMillis: Long = -1,
+  intercept: Boolean = false,
+  noinline filter: suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Boolean = { true },
+  noinline action: suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Unit
+) {
+  val mapper = createMapper<GuildUserCommandSender, TencentGuildPrivateMessageEvent>(filter)
+  val event = (if (timeoutMillis == -1L) {
+    GlobalEventChannel.syncFromEvent<TencentGuildPrivateMessageEvent, TencentGuildPrivateMessageEvent>(mapper)
+  } else {
+    withTimeout(timeoutMillis) {
+      GlobalEventChannel.syncFromEvent<TencentGuildPrivateMessageEvent, TencentGuildPrivateMessageEvent>(mapper)
+    }
+  })
+  action.invoke(event.toCommandSender(), event)
+}
+
+suspend inline fun GuildChannelCommandSender.nextMessage(
+  timeoutMillis: Long = -1,
+  intercept: Boolean = false,
+  noinline filter: suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Boolean = { true },
+  noinline action: suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Unit
+) {
+  val mapper = createMapper<GuildChannelCommandSender, TencentGuildMessageEvent>(filter)
+  val event = (if (timeoutMillis == -1L) {
+    GlobalEventChannel.syncFromEvent<TencentGuildMessageEvent, TencentGuildMessageEvent>(mapper)
+  } else {
+    withTimeout(timeoutMillis) {
+      GlobalEventChannel.syncFromEvent<TencentGuildMessageEvent, TencentGuildMessageEvent>(mapper)
+    }
+  })
+  action.invoke(event.toCommandSender(), event)
+}
+
+
+suspend inline fun <reified C : UserCommandSender> C.nextMessage(
+  timeoutMillis: Long = -1,
+  intercept: Boolean = false,
+  noinline filter: suspend C.(C) -> Boolean = { true },
+  noinline action: suspend C.(C) -> Unit
+) {
+  val mapper = when (this) {
+    is SingleUserCommandSender -> TODO()
+    is GroupCommandSender -> TODO()
+    is GuildUserCommandSender -> createMapper<C, TencentGuildPrivateMessageEvent>(filter)
+    is GuildChannelCommandSender -> createMapper<C, TencentGuildMessageEvent>(filter)
+    else -> TODO()
+  }
+
+  val sender = (if (timeoutMillis == -1L) {
+    GlobalEventChannel.syncFromEvent(mapper)
+  } else {
+    withTimeout(timeoutMillis) {
+      GlobalEventChannel.syncFromEvent(mapper)
+    }
+  }).toCommandSender() as C
+
+  action.invoke(sender, sender)
+}
+
+@PublishedApi
+@JvmName("\$createMapper")
+internal inline fun <reified C : UserCommandSender, E : TencentMessageEvent> C.createMapper(
+  crossinline filter: suspend C.(C) -> Boolean
+): suspend (E) -> E? =
+  mapper@{ event ->
+    if (!this.isContextIdenticalWith(event)) return@mapper null
+    if (!filter(this, this)) return@mapper null
+    event
+  }
+
+@PublishedApi
+internal inline fun <reified C : UserCommandSender, E : TencentMessageEvent> C.createMapper(
+  crossinline filter: suspend C.(E) -> Boolean
+): suspend (E) -> E? =
+  mapper@{ event ->
+    if (!this.isContextIdenticalWith(event)) return@mapper null
+    if (!filter(this, event)) return@mapper null
+    event
+  }
+
+fun UserCommandSender.isContextIdenticalWith(event: TencentMessageEvent): Boolean {
+  return this.user.id == event.sender.id && this.subject.id == event.subject.id
 }

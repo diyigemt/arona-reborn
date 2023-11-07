@@ -7,6 +7,7 @@ import io.ktor.util.pipeline.*
 import kotlinx.coroutines.*
 import kotlinx.datetime.*
 import io.github.z4kn4fein.semver.Version
+import org.slf4j.Logger
 
 typealias SemVersion = Version
 
@@ -49,3 +50,5 @@ fun runSuspend(block: suspend () -> Unit) = ioPool.launch {
 
 val PipelineContext<Unit, ApplicationCall>.isJsonPost
   get() = context.request.header(HttpHeaders.ContentType) == "application/json"
+
+fun Logger.error(exception: Throwable) = error(exception.message ?: "Exception of type ${exception::class}", exception)

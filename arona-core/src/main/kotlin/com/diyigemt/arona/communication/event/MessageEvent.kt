@@ -1,6 +1,7 @@
 package com.diyigemt.arona.communication.event
 
 import com.diyigemt.arona.communication.TencentBot
+import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.message.MessageChain
 import com.diyigemt.arona.communication.message.TencentChannelMessageRaw
@@ -9,7 +10,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 abstract class TencentMessageEvent(
   override val bot: TencentBot,
-  val message: MessageChain
+  val message: MessageChain,
 ) : TencentEvent() {
   abstract val subject: Contact
   abstract val sender: User
@@ -28,7 +29,7 @@ class TencentGuildPrivateMessageEvent internal constructor(
   bot: TencentBot,
   message: MessageChain,
   override val sender: GuildMember,
-  internal val sourceMessage: TencentChannelMessageRaw
+  internal val sourceMessage: TencentChannelMessageRaw,
 ) : TencentMessageEvent(bot, message) {
   override val subject get() = sender.guild
 }
@@ -37,7 +38,7 @@ class TencentSingleMessageEvent internal constructor(
   bot: TencentBot,
   message: MessageChain,
   override val sender: SingleUser,
-  internal val sourceMessage: TencentChannelMessageRaw
+  internal val sourceMessage: TencentChannelMessageRaw,
 ) : TencentMessageEvent(bot, message) {
   override val subject get() = sender
 }
@@ -46,20 +47,20 @@ class TencentGroupMessageEvent internal constructor(
   bot: TencentBot,
   message: MessageChain,
   override val sender: GroupMember,
-  internal val sourceMessage: TencentChannelMessageRaw
+  internal val sourceMessage: TencentChannelMessageRaw,
 ) : TencentMessageEvent(bot, message) {
   override val subject get() = sender.group
 }
 
 suspend inline fun <reified P : TencentMessageEvent> P.nextMessage(
   timeoutMillis: Long = -1,
-  noinline filter: suspend P.(P) -> Boolean = { true }
+  noinline filter: suspend P.(P) -> Boolean = { true },
 ): MessageChain = nextMessage(timeoutMillis, false, filter)
 
 suspend inline fun <reified P : TencentMessageEvent> P.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
-  noinline filter: suspend P.(P) -> Boolean = { true }
+  noinline filter: suspend P.(P) -> Boolean = { true },
 ): MessageChain {
   val mapper: suspend (P) -> P? = createMapper(filter)
 
@@ -74,7 +75,7 @@ suspend inline fun <reified P : TencentMessageEvent> P.nextMessage(
 
 suspend inline fun <reified P : TencentMessageEvent> P.nextMessageOrNull(
   timeoutMillis: Long,
-  noinline filter: suspend P.(P) -> Boolean = { true }
+  noinline filter: suspend P.(P) -> Boolean = { true },
 ): MessageChain? {
   require(timeoutMillis > 0) { "timeoutMillis must be > 0" }
 
@@ -92,6 +93,7 @@ internal inline fun <reified P : TencentMessageEvent> P.createMapper(crossinline
     if (!filter(event, event)) return@mapper null
     event
   }
+
 
 fun TencentMessageEvent.isContextIdenticalWith(another: TencentMessageEvent): Boolean {
   return this.sender == another.sender && this.subject == another.subject

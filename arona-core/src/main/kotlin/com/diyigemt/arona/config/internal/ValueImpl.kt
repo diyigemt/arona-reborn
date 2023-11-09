@@ -1,10 +1,8 @@
 @file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER", "unused", "NOTHING_TO_INLINE", "INAPPLICABLE_JVM_NAME")
+
 package com.diyigemt.arona.config.internal
 
 import com.diyigemt.arona.config.*
-import com.diyigemt.arona.config.byteValueImpl
-import com.diyigemt.arona.config.intValueImpl
-import com.diyigemt.arona.config.shortValueImpl
 import kotlinx.serialization.BinaryFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.StringFormat
@@ -12,6 +10,8 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
@@ -38,19 +38,23 @@ internal abstract class AbstractValueImpl<T> : Value<T> {
 
 interface SerializerAwareValue<T> : Value<T> {
   val serializer: KSerializer<Unit>
+
   companion object {
     @JvmStatic
     fun <T> SerializerAwareValue<T>.serialize(format: StringFormat): String {
       return format.encodeToString(this.serializer, Unit)
     }
+
     @JvmStatic
     fun <T> SerializerAwareValue<T>.serialize(format: BinaryFormat): ByteArray {
       return format.encodeToByteArray(this.serializer, Unit)
     }
+
     @JvmStatic
     fun <T> SerializerAwareValue<T>.deserialize(format: StringFormat, string: String) {
       format.decodeFromString(this.serializer, string)
     }
+
     @JvmStatic
     fun <T> SerializerAwareValue<T>.deserialize(format: BinaryFormat, bytes: ByteArray) {
       format.decodeFromByteArray(this.serializer, bytes)
@@ -63,6 +67,7 @@ internal class ByteValueImpl : SerializerAwareValue<Byte>, KSerializer<Unit>, Ab
   constructor(default: Byte) {
     _value = default
   }
+
   private var _value: Byte? = null
   override var value: Byte
     get() = _value ?: error("ByteValue.value should be initialized before get.")
@@ -95,6 +100,7 @@ internal class ShortValueImpl : SerializerAwareValue<Short>, KSerializer<Unit>, 
   constructor(default: Short) {
     _value = default
   }
+
   private var _value: Short? = null
   override var value: Short
     get() = _value ?: error("ShortValue.value should be initialized before get.")
@@ -127,6 +133,7 @@ internal class IntValueImpl : SerializerAwareValue<Int>, KSerializer<Unit>, Abst
   constructor(default: Int) {
     _value = default
   }
+
   private var _value: Int? = null
   override var value: Int
     get() = _value ?: error("IntValue.value should be initialized before get.")
@@ -159,6 +166,7 @@ internal class LongValueImpl : SerializerAwareValue<Long>, KSerializer<Unit>, Ab
   constructor(default: Long) {
     _value = default
   }
+
   private var _value: Long? = null
   override var value: Long
     get() = _value ?: error("LongValue.value should be initialized before get.")
@@ -191,6 +199,7 @@ internal class FloatValueImpl : SerializerAwareValue<Float>, KSerializer<Unit>, 
   constructor(default: Float) {
     _value = default
   }
+
   private var _value: Float? = null
   override var value: Float
     get() = _value ?: error("FloatValue.value should be initialized before get.")
@@ -223,6 +232,7 @@ internal class DoubleValueImpl : SerializerAwareValue<Double>, KSerializer<Unit>
   constructor(default: Double) {
     _value = default
   }
+
   private var _value: Double? = null
   override var value: Double
     get() = _value ?: error("DoubleValue.value should be initialized before get.")
@@ -255,6 +265,7 @@ internal class CharValueImpl : SerializerAwareValue<Char>, KSerializer<Unit>, Ab
   constructor(default: Char) {
     _value = default
   }
+
   private var _value: Char? = null
   override var value: Char
     get() = _value ?: error("LongValue.value should be initialized before get.")
@@ -287,6 +298,7 @@ internal class BooleanValueImpl : SerializerAwareValue<Boolean>, KSerializer<Uni
   constructor(default: Boolean) {
     _value = default
   }
+
   private var _value: Boolean? = null
   override var value: Boolean
     get() = _value ?: error("BooleanValue.value should be initialized before get.")
@@ -319,6 +331,7 @@ internal class StringValueImpl : SerializerAwareValue<String>, KSerializer<Unit>
   constructor(default: String) {
     _value = default
   }
+
   private var _value: String? = null
   override var value: String
     get() = _value ?: error("StringValue.value should be initialized before get.")
@@ -349,7 +362,6 @@ internal class StringValueImpl : SerializerAwareValue<String>, KSerializer<Unit>
 @Suppress("UNCHECKED_CAST")
 internal fun <T : Any> PluginData.valueImplPrimitive(kClass: KClass<T>): SerializerAwareValue<T>? {
   return when (kClass) {
-    //// region PluginData_valueImplPrimitive CODEGEN ////
 
     Byte::class -> byteValueImpl()
     Short::class -> shortValueImpl()
@@ -361,7 +373,22 @@ internal fun <T : Any> PluginData.valueImplPrimitive(kClass: KClass<T>): Seriali
     Boolean::class -> booleanValueImpl()
     String::class -> stringValueImpl()
 
-    //// endregion PluginData_valueImplPrimitive CODEGEN ////
     else -> error("Internal error: unexpected type passed: ${kClass.qualifiedName}")
   } as SerializerAwareValue<T>?
+}
+
+internal fun <T> Value<T>.setValueBySerializer(value: T) {
+  if (this is SerializableValue<T>) {
+    return this.delegate.setValueBySerializer(value)
+  }
+  this.castOrInternalError<AbstractValueImpl<T>>().setValueBySerializer(value)
+}
+
+@OptIn(ExperimentalContracts::class)
+@Suppress("UNCHECKED_CAST")
+internal inline fun <reified R> Any.castOrInternalError(): R {
+  contract {
+    returns() implies (this@castOrInternalError is R)
+  }
+  return (this as? R) ?: error("Internal error: ${this::class} cannot be casted to ${R::class}")
 }

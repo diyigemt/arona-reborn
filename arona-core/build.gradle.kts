@@ -37,6 +37,7 @@ dependencies {
 
   implementation("com.github.Towdium:PinIn:1.6.0")
   implementation("io.github.crackthecodeabhi:kreds:0.9.0")
+  implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
 
   api("org.xerial:sqlite-jdbc:3.42.0.1")
   api("com.charleskorn.kaml:kaml:0.55.0")

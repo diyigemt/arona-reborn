@@ -37,13 +37,13 @@ internal data class TencentWebsocketInteractionNotifyReq(
    *
    * 5: 仅管理员操作
    */
-  val code: Int
+  val code: Int,
 )
 
 @Serializable
 internal data class TencentWebsocketHelloResp(
   @SerialName("heartbeat_interval")
-  val heartbeatInterval: Long
+  val heartbeatInterval: Long,
 )
 
 @Serializable
@@ -51,14 +51,14 @@ internal data class TencentWebsocketIdentifyReq(
   val token: String,
   val intents: Int,
   val shard: List<Int>,
-  val properties: Map<String, String> = emptyMap()
+  val properties: Map<String, String> = emptyMap(),
 )
 
 @Serializable
 internal data class TencentWebsocketIdentifyUserResp(
   val id: String,
   val username: String,
-  val bot: Boolean
+  val bot: Boolean,
 )
 
 @Serializable
@@ -67,7 +67,7 @@ internal data class TencentWebsocketIdentifyResp(
   @SerialName("session_id")
   val sessionId: String,
   val user: TencentWebsocketIdentifyUserResp,
-  val shard: List<Int>
+  val shard: List<Int>,
 )
 
 @Serializable
@@ -80,7 +80,7 @@ internal data class TencentWebsocketPayload<T>(
   @SerialName("t")
   val type: TencentWebsocketEventType = TencentWebsocketEventType.NULL,
   @SerialName("d")
-  val data: T
+  val data: T,
 )
 
 @Serializable
@@ -91,7 +91,7 @@ internal open class TencentWebsocketPayload0(
   @SerialName("s")
   val serialNumber: Long = 0L,
   @SerialName("t")
-  val type: TencentWebsocketEventType = TencentWebsocketEventType.NULL
+  val type: TencentWebsocketEventType = TencentWebsocketEventType.NULL,
 )
 
 internal object TencentWebsocketOperationTypeAsIntSerializer : KSerializer<TencentWebsocketOperationType> {
@@ -131,7 +131,7 @@ internal object TencentWebsocketHelloHandler : TencentWebsocketOperationHandler<
   override val decoder = TencentWebsocketHelloResp.serializer()
   override suspend fun TencentBotClientWebSocketSession.handler(
     payload: TencentWebsocketPayload<TencentWebsocketHelloResp>?,
-    source: String
+    source: String,
   ) {
     payload ?: return
     heartbeatInterval = payload.data.heartbeatInterval
@@ -146,7 +146,7 @@ internal object TencentWebsocketServerInvalidSessionHandler :
   override val decoder = Unit.serializer()
   override suspend fun TencentBotClientWebSocketSession.handler(
     payload: TencentWebsocketPayload<Unit>?,
-    source: String
+    source: String,
   ) {
     logger.warn("invalid session: $source")
   }
@@ -158,7 +158,7 @@ internal object TencentWebsocketDispatchHandler : TencentWebsocketOperationHandl
   override val decoder = Unit.serializer()
   override suspend fun TencentBotClientWebSocketSession.handler(
     payload: TencentWebsocketPayload<Unit>?,
-    source: String
+    source: String,
   ) {
     val preData = json.decodeFromString<TencentWebsocketPayload0>(source)
     // TODO 为啥不让我通知后台
@@ -184,7 +184,7 @@ internal object TencentWebsocketHeartbeatAckHandler : TencentWebsocketOperationH
   override val decoder = Unit.serializer()
   override suspend fun TencentBotClientWebSocketSession.handler(
     payload: TencentWebsocketPayload<Unit>?,
-    source: String
+    source: String,
   ) {
     logger.info("heartbeat")
   }
@@ -194,6 +194,7 @@ internal object TencentWebsocketOperationManager {
   private val map by lazy {
     ReflectionUtil.scanInterfacePetObjectInstance(TencentWebsocketOperationHandler::class).associateBy { it.type }
   }
+
   internal suspend fun TencentBotClientWebSocketSession.handleTencentOperation() {
     val plainText = incoming.receiveText() ?: return
     val preData = json.decodeFromString<TencentWebsocketPayload0>(plainText)

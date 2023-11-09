@@ -3,7 +3,6 @@ package com.diyigemt.arona.communication
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -13,7 +12,7 @@ import kotlinx.serialization.encoding.Encoder
 data class TencentBotConfig(
   val appId: String,
   val token: String,
-  val secret: String
+  val secret: String,
 ) {
   fun toAuthConfig() = TencentBotAuthEndpointReq(appId, secret)
 }
@@ -21,7 +20,7 @@ data class TencentBotConfig(
 @Serializable
 data class TencentBotAuthEndpointReq(
   val appId: String,
-  val clientSecret: String
+  val clientSecret: String,
 )
 
 @Serializable
@@ -29,12 +28,12 @@ internal data class TencentBotAuthEndpointResp(
   @SerialName("access_token")
   val accessToken: String,
   @SerialName("expires_in")
-  val expiresIn: Int
+  val expiresIn: Int,
 )
 
 @Serializable
 internal data class TencentWebsocketEndpointResp(
-  val url: String
+  val url: String,
 )
 
 internal object TencentWebsocketEventTypeAsStringSerializer : KSerializer<TencentWebsocketEventType> {
@@ -52,6 +51,7 @@ internal enum class TencentWebsocketEventType(val type: String) {
   DIRECT_MESSAGE_CREATE("DIRECT_MESSAGE_CREATE"), // 频道私聊消息
   C2C_MESSAGE_CREATE("C2C_MESSAGE_CREATE"), // 私聊消息发送
   GROUP_AT_MESSAGE_CREATE("GROUP_AT_MESSAGE_CREATE"); // 群聊@机器人消息
+
   companion object {
     private val TypeMap = entries.associateBy { it.type }
     fun fromValue(type: String) = TypeMap[type] ?: NULL

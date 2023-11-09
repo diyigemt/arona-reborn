@@ -28,7 +28,7 @@ interface Contact : CoroutineScope {
   /**
    * 回复消息, 如果包含messageId就是被动消息, 不是就是主动消息
    */
-  suspend fun sendMessage(message: MessageChain) : MessageReceipt
+  suspend fun sendMessage(message: MessageChain): MessageReceipt
 }
 
 internal abstract class AbstractContact(
@@ -40,7 +40,7 @@ internal abstract class AbstractContact(
     endpoint: TencentEndpoint,
     urlPlaceHolder: Map<String, String> = mapOf(),
     body: MessageChain,
-  ) : MessageReceipt {
+  ): MessageReceipt {
     return bot.callOpenapi(
       endpoint,
       MessageReceipt.serializer(),
@@ -140,7 +140,7 @@ internal class ChannelImpl(
 ) : Channel, AbstractContact(bot, parentCoroutineContext) {
   override val id get() = internalChannel.id
   override val unionOpenid: String? = null
-  override suspend fun sendMessage(message: MessageChain) : MessageReceipt {
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     return callMessageOpenApi(
       TencentEndpoint.PostGuildMessage,
       mapOf("channel_id" to id),
@@ -157,7 +157,7 @@ internal class GroupImpl(
   override val id: String,
   override val unionOpenid: String? = null,
 ) : Group, AbstractContact(bot, parentCoroutineContext) {
-  override suspend fun sendMessage(message: MessageChain) : MessageReceipt {
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     return callMessageOpenApi(
       TencentEndpoint.PostGroupMessage,
       mapOf("group_openid" to id),
@@ -197,7 +197,7 @@ internal class SingleUserImpl(
   override val id: String,
   override val unionOpenid: String?,
 ) : SingleUser, AbstractContact(bot, parentCoroutineContext) {
-  override suspend fun sendMessage(message: MessageChain) : MessageReceipt {
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     return callMessageOpenApi(
       TencentEndpoint.PostSingleUserMessage,
       mapOf("openid" to id),
@@ -238,7 +238,7 @@ internal class GuildMemberImpl(
   override val unionOpenid: String? = null,
 ) : GuildMember, AbstractContact(guild.bot, parentCoroutineContext) {
   override val id get() = internalGuildUser.user?.id ?: EmptyMessageId
-  override suspend fun sendMessage(message: MessageChain) : MessageReceipt {
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     // 保存私聊频道才行
     TODO("Not yet implemented")
   }

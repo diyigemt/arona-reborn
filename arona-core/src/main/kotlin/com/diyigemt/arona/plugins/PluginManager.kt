@@ -2,13 +2,18 @@ package com.diyigemt.arona.plugins
 
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
+import com.diyigemt.arona.config.AutoSavePluginData
+import com.diyigemt.arona.config.internal.MultiFilePluginDataStorageImpl
+import com.diyigemt.arona.utils.commandLineLogger
 import io.ktor.util.logging.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import java.io.File
 import java.net.URLClassLoader
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.jar.JarFile
+import kotlin.system.exitProcess
 
 internal val <T> T.job: Job where T : CoroutineScope, T : AronaAbstractPlugin get() = this.coroutineContext[Job]!!
 
@@ -30,6 +35,7 @@ object PluginManager {
       .listFiles { file -> !file.isDirectory && file.extension == "jar" }
       ?.forEach { loadPluginFromFile(it) }
   }
+
   fun initPlugin() {
     plugins.forEach {
       logger.info("loading plugin: ${it.description.name}")
@@ -37,6 +43,8 @@ object PluginManager {
       logger.info("plugin: ${it.description.name} loaded")
     }
   }
+
+  @Suppress("UNCHECKED_CAST")
   private fun loadPluginFromFile(jarFile: File) {
     val jarURL = jarFile.toURI().toURL()
     val classLoader = URLClassLoader(arrayOf(jarURL))
@@ -57,12 +65,26 @@ object PluginManager {
             pluginClassLoader
           )
       )
-      val query = org.reflections.scanners.Scanners.SubTypes
+      val commandQuery = org.reflections.scanners.Scanners.SubTypes
         .of(AbstractCommand::class.java)
         .asClass<AbstractCommand>(pluginClassLoader)
-      query.apply(reflections.store).forEach { clazz ->
+      commandQuery.apply(reflections.store).forEach { clazz ->
         clazz as Class<AbstractCommand>
         CommandManager.registerCommand(clazz.kotlin.objectInstance!!, false)
+      }
+      // 注册自动保存的插件配置文件
+      val pluginDataQuery = org.reflections.scanners.Scanners.SubTypes
+        .of(AutoSavePluginData::class.java)
+        .asClass<AutoSavePluginData>(pluginClassLoader)
+      pluginDataQuery.apply(reflections.store).forEach { clazz ->
+        clazz as Class<AutoSavePluginData>
+        val storage = MultiFilePluginDataStorageImpl(pluginsConfigPath)
+        val dataInstance = clazz.kotlin.objectInstance
+        if (dataInstance == null) {
+          commandLineLogger.warn("load plugin data error: ${clazz.name}")
+          exitProcess(-1)
+        }
+        storage.load(pluginInstance, dataInstance)
       }
       plugins.add(pluginInstance)
     }

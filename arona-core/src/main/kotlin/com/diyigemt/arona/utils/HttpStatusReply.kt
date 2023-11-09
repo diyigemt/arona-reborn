@@ -14,8 +14,12 @@ import kotlinx.serialization.encoding.Encoder
 suspend fun PipelineContext<Unit, ApplicationCall>.badRequest() = context.respond(HttpStatusCode.BadRequest)
 suspend fun PipelineContext<Unit, ApplicationCall>.unauthorized() = context.respond(HttpStatusCode.Unauthorized)
 suspend fun PipelineContext<Unit, ApplicationCall>.forbidden() = context.respond(HttpStatusCode.Forbidden)
-suspend fun PipelineContext<Unit, ApplicationCall>.internalServerError() = context.respond(HttpStatusCode.InternalServerError)
-suspend inline fun <reified T : Any> PipelineContext<Unit, ApplicationCall>.success(data: T) = context.respond(ServerResponse(data))
+suspend fun PipelineContext<Unit, ApplicationCall>.internalServerError() =
+  context.respond(HttpStatusCode.InternalServerError)
+
+suspend inline fun <reified T : Any> PipelineContext<Unit, ApplicationCall>.success(data: T) =
+  context.respond(ServerResponse(data))
+
 suspend fun PipelineContext<Unit, ApplicationCall>.success() = context.respond(ServerResponse(null))
 
 object HttpStatusCodeAsStringSerializer : KSerializer<HttpStatusCode> {
@@ -29,9 +33,9 @@ data class ServerResponse<T>(
   @Serializable(with = HttpStatusCodeAsStringSerializer::class)
   val code: HttpStatusCode,
   val message: String,
-  val data: T?
+  val data: T?,
 ) {
-  constructor(data: T): this(HttpStatusCode.OK, data)
-  constructor(code: HttpStatusCode): this(code, code.description, null)
-  constructor(code: HttpStatusCode, data: T): this(code, code.description, data)
+  constructor(data: T) : this(HttpStatusCode.OK, data)
+  constructor(code: HttpStatusCode) : this(code, code.description, null)
+  constructor(code: HttpStatusCode, data: T) : this(code, code.description, data)
 }

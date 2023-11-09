@@ -5,7 +5,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 suspend inline fun <reified E : TencentEvent, R : Any> EventChannel<*>.syncFromEvent(
-  noinline mapper: suspend (E) -> R?
+  noinline mapper: suspend (E) -> R?,
 ): R = coroutineScope {
   suspendCancellableCoroutine { cont ->
     var listener: Listener<E>? = null

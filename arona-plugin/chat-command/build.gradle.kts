@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm") version "1.9.10"
     java
     application
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.10"
 }
 
 val projectMainClass = "com.diyigemt.arona.chat.command.PluginMain"

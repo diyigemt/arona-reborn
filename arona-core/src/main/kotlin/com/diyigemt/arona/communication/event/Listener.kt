@@ -24,7 +24,7 @@ interface Listener<in E : AbstractEvent> : CompletableJob {
 internal class SafeListener<in E : AbstractEvent> internal constructor(
   parentJob: Job?,
   subscriberContext: CoroutineContext,
-  private val listenerBlock: suspend (E) -> ListeningStatus
+  private val listenerBlock: suspend (E) -> ListeningStatus,
 ) : Listener<E>, CompletableJob by SupervisorJob(parentJob) {
   private val subscriberContext: CoroutineContext = subscriberContext + this // override Job.
   override fun toString() = "SafeListener(subscriberContext=${subscriberContext.minusKey(Job)})"

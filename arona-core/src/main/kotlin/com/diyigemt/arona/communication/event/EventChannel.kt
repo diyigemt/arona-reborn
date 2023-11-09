@@ -9,7 +9,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.KClass
 
-abstract class EventChannel<out BaseEvent : AbstractEvent> (
+abstract class EventChannel<out BaseEvent : AbstractEvent>(
   val baseEventClass: KClass<out BaseEvent>,
   val defaultCoroutineContext: CoroutineContext,
 ) {
@@ -81,7 +81,7 @@ abstract class EventChannel<out BaseEvent : AbstractEvent> (
     createListener(coroutineContext) { it.handler(it); }
   )
 
-   inline fun <reified E : AbstractEvent> subscribeAlways(
+  inline fun <reified E : AbstractEvent> subscribeAlways(
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     noinline handler: suspend E.(E) -> Unit,
   ): Listener<E> = subscribeAlways(E::class, coroutineContext, handler)
@@ -197,7 +197,7 @@ internal open class FilterEventChannel<BaseEvent : AbstractEvent>(
 
   override fun <E : AbstractEvent> createListener(
     coroutineContext: CoroutineContext,
-    listenerBlock: suspend (E) -> ListeningStatus
+    listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> = delegate.createListener0(coroutineContext, intercept(listenerBlock))
 
   override fun context(vararg coroutineContexts: CoroutineContext): EventChannel<BaseEvent> {
@@ -205,8 +205,8 @@ internal open class FilterEventChannel<BaseEvent : AbstractEvent>(
   }
 }
 
-internal sealed class EventChannelImpl<E : AbstractEvent> (
-  baseEventClass: KClass<out E>, defaultCoroutineContext: CoroutineContext = EmptyCoroutineContext
+internal sealed class EventChannelImpl<E : AbstractEvent>(
+  baseEventClass: KClass<out E>, defaultCoroutineContext: CoroutineContext = EmptyCoroutineContext,
 ) : EventChannel<E>(baseEventClass, defaultCoroutineContext) {
   private val eventListeners = EventListeners()
 
@@ -226,7 +226,7 @@ internal sealed class EventChannelImpl<E : AbstractEvent> (
 
   override fun <E : AbstractEvent> createListener(
     coroutineContext: CoroutineContext,
-    listenerBlock: suspend (E) -> ListeningStatus
+    listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> {
     val context = this.defaultCoroutineContext + coroutineContext
     return SafeListener(
@@ -249,7 +249,7 @@ internal sealed class EventChannelImpl<E : AbstractEvent> (
     return object : DelegateEventChannel<E>(this) {
       override fun <E : AbstractEvent> createListener(
         coroutineContext: CoroutineContext,
-        listenerBlock: suspend (E) -> ListeningStatus
+        listenerBlock: suspend (E) -> ListeningStatus,
       ): Listener<E> {
         return super.createListener(
           newDefaultContext + coroutineContext,
@@ -277,7 +277,7 @@ internal abstract class DelegateEventChannel<BaseEvent : AbstractEvent>(
   @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
   override fun <E : AbstractEvent> createListener(
     coroutineContext: CoroutineContext,
-    listenerBlock: suspend (E) -> ListeningStatus
+    listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> = delegate.createListener0(coroutineContext, listenerBlock)
 
   override fun context(vararg coroutineContexts: CoroutineContext): EventChannel<BaseEvent> {
@@ -286,7 +286,7 @@ internal abstract class DelegateEventChannel<BaseEvent : AbstractEvent>(
 }
 
 internal class EventChannelToEventDispatcherAdapter<E : AbstractEvent> private constructor(
-  baseEventClass: KClass<out E>, defaultCoroutineContext: CoroutineContext = EmptyCoroutineContext
+  baseEventClass: KClass<out E>, defaultCoroutineContext: CoroutineContext = EmptyCoroutineContext,
 ) : EventChannelImpl<E>(baseEventClass, defaultCoroutineContext) {
   companion object {
     val instance by lazy { EventChannelToEventDispatcherAdapter(AbstractEvent::class, EmptyCoroutineContext) }
@@ -303,7 +303,7 @@ object GlobalEventChannel : EventChannel<AbstractEvent>(AbstractEvent::class, Em
 
   override fun <E : AbstractEvent> createListener(
     coroutineContext: CoroutineContext,
-    listenerBlock: suspend (E) -> ListeningStatus
+    listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> = instance.createListener0(coroutineContext, listenerBlock)
 
   override fun context(vararg coroutineContexts: CoroutineContext): EventChannel<AbstractEvent> {
@@ -325,5 +325,5 @@ class ExceptionInEventChannelFilterException(
   val event: AbstractEvent,
   val eventChannel: EventChannel<*>,
   override val message: String = "Exception in EventHandler",
-  override val cause: Throwable
+  override val cause: Throwable,
 ) : IllegalStateException()

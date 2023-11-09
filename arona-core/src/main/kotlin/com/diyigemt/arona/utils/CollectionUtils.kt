@@ -1,4 +1,5 @@
 @file:Suppress("DuplicatedCode")
+
 package com.diyigemt.arona.utils
 
 import java.util.function.BiConsumer
@@ -16,7 +17,7 @@ internal open class ShadowMap<K, V, KR, VR>(
   @JvmField protected val kTransform: (K) -> KR,
   @JvmField protected val kTransformBack: (KR) -> K,
   @JvmField protected val vTransform: (V) -> VR,
-  @JvmField protected val vTransformBack: (VR) -> V
+  @JvmField protected val vTransformBack: (VR) -> V,
 ) : MutableMap<KR, VR> {
   override val size: Int get() = originMapComputer().size
   override fun containsKey(key: KR): Boolean = originMapComputer().containsKey(key.let(kTransformBack))
@@ -141,13 +142,13 @@ internal fun <K, V, KR, VR> MutableMap<K, V>.shadowMap(
   kTransform: (K) -> KR,
   kTransformBack: (KR) -> K,
   vTransform: (V) -> VR,
-  vTransformBack: (VR) -> V
+  vTransformBack: (VR) -> V,
 ): MutableMap<KR, VR> = ShadowMap({ this }, kTransform, kTransformBack, vTransform, vTransformBack)
 
 
 internal inline fun <E, R> MutableCollection<E>.shadowMap(
   crossinline transform: (E) -> R,
-  crossinline transformBack: (R) -> E
+  crossinline transformBack: (R) -> E,
 ): MutableCollection<R> {
   return object : MutableCollection<R> {
     override val size: Int get() = this@shadowMap.size
@@ -179,7 +180,7 @@ internal inline fun <E, R> MutableCollection<E>.shadowMap(
 
 internal inline fun <E, R> MutableList<E>.shadowMap(
   crossinline transform: (E) -> R,
-  crossinline transformBack: (R) -> E
+  crossinline transformBack: (R) -> E,
 ): MutableList<R> {
   return object : MutableList<R> {
     override val size: Int get() = this@shadowMap.size
@@ -255,7 +256,7 @@ internal inline fun <E, R> MutableList<E>.shadowMap(
 
 internal inline fun <E, R> MutableSet<E>.shadowMap(
   crossinline transform: (E) -> R,
-  crossinline transformBack: (R) -> E
+  crossinline transformBack: (R) -> E,
 ): MutableSet<R> {
   return object : MutableSet<R> {
     override val size: Int get() = this@shadowMap.size

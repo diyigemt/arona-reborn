@@ -1,17 +1,9 @@
 package com.diyigemt.arona.communication
 
 import com.diyigemt.arona.communication.contact.*
-import com.diyigemt.arona.communication.message.TencentWebsocketOperationManager.handleTencentOperation
 import com.diyigemt.arona.communication.event.*
-import com.diyigemt.arona.communication.event.TencentBotWebsocketAuthSuccessEvent
-import com.diyigemt.arona.communication.event.TencentBotWebsocketHandshakeSuccessEvent
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.communication.message.TencentBotClientWebSocketSession
-import com.diyigemt.arona.communication.message.TencentMessageIntentSuperType
-import com.diyigemt.arona.communication.message.TencentMessageIntentsBuilder
-import com.diyigemt.arona.communication.message.TencentWebsocketIdentifyReq
-import com.diyigemt.arona.communication.message.TencentWebsocketOperationType
-import com.diyigemt.arona.communication.message.TencentWebsocketPayload
+import com.diyigemt.arona.communication.message.TencentWebsocketOperationManager.handleTencentOperation
 import com.diyigemt.arona.utils.runSuspend
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -51,19 +43,18 @@ interface TencentBot : Contact, CoroutineScope {
     endpoint: TencentEndpoint,
     decoder: KSerializer<T>,
     urlPlaceHolder: Map<String, String> = mapOf(),
-    block: HttpRequestBuilder.() -> Unit
+    block: HttpRequestBuilder.() -> Unit,
   ): Result<T>
 
   suspend fun callOpenapi(
     endpoint: TencentEndpoint,
     urlPlaceHolder: Map<String, String> = mapOf(),
-    block: HttpRequestBuilder.() -> Unit
+    block: HttpRequestBuilder.() -> Unit,
   ): Result<Unit>
 }
 
 internal class TencentBotClient
-private constructor(private val config: TencentBotConfig)
-  : Closeable, TencentBot, CoroutineScope {
+private constructor(private val config: TencentBotConfig) : Closeable, TencentBot, CoroutineScope {
   override val id = config.appId
   override val client = HttpClient(CIO) {
     install(WebSockets)
@@ -197,7 +188,7 @@ private constructor(private val config: TencentBotConfig)
     endpoint: TencentEndpoint,
     decoder: KSerializer<T>,
     urlPlaceHolder: Map<String, String>,
-    block: HttpRequestBuilder.() -> Unit
+    block: HttpRequestBuilder.() -> Unit,
   ): Result<T> {
     var bodyTmp = ""
     return runCatching {
@@ -230,12 +221,17 @@ private constructor(private val config: TencentBotConfig)
     }.onFailure {
       when (it) {
         is MissingFieldException -> {
-          logger.error("call endpoint failed, endpoint: {}, placeHolder: {}, body: {}",
-            endpoint, urlPlaceHolder, bodyTmp)
+          logger.error(
+            "call endpoint failed, endpoint: {}, placeHolder: {}, body: {}",
+            endpoint, urlPlaceHolder, bodyTmp
+          )
         }
+
         is HttpNotOkException -> {
-          logger.error("call endpoint failed, endpoint: {}, placeHolder: {}, body: {}",
-            endpoint, urlPlaceHolder, it.message)
+          logger.error(
+            "call endpoint failed, endpoint: {}, placeHolder: {}, body: {}",
+            endpoint, urlPlaceHolder, it.message
+          )
         }
       }
       logger.error(it)
@@ -245,7 +241,7 @@ private constructor(private val config: TencentBotConfig)
   override suspend fun callOpenapi(
     endpoint: TencentEndpoint,
     urlPlaceHolder: Map<String, String>,
-    block: HttpRequestBuilder.() -> Unit
+    block: HttpRequestBuilder.() -> Unit,
   ) = callOpenapi(endpoint, Unit.serializer(), urlPlaceHolder, block)
 
   override val bot: TencentBot = this

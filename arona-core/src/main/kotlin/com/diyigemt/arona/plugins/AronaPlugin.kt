@@ -4,7 +4,7 @@ import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.communication.event.AbstractEvent
 import com.diyigemt.arona.communication.event.EventChannel
 import com.diyigemt.arona.communication.event.GlobalEventChannel
-import com.diyigemt.arona.plugins.job
+import com.diyigemt.arona.config.AutoSavePluginDataHolder
 import com.diyigemt.arona.utils.SemVersion
 import io.github.z4kn4fein.semver.toVersion
 import io.ktor.util.logging.*
@@ -18,32 +18,33 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
 
-interface AronaAbstractPlugin {
+interface AronaAbstractPlugin : AutoSavePluginDataHolder {
   val logger: Logger
   val description: AronaPluginDescription
 }
 
 abstract class AbstractPlugin(
-  parentCoroutineContext: EmptyCoroutineContext = EmptyCoroutineContext
+  parentCoroutineContext: EmptyCoroutineContext = EmptyCoroutineContext,
 ) : AronaAbstractPlugin, CommandOwner, PluginFileExtensions, CoroutineScope {
   final override val logger by lazy {
     KtorSimpleLogger(description.id)
   }
+  final override val dataHolderName: String
+    get() = this.description.id
   final override val dataFolderPath: Path by lazy {
     PluginManager.pluginsDataPath.resolve(description.id).apply { mkdir() }
   }
-
   final override val dataFolder: File by lazy {
     dataFolderPath.toFile()
   }
-
   final override val configFolderPath: Path by lazy {
     PluginManager.pluginsConfigPath.resolve(description.id).apply { mkdir() }
   }
-
   final override val configFolder: File by lazy {
     configFolderPath.toFile()
   }
+  override val autoSaveIntervalMillis: LongRange = (30 * 1000L)..(10 * 1000L)
+
   internal val coroutineContextInitializer = {
     CoroutineExceptionHandler { context, throwable ->
       if (throwable.rootCauseOrSelf !is CancellationException) logger.error(
@@ -60,6 +61,7 @@ abstract class AbstractPlugin(
         }
       }
   }
+
   private fun refreshCoroutineContext(): CoroutineContext {
     return coroutineContextInitializer().also { _coroutineContext = it }.also {
       job.invokeOnCompletion { e ->
@@ -79,7 +81,7 @@ abstract class AbstractPlugin(
 }
 
 abstract class AronaPlugin(
-  final override val description: AronaPluginDescription
+  final override val description: AronaPluginDescription,
 ) : AbstractPlugin() {
   val version get() = description.version
   abstract fun onLoad()
@@ -91,14 +93,14 @@ data class AronaPluginDescription(
   val name: String = "",
   val author: String = "",
   val version: SemVersion = SemVersion(0, 1, 1),
-  val description: String = ""
+  val description: String = "",
 ) {
   constructor(
     id: String,
     name: String = "",
     author: String = "",
     version: String = "0.0,1",
-    description: String = ""
+    description: String = "",
   ) : this(id, name, author, version.toVersion(), description)
 }
 

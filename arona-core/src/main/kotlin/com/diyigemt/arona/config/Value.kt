@@ -2,13 +2,12 @@
   "INVISIBLE_REFERENCE",
   "INVISIBLE_MEMBER",
 )
+
 package com.diyigemt.arona.config
 
 import com.diyigemt.arona.config.internal.*
-import com.diyigemt.arona.config.internal.ByteValueImpl
-import com.diyigemt.arona.config.internal.IntValueImpl
-import com.diyigemt.arona.config.internal.LongValueImpl
-import com.diyigemt.arona.config.internal.ShortValueImpl
+import com.diyigemt.arona.utils.map
+import kotlinx.serialization.KSerializer
 import kotlin.internal.LowPriorityInOverloadResolution
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -76,7 +75,15 @@ internal class LazyReferenceValueImpl<T> : Value<T> {
 }
 
 @LowPriorityInOverloadResolution
-public inline fun <reified T>
+inline fun <reified T> PluginData.value(
+  default: T,
+  crossinline apply: T.() -> Unit = {},
+): SerializerAwareValue<@kotlin.internal.Exact T> {
+  return valueFromKType(typeOf<T>(), default).also { it.value.apply() }
+}
+
+@LowPriorityInOverloadResolution
+inline fun <reified T>
     PluginData.value(apply: T.() -> Unit = {}): SerializerAwareValue<@kotlin.internal.Exact T> =
   valueImpl<T>(typeOf<T>(), T::class).also { it.value.apply() }
 
@@ -85,18 +92,48 @@ public inline fun <reified T>
 internal fun <T> PluginData.valueImpl(type: KType, classifier: KClass<*>): SerializerAwareValue<T> =
   valueFromKType(type, classifier.run { objectInstance ?: createInstanceSmart() } as T)
 
-/**
- * 通过一个特定的 [KType] 创建 [Value], 并设置初始值.
- *
- * 对于 [Map], [Set], [List] 等标准库类型, 这个函数会尝试构造 [LinkedHashMap], [LinkedHashSet], [ArrayList] 等相关类型.
- * 而对于自定义数据类型, 本函数只会反射获取 [objectInstance][KClass.objectInstance] 或使用*无参构造器*构造实例.
- *
- * @param T 具体化参数类型 T. 仅支持:
- * - 基础数据类型, [String]
- * - 标准库集合类型 ([List], [Map], [Set])
- * - 标准库数据类型 ([Map.Entry], [Pair], [Triple])
- * - 使用 [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) 的 [Serializable] 标记的类
- */
 @Suppress("UNCHECKED_CAST")
-public fun <T> PluginData.valueFromKType(type: KType, default: T): SerializerAwareValue<T> =
+fun <T> PluginData.valueFromKType(type: KType, default: T): SerializerAwareValue<T> =
   (valueFromKTypeImpl(type) as SerializerAwareValue<Any?>).apply { this.value = default } as SerializerAwareValue<T>
+
+class SerializableValue<T>(
+  @JvmField internal val delegate: Value<T>,
+  override val serializer: KSerializer<Unit>,
+) : Value<T> by delegate, SerializerAwareValue<T> {
+  override fun toString(): String = delegate.toString()
+
+  override fun equals(other: Any?): Boolean {
+    if (other === this) return true
+    if (other?.javaClass != this.javaClass) return false
+
+    @Suppress("UNCHECKED_CAST")
+    other as SerializableValue<T>
+    if (other.delegate != this.delegate) return false
+    // if (other.serializer != this.serializer) return false
+    // TODO: 2020/9/9 serializers should be checked here, but it will cause incomparable issue when putting a SerializableValue as a Key
+    return true
+  }
+
+  override fun hashCode(): Int {
+    @Suppress("UnnecessaryVariable", "CanBeVal")
+    var result = delegate.hashCode()
+    // result = 31 * result + serializer.hashCode()
+    // TODO: 2020/9/9 serializers should be checked here, but it will cause incomparable issue when putting a SerializableValue as a Key
+    return result
+  }
+
+  companion object {
+    @JvmStatic
+    @JvmName("create")
+    fun <T> Value<T>.serializableValueWith(
+      serializer: KSerializer<T>,
+    ): SerializableValue<T> {
+      return SerializableValue(
+        this,
+        serializer.map(serializer = {
+          this.value
+        }, deserializer = { this.setValueBySerializer(it) })
+      )
+    }
+  }
+}

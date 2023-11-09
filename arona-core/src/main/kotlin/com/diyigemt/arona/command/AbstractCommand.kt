@@ -1,10 +1,10 @@
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.communication.command.CommandSender
-import com.github.ajalt.clikt.core.*
-import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.requireObject
+import com.github.ajalt.clikt.core.subcommands
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.KVisibility
@@ -52,7 +52,7 @@ class IllegalCommandDeclarationException : Exception {
 }
 
 internal class CommandReflector(
-  val command: Command
+  val command: Command,
 ) {
   private fun getSubCommandNames(command: Command): String {
     val annotated = command::class.findAnnotation<SubCommand>()!!.value
@@ -90,7 +90,7 @@ internal class CommandReflector(
   }
 
   @Suppress("UNCHECKED_CAST")
-  fun findSubCommand() : List<AbstractCommand> {
+  fun findSubCommand(): List<AbstractCommand> {
     val s = command::class.java.declaredClasses
       .asSequence()
       .map { it.kotlin }
@@ -112,7 +112,7 @@ internal class CommandReflector(
  */
 @Target(AnnotationTarget.CLASS)
 annotation class SubCommand(
-  val value: String = ""
+  val value: String = "",
 )
 
 abstract class AbstractCommand(
@@ -129,6 +129,7 @@ abstract class AbstractCommand(
   override val targetExtensionFunction by lazy {
     reflector.findTargetExtensionFunction()
   }
+
   init {
     Command.checkCommandName(primaryName)
     secondaryNames.forEach(Command.Companion::checkCommandName)

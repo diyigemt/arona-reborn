@@ -20,6 +20,7 @@ enum class TencentGuildChannelType(val code: Int) {
   STREAM(10005),
   APPLICATION(10006),
   FORM(10007);
+
   companion object {
     private val map = entries.associateBy { it.code }
     fun fromValue(code: Int) = map[code] ?: TEXT
@@ -38,6 +39,7 @@ enum class TencentGuildChannelSubType(val code: Int) {
   ANNOUNCE(1),
   HELP(2),
   KOOK(3);
+
   companion object {
     private val map = entries.associateBy { it.code }
     fun fromValue(code: Int) = map[code] ?: CHAT
@@ -55,6 +57,7 @@ enum class TencentGuildChannelPrivateType(val code: Int) {
   OPEN(0),
   ADMIN_ONLY(1),
   ADMIN_ONLY_MEMBER(2);
+
   companion object {
     private val map = entries.associateBy { it.code }
     fun fromValue(code: Int) = map[code] ?: OPEN
@@ -72,15 +75,19 @@ enum class TencentGuildChannelSpeakPermissionType(val code: Int) {
   INVALID(0),
   ANY(1),
   ADMIN_ONLY_MEMBER(2);
+
   companion object {
     private val map = entries.associateBy { it.code }
     fun fromValue(code: Int) = map[code] ?: INVALID
   }
 }
 
-internal object TencentGuildChannelSpeakPermissionTypeIntSerializer : KSerializer<TencentGuildChannelSpeakPermissionType> {
+internal object TencentGuildChannelSpeakPermissionTypeIntSerializer :
+  KSerializer<TencentGuildChannelSpeakPermissionType> {
   override val descriptor = PrimitiveSerialDescriptor("TencentGuildChannelSpeakPermissionType", PrimitiveKind.INT)
-  override fun serialize(encoder: Encoder, value: TencentGuildChannelSpeakPermissionType) = encoder.encodeInt(value.code)
+  override fun serialize(encoder: Encoder, value: TencentGuildChannelSpeakPermissionType) =
+    encoder.encodeInt(value.code)
+
   override fun deserialize(decoder: Decoder) = TencentGuildChannelSpeakPermissionType.fromValue(decoder.decodeInt())
 }
 
@@ -94,6 +101,7 @@ enum class TencentGuildChannelApplicationType(val code: Int) {
   SCHEDULE(1000050),
   CODM(1000070),
   PEACE(1010000);
+
   companion object {
     private val map = entries.associateBy { it.code }
     fun fromValue(code: Int) = map[code] ?: NULL

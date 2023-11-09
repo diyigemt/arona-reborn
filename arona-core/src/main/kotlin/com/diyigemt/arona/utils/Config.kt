@@ -10,14 +10,15 @@ import java.nio.charset.Charset
 data class RedisConfig(
   val host: String,
   val port: Int,
-  val db: ULong = 0u
+  val db: ULong = 0u,
 )
+
 @Serializable
 data class AronaConfig(
   val debug: Boolean = false,
   val bot: TencentBotConfig,
   val adminToken: String,
-  val redis: RedisConfig
+  val redis: RedisConfig,
 )
 
 internal val aronaConfig: AronaConfig by lazy {

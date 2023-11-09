@@ -1,3 +1,4 @@
+@file:Suppress("MemberVisibilityCanBePrivate", "unused_parameter")
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.communication.command.*
@@ -169,7 +170,7 @@ suspend inline fun GuildUserCommandSender.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
   noinline filter: suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Boolean = { true },
-  noinline action: suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Unit
+  noinline action: suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Unit,
 ) {
   val mapper = createMapper<GuildUserCommandSender, TencentGuildPrivateMessageEvent>(filter)
   val event = (if (timeoutMillis == -1L) {
@@ -186,7 +187,7 @@ suspend inline fun GuildChannelCommandSender.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
   noinline filter: suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Boolean = { true },
-  noinline action: suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Unit
+  noinline action: suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Unit,
 ) {
   val mapper = createMapper<GuildChannelCommandSender, TencentGuildMessageEvent>(filter)
   val event = (if (timeoutMillis == -1L) {
@@ -204,7 +205,7 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
   noinline filter: suspend C.(C) -> Boolean = { true },
-  noinline action: suspend C.(C) -> Unit
+  noinline action: suspend C.(C) -> Unit,
 ) {
   val mapper = when (this) {
     is SingleUserCommandSender -> TODO()
@@ -228,7 +229,7 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
 @PublishedApi
 @JvmName("\$createMapper")
 internal inline fun <reified C : UserCommandSender, E : TencentMessageEvent> C.createMapper(
-  crossinline filter: suspend C.(C) -> Boolean
+  crossinline filter: suspend C.(C) -> Boolean,
 ): suspend (E) -> E? =
   mapper@{ event ->
     if (!this.isContextIdenticalWith(event)) return@mapper null
@@ -238,7 +239,7 @@ internal inline fun <reified C : UserCommandSender, E : TencentMessageEvent> C.c
 
 @PublishedApi
 internal inline fun <reified C : UserCommandSender, E : TencentMessageEvent> C.createMapper(
-  crossinline filter: suspend C.(E) -> Boolean
+  crossinline filter: suspend C.(E) -> Boolean,
 ): suspend (E) -> E? =
   mapper@{ event ->
     if (!this.isContextIdenticalWith(event)) return@mapper null

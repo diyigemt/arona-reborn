@@ -1,7 +1,6 @@
 package com.diyigemt.arona.communication.event
 
 import com.diyigemt.arona.communication.TencentBot
-import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.message.MessageChain
 import com.diyigemt.arona.communication.message.TencentChannelMessageRaw

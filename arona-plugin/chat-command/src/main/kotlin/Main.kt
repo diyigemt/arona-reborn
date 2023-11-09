@@ -12,13 +12,15 @@ import com.github.ajalt.clikt.core.CliktError
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
-object PluginMain : AronaPlugin(AronaPluginDescription(
-  id = "com.diyigemt.arona.chat.command",
-  name = "chat-command",
-  author = "diyigemt",
-  version = "0.1.0",
-  description = "chat-command"
-)) {
+object PluginMain : AronaPlugin(
+  AronaPluginDescription(
+    id = "com.diyigemt.arona.chat.command",
+    name = "chat-command",
+    author = "diyigemt",
+    version = "0.1.0",
+    description = "chat-command"
+  )
+) {
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent>(
       CoroutineExceptionHandler { _, throwable ->
@@ -41,11 +43,13 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
           is CommandExecuteResult.Success -> {
 
           }
+
           is CommandExecuteResult.UnmatchedSignature -> {
             // 发送错误处理
             val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@launch
             commandSender.sendMessage(helpMessage)
           }
+
           else -> {
             result.exception?.let { it1 -> logger.error(it1) }
           }

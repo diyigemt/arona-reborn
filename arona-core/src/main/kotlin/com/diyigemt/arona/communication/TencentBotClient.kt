@@ -4,6 +4,8 @@ import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.communication.message.TencentWebsocketOperationManager.handleTencentOperation
+import com.diyigemt.arona.utils.TimedTask
+import com.diyigemt.arona.utils.launchTimedTask
 import com.diyigemt.arona.utils.runSuspend
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -76,13 +78,14 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
 
   private val timer = Timer("Bot.${config.appId}", true)
   private var accessToken: String = ""
-  private lateinit var accessTokenHeartbeatTask: TimerTask
-  private lateinit var websocketHeartbeatTask: TimerTask
+  private lateinit var accessTokenHeartbeatTask: TimedTask
+  private lateinit var websocketHeartbeatTask: TimedTask
   private lateinit var websocketContext: TencentBotClientWebSocketSession
   private val openapiSignHeader: HeadersBuilder.() -> Unit = {
     append("Authorization", botToken)
     append("X-Union-Appid", id)
   }
+  private val appId = config.appId
   private val botToken
     get() = "QQBot $accessToken"
 
@@ -123,6 +126,28 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
         TencentBotOnlineEvent(this@TencentBotClient).broadcast()
       }
     }
+    // 处理断联事件
+    eventChannel.subscribeAlways<TencentBotWebsocketConnectionLostEvent>(coroutineContext) {
+      // 发送resume操作
+      // 保存上个context的信息
+      val cacheSessionId = websocketContext.sessionId
+      val cacheSerialNumber = websocketContext.serialNumber
+      // 重新连接
+      connectWs {
+        with(websocketContext) {
+          send(json.encodeToString(
+            TencentWebsocketPayload(
+              operation = TencentWebsocketOperationType.Resume,
+              data = TencentWebsocketResumeReq(
+                token = botToken,
+                sessionId = cacheSessionId,
+                serialNumber = cacheSerialNumber
+              )
+            )
+          ))
+        }
+      }
+    }
     doAuth()
     connectWs()
   }
@@ -143,7 +168,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     }
   }
 
-  private suspend fun connectWs() {
+  private suspend fun connectWs(onConnected: suspend (TencentBotClientWebSocketSession) -> Unit = {}) {
     callOpenapi(TencentEndpoint.WebSocket, TencentWebsocketEndpointResp.serializer()) {
       method = HttpMethod.Get
     }.onSuccess {
@@ -154,6 +179,11 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
       }) {
         val cxt = this@TencentBotClient.toWebSocketSession(call, this)
         this@TencentBotClient.websocketContext = cxt
+        runCatching {
+          onConnected(cxt)
+        }.onFailure {
+          logger.error(it)
+        }
         while (true) {
           cxt.handleTencentOperation()
         }
@@ -251,28 +281,31 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   }
 
   private fun TencentBotClientWebSocketSession.startWebsocketHeartbeat() {
-    (timer.scheduleAtFixedRate(0, heartbeatInterval) {
-      runSuspend {
-        sendApiData(
-          TencentWebsocketPayload(
-            operation = TencentWebsocketOperationType.Heartbeat,
-            serialNumber = 0,
-            type = TencentWebsocketEventType.NULL,
-            data = if (serialNumber == 0L) null else serialNumber
-          )
+    launchTimedTask(
+      intervalMillis = heartbeatInterval,
+      coroutineContext = CoroutineName("TencentBotClient($appId).WebsocketHeartbeat")
+    ) {
+      sendApiData(
+        TencentWebsocketPayload(
+          operation = TencentWebsocketOperationType.Heartbeat,
+          serialNumber = 0,
+          type = TencentWebsocketEventType.NULL,
+          data = if (serialNumber == 0L) null else serialNumber
         )
-      }
-    }).also { websocketHeartbeatTask = it }
+      )
+    }.also { websocketHeartbeatTask = it }
   }
 
-  private fun startAccessTokenHeartbeat() =
-    (timer.scheduleAtFixedRate((7200L - 30L) * 1000, (7200L - 30L) * 1000) {
-      runSuspend { doAuth() }
-    }).also { accessTokenHeartbeatTask = it }
+  private fun startAccessTokenHeartbeat() = launchTimedTask(
+    intervalMillis = (7200L - 30L) * 1000,
+    coroutineContext = CoroutineName("TencentBotClient($appId).AccessTokenHeartbeat")
+  ) {
+    doAuth()
+  }.also { accessTokenHeartbeatTask = it }
 
   override fun close() {
-    websocketHeartbeatTask.cancel()
-    accessTokenHeartbeatTask.cancel()
+    websocketHeartbeatTask.job.cancel()
+    accessTokenHeartbeatTask.job.cancel()
     timer.cancel()
     client.close()
   }

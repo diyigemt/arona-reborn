@@ -100,6 +100,8 @@ abstract class TencentEvent : AbstractEvent() {
 
 internal data class TencentBotWebsocketHandshakeSuccessEvent(override val bot: TencentBot) : TencentEvent()
 
+internal data class TencentBotWebsocketConnectionLostEvent(override val bot: TencentBot) : TencentEvent()
+
 internal data class TencentBotWebsocketAuthSuccessEvent(
   override val bot: TencentBot,
   val payload: TencentWebsocketIdentifyResp,

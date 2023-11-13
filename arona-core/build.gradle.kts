@@ -22,14 +22,15 @@ dependencies {
   implementation("io.ktor:ktor-server-forwarded-header-jvm")
   implementation("io.ktor:ktor-server-host-common-jvm")
   implementation("io.ktor:ktor-server-status-pages-jvm")
-  implementation("io.ktor:ktor-server-content-negotiation-jvm")
-  implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
   implementation("io.ktor:ktor-server-double-receive-jvm")
+  implementation("io.ktor:ktor-server-content-negotiation-jvm")
 
   implementation("io.ktor:ktor-client-cio")
   implementation("io.ktor:ktor-client-core")
   implementation("io.ktor:ktor-client-websockets")
   implementation("io.ktor:ktor-client-content-negotiation")
+
+  implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
   api("org.jetbrains.exposed:exposed-dao:$exposedVersion")
   api("org.jetbrains.exposed:exposed-core:$exposedVersion")

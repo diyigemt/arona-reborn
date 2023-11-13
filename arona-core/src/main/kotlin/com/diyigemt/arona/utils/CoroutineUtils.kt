@@ -47,7 +47,7 @@ inline fun <R> runUnwrapCancellationException(block: () -> R): R {
   }
 }
 
-public fun CoroutineContext.newCoroutineContextWithSupervisorJob(name: String? = null): CoroutineContext =
+fun CoroutineContext.newCoroutineContextWithSupervisorJob(name: String? = null): CoroutineContext =
   this + CoroutineName(name ?: "<unnamed>") + SupervisorJob(this[Job])
 
 fun Throwable.unwrapCancellationException(): Throwable = unwrap<CancellationException>()

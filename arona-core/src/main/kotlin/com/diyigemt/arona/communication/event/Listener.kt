@@ -8,8 +8,8 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KClass
 
 internal class ListenerRegistry(
-  val listener: Listener<AbstractEvent>,
-  val type: KClass<out AbstractEvent>,
+  val listener: Listener<Event>,
+  val type: KClass<out Event>,
 )
 
 enum class ListeningStatus {
@@ -17,11 +17,11 @@ enum class ListeningStatus {
   STOPPED
 }
 
-interface Listener<in E : AbstractEvent> : CompletableJob {
+interface Listener<in E : Event> : CompletableJob {
   suspend fun onEvent(event: E): ListeningStatus?
 }
 
-internal class SafeListener<in E : AbstractEvent> internal constructor(
+internal class SafeListener<in E : Event> internal constructor(
   parentJob: Job?,
   subscriberContext: CoroutineContext,
   private val listenerBlock: suspend (E) -> ListeningStatus,
@@ -35,7 +35,7 @@ internal class SafeListener<in E : AbstractEvent> internal constructor(
   }.onFailure {
     val subscriberExceptionHandler = subscriberContext[CoroutineExceptionHandler]
     if (subscriberExceptionHandler == null) {
-      val logger = if (event is TencentEvent) event.bot.logger else userLogger
+      val logger = if (event is TencentBotEvent) event.bot.logger else userLogger
       val subscriberName = subscriberContext[CoroutineName]?.name ?: "<unnamed>"
       val broadcasterName = currentCoroutineContext()[CoroutineName]?.name ?: "<unnamed>"
       val message =
@@ -58,7 +58,7 @@ internal class EventListeners {
     container.clear()
   }
 
-  internal suspend fun <E : AbstractEvent> callListeners(event: E) {
+  internal suspend fun <E : Event> callListeners(event: E) {
     for (registry in container) {
       if (!registry.type.isInstance(event)) continue
       supervisorScope {
@@ -69,19 +69,19 @@ internal class EventListeners {
     }
   }
 
-  internal fun <E : AbstractEvent> addListener(eventClass: KClass<E>, listener: Listener<E>) {
+  internal fun <E : Event> addListener(eventClass: KClass<E>, listener: Listener<E>) {
     @Suppress("UNCHECKED_CAST")
-    val node = ListenerRegistry(listener as Listener<AbstractEvent>, eventClass)
+    val node = ListenerRegistry(listener as Listener<Event>, eventClass)
     container.add(node)
     listener.invokeOnCompletion {
       container.remove(node)
     }
   }
 
-  private suspend fun <E : AbstractEvent> process(
+  private suspend fun <E : Event> process(
     container: MutableCollection<ListenerRegistry>,
     registry: ListenerRegistry,
-    listener: Listener<AbstractEvent>,
+    listener: Listener<Event>,
     event: E,
   ) {
     listener as SafeListener

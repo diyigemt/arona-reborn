@@ -9,7 +9,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.KClass
 
-abstract class EventChannel<out BaseEvent : AbstractEvent>(
+abstract class EventChannel<out BaseEvent : Event>(
   val baseEventClass: KClass<out BaseEvent>,
   val defaultCoroutineContext: CoroutineContext,
 ) {
@@ -23,13 +23,13 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
     return filter { runBIO { filter(it) } }
   }
 
-  inline fun <reified E : AbstractEvent> filterIsInstance(): EventChannel<E> = filterIsInstance(E::class)
+  inline fun <reified E : Event> filterIsInstance(): EventChannel<E> = filterIsInstance(E::class)
 
-  fun <E : AbstractEvent> filterIsInstance(kClass: KClass<out E>): EventChannel<E> {
+  fun <E : Event> filterIsInstance(kClass: KClass<out E>): EventChannel<E> {
     return filter { kClass.isInstance(it) }.cast()
   }
 
-  fun <E : AbstractEvent> filterIsInstance(clazz: Class<out E>): EventChannel<E> = filterIsInstance(clazz.kotlin)
+  fun <E : Event> filterIsInstance(clazz: Class<out E>): EventChannel<E> = filterIsInstance(clazz.kotlin)
 
   abstract fun context(vararg coroutineContexts: CoroutineContext): EventChannel<BaseEvent>
 
@@ -67,12 +67,12 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
     return context(job)
   }
 
-  inline fun <reified E : AbstractEvent> subscribe(
+  inline fun <reified E : Event> subscribe(
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     noinline handler: suspend E.(E) -> ListeningStatus,
   ): Listener<E> = subscribe(E::class, coroutineContext, handler)
 
-  fun <E : AbstractEvent> subscribe(
+  fun <E : Event> subscribe(
     eventClass: KClass<out E>,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     handler: suspend E.(E) -> ListeningStatus,
@@ -81,12 +81,12 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
     createListener(coroutineContext) { it.handler(it); }
   )
 
-  inline fun <reified E : AbstractEvent> subscribeAlways(
+  inline fun <reified E : Event> subscribeAlways(
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     noinline handler: suspend E.(E) -> Unit,
   ): Listener<E> = subscribeAlways(E::class, coroutineContext, handler)
 
-  fun <E : AbstractEvent> subscribeAlways(
+  fun <E : Event> subscribeAlways(
     eventClass: KClass<out E>,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     handler: suspend E.(E) -> Unit,
@@ -95,12 +95,12 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
     createListener(coroutineContext) { it.handler(it); ListeningStatus.LISTENING }
   )
 
-  inline fun <reified E : AbstractEvent> subscribeOnce(
+  inline fun <reified E : Event> subscribeOnce(
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     noinline handler: suspend E.(E) -> Unit,
   ): Listener<E> = subscribeOnce(E::class, coroutineContext, handler)
 
-  fun <E : AbstractEvent> subscribeOnce(
+  fun <E : Event> subscribeOnce(
     eventClass: KClass<out E>,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     handler: suspend E.(E) -> Unit,
@@ -111,7 +111,7 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
 
   @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
   @kotlin.internal.LowPriorityInOverloadResolution
-  fun <E : AbstractEvent> subscribeAlways(
+  fun <E : Event> subscribeAlways(
     eventClass: Class<out E>,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     handler: Consumer<E>,
@@ -123,7 +123,7 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
     }
   )
 
-  fun <E : AbstractEvent> subscribe(
+  fun <E : Event> subscribe(
     eventClass: Class<out E>,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     handler: java.util.function.Function<E, ListeningStatus>,
@@ -136,7 +136,7 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
 
   @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
   @kotlin.internal.LowPriorityInOverloadResolution
-  fun <E : AbstractEvent> subscribeOnce(
+  fun <E : Event> subscribeOnce(
     eventClass: Class<out E>,
     coroutineContext: CoroutineContext = EmptyCoroutineContext,
     handler: Consumer<E>,
@@ -148,24 +148,24 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
     }
   )
 
-  protected abstract fun <E : AbstractEvent> registerListener(eventClass: KClass<out E>, listener: Listener<E>)
+  protected abstract fun <E : Event> registerListener(eventClass: KClass<out E>, listener: Listener<E>)
 
-  internal fun <E : AbstractEvent> registerListener0(eventClass: KClass<out E>, listener: Listener<E>) {
+  internal fun <E : Event> registerListener0(eventClass: KClass<out E>, listener: Listener<E>) {
     return registerListener(eventClass, listener)
   }
 
-  private fun <L : Listener<E>, E : AbstractEvent> subscribeInternal(eventClass: KClass<out E>, listener: L): L {
+  private fun <L : Listener<E>, E : Event> subscribeInternal(eventClass: KClass<out E>, listener: L): L {
     registerListener(eventClass, listener)
     return listener
   }
 
   @Contract("_ -> new")
-  protected abstract fun <E : AbstractEvent> createListener(
+  protected abstract fun <E : Event> createListener(
     coroutineContext: CoroutineContext,
     listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E>
 
-  internal fun <E : AbstractEvent> createListener0(
+  internal fun <E : Event> createListener0(
     coroutineContext: CoroutineContext,
     listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> = createListener(coroutineContext, listenerBlock)
@@ -173,11 +173,11 @@ abstract class EventChannel<out BaseEvent : AbstractEvent>(
 }
 
 
-internal open class FilterEventChannel<BaseEvent : AbstractEvent>(
+internal open class FilterEventChannel<BaseEvent : Event>(
   private val delegate: EventChannel<BaseEvent>,
   private val filter: suspend (event: BaseEvent) -> Boolean,
 ) : EventChannel<BaseEvent>(delegate.baseEventClass, delegate.defaultCoroutineContext) {
-  private fun <E : AbstractEvent> intercept(block: suspend (E) -> ListeningStatus): suspend (E) -> ListeningStatus {
+  private fun <E : Event> intercept(block: suspend (E) -> ListeningStatus): suspend (E) -> ListeningStatus {
     return { ev ->
       val filterResult = try {
         @Suppress("UNCHECKED_CAST")
@@ -191,11 +191,11 @@ internal open class FilterEventChannel<BaseEvent : AbstractEvent>(
     }
   }
 
-  override fun <E : AbstractEvent> registerListener(eventClass: KClass<out E>, listener: Listener<E>) {
+  override fun <E : Event> registerListener(eventClass: KClass<out E>, listener: Listener<E>) {
     delegate.registerListener0(eventClass, listener)
   }
 
-  override fun <E : AbstractEvent> createListener(
+  override fun <E : Event> createListener(
     coroutineContext: CoroutineContext,
     listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> = delegate.createListener0(coroutineContext, intercept(listenerBlock))
@@ -205,26 +205,26 @@ internal open class FilterEventChannel<BaseEvent : AbstractEvent>(
   }
 }
 
-internal sealed class EventChannelImpl<E : AbstractEvent>(
+internal sealed class EventChannelImpl<E : Event>(
   baseEventClass: KClass<out E>, defaultCoroutineContext: CoroutineContext = EmptyCoroutineContext,
 ) : EventChannel<E>(baseEventClass, defaultCoroutineContext) {
   private val eventListeners = EventListeners()
 
-  suspend fun <E : AbstractEvent> broadcastEventImpl(event: E): E {
+  suspend fun <E : Event> broadcastEventImpl(event: E): E {
     callListeners(event)
     return event
   }
 
-  private suspend fun callListeners(event: AbstractEvent) {
+  private suspend fun callListeners(event: Event) {
     logEvent(event)
     eventListeners.callListeners(event)
   }
 
-  override fun <E : AbstractEvent> registerListener(eventClass: KClass<out E>, listener: Listener<E>) {
+  override fun <E : Event> registerListener(eventClass: KClass<out E>, listener: Listener<E>) {
     eventListeners.addListener(eventClass, listener)
   }
 
-  override fun <E : AbstractEvent> createListener(
+  override fun <E : Event> createListener(
     coroutineContext: CoroutineContext,
     listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> {
@@ -236,7 +236,7 @@ internal sealed class EventChannelImpl<E : AbstractEvent>(
     )
   }
 
-  private fun logEvent(event: AbstractEvent) {
+  private fun logEvent(event: Event) {
     // TODO
   }
 
@@ -247,7 +247,7 @@ internal sealed class EventChannelImpl<E : AbstractEvent>(
 
     @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
     return object : DelegateEventChannel<E>(this) {
-      override fun <E : AbstractEvent> createListener(
+      override fun <E : Event> createListener(
         coroutineContext: CoroutineContext,
         listenerBlock: suspend (E) -> ListeningStatus,
       ): Listener<E> {
@@ -265,17 +265,17 @@ internal sealed class EventChannelImpl<E : AbstractEvent>(
 }
 
 
-internal abstract class DelegateEventChannel<BaseEvent : AbstractEvent>(
+internal abstract class DelegateEventChannel<BaseEvent : Event>(
   protected val delegate: EventChannel<BaseEvent>,
 ) : EventChannel<BaseEvent>(delegate.baseEventClass, delegate.defaultCoroutineContext) {
 
   @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
-  override fun <E : AbstractEvent> registerListener(eventClass: KClass<out E>, listener: Listener<E>) {
+  override fun <E : Event> registerListener(eventClass: KClass<out E>, listener: Listener<E>) {
     delegate.registerListener0(eventClass, listener)
   }
 
   @Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
-  override fun <E : AbstractEvent> createListener(
+  override fun <E : Event> createListener(
     coroutineContext: CoroutineContext,
     listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> = delegate.createListener0(coroutineContext, listenerBlock)
@@ -285,28 +285,28 @@ internal abstract class DelegateEventChannel<BaseEvent : AbstractEvent>(
   }
 }
 
-internal class EventChannelToEventDispatcherAdapter<E : AbstractEvent> private constructor(
+internal class EventChannelToEventDispatcherAdapter<E : Event> private constructor(
   baseEventClass: KClass<out E>, defaultCoroutineContext: CoroutineContext = EmptyCoroutineContext,
 ) : EventChannelImpl<E>(baseEventClass, defaultCoroutineContext) {
   companion object {
-    val instance by lazy { EventChannelToEventDispatcherAdapter(AbstractEvent::class, EmptyCoroutineContext) }
+    val instance by lazy { EventChannelToEventDispatcherAdapter(Event::class, EmptyCoroutineContext) }
   }
 }
 
 
-object GlobalEventChannel : EventChannel<AbstractEvent>(AbstractEvent::class, EmptyCoroutineContext) {
+object GlobalEventChannel : EventChannel<Event>(Event::class, EmptyCoroutineContext) {
   private val instance = EventChannelToEventDispatcherAdapter.instance
 
-  override fun <E : AbstractEvent> registerListener(eventClass: KClass<out E>, listener: Listener<E>) {
+  override fun <E : Event> registerListener(eventClass: KClass<out E>, listener: Listener<E>) {
     return instance.registerListener0(eventClass, listener)
   }
 
-  override fun <E : AbstractEvent> createListener(
+  override fun <E : Event> createListener(
     coroutineContext: CoroutineContext,
     listenerBlock: suspend (E) -> ListeningStatus,
   ): Listener<E> = instance.createListener0(coroutineContext, listenerBlock)
 
-  override fun context(vararg coroutineContexts: CoroutineContext): EventChannel<AbstractEvent> {
+  override fun context(vararg coroutineContexts: CoroutineContext): EventChannel<Event> {
     return instance.context(*coroutineContexts)
   }
 }
@@ -322,7 +322,7 @@ inline fun <reified T> Any?.cast(): T {
 }
 
 class ExceptionInEventChannelFilterException(
-  val event: AbstractEvent,
+  val event: Event,
   val eventChannel: EventChannel<*>,
   override val message: String = "Exception in EventHandler",
   override val cause: Throwable,

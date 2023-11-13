@@ -1,14 +1,15 @@
 package com.diyigemt.arona.config.internal
 
 import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlConfiguration
 import com.diyigemt.arona.config.MultiFilePluginDataStorage
 import com.diyigemt.arona.config.PluginData
 import com.diyigemt.arona.config.PluginDataHolder
 import com.diyigemt.arona.config.PluginDataStorage
+import com.diyigemt.arona.config.internal.serializer.YamlNullableDynamicSerializer
 import com.diyigemt.arona.utils.qualifiedNameOrTip
 import io.ktor.util.logging.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.Json.Default.decodeFromString
 import org.slf4j.Logger
 import java.io.File
 import java.lang.System.currentTimeMillis
@@ -68,8 +69,9 @@ internal open class MultiFilePluginDataStorageImpl(
   public override fun store(holder: PluginDataHolder, instance: PluginData) {
     getPluginDataFile(holder, instance).writeText(
       kotlin.runCatching {
-        createYaml(instance).encodeToString(instance.updaterSerializer, Unit).also {
-          decodeFromString(instance.updaterSerializer, it) // test yaml
+        val yaml = createYaml(instance)
+        yaml.encodeToString(instance.updaterSerializer, Unit).also {
+          yaml.decodeFromString(YamlNullableDynamicSerializer, it)
         }
       }.recoverCatching {
         logger.warn(
@@ -92,7 +94,7 @@ internal open class MultiFilePluginDataStorageImpl(
   }
 
   private fun createYaml(instance: PluginData): Yaml {
-    return Yaml(instance.serializersModule)
+    return Yaml(instance.serializersModule, YamlConfiguration(strictMode = false))
   }
 }
 

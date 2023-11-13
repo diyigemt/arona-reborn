@@ -32,8 +32,5 @@ object TestCommand : AbstractCommand(
   private val arg by argument("参数1")
   suspend fun GuildChannelCommandSender.test() {
     sendMessage("这是通过指令触发的消息, 参数是 $arg")
-    nextMessage {
-      sendMessage("这是等待触发的消息")
-    }
   }
 }

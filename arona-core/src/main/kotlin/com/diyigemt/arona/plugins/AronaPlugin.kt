@@ -1,7 +1,7 @@
 package com.diyigemt.arona.plugins
 
 import com.diyigemt.arona.command.CommandOwner
-import com.diyigemt.arona.communication.event.AbstractEvent
+import com.diyigemt.arona.communication.event.Event
 import com.diyigemt.arona.communication.event.EventChannel
 import com.diyigemt.arona.communication.event.GlobalEventChannel
 import com.diyigemt.arona.config.AutoSavePluginDataHolder
@@ -85,7 +85,7 @@ abstract class AronaPlugin(
 ) : AbstractPlugin() {
   val version get() = description.version
   abstract fun onLoad()
-  fun pluginEventChannel(): EventChannel<AbstractEvent> = GlobalEventChannel.context(coroutineContext)
+  fun pluginEventChannel(): EventChannel<Event> = GlobalEventChannel.context(coroutineContext)
 }
 
 data class AronaPluginDescription(

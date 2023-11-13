@@ -9,7 +9,10 @@ import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.client.call.*
 import io.ktor.client.plugins.websocket.*
+import io.ktor.util.logging.*
 import io.ktor.websocket.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -205,23 +208,38 @@ internal object TencentWebsocketOperationManager {
     ReflectionUtil.scanInterfacePetObjectInstance(TencentWebsocketOperationHandler::class).associateBy { it.type }
   }
 
-  internal suspend fun TencentBotClientWebSocketSession.handleTencentOperation() {
-    for (message in incoming) {
-      when (message) {
-        is Frame.Close -> TencentBotWebsocketConnectionLostEvent(bot).broadcast()
-        else -> {
-          val plainText = incoming.receiveText() ?: return
-          val preData = json.decodeFromString<TencentWebsocketPayload0>(plainText)
-          val handler = map[preData.operation] ?: return
-          logger.debug("recev websocket data: {}, type: {}", plainText, preData.operation)
-          val data = runCatching {
-            json.decodeFromString(TencentWebsocketPayload.serializer(handler.decoder), plainText)
-          }.getOrNull()
-          serialNumber = if (preData.serialNumber == 0L) serialNumber else preData.serialNumber
-          handler::class.declaredFunctions.firstOrNull()?.callSuspend(handler, this, data, plainText)
+  @OptIn(DelicateCoroutinesApi::class)
+  internal suspend fun TencentBotClientWebSocketSession.handleTencentOperation() : Boolean {
+    if (incoming.isClosedForReceive) {
+      TencentBotWebsocketConnectionLostEvent(bot).broadcast()
+      return false
+    }
+    return runCatching {
+      for (message in incoming) {
+        when (message) {
+          is Frame.Close -> TencentBotWebsocketConnectionLostEvent(bot).broadcast()
+          is Frame.Text -> {
+            val plainText = message.readText()
+            val preData = json.decodeFromString<TencentWebsocketPayload0>(plainText)
+            val handler = map[preData.operation] ?: continue
+            logger.debug("recev websocket data: {}, type: {}", plainText, preData.operation)
+            val data = runCatching {
+              json.decodeFromString(TencentWebsocketPayload.serializer(handler.decoder), plainText)
+            }.getOrNull()
+            serialNumber = if (preData.serialNumber == 0L) serialNumber else preData.serialNumber
+            handler::class.declaredFunctions.firstOrNull()?.callSuspend(handler, this, data, plainText)
+          }
+          else -> Unit
         }
       }
-    }
+      true
+    }.onFailure {
+      if (it is ClosedReceiveChannelException) {
+        TencentBotWebsocketConnectionLostEvent(bot).broadcast()
+      } else {
+        logger.error(it)
+      }
+    }.getOrDefault(false)
   }
 
   private suspend fun ReceiveChannel<Frame>.receiveText() = (receive() as? Frame.Text)?.readText()

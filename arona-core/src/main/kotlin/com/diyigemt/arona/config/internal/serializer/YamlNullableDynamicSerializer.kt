@@ -1,8 +1,7 @@
 package com.diyigemt.arona.config.internal.serializer
 
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.KSerializer
+import com.charleskorn.kaml.YamlInput
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
@@ -10,13 +9,13 @@ import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
+// TODO handle deserialize
 object YamlNullableDynamicSerializer : KSerializer<Any?>, IYamlDynamicSerializer {
   @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
   override val descriptor: SerialDescriptor = buildSerialDescriptor("YamlNullableDynamic", SerialKind.CONTEXTUAL)
 
-  override fun deserialize(decoder: Decoder): Any? {
-    TODO("Not yet implemented")
-  }
+  @OptIn(ExperimentalSerializationApi::class)
+  override fun deserialize(decoder: Decoder): Any? = (decoder as YamlInput).decodeNullableSerializableValue(decoder.yaml.serializersModule.serializer<Unit>())
 
   @OptIn(ExperimentalSerializationApi::class)
   override fun serialize(encoder: Encoder, value: Any?) {

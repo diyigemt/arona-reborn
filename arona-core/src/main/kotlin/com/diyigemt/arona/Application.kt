@@ -1,10 +1,12 @@
 package com.diyigemt.arona
 
-import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.commandline.CommandMain
 import com.diyigemt.arona.communication.TencentBotClient
+import com.diyigemt.arona.communication.event.Event
+import com.diyigemt.arona.communication.event.GlobalEventChannel
 import com.diyigemt.arona.plugins.PluginManager
 import com.diyigemt.arona.utils.aronaConfig
+import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.webui.plugins.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -15,6 +17,9 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
+    GlobalEventChannel.subscribeAlways<Event> {
+      commandLineLogger.info(it.toString())
+    }
     TencentBotClient.invoke(aronaConfig.bot).auth()
     CoroutineScope(Dispatchers.IO).launch {
       while (true) {
@@ -25,7 +30,7 @@ object AronaApplication : CoroutineScope {
     }
     val environment = applicationEngineEnvironment {
       connector {
-        port = 8080
+        port = 8081
         host = "0.0.0.0"
       }
       rootPath = "/api/v2"

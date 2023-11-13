@@ -1,6 +1,7 @@
 package com.diyigemt.arona.communication.event
 
 import com.diyigemt.arona.communication.TencentBot
+import com.diyigemt.arona.communication.TencentBotAuthEndpointResp
 import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
 import com.diyigemt.arona.communication.message.*
@@ -86,9 +87,11 @@ internal object TencentWebsocketDispatchEventManager {
   }
 }
 
-abstract class AbstractEvent
+interface Event
 
-suspend fun <E : AbstractEvent> E.broadcast(): E {
+abstract class AbstractEvent : Event
+
+suspend fun <E : Event> E.broadcast(): E {
   EventChannelToEventDispatcherAdapter.instance.broadcastEventImpl(this)
   return this
 }
@@ -98,15 +101,32 @@ abstract class TencentEvent : AbstractEvent() {
   val logger get() = bot.logger
 }
 
-internal data class TencentBotWebsocketHandshakeSuccessEvent(override val bot: TencentBot) : TencentEvent()
+interface TencentBotEvent : Event {
+  val bot: TencentBot
+}
 
-internal data class TencentBotWebsocketConnectionLostEvent(override val bot: TencentBot) : TencentEvent()
+internal data class TencentBotAuthSuccessEvent(
+  override val bot: TencentBot,
+  val payload: TencentBotAuthEndpointResp,
+) : TencentBotEvent, TencentEvent()
+
+internal data class TencentBotWebsocketHandshakeSuccessEvent(
+  override val bot: TencentBot,
+) : TencentBotEvent, TencentEvent()
+
+internal data class TencentBotWebsocketConnectionLostEvent(
+  override val bot: TencentBot,
+) : TencentBotEvent, TencentEvent()
+
+internal data class TencentBotWebsocketConnectionResumeEvent(
+  override val bot: TencentBot,
+) : TencentBotEvent, TencentEvent()
 
 internal data class TencentBotWebsocketAuthSuccessEvent(
   override val bot: TencentBot,
   val payload: TencentWebsocketIdentifyResp,
-) : TencentEvent()
+) : TencentBotEvent, TencentEvent()
 
 data class TencentBotOnlineEvent(
   override val bot: TencentBot,
-) : TencentEvent()
+) : TencentBotEvent, TencentEvent()

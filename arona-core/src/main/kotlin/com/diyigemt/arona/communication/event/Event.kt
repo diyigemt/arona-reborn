@@ -46,13 +46,14 @@ internal object TencentWebsocketAtMessageCreateHandler :
   override val decoder = TencentChannelMessageRaw.serializer()
 
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
+    val guild = bot.guilds[payload.guildId]!!
     val tmp = GuildChannelMemberImpl(
       coroutineContext,
-      bot.guilds[payload.guildId]!!.channels[payload.channelId]!!,
-      bot.guilds[payload.guildId]!!.members[payload.author.id]!!
+      guild.channels[payload.channelId]!!,
+      guild.members[payload.author.id] ?: guild.emptyGuildMember
     )
     TencentGuildMessageEvent(
-      payload.toMessageChain().let { MessageChainBuilder(it).append(TencentAt(bot)).build() },
+      payload.toMessageChain(),
       tmp
     ).broadcast()
   }

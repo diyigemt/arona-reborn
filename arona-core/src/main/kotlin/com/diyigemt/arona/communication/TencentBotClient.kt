@@ -27,6 +27,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import java.util.*
+import kotlin.concurrent.schedule
 import kotlin.concurrent.scheduleAtFixedRate
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -40,6 +41,7 @@ interface TencentBot : Contact, CoroutineScope {
   val guilds: ContactList<Guild>
   val groups: ContactList<Group>
   val friends: ContactList<SingleUser>
+  val isPublic: Boolean
   suspend fun <T> callOpenapi(
     endpoint: TencentEndpoint,
     decoder: KSerializer<T>,
@@ -74,7 +76,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   override val guilds: ContactList<Guild> = ContactList()
   override val groups: ContactList<Group> = ContactList()
   override val friends: ContactList<SingleUser> = ContactList()
-
+  override val isPublic = config.public
   private val timer = Timer("Bot.${config.appId}", true)
   private var accessToken: String = ""
   private lateinit var accessTokenHeartbeatTask: TimerTask
@@ -107,9 +109,11 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
               operation = TencentWebsocketOperationType.Identify,
               data = TencentWebsocketIdentifyReq(
                 token = botToken,
-                intents = TencentMessageIntentsBuilder()
-                  .append(TencentMessageIntentSuperType.GUILD_MESSAGES)
-                  .build(),
+                intents = TencentMessageIntentsBuilder().apply {
+                  if (this@TencentBotClient.isPublic) buildPublicBot()
+                  else append(TencentMessageIntentSuperType.DIRECT_MESSAGE)
+                }
+                .build(),
                 shard = listOf(0, 1)
               )
             )
@@ -164,13 +168,11 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     }
     if (resp.status == HttpStatusCode.OK) {
       val authResult = Json.decodeFromString<TencentBotAuthEndpointResp>(resp.bodyAsText())
-      if (accessToken.isEmpty()) {
-        startAccessTokenHeartbeat()
-      }
+      startAccessTokenHeartbeat(authResult.expiresIn)
       accessToken = authResult.accessToken
       TencentBotAuthSuccessEvent(this, authResult).broadcast()
     } else {
-      throw Exception()
+      logger.error("request app token failed")
     }
   }
 
@@ -238,7 +240,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
         }
         contentType(ContentType.Application.Json)
         url(
-          "https://sandbox.api.sgroup.qq.com${endpoint.path}".let {
+          "https://api.sgroup.qq.com${endpoint.path}".let {
             var base = it
             urlPlaceHolder.forEach { (k, v) ->
               base = it.replace("{$k}", v)
@@ -252,7 +254,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
         bodyTmp = resp.bodyAsText()
         json.decodeFromString(decoder, bodyTmp)
       } else {
-        throw HttpNotOkException(resp.bodyAsText())
+        throw HttpNotOkException(resp.status, resp.bodyAsText(), resp.headers["X-Tps-Trace-Id"])
       }
     }.onFailure {
       when (it) {
@@ -269,8 +271,9 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
             endpoint, urlPlaceHolder, it.message
           )
         }
+
+        else -> logger.error(it)
       }
-      logger.error(it)
     }
   }
 
@@ -301,9 +304,8 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     }.also { websocketHeartbeatTask = it }
 
 
-  private fun startAccessTokenHeartbeat() {
-    val interval = (7200L - 30L) * 1000
-    timer.scheduleAtFixedRate(interval, interval) {
+  private fun startAccessTokenHeartbeat(interval: Int) {
+    timer.schedule(interval * 1000L) {
       runSuspend {
         doAuth()
       }
@@ -320,4 +322,6 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   }
 }
 
-class HttpNotOkException(message: String) : Exception(message)
+class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String? = "") : Exception(
+  "status: $status, traceId: $traceId, message: $body"
+)

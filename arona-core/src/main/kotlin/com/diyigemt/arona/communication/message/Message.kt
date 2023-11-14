@@ -3,11 +3,13 @@ package com.diyigemt.arona.communication.message
 import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.contact.Contact
 import com.diyigemt.arona.communication.event.TencentMessageEvent
+import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -27,6 +29,17 @@ internal class TencentMessageIntentsBuilder {
     .toMutableList()
     .apply { this[0] = 1 shl this[0] }
     .reduce { acc, i -> acc or (1 shl i) }
+
+  fun buildPublicBot() = this.apply {
+    append(TencentMessageIntentSuperType.GUILDS)
+    append(TencentMessageIntentSuperType.GUILD_MEMBERS)
+    append(TencentMessageIntentSuperType.GUILD_MESSAGE_REACTIONS)
+    append(TencentMessageIntentSuperType.DIRECT_MESSAGE)
+    append(TencentMessageIntentSuperType.INTERACTION)
+    append(TencentMessageIntentSuperType.MESSAGE_AUDIT)
+    append(TencentMessageIntentSuperType.AUDIO_ACTION)
+    append(TencentMessageIntentSuperType.PUBLIC_GUILD_MESSAGES)
+  }
 
   fun buildAll() = this.apply {
     append(TencentMessageIntentSuperType.entries.toTypedArray())
@@ -70,7 +83,15 @@ internal data class TencentGuildMemberRaw(
   val user: TencentGuildUserRaw? = null,
   @SerialName("guild_id")
   val guildIid: String = "",
-)
+) {
+  companion object {
+    val EmptyTencentGuildMemberRaw = TencentGuildMemberRaw(
+      "",
+      listOf(),
+      ""
+    )
+  }
+}
 
 @Serializable
 internal data class TencentMessageAttachmentRaw(
@@ -220,8 +241,17 @@ internal interface TencentMessageRaw : ContactRaw {
   val attachments: List<TencentMessageAttachmentRaw>?
   fun toMessageChain(): MessageChain {
     val messageChain = MessageChainImpl(this.id)
-    if (this.content.isNotBlank()) {
-      messageChain.delegate.add(PlainText(this.content))
+    with(this.content) {
+      if (isNotBlank()) {
+        split(" ")
+          .takeIf { it.size >= 2 }
+          ?.run {
+            first().toSourceTencentAt()?.also { at ->
+              messageChain.delegate.add(at)
+              messageChain.delegate.add(PlainText(this.subList(1, this.size).joinToString(" ")))
+            }
+          } ?: messageChain.delegate.add(PlainText(this.trim()))
+      }
     }
     if (this.attachments?.isNotEmpty() == true) {
       messageChain.delegate.addAll(
@@ -366,6 +396,20 @@ internal class MessageChainImpl(
   override fun serialization() = ""
 }
 
+object MessageChainAsStringSerializer : KSerializer<MessageChain> {
+  override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("MessageChain", PrimitiveKind.STRING)
+
+  override fun deserialize(decoder: Decoder): MessageChain {
+    TODO("Not yet implemented")
+
+  }
+
+  override fun serialize(encoder: Encoder, value: MessageChain) {
+    TODO("Not yet implemented")
+  }
+
+}
+
 interface Message {
   /**
    * 给出可读的字符串
@@ -397,14 +441,64 @@ data class TencentImage(
       val matchResult = matcher.matchEntire(this) ?: return null
       return TencentImage(matchResult.groupValues[1])
     }
+
+    val serializer = object : KSerializer<TencentImage> {
+      override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TencentImage", PrimitiveKind.STRING)
+
+      override fun deserialize(decoder: Decoder): TencentImage =
+        decoder.decodeString().toTencentImage() ?: TencentImage("")
+
+      override fun serialize(encoder: Encoder, value: TencentImage) = encoder.encodeString(value.serialization())
+
+    }
   }
 }
 
 data class TencentAt(
-  val contact: Contact,
+  val target: String,
 ) : Message {
-  override fun toString() = "@${contact.id}"
-  override fun serialization() = "[tencent:at:${contact.id}]"
+  override fun toString() = "@${target}"
+  override fun serialization() = "[tencent:at:${target}]"
+
+  companion object {
+    private val matcher = Regex("^\\[tencent:at:(\\w+)]$")
+    private val tencentMatcher = Regex("^<@!(\\w+)>$")
+
+    /**
+     * 构造一个at这个contact的消息
+     */
+    fun Contact.at() = TencentAt(this.unionOpenidOrId)
+
+    fun String.toTencentAt(): TencentAt? {
+      val matchResult = matcher.matchEntire(this) ?: return null
+      return TencentAt(matchResult.groupValues[1])
+    }
+
+    fun String.toSourceTencentAt(): TencentAt? {
+      val matchResult = tencentMatcher.matchEntire(this) ?: return null
+      return TencentAt(matchResult.groupValues[1])
+    }
+
+    val serializer = object : KSerializer<TencentAt> {
+      override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TencentAt", PrimitiveKind.STRING)
+
+      override fun deserialize(decoder: Decoder): TencentAt =
+        decoder.decodeString().toSourceTencentAt() ?: TencentAt("")
+
+      override fun serialize(encoder: Encoder, value: TencentAt) = encoder.encodeString(value.serialization())
+
+    }
+
+    val tencentSerializer = object : KSerializer<TencentAt> {
+      override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TencentAt", PrimitiveKind.STRING)
+
+      override fun deserialize(decoder: Decoder): TencentAt = decoder.decodeString().toTencentAt() ?: TencentAt("")
+
+      override fun serialize(encoder: Encoder, value: TencentAt) = encoder.encodeString(value.serialization())
+
+    }
+
+  }
 }
 
 @Suppress("NOTHING_TO_INLINE")
@@ -523,7 +617,7 @@ class MessageChainBuilder private constructor(
   }
 
   fun append(element: MessageChain) = this.apply {
-    sourceMessageId = element.sourceId
+    sourceMessageId = element.sourceId.takeIf { it.isNotBlank() } ?: sourceMessageId
     container.addAll(element)
   }
 

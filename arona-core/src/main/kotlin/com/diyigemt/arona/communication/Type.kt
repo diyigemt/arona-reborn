@@ -13,6 +13,7 @@ data class TencentBotConfig(
   val appId: String,
   val token: String,
   val secret: String,
+  val public: Boolean = false
 ) {
   fun toAuthConfig() = TencentBotAuthEndpointReq(appId, secret)
 }

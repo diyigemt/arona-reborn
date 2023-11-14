@@ -236,10 +236,11 @@ internal object TencentWebsocketOperationManager {
     }.onFailure {
       if (it is ClosedReceiveChannelException) {
         TencentBotWebsocketConnectionLostEvent(bot).broadcast()
+        return false
       } else {
         logger.error(it)
       }
-    }.getOrDefault(false)
+    }.getOrDefault(true)
   }
 
   private suspend fun ReceiveChannel<Frame>.receiveText() = (receive() as? Frame.Text)?.readText()

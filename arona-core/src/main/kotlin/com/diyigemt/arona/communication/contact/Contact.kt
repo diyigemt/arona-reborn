@@ -17,7 +17,8 @@ interface Contact : CoroutineScope {
   val bot: TencentBot // 与之关联的bot
   val id: String // 特定id
   val unionOpenid: String? // 统一id
-
+  val unionOpenidOrId
+    get() = unionOpenid ?: id
   suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
 
   /**
@@ -49,9 +50,7 @@ internal abstract class AbstractContact(
       method = HttpMethod.Post
       contentType(ContentType.Application.Json)
       setBody(
-        bot.json.encodeToString(
-          TencentMessageBuilder().append(body).build()
-        )
+        "{\"image\":\"https://arona.cdn.diyigemt.com/image/some/长草.png\",\"msg_id\":\"${body.sourceId}\"}"
       )
     }.getOrThrow() // TODO 异常处理
   }
@@ -60,6 +59,8 @@ internal abstract class AbstractContact(
 interface Guild : Contact {
   val members: ContactList<GuildMember>
   val channels: ContactList<Channel>
+  val emptyGuildMember : GuildMember
+  val isPublic: Boolean
 }
 
 internal class GuildImpl(
@@ -71,6 +72,8 @@ internal class GuildImpl(
   override val unionOpenid: String? = null
   override val members: ContactList<GuildMember> = ContactList()
   override val channels: ContactList<Channel> = ContactList()
+  override val emptyGuildMember : GuildMember = EmptyGuildMemberImpl(this)
+  override val isPublic: Boolean = bot.isPublic
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     // 无法实现
     TODO()
@@ -78,7 +81,7 @@ internal class GuildImpl(
 
   init {
     this.launch {
-      fetchMemberList()
+      if (!isPublic) fetchMemberList()
       fetchChannelList()
     }
   }
@@ -97,7 +100,6 @@ internal class GuildImpl(
       members.delegate.addAll(
         it.map { member ->
           GuildMemberImpl(
-            coroutineContext,
             this@GuildImpl,
             member
           )
@@ -232,16 +234,23 @@ internal class GuildChannelMemberImpl(
 }
 
 internal class GuildMemberImpl(
-  parentCoroutineContext: CoroutineContext,
   override val guild: Guild,
   private val internalGuildUser: TencentGuildMemberRaw,
   override val unionOpenid: String? = null,
-) : GuildMember, AbstractContact(guild.bot, parentCoroutineContext) {
-  override val id get() = internalGuildUser.user?.id ?: EmptyMessageId
+) : GuildMember, AbstractContact(guild.bot, guild.coroutineContext) {
+  override val id get() = unionOpenid ?: internalGuildUser.user?.id ?: EmptyMessageId
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     // 保存私聊频道才行
     TODO("Not yet implemented")
   }
+}
+
+internal class EmptyGuildMemberImpl(
+  override val guild: Guild,
+) : GuildMember, AbstractContact(guild.bot, guild.coroutineContext) {
+  override val unionOpenid = EmptyMessageId
+  override val id = EmptyMessageId
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt = guild.sendMessage(message)
 }
 
 class ContactList<out C : Contact>(

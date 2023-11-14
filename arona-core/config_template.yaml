@@ -2,6 +2,7 @@ bot:
   appId: ""
   token: ""
   secret: ""
+  public: false
 adminToken: ''
 redis:
   host: '172.18.100.39'

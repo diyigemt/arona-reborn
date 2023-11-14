@@ -6,6 +6,8 @@ import com.diyigemt.arona.communication.command.CommandSender.Companion.toComman
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.Message
 import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.communication.message.TencentAt
+import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import com.diyigemt.arona.communication.message.toMessageChain
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.MissingArgument
@@ -146,16 +148,25 @@ internal suspend fun executeCommandImpl(
     call.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return CommandExecuteResult.UnresolvedCommand()
   val commandStr =
     messageString.split(" ").toMutableList().removeFirstOrNull() ?: return CommandExecuteResult.UnresolvedCommand()
-  val command = CommandManager.matchCommand(commandStr.replace("/", "")) ?: return CommandExecuteResult
+  val command = CommandManager.matchCommand(commandStr.replace("/", "")) as? AbstractCommand ?: return CommandExecuteResult
     .UnresolvedCommand()
-  if (command !is AbstractCommand) return CommandExecuteResult.UnresolvedCommand()
   val arg = call.toString()
   return runCatching {
-    (command as CliktCommand).context {
+    command.context {
       obj = caller
       terminal = commandTerminal
       localization = crsiveLocalization
-    }.parse(arg.split(" ").toMutableList().apply { removeFirstOrNull() })
+    }.parse(
+      arg
+        .split(" ")
+        .toMutableList()
+        .apply {
+          // 如果第一个是at机器人, 继续移除掉
+          removeFirstOrNull()?.toSourceTencentAt().also {
+            removeFirstOrNull()
+          }
+        }
+    )
     CommandExecuteResult.Success(command)
   }.getOrElse {
     when (it) {

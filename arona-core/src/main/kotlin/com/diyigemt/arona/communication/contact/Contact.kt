@@ -19,6 +19,7 @@ interface Contact : CoroutineScope {
   val unionOpenid: String? // 统一id
   val unionOpenidOrId
     get() = unionOpenid ?: id
+
   suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
 
   /**
@@ -50,16 +51,19 @@ internal abstract class AbstractContact(
       method = HttpMethod.Post
       contentType(ContentType.Application.Json)
       setBody(
-        "{\"image\":\"https://arona.cdn.diyigemt.com/image/some/长草.png\",\"msg_id\":\"${body.sourceId}\"}"
+        bot.json.encodeToString(
+          TencentMessageBuilder().append(body).build()
+        )
       )
-    }.getOrThrow() // TODO 异常处理
+    }.getOrDefault(MessageReceipt("", "")) // TODO 异常处理
   }
 }
 
 interface Guild : Contact {
   val members: ContactList<GuildMember>
   val channels: ContactList<Channel>
-  val emptyGuildMember : GuildMember
+  val emptyGuildMember: GuildMember
+  val emptyChannelMember: Channel
   val isPublic: Boolean
 }
 
@@ -70,9 +74,10 @@ internal class GuildImpl(
 ) : Guild, AbstractContact(bot, parentCoroutineContext) {
   override val id get() = internalGuild.id
   override val unionOpenid: String? = null
-  override val members: ContactList<GuildMember> = ContactList()
-  override val channels: ContactList<Channel> = ContactList()
-  override val emptyGuildMember : GuildMember = EmptyGuildMemberImpl(this)
+  override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
+  override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
+  override val emptyGuildMember: GuildMember = EmptyGuildMemberImpl(this)
+  override val emptyChannelMember: Channel = EmptyChannelImpl(this)
   override val isPublic: Boolean = bot.isPublic
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     // 无法实现
@@ -151,7 +156,9 @@ internal class ChannelImpl(
   }
 }
 
-interface Group : Contact
+interface Group : Contact {
+  val members: ContactList<GroupMember>
+}
 
 internal class GroupImpl(
   bot: TencentBot,
@@ -159,6 +166,7 @@ internal class GroupImpl(
   override val id: String,
   override val unionOpenid: String? = null,
 ) : Group, AbstractContact(bot, parentCoroutineContext) {
+  override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyGroupMemberImpl(this, it) }
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     return callMessageOpenApi(
       TencentEndpoint.PostGroupMessage,
@@ -245,37 +253,123 @@ internal class GuildMemberImpl(
   }
 }
 
+interface EmptyContact : Contact {
+  override val id: String
+    get() = EmptyMessageId
+}
+
 internal class EmptyGuildMemberImpl(
   override val guild: Guild,
-) : GuildMember, AbstractContact(guild.bot, guild.coroutineContext) {
+  override val id: String = EmptyMessageId
+) : GuildMember, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext) {
   override val unionOpenid = EmptyMessageId
-  override val id = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain): MessageReceipt = guild.sendMessage(message)
 }
 
-class ContactList<out C : Contact>(
+internal class EmptyChannelImpl(
+  override val guild: Guild,
+  override val id: String = EmptyMessageId
+) : Channel, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext) {
+  override val unionOpenid = EmptyMessageId
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt = guild.sendMessage(message)
+}
+
+internal class EmptyGuildImpl(
+  bot: TencentBot,
+  override val id: String = EmptyMessageId
+) : Guild, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
+  override val unionOpenid: String = EmptyMessageId
+  override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
+  override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
+  override val emptyGuildMember: GuildMember = EmptyGuildMemberImpl(this)
+  override val emptyChannelMember: Channel = EmptyChannelImpl(this)
+  override val isPublic: Boolean = bot.isPublic
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
+    TODO("Not yet implemented")
+  }
+}
+
+internal class EmptyGroupMemberImpl(
+  override val group: Group,
+  override val id: String = EmptyMessageId
+) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
+  override val unionOpenid: String = EmptyMessageId
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
+    TODO("Not yet implemented")
+  }
+  override fun asSingleUser(): SingleUser {
+    TODO("Not yet implemented")
+  }
+}
+
+internal class EmptySingleUserImpl(
+  bot: TencentBot,
+  override val id: String = EmptyMessageId
+) : SingleUser, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
+  override val unionOpenid: String = EmptyMessageId
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
+    TODO("Not yet implemented")
+  }
+}
+
+internal class EmptyGroupImpl(
+  bot: TencentBot,
+  override val id: String = EmptyMessageId
+) : Group, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
+  override val unionOpenid: String = EmptyMessageId
+  override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyGroupMemberImpl(this, it) }
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
+    return callMessageOpenApi(
+      TencentEndpoint.PostGroupMessage,
+      mapOf("group_openid" to id),
+      message
+    )
+  }
+}
+
+abstract class ContactList<out C : Contact>(
   internal val delegate: MutableCollection<@UnsafeVariance C>,
 ) : Collection<C> by delegate {
   constructor() : this(ConcurrentLinkedQueue())
 
   operator fun get(id: String): C? = delegate.firstOrNull { it.id == id }
 
-  /**
-   * 获取一个 [Contact.id] 为 [id] 的元素. 在不存在时抛出 [NoSuchElementException].
-   */
+  abstract val generator: (id: String) -> C
+
+  fun getOrCreate(id: String): C = get(id) ?: generator(id).also { delegate.add(it) }
+
   fun getOrFail(id: String): C = get(id) ?: throw NoSuchElementException("Contact $id not found.")
 
-  /**
-   * 删除 [Contact.id] 为 [id] 的元素.
-   */
   fun remove(id: String): Boolean = delegate.removeAll { it.id == id }
 
-  /**
-   * 当存在 [Contact.id] 为 [id] 的元素时返回 `true`.
-   */
   operator fun contains(id: String): Boolean = get(id) != null
 
   override fun toString(): String = delegate.joinToString(separator = ", ", prefix = "ContactList(", postfix = ")")
   override fun equals(other: Any?): Boolean = other is ContactList<*> && delegate == other.delegate
   override fun hashCode(): Int = delegate.hashCode()
 }
+
+internal class GuildMemberContactList(
+  override val generator: (id: String) -> GuildMember
+) : ContactList<GuildMember>()
+
+internal class ChannelContactList(
+  override val generator: (id: String) -> Channel
+) : ContactList<Channel>()
+
+internal class GuildContactList(
+  override val generator: (id: String) -> Guild
+) : ContactList<Guild>()
+
+internal class GroupContactList(
+  override val generator: (id: String) -> Group
+) : ContactList<Group>()
+
+
+internal class GroupMemberContactList(
+  override val generator: (id: String) -> GroupMember
+) : ContactList<GroupMember>()
+
+internal class SingleUserContactList(
+  override val generator: (id: String) -> SingleUser
+) : ContactList<SingleUser>()

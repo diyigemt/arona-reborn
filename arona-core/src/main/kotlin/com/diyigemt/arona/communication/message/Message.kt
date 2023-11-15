@@ -5,8 +5,10 @@ import com.diyigemt.arona.communication.contact.Contact
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialInfo
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -35,6 +37,7 @@ internal class TencentMessageIntentsBuilder {
     append(TencentMessageIntentSuperType.GUILD_MEMBERS)
     append(TencentMessageIntentSuperType.GUILD_MESSAGE_REACTIONS)
     append(TencentMessageIntentSuperType.DIRECT_MESSAGE)
+    append(TencentMessageIntentSuperType.CLIENT_MESSAGE)
     append(TencentMessageIntentSuperType.INTERACTION)
     append(TencentMessageIntentSuperType.MESSAGE_AUDIT)
     append(TencentMessageIntentSuperType.AUDIO_ACTION)
@@ -96,6 +99,17 @@ internal data class TencentGuildMemberRaw(
 @Serializable
 internal data class TencentMessageAttachmentRaw(
   val url: String, // 下载地址
+)
+
+@Serializable
+internal data class TencentMessageAttachmentRaw0(
+  @SerialName("content_type")
+  val url: String = "", // 下载地址
+  val size: String = "",
+  val width: String = "",
+  val height: String = "",
+  val filename: String = "",
+  val contentType: String = "",
 )
 
 @Serializable
@@ -360,8 +374,21 @@ internal typealias TencentGuildPrivateMessageRaw = TencentChannelMessageRaw
 
 @Serializable
 internal data class TencentPrivateMessageAuthorRaw(
-  override val id: String,
-) : ContactRaw
+  @SerialName("user_openid")
+  val userOpenid: String,
+) : ContactRaw {
+  override val id: String
+    get() = userOpenid // TODO union_id
+}
+
+@Serializable
+internal data class TencentGroupMessageAuthorRaw(
+  @SerialName("member_openid")
+  val memberOpenid: String,
+) : ContactRaw {
+  override val id: String
+    get() = memberOpenid // TODO union_id
+}
 
 @Serializable
 internal data class TencentPrivateMessageRaw(
@@ -369,13 +396,19 @@ internal data class TencentPrivateMessageRaw(
   override val author: TencentPrivateMessageAuthorRaw,
   override val content: String,
   override val timestamp: String,
-  override val attachments: List<TencentMessageAttachmentRaw>?,
-  @SerialName("group_id")
-  val groupId: String = "0",
+  override val attachments: List<TencentMessageAttachmentRaw>? = null,
 ) : TencentMessageRaw
 
-// TODO 更详细地定义群聊原始消息?
-internal typealias TencentGroupMessageRaw = TencentPrivateMessageRaw
+@Serializable
+internal data class TencentGroupMessageRaw(
+  override val id: String,
+  override val author: TencentGroupMessageAuthorRaw,
+  override val content: String,
+  override val timestamp: String,
+  override val attachments: List<TencentMessageAttachmentRaw>? = null,
+  @SerialName("group_openid")
+  val groupId: String
+) : TencentMessageRaw
 
 internal const val EmptyMessageId = ""
 
@@ -528,7 +561,7 @@ class TencentMessage(
   val content: String,
   @SerialName("msg_type")
   @Serializable(with = TencentMessageTypeAsIntSerializer::class)
-  var messageType: TencentMessageType,
+  var messageType: TencentMessageType = TencentMessageType.PLAIN_TEXT,
   var image: String? = null,
   val markdown: String? = null,
   val keyboard: String? = null,
@@ -650,8 +683,8 @@ class MessageChainBuilder private constructor(
 
 @Serializable
 data class MessageReceipt(
-  val id: String,
-  val timestamp: String,
+  val id: String = "",
+  val timestamp: String = "",
 )
 
 fun Message.toMessageChain(): MessageChain = when (this) {

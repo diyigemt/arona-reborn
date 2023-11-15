@@ -21,33 +21,30 @@ class TencentGuildMessageEvent internal constructor(
   override val sender: GuildChannelMember,
 ) : TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.channel
+  override fun toString(): String {
+    return "TencentGuildMessageEvent(message=$message, sender=$sender)"
+  }
 }
 
 // 频道私聊消息事件
 class TencentGuildPrivateMessageEvent internal constructor(
-  bot: TencentBot,
   message: MessageChain,
   override val sender: GuildMember,
-  internal val sourceMessage: TencentChannelMessageRaw,
-) : TencentMessageEvent(bot, message) {
+) : TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.guild
 }
 
 class TencentSingleMessageEvent internal constructor(
-  bot: TencentBot,
   message: MessageChain,
   override val sender: SingleUser,
-  internal val sourceMessage: TencentChannelMessageRaw,
-) : TencentMessageEvent(bot, message) {
+) : TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender
 }
 
 class TencentGroupMessageEvent internal constructor(
-  bot: TencentBot,
   message: MessageChain,
   override val sender: GroupMember,
-  internal val sourceMessage: TencentChannelMessageRaw,
-) : TencentMessageEvent(bot, message) {
+) : TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.group
 }
 

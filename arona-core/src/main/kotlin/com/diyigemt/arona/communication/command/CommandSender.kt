@@ -5,6 +5,7 @@ package com.diyigemt.arona.communication.command
 import com.diyigemt.arona.AronaApplication
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.contact.*
+import com.diyigemt.arona.communication.event.TencentGroupMessageEvent
 import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
 import com.diyigemt.arona.communication.event.TencentGuildPrivateMessageEvent
 import com.diyigemt.arona.communication.event.TencentMessageEvent
@@ -30,9 +31,11 @@ interface CommandSender : CoroutineScope {
   companion object {
     fun TencentGuildMessageEvent.toCommandSender() = GuildChannelCommandSender(sender, message.sourceId)
     fun TencentGuildPrivateMessageEvent.toCommandSender() = GuildUserCommandSender(sender, message.sourceId)
+    fun TencentGroupMessageEvent.toCommandSender() = GroupCommandSender(sender, message.sourceId)
     fun <T : TencentMessageEvent> T.toCommandSender() = when (this) {
       is TencentGuildMessageEvent -> toCommandSender()
       is TencentGuildPrivateMessageEvent -> toCommandSender()
+      is TencentGroupMessageEvent -> toCommandSender()
       else -> throw IllegalArgumentException("Unsupported MessageEvent: ${this::class.qualifiedNameOrTip}")
     }
 
@@ -81,7 +84,7 @@ class GroupCommandSender internal constructor(
   override val subject get() = user.group
   val group get() = user.group
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+  override suspend fun sendMessage(message: Message) = subject.sendMessage(message)
 }
 
 /**

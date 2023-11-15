@@ -1,6 +1,8 @@
 package com.diyigemt.arona.debugger
 
 import com.diyigemt.arona.communication.event.Event
+import com.diyigemt.arona.communication.event.TencentBotEvent
+import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 
@@ -13,7 +15,10 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
 )) {
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<Event> {
-      logger.warn(it.toString())
+      when (it) {
+        is TencentBotEvent -> it.bot.logger.info(it.toString())
+        else -> logger.info(it.toString())
+      }
     }
   }
 }

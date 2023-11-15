@@ -17,6 +17,8 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
+    PluginManager.loadPluginFromPluginDirectory()
+    PluginManager.initPlugin()
     TencentBotClient.invoke(aronaConfig.bot).auth()
     CoroutineScope(Dispatchers.IO).launch {
       while (true) {
@@ -48,7 +50,5 @@ fun Application.module() {
   configureRouting()
   configureSerialize()
   configureDoubleReceive()
-  PluginManager.loadPluginFromPluginDirectory()
-  PluginManager.initPlugin()
 //  configureErrorHandler()
 }

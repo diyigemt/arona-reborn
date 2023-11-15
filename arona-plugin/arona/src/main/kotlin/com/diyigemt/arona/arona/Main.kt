@@ -66,30 +66,30 @@ object TrainerCommand : AbstractCommand(
   private val arg by argument("学生名称/别名/主线地图/其他杂图名称")
   private val serializer = ServerResponse.serializer(ListSerializer(ImageQueryData.serializer()))
   suspend fun GuildChannelCommandSender.trainer() {
-    Arona.httpClient.get("http://127.0.0.1:8080/api/v2/image") {
-      parameter("name", arg)
-    }.run {
-      Json.decodeFromString(serializer, bodyAsText())
-    }.run {
-      data?.run {
-        dbQuery {
-          ImageTableModel.new {
-            name = first().name
-            hash = first().hash
-            content = first().content
-            type = ResourceType.fromValue(first().type)
-          }
-        }
-        MessageChainBuilder()
-          .append(
-            TencentImage(
-              url = "https://arona.cdn.diyigemt.com/image${first().content}"
-            )
-          ).build().also { sendMessage(it) }
-      } ?: sendMessage("空结果")
-    }
-//    sendMessage("开始查询: $arg")
-//    delay(1000)
-//    sendMessage("查询结束")
+//    Arona.httpClient.get("http://127.0.0.1:8080/api/v2/image") {
+//      parameter("name", arg)
+//    }.run {
+//      Json.decodeFromString(serializer, bodyAsText())
+//    }.run {
+//      data?.run {
+//        dbQuery {
+//          ImageTableModel.new {
+//            name = first().name
+//            hash = first().hash
+//            content = first().content
+//            type = ResourceType.fromValue(first().type)
+//          }
+//        }
+//        MessageChainBuilder()
+//          .append(
+//            TencentImage(
+//              url = "https://arona.cdn.diyigemt.com/image${first().content}"
+//            )
+//          ).build().also { sendMessage(it) }
+//      } ?: sendMessage("空结果")
+//    }
+    sendMessage("开始查询: $arg")
+    delay(1000)
+    sendMessage("查询结束")
   }
 }

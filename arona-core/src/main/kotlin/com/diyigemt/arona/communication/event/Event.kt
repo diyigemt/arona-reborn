@@ -33,7 +33,7 @@ internal object TencentWebsocketMessageCreateHandler :
     val tmp = GuildChannelMemberImpl(
       coroutineContext,
       bot.guilds[payload.guildId]!!.channels[payload.channelId]!!,
-      bot.guilds[payload.guildId]!!.members[payload.author.id]!!
+      bot.guilds[payload.guildId]!!.members.getOrCreate(payload.author.id)
     )
     TencentGuildMessageEvent(payload.toMessageChain(), tmp).broadcast()
   }
@@ -56,6 +56,18 @@ internal object TencentWebsocketAtMessageCreateHandler :
       payload.toMessageChain(),
       tmp
     ).broadcast()
+  }
+}
+
+@Suppress("UNUSED")
+internal object TencentWebsocketGroupAtMessageCreateHandler :
+  TencentWebsocketDispatchEventHandler<TencentGroupMessageRaw>() {
+  override val type = TencentWebsocketEventType.GROUP_AT_MESSAGE_CREATE
+  override val decoder = TencentGroupMessageRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGroupMessageRaw) {
+    val member = bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
+    TencentGroupMessageEvent(payload.toMessageChain(), member).broadcast()
   }
 }
 

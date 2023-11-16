@@ -1,0 +1,49 @@
+{
+  "name": "arona-docs",
+  "version": "1.0.1",
+  "description": "",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "vitepress dev docs",
+    "open:dist": "open ./docs/.vitepress/dist",
+    "build": "vitepress build docs",
+    "preview": "vitepress build docs && vitepress preview docs",
+    "format": "prettier --config .prettierrc.json -uw ./docs/components",
+    "check": "vue-tsc --noEmit; eslint --config ./.eslintrc.json ./docs/ --ext .js,.ts,.vue"
+  },
+  "keywords": [],
+  "author": "diyigemt",
+  "license": "ISC",
+  "devDependencies": {
+    "@algolia/client-search": "^4.20.0",
+    "@rushstack/eslint-patch": "1.5.1",
+    "@typescript-eslint/eslint-plugin": "5.53.0",
+    "@typescript-eslint/parser": "5.53.0",
+    "@vite-pwa/vitepress": "^0.2.3",
+    "@vue/eslint-config-typescript": "11.0.2",
+    "element-plus": "2.4.2",
+    "eslint": "8.53.0",
+    "eslint-config-prettier": "8.6.0",
+    "eslint-plugin-vue": "9.18.1",
+    "flexsearch": "0.7.31",
+    "markdown-it": "13.0.2",
+    "prettier": "2.8.4",
+    "sass": "1.69.5",
+    "typescript": "4.9.5",
+    "unplugin-auto-import": "0.16.7",
+    "unplugin-icons": "0.17.4",
+    "unplugin-vue-components": "0.25.2",
+    "vitepress": "1.0.0-rc.25",
+    "vitepress-plugin-search": "1.0.4-alpha.20",
+    "vue": "3.3.8",
+    "vue-tsc": "1.8.22",
+    "workbox-window": "6.5.4"
+  },
+  "dependencies": {
+    "@vueuse/core": "10.6.1",
+    "axios": "1.6.2",
+    "vite": "4.1.5",
+    "vite-plugin-pwa": "^0.16.7"
+  }
+}

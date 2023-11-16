@@ -1,13 +1,11 @@
+@file:OptIn(ExperimentalSerializationApi::class)
 package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.contact.Contact
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
+import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -413,6 +411,9 @@ internal const val EmptyMessageId = ""
 
 sealed interface MessageChain : Message, Collection<Message> {
   val sourceId: String
+  companion object {
+    fun MessageChain.hasExternalMessage() = this.filterIsInstance<PlainText>().size != this.size
+  }
 }
 
 internal class MessageChainImpl(
@@ -567,6 +568,7 @@ internal object TencentRichMessageTypeAsIntSerializer : KSerializer<TencentRichM
   override fun deserialize(decoder: Decoder) = TencentRichMessageType.fromValue(decoder.decodeInt())
 }
 
+@Serializable(with = TencentRichMessageTypeAsIntSerializer::class)
 enum class TencentRichMessageType(val code: Int) {
   IMAGE(1), // 图片
   VIDEO(2), // 视频
@@ -580,29 +582,37 @@ enum class TencentRichMessageType(val code: Int) {
 }
 
 @Serializable
-class TencentMessage(
+data class TencentMessage constructor(
   val content: String,
   @SerialName("msg_type")
   @Serializable(with = TencentMessageTypeAsIntSerializer::class)
+  @EncodeDefault
   var messageType: TencentMessageType = TencentMessageType.PLAIN_TEXT,
+  @EncodeDefault
   var image: String? = null,
+  @EncodeDefault
   val markdown: String? = null,
+  @EncodeDefault
   val keyboard: String? = null,
+  @EncodeDefault
   val ark: String? = null,
   @SerialName("msg_id")
+  @EncodeDefault
   var messageId: String? = null,
 )
 
 @Serializable
-class TencentRichMessage(
+data class TencentRichMessage @OptIn(ExperimentalSerializationApi::class) constructor(
+  val url: String,
   @SerialName("file_type")
-  @Serializable(with = TencentRichMessageTypeAsIntSerializer::class)
-  var fileType: TencentRichMessageType = TencentRichMessageType.IMAGE,
-  var url: String,
+  @EncodeDefault
+  val fileType: TencentRichMessageType = TencentRichMessageType.IMAGE,
   @SerialName("srv_send_msg")
+  @EncodeDefault
   val srvSendMsg: Boolean = true,
   @Transient
   @SerialName("file_data")
+  @EncodeDefault
   val fileData: String? = null,
 )
 

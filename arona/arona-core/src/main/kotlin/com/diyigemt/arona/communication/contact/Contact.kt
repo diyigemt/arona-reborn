@@ -2,14 +2,19 @@ package com.diyigemt.arona.communication.contact
 
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
+import com.diyigemt.arona.communication.TencentEndpoint.Companion.isUserOrGroupMessageEndpoint
+import com.diyigemt.arona.communication.TencentEndpoint.Companion.toRichEndpoint
 import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.communication.message.MessageChain.Companion.hasExternalMessage
 import com.diyigemt.arona.utils.childScopeContext
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
+import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.coroutines.CoroutineContext
 
@@ -43,19 +48,66 @@ internal abstract class AbstractContact(
     urlPlaceHolder: Map<String, String> = mapOf(),
     body: MessageChain,
   ): MessageReceipt {
-    return bot.callOpenapi(
-      endpoint,
-      MessageReceipt.serializer(),
-      urlPlaceHolder
-    ) {
-      method = HttpMethod.Post
-      contentType(ContentType.Application.Json)
-      setBody(
-        bot.json.encodeToString(
-          TencentMessageBuilder().append(body).build()
+    return if (endpoint.isUserOrGroupMessageEndpoint() && body.hasExternalMessage()) {
+      bot.callOpenapi(
+        endpoint.toRichEndpoint(),
+        MessageReceipt.serializer(),
+        urlPlaceHolder
+      ) {
+        method = HttpMethod.Post
+        contentType(ContentType.Application.Json)
+        setBody(
+          bot.json.encodeToString(
+            // TODO 支持其他类型消息
+            body.filterIsInstance<TencentImage>().first().let {
+              TencentRichMessage(
+                url = it.url
+              )
+            }
+          )
         )
-      )
-    }.getOrDefault(MessageReceipt("", "")) // TODO 异常处理
+      }.getOrDefault(MessageReceipt("", "")) // TODO 异常处理
+    } else {
+      bot.callOpenapi(
+        endpoint,
+        MessageReceipt.serializer(),
+        urlPlaceHolder
+      ) {
+        method = HttpMethod.Post
+        // TODO 支持其他类型消息
+//        if (body.hasExternalMessage()) {
+//          contentType(ContentType.MultiPart.FormData)
+//          val data = formData {
+//            body.filterIsInstance<PlainText>().joinToString("") { it.toString() }.also {
+//              append("content", "123")
+//            }
+//            body.filterIsInstance<TencentImage>().firstOrNull()?.also {
+//              append("file_image", File("C:\\Users\\diyigemt\\Desktop\\123.jpg").readBytes(), Headers.build {
+//                append(HttpHeaders.ContentType, ContentType.Image.JPEG)
+//                append(HttpHeaders.ContentDisposition, ContentDisposition.Attachment.withParameter("filename", "image.jpg"))
+//              })
+//            }
+//            append("msg_id", body.sourceId)
+//          }
+//          setBody(
+//            MultiPartFormDataContent(data)
+//          )
+//        } else {
+//          contentType(ContentType.Application.Json)
+//          setBody(
+//            bot.json.encodeToString(
+//              TencentMessageBuilder().append(body).build()
+//            )
+//          )
+//        }
+        contentType(ContentType.Application.Json)
+        setBody(
+          bot.json.encodeToString(
+            TencentMessageBuilder().append(body).build()
+          )
+        )
+      }.getOrDefault(MessageReceipt("", "")) // TODO 异常处理
+    }
   }
 }
 

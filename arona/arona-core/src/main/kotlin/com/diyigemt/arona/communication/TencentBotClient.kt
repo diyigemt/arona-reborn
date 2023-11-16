@@ -10,6 +10,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.logging.*
@@ -18,6 +19,8 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.MissingFieldException
@@ -89,7 +92,6 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   private val appId = config.appId
   private val botToken
     get() = "QQBot $accessToken"
-
   companion object {
     operator fun invoke(config: TencentBotConfig): TencentBotClient {
       return TencentBotClient(config)
@@ -98,10 +100,12 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
 
   fun auth() = runSuspend {
     eventChannel.subscribeOnce<TencentBotAuthSuccessEvent>(coroutineContext) {
+      logger.warn("TencentBotAuthSuccessEvent trigger")
       connectWs()
     }
     subscribeHandshake()
     eventChannel.subscribeOnce<TencentBotWebsocketAuthSuccessEvent>(coroutineContext) {
+      logger.warn("TencentBotWebsocketAuthSuccessEvent trigger")
       // 此时bot正式登录成功, 开始维护websocket和token刷新长连接
       with(websocketContext) {
         startWebsocketHeartbeat()

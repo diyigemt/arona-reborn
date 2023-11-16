@@ -215,9 +215,13 @@ internal object TencentWebsocketOperationManager {
       return false
     }
     return runCatching {
+      var flag = true
       for (message in incoming) {
         when (message) {
-          is Frame.Close -> TencentBotWebsocketConnectionLostEvent(bot).broadcast()
+          is Frame.Close -> {
+            TencentBotWebsocketConnectionLostEvent(bot).broadcast()
+            flag = false
+          }
           is Frame.Text -> {
             val plainText = message.readText()
             val preData = json.decodeFromString<TencentWebsocketPayload0>(plainText)
@@ -232,15 +236,15 @@ internal object TencentWebsocketOperationManager {
           else -> Unit
         }
       }
-      true
-    }.onFailure {
+      flag
+    }.getOrElse {
       if (it is ClosedReceiveChannelException) {
         TencentBotWebsocketConnectionLostEvent(bot).broadcast()
-        return false
       } else {
         logger.error(it)
       }
-    }.getOrDefault(true)
+      false
+    }
   }
 
   private suspend fun ReceiveChannel<Frame>.receiveText() = (receive() as? Frame.Text)?.readText()

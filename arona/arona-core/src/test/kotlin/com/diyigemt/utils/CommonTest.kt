@@ -1,8 +1,12 @@
 package com.diyigemt.utils
 
+import com.diyigemt.arona.communication.message.TencentRichMessage
+import com.diyigemt.arona.communication.message.TencentRichMessageType
 import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.currentTime
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.reflect.full.declaredMembers
 import kotlin.test.Test
 
@@ -30,18 +34,8 @@ class CommonTest {
     println(1 shl 0 or 1 shl 9 or 1 shl 1)
   }
 
-  interface A {
-    fun save() {
-      println(this::class.declaredMembers.map { it.name })
-    }
-  }
-
-  object B : A {
-    var name: String = "a"
-  }
-
   @Test
-  fun testInterfaceClass() {
-    B.save()
+  fun testJson() {
+    println(Json.encodeToString(TencentRichMessage("123")))
   }
 }

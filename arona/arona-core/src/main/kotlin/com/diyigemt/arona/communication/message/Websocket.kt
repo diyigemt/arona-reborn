@@ -147,7 +147,7 @@ internal object TencentWebsocketHelloHandler : TencentWebsocketOperationHandler<
     source: String,
   ) {
     payload ?: return
-    heartbeatInterval = payload.data.heartbeatInterval
+    heartbeatInterval = payload.data.heartbeatInterval - 2000
     TencentBotWebsocketHandshakeSuccessEvent(bot).broadcast()
   }
 }

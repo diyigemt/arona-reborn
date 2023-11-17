@@ -16,6 +16,7 @@ import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.util.logging.*
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -176,6 +177,7 @@ internal suspend fun executeCommandImpl(
   }.getOrElse {
     when (it) {
       is MissingArgument -> CommandExecuteResult.UnmatchedSignature(it, command)
+      is TimeoutCancellationException -> CommandExecuteResult.Success(command)
       else -> CommandExecuteResult.ExecutionFailed(it, command)
     }
   }
@@ -221,25 +223,25 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
   noinline filter: suspend C.(C) -> Boolean = { true },
-  noinline action: suspend C.(C) -> Unit,
+  noinline action: suspend C.(TencentMessageEvent) -> Unit,
 ) {
   val mapper = when (this) {
     is SingleUserCommandSender -> TODO()
-    is GroupCommandSender -> TODO()
+    is GroupCommandSender -> createMapper<C, TencentGroupMessageEvent>(filter)
     is GuildUserCommandSender -> createMapper<C, TencentGuildPrivateMessageEvent>(filter)
     is GuildChannelCommandSender -> createMapper<C, TencentGuildMessageEvent>(filter)
     else -> TODO()
   }
 
-  val sender = (if (timeoutMillis == -1L) {
+  val event = (if (timeoutMillis == -1L) {
     GlobalEventChannel.syncFromEvent(mapper)
   } else {
     withTimeout(timeoutMillis) {
       GlobalEventChannel.syncFromEvent(mapper)
     }
-  }).toCommandSender() as C
+  })
 
-  action.invoke(sender, sender)
+  action.invoke(event.toCommandSender() as C, event)
 }
 
 @PublishedApi

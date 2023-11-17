@@ -62,6 +62,10 @@ abstract class AbstractPlugin(
       }
   }
 
+  fun runSuspend(block: suspend () -> Unit) = launch(coroutineContext) {
+    block()
+  }
+
   private fun refreshCoroutineContext(): CoroutineContext {
     return coroutineContextInitializer().also { _coroutineContext = it }.also {
       job.invokeOnCompletion { e ->

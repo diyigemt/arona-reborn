@@ -100,12 +100,10 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
 
   fun auth() = runSuspend {
     eventChannel.subscribeOnce<TencentBotAuthSuccessEvent>(coroutineContext) {
-      logger.warn("TencentBotAuthSuccessEvent trigger")
       connectWs()
     }
     subscribeHandshake()
     eventChannel.subscribeOnce<TencentBotWebsocketAuthSuccessEvent>(coroutineContext) {
-      logger.warn("TencentBotWebsocketAuthSuccessEvent trigger")
       // 此时bot正式登录成功, 开始维护websocket和token刷新长连接
       with(websocketContext) {
         startWebsocketHeartbeat()
@@ -197,27 +195,28 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   }
 
   private suspend fun connectWs(onConnected: suspend (TencentBotClientWebSocketSession) -> Unit = {}) {
-    callOpenapi(TencentEndpoint.WebSocket, TencentWebsocketEndpointResp.serializer()) {
-      method = HttpMethod.Get
-    }.onSuccess {
-      client.ws({
+    runSuspend {
+      callOpenapi(TencentEndpoint.WebSocket, TencentWebsocketEndpointResp.serializer()) {
         method = HttpMethod.Get
-        url(it.url)
-        headers(openapiSignHeader)
-      }) {
-        val cxt = this@TencentBotClient.toWebSocketSession(call, this)
-        this@TencentBotClient.websocketContext = cxt
-        runCatching {
-          onConnected(cxt)
-        }.onFailure {
-          logger.error(it)
+      }.onSuccess {
+        client.ws({
+          method = HttpMethod.Get
+          url(it.url)
+        }) {
+          val cxt = this@TencentBotClient.toWebSocketSession(call, this)
+          this@TencentBotClient.websocketContext = cxt
+          runCatching {
+            onConnected(cxt)
+          }.onFailure {
+            logger.error(it)
+          }
+          while (cxt.handleTencentOperation()) {
+            //
+          }
         }
-        while (cxt.handleTencentOperation()) {
-          //
-        }
+      }.onFailure {
+        logger.error("get websocket endpoint failed.")
       }
-    }.onFailure {
-      logger.error("get websocket endpoint failed.")
     }
   }
 

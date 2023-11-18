@@ -7,6 +7,7 @@ import com.diyigemt.arona.arona.tools.queryTeacherNameFromDB
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.option
 
 @Suppress("unused")
@@ -15,7 +16,7 @@ object CallMeCommand : AbstractCommand(
   "叫我",
   description = "记录用于称呼的名字"
 ) {
-  val expect by argument(name = "期望的称呼", help = "期望的称呼")
+  private val expect by argument(name = "期望的称呼", help = "期望的称呼").optional()
   suspend fun UserCommandSender.callMe() {
     if (expect.isNullOrBlank()) {
       queryTeacherNameFromDB(user.id).also {

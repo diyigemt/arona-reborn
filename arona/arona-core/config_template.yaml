@@ -3,6 +3,7 @@ bot:
   token: ""
   secret: ""
   public: false
+  debug: false
 adminToken: ''
 redis:
   host: '172.18.100.39'

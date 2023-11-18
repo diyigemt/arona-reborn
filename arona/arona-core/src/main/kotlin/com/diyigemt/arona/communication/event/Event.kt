@@ -3,11 +3,17 @@ package com.diyigemt.arona.communication.event
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentBotAuthEndpointResp
 import com.diyigemt.arona.communication.TencentWebsocketEventType
+import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
+import com.diyigemt.arona.communication.contact.GuildMemberImpl
 import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.database.guild.GuildMemberSchema
+import com.diyigemt.arona.database.guild.GuildMemberTable
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
+import org.jetbrains.exposed.sql.and
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
@@ -30,10 +36,10 @@ internal object TencentWebsocketMessageCreateHandler :
   override val decoder = TencentChannelMessageRaw.serializer()
 
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
+    val guild = bot.guilds.getOrCreate(payload.guildId)
     val tmp = GuildChannelMemberImpl(
-      coroutineContext,
-      bot.guilds[payload.guildId]!!.channels[payload.channelId]!!,
-      bot.guilds[payload.guildId]!!.members.getOrCreate(payload.author.id)
+      guild.channels.getOrCreate(payload.channelId),
+      guild.members.getOrCreate(payload.author.id)
     )
     TencentGuildMessageEvent(payload.toMessageChain(), tmp).broadcast()
   }
@@ -46,15 +52,35 @@ internal object TencentWebsocketAtMessageCreateHandler :
   override val decoder = TencentChannelMessageRaw.serializer()
 
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
-    // TODO 删去?
     val guild = bot.guilds.getOrCreate(payload.guildId)
     val tmp = GuildChannelMemberImpl(
-      coroutineContext,
-      // TODO 删去?
       guild.channels.getOrCreate(payload.channelId),
-      guild.members[payload.author.id] ?: guild.emptyGuildMember
+      guild.members.getOrCreate(payload.author.id)
     )
     TencentGuildMessageEvent(
+      payload.toMessageChain(),
+      tmp
+    ).broadcast()
+  }
+}
+
+// 频道私聊事件
+@Suppress("UNUSED")
+internal object TencentWebsocketDirectMessageCreateHandler :
+  TencentWebsocketDispatchEventHandler<TencentChannelMessageRaw>() {
+  override val type = TencentWebsocketEventType.DIRECT_MESSAGE_CREATE
+  override val decoder = TencentChannelMessageRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
+    val memberId = payload.author.id
+    val guildId = payload.guildId
+    val guild = bot.guilds.getOrCreate(guildId)
+    val tmp = GuildMemberImpl(
+      guild,
+      guild.findOrCreateMemberPrivateChannel(memberId, payload.channelId),
+      payload.member
+    )
+    TencentGuildPrivateMessageEvent(
       payload.toMessageChain(),
       tmp
     ).broadcast()

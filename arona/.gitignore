@@ -39,3 +39,4 @@ out/
 database.db
 logs/
 config.yaml
+/sandbox/

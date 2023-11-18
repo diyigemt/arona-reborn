@@ -4,17 +4,20 @@ import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
 import com.diyigemt.arona.communication.TencentEndpoint.Companion.isUserOrGroupMessageEndpoint
 import com.diyigemt.arona.communication.TencentEndpoint.Companion.toRichEndpoint
+import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.communication.message.MessageChain.Companion.hasExternalMessage
+import com.diyigemt.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.database.guild.GuildMemberSchema
+import com.diyigemt.arona.database.guild.GuildMemberTable
 import com.diyigemt.arona.utils.childScopeContext
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
-import java.io.File
+import org.jetbrains.exposed.sql.and
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.coroutines.CoroutineContext
 
@@ -114,9 +117,41 @@ internal abstract class AbstractContact(
 interface Guild : Contact {
   val members: ContactList<GuildMember>
   val channels: ContactList<Channel>
-  val emptyGuildMember: GuildMember
-  val emptyChannelMember: Channel
   val isPublic: Boolean
+
+  companion object {
+    fun Guild.findOrCreateMemberPrivateChannel(memberId: String, channelId: String = "0"): Channel {
+      return when (val channel = dbQuery {
+        GuildMemberSchema.find {
+          (GuildMemberTable.botId eq bot.id) and (GuildMemberTable.id eq memberId) and (GuildMemberTable.guildId eq id)
+        }.firstOrNull()
+      }) {
+        is GuildMemberSchema -> {
+          channels.getOrCreate(
+            channel.channelId
+          )
+
+        }
+
+        else -> {
+          channels.getOrCreate(
+            channelId
+          ).also {
+            if (channelId != "0") {
+              // 记录私聊频道
+              dbQuery {
+                GuildMemberSchema.new(memberId) {
+                  this@new.botId = bot.id
+                  this@new.guildId = this@findOrCreateMemberPrivateChannel.id
+                  this@new.channelId = channelId
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 internal class GuildImpl(
@@ -128,8 +163,6 @@ internal class GuildImpl(
   override val unionOpenid: String? = null
   override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
   override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
-  override val emptyGuildMember: GuildMember = EmptyGuildMemberImpl(this)
-  override val emptyChannelMember: Channel = EmptyChannelImpl(this)
   override val isPublic: Boolean = bot.isPublic
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     // 无法实现
@@ -158,6 +191,7 @@ internal class GuildImpl(
         it.map { member ->
           GuildMemberImpl(
             this@GuildImpl,
+            findOrCreateMemberPrivateChannel(member.user?.id ?: ""),
             member
           )
         }
@@ -177,7 +211,6 @@ internal class GuildImpl(
         it.map { ch ->
           ChannelImpl(
             bot,
-            coroutineContext,
             this@GuildImpl,
             ch
           )
@@ -189,16 +222,19 @@ internal class GuildImpl(
 
 interface Channel : Contact {
   val guild: Guild
+  val members: ContactList<GuildChannelMember>
 }
 
 internal class ChannelImpl(
   bot: TencentBot,
-  parentCoroutineContext: CoroutineContext,
   override val guild: Guild,
   private val internalChannel: TencentGuildChannelRaw,
-) : Channel, AbstractContact(bot, parentCoroutineContext) {
+) : Channel, AbstractContact(bot, guild.coroutineContext) {
   override val id get() = internalChannel.id
   override val unionOpenid: String? = null
+  override val members: ContactList<GuildChannelMember> =
+    GuildChannelMemberContactList { EmptyGuildChannelMemberImpl(this, it) }
+
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     return callMessageOpenApi(
       TencentEndpoint.PostGuildMessage,
@@ -251,6 +287,7 @@ interface GuildChannelMember : User {
 // 频道成员 私聊情况下
 interface GuildMember : User {
   val guild: Guild
+  val channel: Channel
 }
 
 internal class SingleUserImpl(
@@ -282,10 +319,9 @@ internal class GroupMemberImpl(
 }
 
 internal class GuildChannelMemberImpl(
-  parentCoroutineContext: CoroutineContext,
   override val channel: Channel,
   private val internalMember: GuildMember,
-) : GuildChannelMember, AbstractContact(channel.bot, parentCoroutineContext) {
+) : GuildChannelMember, AbstractContact(channel.bot, channel.coroutineContext) {
   override val id get() = internalMember.id
   override val guild get() = internalMember.guild
   override val unionOpenid: String? = null
@@ -293,15 +329,22 @@ internal class GuildChannelMemberImpl(
   override suspend fun sendMessage(message: MessageChain) = asGuildMember().sendMessage(message)
 }
 
+// 通过频道直接获取的频道成员
 internal class GuildMemberImpl(
   override val guild: Guild,
+  override val channel: Channel, // 私聊频道
   private val internalGuildUser: TencentGuildMemberRaw,
   override val unionOpenid: String? = null,
 ) : GuildMember, AbstractContact(guild.bot, guild.coroutineContext) {
   override val id get() = unionOpenid ?: internalGuildUser.user?.id ?: EmptyMessageId
+
+  // 私聊使用另一个接口, 而不是频道接口
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
-    // 保存私聊频道才行
-    TODO("Not yet implemented")
+    return callMessageOpenApi(
+      TencentEndpoint.PostGuildMemberMessage,
+      mapOf("guild_id" to guild.id),
+      message
+    )
   }
 }
 
@@ -315,7 +358,21 @@ internal class EmptyGuildMemberImpl(
   override val id: String = EmptyMessageId
 ) : GuildMember, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext) {
   override val unionOpenid = EmptyMessageId
-  override suspend fun sendMessage(message: MessageChain): MessageReceipt = guild.sendMessage(message)
+  override val channel: Channel
+    get() = guild.findOrCreateMemberPrivateChannel(id)
+
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt = channel.sendMessage(message)
+}
+
+internal class EmptyGuildChannelMemberImpl(
+  override val channel: Channel, // 私聊频道
+  override val id: String = EmptyMessageId
+) : GuildChannelMember, EmptyContact, AbstractContact(channel.bot, channel.coroutineContext) {
+  override val guild: Guild = channel.guild
+  override fun asGuildMember(): GuildMember = guild.members.getOrCreate(id)
+
+  override val unionOpenid = EmptyMessageId
+  override suspend fun sendMessage(message: MessageChain): MessageReceipt = channel.sendMessage(message)
 }
 
 internal class EmptyChannelImpl(
@@ -323,6 +380,9 @@ internal class EmptyChannelImpl(
   override val id: String = EmptyMessageId
 ) : Channel, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext) {
   override val unionOpenid = EmptyMessageId
+  override val members: ContactList<GuildChannelMember> =
+    GuildChannelMemberContactList { EmptyGuildChannelMemberImpl(this, it) }
+
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     return callMessageOpenApi(
       TencentEndpoint.PostGuildMessage,
@@ -339,8 +399,6 @@ internal class EmptyGuildImpl(
   override val unionOpenid: String = EmptyMessageId
   override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
   override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
-  override val emptyGuildMember: GuildMember = EmptyGuildMemberImpl(this)
-  override val emptyChannelMember: Channel = EmptyChannelImpl(this)
   override val isPublic: Boolean = bot.isPublic
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     TODO("Not yet implemented")
@@ -355,6 +413,7 @@ internal class EmptyGroupMemberImpl(
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
     TODO("Not yet implemented")
   }
+
   override fun asSingleUser(): SingleUser {
     TODO("Not yet implemented")
   }
@@ -410,6 +469,10 @@ abstract class ContactList<out C : Contact>(
 internal class GuildMemberContactList(
   override val generator: (id: String) -> GuildMember
 ) : ContactList<GuildMember>()
+
+internal class GuildChannelMemberContactList(
+  override val generator: (id: String) -> GuildChannelMember
+) : ContactList<GuildChannelMember>()
 
 internal class ChannelContactList(
   override val generator: (id: String) -> Channel

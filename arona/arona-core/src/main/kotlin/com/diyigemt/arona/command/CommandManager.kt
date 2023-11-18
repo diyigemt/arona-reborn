@@ -135,7 +135,9 @@ internal val crsiveLocalization = object : Localization {
   override fun usageTitle() = "用例:"
   override fun optionsTitle() = "可选参数"
   override fun optionsMetavar() = "可选参数"
-  override fun missingArgument(paramName: String) = "缺少参数 $paramName"
+  override fun missingArgument(paramName: String) = "缺少参数: $paramName"
+  override fun extraArgumentOne(name: String) = "多余的参数: $name"
+  override fun extraArgumentMany(name: String, count: Int) = "多余的参数: $name"
 }
 
 internal suspend fun executeCommandImpl(
@@ -161,6 +163,8 @@ internal suspend fun executeCommandImpl(
     }.parse(
       arg
         .split(" ")
+        .filter { it.isNotEmpty() }
+        .map { it.trim() }
         .toMutableList()
         .apply {
           // 如果第一个是at机器人, 继续移除掉

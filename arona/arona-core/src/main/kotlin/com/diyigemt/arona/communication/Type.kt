@@ -10,10 +10,12 @@ import kotlinx.serialization.encoding.Encoder
 
 @Serializable
 data class TencentBotConfig(
+  val id: String,
   val appId: String,
   val token: String,
   val secret: String,
-  val public: Boolean = false
+  val public: Boolean = false,
+  val debug: Boolean = false
 ) {
   fun toAuthConfig() = TencentBotAuthEndpointReq(appId, secret)
 }
@@ -67,6 +69,7 @@ enum class TencentEndpoint(val path: String) {
   PostGroupMessage("/v2/groups/{group_openid}/messages"), // 向群聊发送消息
   PostGroupRichMessage("/v2/groups/{group_openid}/files"), // 向群聊发送消息
   PostGuildMessage("/channels/{channel_id}/messages"), // 向子频道发送消息
+  PostGuildMemberMessage("/dms/{guild_id}/messages"), // 向频道成员发送私聊消息
   GetBotGuildList("/users/@me/guilds"), // 获取机器人/创建者加入的频道列表
   GetGuildMemberList("/guilds/{guild_id}/members"), // 获取频道的成员列表
   GetGuildChannelList("/guilds/{guild_id}/channels"); // 获取频道的子频道列表

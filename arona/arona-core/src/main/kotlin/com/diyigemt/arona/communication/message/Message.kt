@@ -65,9 +65,9 @@ internal enum class TencentMessageIntentSuperType(val offset: Int) {
 @Serializable
 internal data class TencentGuildUserRaw(
   override val id: String,
-  val bot: Boolean,
   val avatar: String,
   val username: String,
+  val bot: Boolean = false,
   @SerialName("union_openid")
   val unionOpenid: String = "",
   @SerialName("union_user_account")
@@ -76,10 +76,10 @@ internal data class TencentGuildUserRaw(
 
 @Serializable
 internal data class TencentGuildMemberRaw(
-  val nick: String,
-  val roles: List<String>,
   @SerialName("joined_at")
   val joinedAt: String,
+  val nick: String = "",
+  val roles: List<String> = listOf(),
   val user: TencentGuildUserRaw? = null,
   @SerialName("guild_id")
   val guildIid: String = "",
@@ -87,8 +87,6 @@ internal data class TencentGuildMemberRaw(
   companion object {
     val EmptyTencentGuildMemberRaw = TencentGuildMemberRaw(
       "",
-      listOf(),
-      ""
     )
   }
 }

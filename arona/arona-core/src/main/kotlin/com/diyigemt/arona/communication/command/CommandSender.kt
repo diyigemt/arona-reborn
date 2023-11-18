@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalContracts::class)
+@file:OptIn(ExperimentalContracts::class, ExperimentalContracts::class)
 
 package com.diyigemt.arona.communication.command
 
@@ -111,7 +111,7 @@ class GuildUserCommandSender internal constructor(
   override val subject get() = user.guild
   val guild get() = user.guild
   override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = user.sendMessage(message)
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId))
 }
 
 object ConsoleCommandSender : AbstractCommandSender(), CommandSender {

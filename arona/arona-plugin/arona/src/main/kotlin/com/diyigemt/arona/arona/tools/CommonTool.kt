@@ -4,9 +4,9 @@ import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.name.TeacherName
 
 fun queryTeacherNameFromDB(id: String): String {
-  return (dbQuery {
+  return dbQuery {
     TeacherName.findById(id)
-  }?.name ?: "") + "老师"
+  }?.name ?: "老师"
 }
 
 fun randomInt(bound: Int): Int = (System.currentTimeMillis() % bound).toInt()

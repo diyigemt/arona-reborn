@@ -31,7 +31,10 @@ class TencentGuildPrivateMessageEvent internal constructor(
   message: MessageChain,
   override val sender: GuildMember,
 ) : TencentMessageEvent(sender.bot, message) {
-  override val subject get() = sender.guild
+  override val subject get() = sender.channel
+  override fun toString(): String {
+    return "[PrivateChannel(${subject.id})] ${sender.id} -> $message"
+  }
 }
 
 class TencentSingleMessageEvent internal constructor(

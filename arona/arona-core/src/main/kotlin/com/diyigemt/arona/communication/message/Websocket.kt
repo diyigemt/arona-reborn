@@ -198,9 +198,7 @@ internal object TencentWebsocketHeartbeatAckHandler : TencentWebsocketOperationH
   override suspend fun TencentBotClientWebSocketSession.handler(
     payload: TencentWebsocketPayload<Unit>?,
     source: String,
-  ) {
-    logger.info("heartbeat")
-  }
+  ) {}
 }
 
 internal object TencentWebsocketOperationManager {

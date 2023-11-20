@@ -17,6 +17,7 @@ enum class ResourceType(val display: String) {
   NULL("null"),  // 错误
   FILE("file"),  // cdn文件
   PLAIN("plain"); // 纯文本
+
   companion object {
     private val ResourceTypeMap: Map<String, ResourceType> = entries.associateBy { it.display }
     fun fromValue(value: String) = ResourceTypeMap[value] ?: NULL
@@ -30,15 +31,16 @@ object ResourceTypeAsStringSerializer : KSerializer<ResourceType> {
 }
 
 @Database
-object ResourceTable: LongIdTable(name = "Resource") {
+object ResourceTable : LongIdTable(name = "Resource") {
   val name = char("name", 255)
   val hash = char("hash", 255)
   val content = char("content", 255)
   val type = enumerationByName<ResourceType>("type", 10)
 }
 
-class ImageTableModel(id: EntityID<Long>): LongEntity(id) {
-  companion object: LongEntityClass<ImageTableModel>(ResourceTable)
+class ImageTableModel(id: EntityID<Long>) : LongEntity(id) {
+  companion object : LongEntityClass<ImageTableModel>(ResourceTable)
+
   var name by ResourceTable.name
   var hash by ResourceTable.hash
   var content by ResourceTable.content

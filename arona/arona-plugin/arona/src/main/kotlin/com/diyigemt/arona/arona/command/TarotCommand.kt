@@ -39,15 +39,17 @@ object TarotCommand : AbstractCommand(
     }!!
     val positive = randomBoolean()
     send(this, tarot, positive)
-    if (record != null) {
-      record.day = today
-      record.tarot = tarotIndex
-      record.positive = positive
-    } else {
-      TarotRecord.new(id) {
-        this@new.day = today
-        this@new.tarot = tarotIndex
-        this@new.positive = positive
+    dbQuery {
+      if (record != null) {
+        record.day = today
+        record.tarot = tarotIndex
+        record.positive = positive
+      } else {
+        TarotRecord.new(id) {
+          this@new.day = today
+          this@new.tarot = tarotIndex
+          this@new.positive = positive
+        }
       }
     }
   }
@@ -58,7 +60,7 @@ object TarotCommand : AbstractCommand(
     val path = "/tarot/${tarot.id.value}-${fileSuffix}.png"
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
     // TODO 多次回复
-//    commandSender.sendMessage("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
+    commandSender.sendMessage("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
     MessageChainBuilder()
       .append(
         TencentImage(

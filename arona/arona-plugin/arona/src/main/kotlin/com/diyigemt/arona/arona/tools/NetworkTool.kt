@@ -27,7 +27,7 @@ enum class BackendEndpoint(val path: String) {
 }
 
 object NetworkTool {
-  private val json = Json { ignoreUnknownKeys = true }
+  val json = Json { ignoreUnknownKeys = true }
   private const val BACKEND_BASE_PATH = "https://arona.diyigemt.com"
 
   suspend fun <T> request(
@@ -67,7 +67,7 @@ object NetworkTool {
       val resp = baseRequest(endpoint.path, block = block)
       if (resp.status == HttpStatusCode.OK) {
         bodyTmp = resp.bodyAsText()
-        Json.decodeFromString<ServerResponse<T>>(bodyTmp)
+        json.decodeFromString<ServerResponse<T>>(bodyTmp)
       } else {
         throw HttpNotOkException(resp.status, bodyTmp)
       }

@@ -45,6 +45,7 @@ interface TencentBot : Contact, CoroutineScope {
   val groups: ContactList<Group>
   val users: ContactList<SingleUser>
   val isPublic: Boolean
+  val isDebug: Boolean
   suspend fun <T> callOpenapi(
     endpoint: TencentEndpoint,
     decoder: KSerializer<T>,
@@ -61,7 +62,7 @@ interface TencentBot : Contact, CoroutineScope {
 
 internal class TencentBotClient
 private constructor(private val config: TencentBotConfig) : Closeable, TencentBot, CoroutineScope {
-  override val id = config.appId
+  override val id = config.id
   override val client = HttpClient(CIO) {
     install(WebSockets)
     install(ContentNegotiation) {
@@ -80,6 +81,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   override val groups: ContactList<Group> = GroupContactList { EmptyGroupImpl(this, it) }
   override val users: ContactList<SingleUser> = SingleUserContactList { EmptySingleUserImpl(this, it) }
   override val isPublic = config.public
+  override val isDebug = config.debug
   private val timer = Timer("Bot.${config.appId}", true)
   private var accessToken: String = ""
   private lateinit var accessTokenHeartbeatTask: TimerTask
@@ -261,7 +263,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
         }
         contentType(ContentType.Application.Json)
         url(
-          "https://api.sgroup.qq.com${endpoint.path}".let {
+          "https://${if (isDebug) "sandbox." else ""}api.sgroup.qq.com${endpoint.path}".let {
             var base = it
             urlPlaceHolder.forEach { (k, v) ->
               base = it.replace("{$k}", v)

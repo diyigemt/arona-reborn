@@ -4,7 +4,15 @@
 
 ### 如何使用
 
-在 qq 群机器人管理界面/频道机器人管理界面搜索 AronaBot 添加即可（还在审核中）
+群主/管理员/频道主扫描二维码即可
+
+群:
+
+![group](.\arona-doc\docs\public\image\group.png)
+
+频道:
+
+![guild](.\arona-doc\docs\public\image\guild.png)
 
 ### 自行部署
 

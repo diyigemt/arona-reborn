@@ -8,11 +8,11 @@
 
 群:
 
-![group](.\arona-doc\docs\public\image\group.png)
+![group](/arona-doc/docs/public/image/group.png)
 
 频道:
 
-![guild](.\arona-doc\docs\public\image\guild.png)
+![guild](/arona-doc/docs/public/image/guild.png)
 
 ### 自行部署
 

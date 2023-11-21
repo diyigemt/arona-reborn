@@ -9,7 +9,6 @@ import com.diyigemt.arona.command.nextMessage
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.PlainText
-import com.diyigemt.arona.communication.message.TencentImage
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.coroutines.withTimeout
@@ -25,12 +24,6 @@ data class ImageQueryData(
   val type: String,
 )
 
-@Serializable
-data class ImageQueryData0(
-  val name: String,
-  val path: String,
-)
-
 @Suppress("unused")
 object TrainerCommand : AbstractCommand(
   Arona,
@@ -38,10 +31,10 @@ object TrainerCommand : AbstractCommand(
   description = "提供各种攻略"
 ) {
   private val arg by argument(name = "图片名", help = "学生名称/别名/主线地图/其他杂图名称")
-  private val serializer = ServerResponse.serializer(ListSerializer(ImageQueryData0.serializer()))
+  private val serializer = ServerResponse.serializer(ListSerializer(ImageQueryData.serializer()))
   private val json = Json { ignoreUnknownKeys = true }
-  private suspend fun getImage(name: String): ServerResponse<List<ImageQueryData0>> {
-    return NetworkTool.request<List<ImageQueryData0>>(BackendEndpoint.QueryImage) {
+  private suspend fun getImage(name: String): ServerResponse<List<ImageQueryData>> {
+    return NetworkTool.request<List<ImageQueryData>>(BackendEndpoint.QueryImage) {
       parameter("name", name)
     }.getOrThrow()
   }
@@ -70,7 +63,7 @@ object TrainerCommand : AbstractCommand(
 //                    MessageChainBuilder()
 //                      .append(
 //                        TencentImage(
-//                          url = "https://arona.cdn.diyigemt.com/image${get(0).path}"
+//                          url = "https://arona.cdn.diyigemt.com/image${get(0).content}"
 //                        )
 //                      ).build().also { ch -> this@trainer.sendMessage(ch) }
 //                  }
@@ -86,7 +79,7 @@ object TrainerCommand : AbstractCommand(
 //          MessageChainBuilder()
 //            .append(
 //              TencentImage(
-//                url = "https://arona.cdn.diyigemt.com/image${first().path}"
+//                url = "https://arona.cdn.diyigemt.com/image${first().content}"
 //              )
 //            ).build().also { sendMessage(it) }
         }

@@ -1,15 +1,12 @@
 package com.diyigemt.arona.hello
 
 import com.diyigemt.arona.command.AbstractCommand
-import com.diyigemt.arona.command.nextMessage
-import com.diyigemt.arona.command.parser.image
 import com.diyigemt.arona.communication.command.GuildChannelCommandSender
 import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.types.int
 
 object PluginMain : AronaPlugin(AronaPluginDescription(
   id = "com.diyigemt.arona.hello",

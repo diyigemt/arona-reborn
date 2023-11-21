@@ -325,7 +325,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
 
   override val bot: TencentBot = this
   override val unionOpenid: String = config.appId
-  override suspend fun sendMessage(message: MessageChain): MessageReceipt {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
     TODO("Not yet implemented")
   }
 

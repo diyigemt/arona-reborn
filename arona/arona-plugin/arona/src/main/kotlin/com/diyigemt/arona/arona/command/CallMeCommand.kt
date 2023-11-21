@@ -8,7 +8,6 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
-import com.github.ajalt.clikt.parameters.options.option
 
 @Suppress("unused")
 object CallMeCommand : AbstractCommand(

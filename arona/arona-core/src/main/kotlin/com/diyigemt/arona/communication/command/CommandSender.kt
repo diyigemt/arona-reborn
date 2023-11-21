@@ -25,7 +25,8 @@ interface CommandSender : CoroutineScope {
   val subject: Contact?
   val user: User?
   val sourceId: String?
-  suspend fun sendMessage(message: String): MessageReceipt
+  var messageSequence: Int // 消息序列, 回复同一条sourceId时自增, 从1开始
+  suspend fun sendMessage(message: String): MessageReceipt = sendMessage(PlainText(message))
   suspend fun sendMessage(message: Message): MessageReceipt
 
   companion object {
@@ -51,7 +52,6 @@ sealed class AbstractCommandSender : CommandSender {
 
 sealed class AbstractUserCommandSender : UserCommandSender, AbstractCommandSender() {
   override val bot: TencentBot get() = user.bot
-  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
   override suspend fun sendMessage(message: Message) = user.sendMessage(message)
 }
 
@@ -70,8 +70,8 @@ class SingleUserCommandSender internal constructor(
   override val sourceId: String,
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("SingleUserCommandSender") {
   override val subject get() = user
-  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId))
+  override var messageSequence: Int = 1
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -83,8 +83,8 @@ class GroupCommandSender internal constructor(
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GroupCommandSender") {
   override val subject get() = user.group
   val group get() = user.group
-  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = subject.sendMessage(message.toMessageChain(sourceId))
+  override var messageSequence: Int = 1
+  override suspend fun sendMessage(message: Message) = subject.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -97,8 +97,8 @@ class GuildChannelCommandSender internal constructor(
   override val subject get() = user.channel
   val channel get() = user.channel
   val guild get() = user.guild
-  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = subject.sendMessage(message.toMessageChain(sourceId))
+  override var messageSequence: Int = 1
+  override suspend fun sendMessage(message: Message) = subject.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -110,8 +110,8 @@ class GuildUserCommandSender internal constructor(
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildUserCommandSender") {
   override val subject get() = user.guild
   val guild get() = user.guild
-  override suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
-  override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId))
+  override var messageSequence: Int = 1
+  override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
 }
 
 object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
@@ -120,11 +120,8 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val subject: Contact? = null
   override val user: User? = null
   override val sourceId: String = EmptyMessageId
-  override suspend fun sendMessage(message: String): MessageReceipt {
-    commandLineLogger.info(message)
-    TODO()
-  }
 
+  override var messageSequence: Int = 1
   override suspend fun sendMessage(message: Message): MessageReceipt {
     commandLineLogger.info(message.serialization())
     TODO()
@@ -133,6 +130,7 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val coroutineContext: CoroutineContext = AronaApplication.childScopeContext(NAME)
 }
 
+@OptIn(ExperimentalContracts::class)
 fun CommandSender.isConsole(): Boolean {
   contract {
     returns(true) implies (this@isConsole is ConsoleCommandSender)

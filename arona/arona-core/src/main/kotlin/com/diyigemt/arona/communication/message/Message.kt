@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.*
@@ -409,6 +410,7 @@ internal const val EmptyMessageId = ""
 
 sealed interface MessageChain : Message, Collection<Message> {
   val sourceId: String
+
   companion object {
     fun MessageChain.hasExternalMessage() = this.filterIsInstance<PlainText>().size != this.size
   }
@@ -597,6 +599,9 @@ data class TencentMessage constructor(
   @SerialName("msg_id")
   @EncodeDefault
   var messageId: String? = null,
+  @SerialName("msg_seq")
+  @EncodeDefault
+  var messageSequence: Int = 1,
 )
 
 @Serializable
@@ -616,12 +621,18 @@ data class TencentRichMessage @OptIn(ExperimentalSerializationApi::class) constr
 
 class TencentMessageBuilder private constructor(
   private val container: MutableList<Message>,
-  messageSource: TencentMessageEvent? = null,
+  private val messageSequence: Int = 1,
+  messageSource: TencentMessageEvent? = null
 ) : MutableList<Message> by container {
   private var sourceMessageId: String? = messageSource?.message?.sourceId
 
-  constructor(messageSource: TencentMessageEvent? = null) : this(mutableListOf(), messageSource)
-  constructor(sourceId: String) : this(mutableListOf()) {
+  constructor(messageSource: TencentMessageEvent? = null, messageSequence: Int = 1) : this(
+    mutableListOf(),
+    messageSequence,
+    messageSource
+  )
+
+  constructor(sourceId: String, messageSequence: Int = 1) : this(mutableListOf(), messageSequence) {
     sourceMessageId = sourceId
   }
 
@@ -669,7 +680,8 @@ class TencentMessageBuilder private constructor(
       .joinToString("\n") { it.toString() }
       .takeIf { it.isNotEmpty() } ?: " ",
     messageType = TencentMessageType.PLAIN_TEXT,
-    messageId = sourceMessageId
+    messageId = sourceMessageId,
+    messageSequence = messageSequence
   ).apply {
     val im = container.filterIsInstance<TencentImage>().firstOrNull()
     if (im != null) {

@@ -10,7 +10,6 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.logging.*
@@ -19,8 +18,6 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.MissingFieldException
@@ -94,6 +91,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   private val appId = config.appId
   private val botToken
     get() = "QQBot $accessToken"
+
   companion object {
     operator fun invoke(config: TencentBotConfig): TencentBotClient {
       return TencentBotClient(config)
@@ -273,11 +271,23 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
         )
         block.invoke(this)
       }
+      if (isDebug) {
+        logger.info("sending message, endpoint: {}, body: {}", endpoint, resp.request.content.toString())
+      }
       if (resp.status == HttpStatusCode.OK) {
         bodyTmp = resp.bodyAsText()
         json.decodeFromString(decoder, bodyTmp)
       } else {
-        throw HttpNotOkException(resp.status, resp.bodyAsText(), resp.headers["X-Tps-Trace-Id"])
+        bodyTmp = resp.bodyAsText()
+        if (bodyTmp.contains("\"code\":22009")) {
+          throw ImageFailedException(bodyTmp)
+        }
+        throw HttpNotOkException(
+          resp.status,
+          resp.bodyAsText(),
+          resp.headers["X-Tps-Trace-Id"],
+          resp.request.content.toString()
+        )
       }
     }.onFailure {
       when (it) {
@@ -292,6 +302,13 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
           logger.error(
             "call endpoint failed, endpoint: {}, placeHolder: {}, body: {}",
             endpoint, urlPlaceHolder, it.message
+          )
+        }
+
+        is ImageFailedException -> {
+          logger.error(
+            "call endpoint failed, endpoint: {}, placeHolder: {}, cause: msg limit exceed",
+            endpoint, urlPlaceHolder
           )
         }
 
@@ -345,6 +362,8 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   }
 }
 
-class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String? = "") : Exception(
-  "status: $status, traceId: $traceId, message: $body"
+class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String? = "", req: String? = "") : Exception(
+  "status: $status, traceId: $traceId, message: $body, req-body: $req"
 )
+
+class ImageFailedException(msg: String) : Exception(msg)

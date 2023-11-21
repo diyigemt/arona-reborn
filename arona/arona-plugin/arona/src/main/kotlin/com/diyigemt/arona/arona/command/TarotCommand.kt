@@ -1,6 +1,7 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
+import com.diyigemt.arona.arona.command.TrainerCommand.trainer
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.tarot.Tarot
 import com.diyigemt.arona.arona.database.tarot.TarotRecord
@@ -60,12 +61,14 @@ object TarotCommand : AbstractCommand(
     val path = "/tarot/${tarot.id.value}-${fileSuffix}.png"
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
     // TODO 多次回复
-    commandSender.sendMessage("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
-    MessageChainBuilder()
-      .append(
-        TencentImage(
-          url = "https://arona.cdn.diyigemt.com/image$path"
-        )
-      ).build().also { ch -> commandSender.sendMessage(ch) }
+    commandSender.sendMessage("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})" +
+        "\n${res}\n藤子抽风了，发图发不出去，第二句回复也发不出去，待会再用吧，唉")
+//    commandSender.sendMessage("图片发送失败, 这是直链:\nhttps://arona.cdn.diyigemt.com/image$path")
+//    MessageChainBuilder()
+//      .append(
+//        TencentImage(
+//          url = "https://arona.cdn.diyigemt.com/image$path"
+//        )
+//      ).build().also { ch -> commandSender.sendMessage(ch) }
   }
 }

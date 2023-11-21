@@ -12,7 +12,6 @@ import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.TencentImage
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -46,13 +45,14 @@ object TrainerCommand : AbstractCommand(
       parameter("name", name)
     }.getOrThrow()
   }
+
   suspend fun UserCommandSender.trainer() {
     getImage(arg).run {
       data?.run r1@{
         if (size != 1) {
           sendMessage("没有与${arg}对应的信息, 是否想要输入:\n${
             filterIndexed { index, _ -> index < 4 }
-              .mapIndexed { index, it -> "${index + 1}. ${it.name}" }
+              .mapIndexed { index, it -> "${index + 1}. /攻略 ${it.name}" }
               .joinToString("\n")
           }")
           withTimeout(50000) {
@@ -61,26 +61,34 @@ object TrainerCommand : AbstractCommand(
               runCatching {
                 feedback.toInt()
               }.onSuccess { i ->
-                getImage(this@r1[i - 1].name).run {
-                  data?.run {
-                    MessageChainBuilder()
-                      .append(
-                        TencentImage(
-                          url = "https://arona.cdn.diyigemt.com/image${get(0).path}"
-                        )
-                      ).build().also { ch -> this@nextMessage.sendMessage(ch) }
-                  }
-                }
+                MessageChainBuilder()
+                  .append(
+                    "没救了，图发不出去，藤子炸了"
+                  ).build().also { ch -> this@trainer.sendMessage(ch) }
+//                getImage(this@r1[i - 1].name).run {
+//                  data?.run {
+//                    MessageChainBuilder()
+//                      .append(
+//                        TencentImage(
+//                          url = "https://arona.cdn.diyigemt.com/image${get(0).path}"
+//                        )
+//                      ).build().also { ch -> this@trainer.sendMessage(ch) }
+//                  }
+//                }
               }
             }
           }
         } else {
           MessageChainBuilder()
             .append(
-              TencentImage(
-                url = "https://arona.cdn.diyigemt.com/image${first().path}"
-              )
-            ).build().also { sendMessage(it) }
+              "没救了，图发不出去，藤子炸了"
+            ).build().also { ch -> sendMessage(ch) }
+//          MessageChainBuilder()
+//            .append(
+//              TencentImage(
+//                url = "https://arona.cdn.diyigemt.com/image${first().path}"
+//              )
+//            ).build().also { sendMessage(it) }
         }
       } ?: sendMessage("空结果")
     }

@@ -621,6 +621,9 @@ class TencentMessageBuilder private constructor(
   private var sourceMessageId: String? = messageSource?.message?.sourceId
 
   constructor(messageSource: TencentMessageEvent? = null) : this(mutableListOf(), messageSource)
+  constructor(sourceId: String) : this(mutableListOf()) {
+    sourceMessageId = sourceId
+  }
 
   fun append(text: String) = this.apply {
     container.add(PlainText(text))

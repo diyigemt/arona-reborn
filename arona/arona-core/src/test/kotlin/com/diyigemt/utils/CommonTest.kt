@@ -38,4 +38,12 @@ class CommonTest {
   fun testJson() {
     println(Json.encodeToString(TencentRichMessage("123")))
   }
+
+  @Test
+  fun testException() {
+    runCatching {
+      throw Exception("")
+    }.onFailure { println(1) }
+      .getOrElse { println(2) }
+  }
 }

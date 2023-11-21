@@ -1,5 +1,6 @@
 package com.diyigemt.arona.communication.contact
 
+import com.diyigemt.arona.communication.ImageFailedException
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
 import com.diyigemt.arona.communication.TencentEndpoint.Companion.isUserOrGroupMessageEndpoint
@@ -11,6 +12,7 @@ import com.diyigemt.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.database.guild.GuildMemberSchema
 import com.diyigemt.arona.database.guild.GuildMemberTable
 import com.diyigemt.arona.utils.childScopeContext
+import com.diyigemt.arona.utils.commandLineLogger
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
@@ -69,7 +71,31 @@ internal abstract class AbstractContact(
             }
           )
         )
-      }.getOrDefault(MessageReceipt("", "")) // TODO 异常处理
+      }.getOrElse {
+        if (it is ImageFailedException) {
+          // 通知用户图片发送失败
+          bot.callOpenapi(
+            endpoint,
+            MessageReceipt.serializer(),
+            urlPlaceHolder
+          ) {
+            method = HttpMethod.Post
+            contentType(ContentType.Application.Json)
+            setBody(
+              bot.json.encodeToString(
+                TencentMessageBuilder(body.sourceId).append(
+                  "图片发送达到上限，发送失败, 这是直链:\n${
+                    body.filterIsInstance<TencentImage>()
+                      .firstOrNull()?.url
+                  }"
+                )
+                  .build()
+              )
+            )
+          }
+        }
+        MessageReceipt("", "")
+      }
     } else {
       bot.callOpenapi(
         endpoint,
@@ -355,7 +381,7 @@ interface EmptyContact : Contact {
 
 internal class EmptyGuildMemberImpl(
   override val guild: Guild,
-  override val id: String = EmptyMessageId
+  override val id: String = EmptyMessageId,
 ) : GuildMember, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext) {
   override val unionOpenid = EmptyMessageId
   override val channel: Channel
@@ -366,7 +392,7 @@ internal class EmptyGuildMemberImpl(
 
 internal class EmptyGuildChannelMemberImpl(
   override val channel: Channel, // 私聊频道
-  override val id: String = EmptyMessageId
+  override val id: String = EmptyMessageId,
 ) : GuildChannelMember, EmptyContact, AbstractContact(channel.bot, channel.coroutineContext) {
   override val guild: Guild = channel.guild
   override fun asGuildMember(): GuildMember = guild.members.getOrCreate(id)
@@ -377,7 +403,7 @@ internal class EmptyGuildChannelMemberImpl(
 
 internal class EmptyChannelImpl(
   override val guild: Guild,
-  override val id: String = EmptyMessageId
+  override val id: String = EmptyMessageId,
 ) : Channel, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext) {
   override val unionOpenid = EmptyMessageId
   override val members: ContactList<GuildChannelMember> =
@@ -394,7 +420,7 @@ internal class EmptyChannelImpl(
 
 internal class EmptyGuildImpl(
   bot: TencentBot,
-  override val id: String = EmptyMessageId
+  override val id: String = EmptyMessageId,
 ) : Guild, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
@@ -407,7 +433,7 @@ internal class EmptyGuildImpl(
 
 internal class EmptyGroupMemberImpl(
   override val group: Group,
-  override val id: String = EmptyMessageId
+  override val id: String = EmptyMessageId,
 ) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
@@ -421,7 +447,7 @@ internal class EmptyGroupMemberImpl(
 
 internal class EmptySingleUserImpl(
   bot: TencentBot,
-  override val id: String = EmptyMessageId
+  override val id: String = EmptyMessageId,
 ) : SingleUser, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain): MessageReceipt {
@@ -431,7 +457,7 @@ internal class EmptySingleUserImpl(
 
 internal class EmptyGroupImpl(
   bot: TencentBot,
-  override val id: String = EmptyMessageId
+  override val id: String = EmptyMessageId,
 ) : Group, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyGroupMemberImpl(this, it) }
@@ -467,30 +493,30 @@ abstract class ContactList<out C : Contact>(
 }
 
 internal class GuildMemberContactList(
-  override val generator: (id: String) -> GuildMember
+  override val generator: (id: String) -> GuildMember,
 ) : ContactList<GuildMember>()
 
 internal class GuildChannelMemberContactList(
-  override val generator: (id: String) -> GuildChannelMember
+  override val generator: (id: String) -> GuildChannelMember,
 ) : ContactList<GuildChannelMember>()
 
 internal class ChannelContactList(
-  override val generator: (id: String) -> Channel
+  override val generator: (id: String) -> Channel,
 ) : ContactList<Channel>()
 
 internal class GuildContactList(
-  override val generator: (id: String) -> Guild
+  override val generator: (id: String) -> Guild,
 ) : ContactList<Guild>()
 
 internal class GroupContactList(
-  override val generator: (id: String) -> Group
+  override val generator: (id: String) -> Group,
 ) : ContactList<Group>()
 
 
 internal class GroupMemberContactList(
-  override val generator: (id: String) -> GroupMember
+  override val generator: (id: String) -> GroupMember,
 ) : ContactList<GroupMember>()
 
 internal class SingleUserContactList(
-  override val generator: (id: String) -> SingleUser
+  override val generator: (id: String) -> SingleUser,
 ) : ContactList<SingleUser>()

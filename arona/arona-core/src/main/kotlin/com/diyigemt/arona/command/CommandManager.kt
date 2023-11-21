@@ -229,23 +229,46 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
   noinline filter: suspend C.(C) -> Boolean = { true },
   noinline action: suspend C.(TencentMessageEvent) -> Unit,
 ) {
-  val mapper = when (this) {
+  when (this) {
     is SingleUserCommandSender -> TODO()
-    is GroupCommandSender -> createMapper<C, TencentGroupMessageEvent>(filter)
-    is GuildUserCommandSender -> createMapper<C, TencentGuildPrivateMessageEvent>(filter)
-    is GuildChannelCommandSender -> createMapper<C, TencentGuildMessageEvent>(filter)
+    is GroupCommandSender -> {
+      val mapper = createMapper<C, TencentGroupMessageEvent>(filter)
+      val event = (if (timeoutMillis == -1L) {
+        GlobalEventChannel.syncFromEvent(mapper)
+      } else {
+        withTimeout(timeoutMillis) {
+          GlobalEventChannel.syncFromEvent(mapper)
+        }
+      })
+
+      action.invoke(event.toCommandSender() as C, event)
+    }
+    is GuildUserCommandSender -> {
+      val mapper = createMapper<C, TencentGuildPrivateMessageEvent>(filter)
+      val event = (if (timeoutMillis == -1L) {
+        GlobalEventChannel.syncFromEvent(mapper)
+      } else {
+        withTimeout(timeoutMillis) {
+          GlobalEventChannel.syncFromEvent(mapper)
+        }
+      })
+
+      action.invoke(event.toCommandSender() as C, event)
+    }
+    is GuildChannelCommandSender -> {
+      val mapper = createMapper<C, TencentGuildMessageEvent>(filter)
+      val event = (if (timeoutMillis == -1L) {
+        GlobalEventChannel.syncFromEvent(mapper)
+      } else {
+        withTimeout(timeoutMillis) {
+          GlobalEventChannel.syncFromEvent(mapper)
+        }
+      })
+
+      action.invoke(event.toCommandSender() as C, event)
+    }
     else -> TODO()
   }
-
-  val event = (if (timeoutMillis == -1L) {
-    GlobalEventChannel.syncFromEvent(mapper)
-  } else {
-    withTimeout(timeoutMillis) {
-      GlobalEventChannel.syncFromEvent(mapper)
-    }
-  })
-
-  action.invoke(event.toCommandSender() as C, event)
 }
 
 @PublishedApi

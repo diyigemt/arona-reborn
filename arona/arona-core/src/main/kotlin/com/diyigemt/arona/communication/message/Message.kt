@@ -266,7 +266,7 @@ internal interface TencentMessageRaw : ContactRaw {
     if (this.attachments?.isNotEmpty() == true) {
       messageChain.delegate.addAll(
         this.attachments!!.map { im ->
-          TencentImage(im.url)
+          TencentOnlineImage("", "", 0L, im.url)
         }
       )
     }
@@ -462,29 +462,77 @@ data class PlainText(
   override fun serialization() = content
 }
 
-data class TencentImage(
-  val url: String,
-) : Message {
+interface TencentResource {
+  val resourceId: String
+  val resourceUuid: String
+  val ttl: Long
+  val size: Long
+}
+
+interface TencentImage : TencentResource, Message {
+  val height: Int
+  val width: Int
+  val url: String
+}
+
+// 由客户端通过文件上传接口获取到的image实例
+data class TencentOfflineImage(
+  override val resourceId: String,
+  override val resourceUuid: String,
+  override val ttl: Long,
+  override val url: String = "",
+) : TencentImage {
   override fun toString() = url
   override fun serialization() = "[tencent:image:$url]"
+  override val height: Int = 0
+  override val width: Int = 0
+  override val size: Long = 0L
 
   companion object {
     private val matcher = Regex("^\\[tencent:image:(\\w+)]$")
-    fun String.toTencentImage(): TencentImage? {
+    fun String.toTencentImage(): TencentOfflineImage? {
       val matchResult = matcher.matchEntire(this) ?: return null
-      return TencentImage(matchResult.groupValues[1])
+      return TencentOfflineImage(matchResult.groupValues[1], "", 0L)
     }
 
-    val serializer = object : KSerializer<TencentImage> {
+    val serializer = object : KSerializer<TencentOfflineImage> {
       override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TencentImage", PrimitiveKind.STRING)
 
-      override fun deserialize(decoder: Decoder): TencentImage =
-        decoder.decodeString().toTencentImage() ?: TencentImage("")
+      override fun deserialize(decoder: Decoder): TencentOfflineImage =
+        decoder.decodeString().toTencentImage() ?: TencentOfflineImage("", "", 0L)
 
-      override fun serialize(encoder: Encoder, value: TencentImage) = encoder.encodeString(value.serialization())
+      override fun serialize(encoder: Encoder, value: TencentOfflineImage) = encoder.encodeString(value.serialization())
 
     }
   }
+}
+
+// 由接收到的消息序列化成的image对象
+data class TencentOnlineImage(
+  override val resourceId: String,
+  override val resourceUuid: String,
+  override val ttl: Long,
+  override val url: String = "",
+) : TencentImage {
+  override fun toString() = url
+  override fun serialization() = "[tencent:image:$url]"
+  override val height: Int = 0
+  override val width: Int = 0
+  override val size: Long = 0L
+}
+
+// 简单的频道图片对象
+data class TencentGuildImage(
+  override val url: String,
+  override val resourceId: String = "",
+  override val resourceUuid: String = "",
+  override val ttl: Long = 0L,
+) : TencentImage {
+  override fun toString() = url
+  override fun serialization() = "[tencent:image:$url]"
+  override val height: Int = 0
+  override val width: Int = 0
+  override val size: Long = 0L
 }
 
 data class TencentAt(
@@ -554,7 +602,8 @@ enum class TencentMessageType(val code: Int) {
   IMAGE(1), // 图文
   MARKDOWN(2), // markdown
   ARK(3), // 卡片
-  EMBED(4); // 小程序
+  EMBED(4), // 小程序
+  FILE(7); // 文件
 
   companion object {
     private val TypeMap = entries.associateBy { it.code }
@@ -590,6 +639,7 @@ data class TencentMessage constructor(
   var messageType: TencentMessageType = TencentMessageType.PLAIN_TEXT,
   @EncodeDefault
   var image: String? = null,
+  var media: TencentMessageMediaInfo? = null,
   @EncodeDefault
   val markdown: String? = null,
   @EncodeDefault
@@ -602,6 +652,15 @@ data class TencentMessage constructor(
   @SerialName("msg_seq")
   @EncodeDefault
   var messageSequence: Int = 1,
+)
+
+@Serializable
+data class TencentMessageMediaInfo(
+  @SerialName("file_info")
+  val fileInfo: String,
+  @SerialName("file_uuid")
+  val fileUuid: String = "",
+  val ttl: Long = 0L,
 )
 
 @Serializable
@@ -622,7 +681,7 @@ data class TencentRichMessage @OptIn(ExperimentalSerializationApi::class) constr
 class TencentMessageBuilder private constructor(
   private val container: MutableList<Message>,
   private val messageSequence: Int = 1,
-  messageSource: TencentMessageEvent? = null
+  messageSource: TencentMessageEvent? = null,
 ) : MutableList<Message> by container {
   private var sourceMessageId: String? = messageSource?.message?.sourceId
 
@@ -660,7 +719,7 @@ class TencentMessageBuilder private constructor(
 
       TencentMessageType.IMAGE -> {
         if (message.image != null) {
-          append(TencentImage(message.image!!))
+          append(TencentOfflineImage("", "", 0L, message.image!!))
         }
       }
 
@@ -683,10 +742,18 @@ class TencentMessageBuilder private constructor(
     messageId = sourceMessageId,
     messageSequence = messageSequence
   ).apply {
-    val im = container.filterIsInstance<TencentImage>().firstOrNull()
-    if (im != null) {
-      messageType = TencentMessageType.IMAGE
-      image = im.url
+    when (val im = container.filterIsInstance<TencentImage>().firstOrNull()) {
+      is TencentOfflineImage -> {
+        messageType = TencentMessageType.FILE
+        media = TencentMessageMediaInfo(
+          fileInfo = im.resourceId
+        )
+      }
+      is TencentGuildImage -> {
+        messageType = TencentMessageType.IMAGE
+        image = im.url
+      }
+      else -> {}
     }
   }
 }
@@ -724,7 +791,7 @@ class MessageChainBuilder private constructor(
 
       TencentMessageType.IMAGE -> {
         if (message.image != null) {
-          append(TencentImage(message.image!!))
+          append(TencentOfflineImage("", "", 0L, message.image!!))
         }
       }
 

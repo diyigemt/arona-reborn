@@ -13,7 +13,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class ServerResponse<T>(
-  val status: Int,
+  val code: Int,
   val message: String = "",
   val data: T?,
 )

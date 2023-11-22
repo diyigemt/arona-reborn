@@ -1,7 +1,7 @@
 package com.diyigemt.arona.command.parser
 
-import com.diyigemt.arona.communication.message.TencentImage
-import com.diyigemt.arona.communication.message.TencentImage.Companion.toTencentImage
+import com.diyigemt.arona.communication.message.TencentOfflineImage
+import com.diyigemt.arona.communication.message.TencentOfflineImage.Companion.toTencentImage
 import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.clikt.parameters.arguments.ProcessedArgument
 import com.github.ajalt.clikt.parameters.arguments.RawArgument
@@ -11,17 +11,17 @@ import com.github.ajalt.clikt.parameters.options.RawOption
 import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.transform.TransformContext
 
-private val conversion: TransformContext.(String) -> TencentImage = {
+private val conversion: TransformContext.(String) -> TencentOfflineImage = {
   it.toTencentImage() ?: fail(context.localization.imageConversionError(it))
 }
 
 /** Convert the argument values to an `TencentImage` */
-fun RawArgument.image(): ProcessedArgument<TencentImage, TencentImage> = convert(conversion = conversion)
+fun RawArgument.image(): ProcessedArgument<TencentOfflineImage, TencentOfflineImage> = convert(conversion = conversion)
 
 /**
  * Convert the option values to an `TencentImage`
  */
-fun RawOption.image(): NullableOption<TencentImage, TencentImage> {
+fun RawOption.image(): NullableOption<TencentOfflineImage, TencentOfflineImage> {
   return convert({ localization.imageMetavar() }, conversion = conversion)
 }
 

@@ -74,11 +74,6 @@ enum class TencentEndpoint(val path: String) {
   GetGuildMemberList("/guilds/{guild_id}/members"), // 获取频道的成员列表
   GetGuildChannelList("/guilds/{guild_id}/channels"); // 获取频道的子频道列表
   companion object {
-    fun TencentEndpoint.toRichEndpoint() = when (this) {
-      PostSingleUserMessage -> PostSingleUserRichMessage
-      PostGroupMessage -> PostGroupRichMessage
-      else -> this
-    }
     fun TencentEndpoint.isGuildEndMessageEndpoint() = this == PostGuildMessage
     fun TencentEndpoint.isUserOrGroupMessageEndpoint() = this == PostGroupMessage || this == PostSingleUserMessage
   }

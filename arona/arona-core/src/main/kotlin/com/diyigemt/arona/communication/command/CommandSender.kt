@@ -138,6 +138,15 @@ fun CommandSender.isConsole(): Boolean {
   return this is ConsoleCommandSender
 }
 
+// TODO 支持私聊
+@OptIn(ExperimentalContracts::class)
+fun CommandSender.isGroupOrPrivate(): Boolean {
+  contract {
+    returns(true) implies (this@isGroupOrPrivate is GroupCommandSender)
+  }
+  return this is GroupCommandSender
+}
+
 fun CommandSender.isNotConsole(): Boolean {
   contract {
     returns(true) implies (this@isNotConsole !is ConsoleCommandSender)

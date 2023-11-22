@@ -7,8 +7,11 @@ import com.diyigemt.arona.arona.tools.ServerResponse
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextMessage
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.communication.message.TencentGuildImage
+import com.diyigemt.arona.communication.message.TencentOfflineImage
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.coroutines.withTimeout
@@ -54,34 +57,38 @@ object TrainerCommand : AbstractCommand(
               runCatching {
                 feedback.toInt()
               }.onSuccess { i ->
-                MessageChainBuilder()
-                  .append(
-                    "没救了，图发不出去，藤子炸了"
-                  ).build().also { ch -> this@trainer.sendMessage(ch) }
-//                getImage(this@r1[i - 1].name).run {
-//                  data?.run {
-//                    MessageChainBuilder()
-//                      .append(
-//                        TencentImage(
-//                          url = "https://arona.cdn.diyigemt.com/image${get(0).content}"
-//                        )
-//                      ).build().also { ch -> this@trainer.sendMessage(ch) }
-//                  }
-//                }
+                getImage(this@r1[i - 1].name).run {
+                  data?.run {
+                    if (isGroupOrPrivate()) {
+                      subject.uploadImage("https://arona.cdn.diyigemt.com/image${get(0).content}").also { im ->
+                        sendMessage(im)
+                      }
+                    } else {
+                      MessageChainBuilder()
+                        .append(
+                          TencentGuildImage(
+                            url = "https://arona.cdn.diyigemt.com/image${get(0).content}"
+                          )
+                        ).build().also { ch -> this@trainer.sendMessage(ch) }
+                    }
+                  }
+                }
               }
             }
           }
         } else {
-          MessageChainBuilder()
-            .append(
-              "没救了，图发不出去，藤子炸了"
-            ).build().also { ch -> sendMessage(ch) }
-//          MessageChainBuilder()
-//            .append(
-//              TencentImage(
-//                url = "https://arona.cdn.diyigemt.com/image${first().content}"
-//              )
-//            ).build().also { sendMessage(it) }
+          if (isGroupOrPrivate()) {
+            subject.uploadImage("https://arona.cdn.diyigemt.com/image${first().content}").also { im ->
+              sendMessage(im)
+            }
+          } else {
+            MessageChainBuilder()
+              .append(
+                TencentGuildImage(
+                  url = "https://arona.cdn.diyigemt.com/image${first().content}"
+                )
+              ).build().also { ch -> this@trainer.sendMessage(ch) }
+          }
         }
       } ?: sendMessage("空结果")
     }

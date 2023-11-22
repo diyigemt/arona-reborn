@@ -329,6 +329,10 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     TODO("Not yet implemented")
   }
 
+  override suspend fun uploadImage(url: String): TencentImage {
+    TODO("Not yet implemented")
+  }
+
   private fun TencentBotClientWebSocketSession.startWebsocketHeartbeat() =
     timer.scheduleAtFixedRate(0, heartbeatInterval) {
       runSuspend {

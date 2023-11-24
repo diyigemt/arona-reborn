@@ -6,6 +6,7 @@ import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.contact.Contact
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
+import io.ktor.http.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -751,7 +752,7 @@ class TencentMessageBuilder private constructor(
       }
       is TencentGuildImage -> {
         messageType = TencentMessageType.IMAGE
-        image = im.url
+        image = im.url.encodeURLPath()
       }
       else -> {}
     }

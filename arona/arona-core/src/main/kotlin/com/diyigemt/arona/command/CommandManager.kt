@@ -226,7 +226,7 @@ suspend inline fun GuildChannelCommandSender.nextMessage(
 suspend inline fun <reified C : UserCommandSender> C.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
-  noinline filter: suspend C.(C) -> Boolean = { true },
+  noinline filter: suspend C.(TencentMessageEvent) -> Boolean = { true },
   noinline action: suspend C.(TencentMessageEvent) -> Unit,
 ) {
   when (this) {

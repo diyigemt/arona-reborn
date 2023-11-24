@@ -52,7 +52,12 @@ object TrainerCommand : AbstractCommand(
               .joinToString("\n")
           }")
           withTimeout(50000) {
-            nextMessage {
+            nextMessage ( filter =  filter@{ event ->
+              val fb = event.message.filterIsInstance<PlainText>().firstOrNull() ?: return@filter false
+              runCatching {
+                fb.toString().toInt().let { this@r1.size >= it && it > 0 }
+              }.getOrDefault(false)
+            } ) {
               val feedback = it.message.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: "1"
               runCatching {
                 feedback.toInt()
@@ -67,7 +72,7 @@ object TrainerCommand : AbstractCommand(
                       MessageChainBuilder()
                         .append(
                           TencentGuildImage(
-                            url = "https://arona.cdn.diyigemt.com/image${get(0).content}"
+                            url = "https://arona.cdn.diyigemt.com/image/s${get(0).content}"
                           )
                         ).build().also { ch -> this@trainer.sendMessage(ch) }
                     }
@@ -85,7 +90,7 @@ object TrainerCommand : AbstractCommand(
             MessageChainBuilder()
               .append(
                 TencentGuildImage(
-                  url = "https://arona.cdn.diyigemt.com/image${first().content}"
+                  url = "https://arona.cdn.diyigemt.com/image/s${first().content}"
                 )
               ).build().also { ch -> this@trainer.sendMessage(ch) }
           }

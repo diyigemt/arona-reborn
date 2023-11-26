@@ -20,7 +20,7 @@ object AronaApplication : CoroutineScope {
     PluginManager.loadPluginFromPluginDirectory()
     PluginManager.initPlugin()
     TencentBotClient.invoke(aronaConfig.bot).auth()
-    CoroutineScope(Dispatchers.IO).launch {
+    CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
       while (true) {
         val input = readlnOrNull() ?: ""
         CommandMain.run(input.split(" "))

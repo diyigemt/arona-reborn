@@ -71,7 +71,7 @@ internal abstract class AbstractContact(
     url: String
   ): TencentImage {
     return when(this) {
-      is SingleUser -> {
+      is FriendUser -> {
         bot.callOpenapi(
           TencentEndpoint.PostSingleUserRichMessage,
           TencentMessageMediaInfo.serializer(),
@@ -274,7 +274,7 @@ internal class GroupImpl(
 
 interface User : Contact
 
-interface SingleUser : User // 单纯用户 私聊情况下
+interface FriendUser : User // 单纯用户 私聊情况下
 
 // 群组成员 群聊情况下
 interface GroupMember : User {
@@ -282,7 +282,7 @@ interface GroupMember : User {
    * 所在群
    */
   val group: Group
-  fun asSingleUser(): SingleUser
+  fun asSingleUser(): FriendUser
 }
 
 // 频道成员 频道聊天情况下
@@ -298,12 +298,12 @@ interface GuildMember : User {
   val channel: Channel
 }
 
-internal class SingleUserImpl(
+internal class FriendUserImpl(
   bot: TencentBot,
   parentCoroutineContext: CoroutineContext,
   override val id: String,
   override val unionOpenid: String?,
-) : SingleUser, AbstractContact(bot, parentCoroutineContext) {
+) : FriendUser, AbstractContact(bot, parentCoroutineContext) {
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
     return callMessageOpenApi(
       TencentEndpoint.PostSingleUserMessage,
@@ -320,7 +320,7 @@ internal class GroupMemberImpl(
   override val group: Group,
   override val unionOpenid: String? = null,
 ) : GroupMember, AbstractContact(group.bot, parentCoroutineContext) {
-  override fun asSingleUser(): SingleUser {
+  override fun asSingleUser(): FriendUser {
     TODO("Not yet implemented")
   }
 
@@ -462,15 +462,15 @@ internal class EmptyGroupMemberImpl(
     TODO("Not yet implemented")
   }
 
-  override fun asSingleUser(): SingleUser {
+  override fun asSingleUser(): FriendUser {
     TODO("Not yet implemented")
   }
 }
 
-internal class EmptySingleUserImpl(
+internal class EmptyFriendUserImpl(
   bot: TencentBot,
   override val id: String = EmptyMessageId,
-) : SingleUser, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
+) : FriendUser, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
     TODO("Not yet implemented")
@@ -541,5 +541,5 @@ internal class GroupMemberContactList(
 ) : ContactList<GroupMember>()
 
 internal class SingleUserContactList(
-  override val generator: (id: String) -> SingleUser,
-) : ContactList<SingleUser>()
+  override val generator: (id: String) -> FriendUser,
+) : ContactList<FriendUser>()

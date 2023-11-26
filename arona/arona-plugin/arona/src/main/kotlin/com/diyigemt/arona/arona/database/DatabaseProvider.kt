@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object DatabaseProvider {
+internal object DatabaseProvider {
   private val database: DB by lazy {
     val database = DB.connect("jdbc:sqlite:${Arona.dataFolder}/arona.db", "org.sqlite.JDBC")
     transaction(database) {

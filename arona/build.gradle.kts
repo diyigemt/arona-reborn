@@ -20,8 +20,6 @@ allprojects {
 subprojects {
   repositories {
     mavenCentral()
-    maven {
-      url = URI("https://jitpack.io")
-    }
+    maven(url = "https://jitpack.io")
   }
 }

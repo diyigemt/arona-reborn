@@ -1,20 +1,17 @@
-package com.diyigemt.arona.database
+package com.diyigemt.arona.user.recorder.database
 
-import com.diyigemt.arona.utils.ReflectionUtil
+import com.diyigemt.arona.user.recorder.PluginMain
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
 
 internal object DatabaseProvider {
   private val database: Database by lazy {
-    val database = Database.connect("jdbc:sqlite:./database.db", "org.sqlite.JDBC")
+    val database = Database.connect("jdbc:sqlite:${PluginMain.dataFolder}/contact.db", "org.sqlite.JDBC")
     transaction(database) {
-      ReflectionUtil.scanTypeAnnotatedObjectInstance(AronaDatabase::class).forEach {
-        SchemaUtils.create(it as Table)
-      }
+      SchemaUtils.create(UserTable, ContactTable, CommandTable)
     }
     database
   }
@@ -24,6 +21,3 @@ internal object DatabaseProvider {
 
   fun <T> dbQuery(block: () -> T): T = transaction(database) { block() }
 }
-
-@Target(AnnotationTarget.CLASS)
-annotation class AronaDatabase

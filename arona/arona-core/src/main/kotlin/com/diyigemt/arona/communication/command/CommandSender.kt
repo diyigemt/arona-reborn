@@ -40,7 +40,7 @@ interface CommandSender : CoroutineScope {
       else -> throw IllegalArgumentException("Unsupported MessageEvent: ${this::class.qualifiedNameOrTip}")
     }
 
-    fun SingleUser.asCommandSender() = SingleUserCommandSender(this, EmptyMessageId)
+    fun FriendUser.asCommandSender() = SingleUserCommandSender(this, EmptyMessageId)
   }
 }
 
@@ -66,7 +66,7 @@ interface UserCommandSender : CommandSender {
  * 单聊
  */
 class SingleUserCommandSender internal constructor(
-  override val user: SingleUser,
+  override val user: FriendUser,
   override val sourceId: String,
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("SingleUserCommandSender") {
   override val subject get() = user

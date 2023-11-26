@@ -9,4 +9,10 @@ redis:
   host: '172.18.100.39'
   port: 6379
   db: 0
+mongodb:
+  host: ''
+  port: 27017
+  user: ""
+  password: ""
+  db: ""
 debug: false

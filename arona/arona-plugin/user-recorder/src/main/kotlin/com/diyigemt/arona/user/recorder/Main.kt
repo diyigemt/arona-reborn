@@ -20,22 +20,6 @@ object PluginMain : AronaPlugin(
 ) {
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
-      val messageString =
-        it.message.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return@subscribeAlways
-      val commandStr =
-        messageString.split(" ").toMutableList().removeFirstOrNull() ?: return@subscribeAlways
-      val command =
-        CommandManager.matchCommand(commandStr.replace("/", "")) as? AbstractCommand ?: return@subscribeAlways
-      dbQuery {
-        Command.find { CommandTable.name eq command.primaryName }.firstOrNull()?.run {
-          this.count++
-        } ?: {
-          Command.new {
-            name = command.primaryName
-            count = 1
-          }
-        }
-      }
       dbQuery {
         Contact.find { ContactTable.id eq it.subject.id }.firstOrNull() ?: {
           Contact.new(it.subject.id) {
@@ -53,6 +37,22 @@ object PluginMain : AronaPlugin(
           User.new(
             id = sender.id
           ) { }
+        }
+      }
+      val messageString =
+        it.message.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return@subscribeAlways
+      val commandStr =
+        messageString.split(" ").toMutableList().removeFirstOrNull() ?: return@subscribeAlways
+      val command =
+        CommandManager.matchCommand(commandStr.replace("/", "")) as? AbstractCommand ?: return@subscribeAlways
+      dbQuery {
+        Command.find { CommandTable.name eq command.primaryName }.firstOrNull()?.run {
+          this.count++
+        } ?: {
+          Command.new {
+            name = command.primaryName
+            count = 1
+          }
         }
       }
     }

@@ -86,6 +86,7 @@ object PluginManager {
         }
         storage.load(pluginInstance, dataInstance)
       }
+      pluginInstance.internalOnEnable()
       plugins.add(pluginInstance)
     }
   }

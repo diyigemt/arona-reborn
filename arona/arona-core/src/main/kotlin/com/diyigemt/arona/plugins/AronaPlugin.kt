@@ -5,6 +5,9 @@ import com.diyigemt.arona.communication.event.Event
 import com.diyigemt.arona.communication.event.EventChannel
 import com.diyigemt.arona.communication.event.GlobalEventChannel
 import com.diyigemt.arona.config.AutoSavePluginDataHolder
+import com.diyigemt.arona.permission.Permission
+import com.diyigemt.arona.permission.PermissionId
+import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.utils.SemVersion
 import io.github.z4kn4fein.semver.toVersion
 import io.ktor.util.logging.*
@@ -42,6 +45,12 @@ abstract class AbstractPlugin(
   }
   final override val configFolder: File by lazy {
     configFolderPath.toFile()
+  }
+  final override val permission: Permission by lazy {
+    PermissionService.register(
+      PermissionId(this.description.id.lowercase(), "*"),
+      "${this.description.id} plugin base permission"
+    )
   }
   override val autoSaveIntervalMillis: LongRange = (30 * 1000L)..(10 * 1000L)
 
@@ -82,6 +91,12 @@ abstract class AbstractPlugin(
   final override val coroutineContext: CoroutineContext
     get() = _coroutineContext
       ?: contextUpdateLock.withLock { _coroutineContext ?: refreshCoroutineContext() }
+  internal fun internalOnEnable() {
+    permission
+  }
+  internal fun internalOnDisable() {
+    // TODO
+  }
 }
 
 abstract class AronaPlugin(

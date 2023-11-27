@@ -1,6 +1,8 @@
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.communication.command.CommandSender
+import com.diyigemt.arona.permission.*
+import com.diyigemt.arona.permission.PermissionService
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.core.subcommands
@@ -17,7 +19,7 @@ interface Command {
   val description: String
   val owner: CommandOwner
   val targetExtensionFunction: KFunction<*>
-
+  val permission: Permission
   companion object {
     fun checkCommandName(name: String) {
       when {
@@ -145,6 +147,11 @@ abstract class AbstractCommand(
       targetExtensionFunction.callSuspend(this@AbstractCommand, commandSender)
     }
   }
+
+  final override val permission = findOrCreateCommandPermission(owner.permission)
 }
 
-interface CommandOwner
+internal fun Command.findOrCreateCommandPermission(parent: Permission): Permission {
+  val id = owner.permissionId("command.$primaryName")
+  return PermissionService[id] ?: PermissionService.register(id, description, parent)
+}

@@ -1,15 +1,15 @@
 package com.diyigemt.arona.permission
 
-internal interface PermissionNameSpace {
-  val permission: Permission
+interface PermissionNameSpace {
+  fun permissionId(name: String): PermissionId
 }
 
-internal data class PermissionId(
+data class PermissionId(
   val nameSpace: String,
   val name: String
 )
 
-internal interface Permission {
+interface Permission {
   val id: PermissionId
   val parent: Permission
   val description: String
@@ -19,7 +19,7 @@ internal interface Permission {
   }
 }
 
-internal data class PermissionImpl(
+data class PermissionImpl(
   override val id: PermissionId,
   override val description: String
 ) : Permission {

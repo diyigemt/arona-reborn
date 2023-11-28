@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.Column
 
 
 @AronaDatabase
-object GuildMemberTable : IdTable<String>(name = "GuildMember") {
+internal object GuildMemberTable : IdTable<String>(name = "GuildMember") {
   override val id: Column<EntityID<String>> = text("id").entityId()
   val botId: Column<String> = text("bot")
   val guildId: Column<String> = text("guild")
@@ -17,7 +17,7 @@ object GuildMemberTable : IdTable<String>(name = "GuildMember") {
   override val primaryKey: PrimaryKey = PrimaryKey(id, botId, guildId, channelId)
 }
 
-class GuildMemberSchema(id: EntityID<String>) : Entity<String>(id) {
+internal class GuildMemberSchema(id: EntityID<String>) : Entity<String>(id) {
   companion object : EntityClass<String, GuildMemberSchema>(GuildMemberTable)
 
   var botId by GuildMemberTable.botId

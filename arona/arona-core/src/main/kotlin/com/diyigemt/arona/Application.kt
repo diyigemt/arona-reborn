@@ -1,12 +1,11 @@
 package com.diyigemt.arona
 
-import com.diyigemt.arona.commandline.CommandMain
+import com.diyigemt.arona.console.CommandMain
 import com.diyigemt.arona.communication.TencentBotClient
-import com.diyigemt.arona.communication.event.Event
-import com.diyigemt.arona.communication.event.GlobalEventChannel
+import com.diyigemt.arona.console.launchConsole
 import com.diyigemt.arona.plugins.PluginManager
 import com.diyigemt.arona.utils.aronaConfig
-import com.diyigemt.arona.utils.commandLineLogger
+import com.diyigemt.arona.utils.runSuspend
 import com.diyigemt.arona.webui.plugins.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -17,16 +16,12 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
+    runSuspend {
+      launchConsole()
+    }
     PluginManager.loadPluginFromPluginDirectory()
     PluginManager.initPlugin()
     TencentBotClient.invoke(aronaConfig.bot).auth()
-    CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-      while (true) {
-        val input = readlnOrNull() ?: ""
-        CommandMain.run(input.split(" "))
-        delay(1000)
-      }
-    }
     val environment = applicationEngineEnvironment {
       connector {
         port = 8081

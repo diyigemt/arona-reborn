@@ -13,6 +13,14 @@ application {
   applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
 
+tasks.withType<Tar>{
+  duplicatesStrategy = DuplicatesStrategy.WARN
+}
+
+tasks.withType<Zip>{
+  duplicatesStrategy = DuplicatesStrategy.WARN
+}
+
 dependencies {
   implementation("io.ktor:ktor-server-cors")
   implementation("io.ktor:ktor-server-core-jvm")

@@ -28,7 +28,7 @@ val PipelineContext<Unit, ApplicationCall>.ip: String
 
 private val ContextUserAttrKey = AttributeKey<UserSchema>("user")
 
-var PipelineContext<Unit, ApplicationCall>.aronaUser: UserSchema?
+internal var PipelineContext<Unit, ApplicationCall>.aronaUser: UserSchema?
   get() = context.attributes.getOrNull(ContextUserAttrKey)
   set(value) = context.attributes.put(ContextUserAttrKey, value as UserSchema)
 

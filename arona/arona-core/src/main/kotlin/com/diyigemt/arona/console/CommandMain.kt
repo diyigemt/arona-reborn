@@ -1,4 +1,4 @@
-package com.diyigemt.arona.commandline
+package com.diyigemt.arona.console
 
 import com.diyigemt.arona.utils.ReflectionUtil
 import com.diyigemt.arona.utils.commandLineLogger
@@ -38,20 +38,14 @@ class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invo
 @CommandLineSubCommand
 class ExitCommand : CliktCommand(name = "exit", help = "安全退出程序") {
   override fun run() {
-    waitInput("confirm exit? (y/N): ")
-      .onSuccess {
-        echo("exiting")
-        exitProcess(0)
-      }.onFailure {
-        echo("cancel")
-      }
+    echo("exiting")
+    exitProcess(0)
   }
 }
 
-internal fun waitInput(tip: String = "confirm? ", expect: String? = null, default: String = "y"): Result<String> {
-  print(tip)
-  val result = readlnOrNull()
-  return if (result == expect || (result ?: default).lowercase() == expect) {
-    Result.success(result ?: default)
-  } else Result.failure(Exception())
+@CommandLineSubCommand
+class PermissionManagerCommand : CliktCommand(name = "perm", help = "查看权限") {
+  override fun run() {
+    echo("permission")
+  }
 }

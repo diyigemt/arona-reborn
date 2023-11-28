@@ -12,7 +12,7 @@ import org.jetbrains.exposed.sql.Column
 import java.util.*
 
 @AronaDatabase
-object UserTable : IdTable<UUID>(name = "user") {
+internal object UserTable : IdTable<UUID>(name = "user") {
   override val id: Column<EntityID<UUID>> = uuid("uuid").autoGenerate().entityId() // 唯一标识符
   val uuid get() = id
   val version = varchar("version", length = 50) // 客户端版本号
@@ -22,7 +22,7 @@ object UserTable : IdTable<UUID>(name = "user") {
   override val primaryKey = PrimaryKey(id)
 }
 
-class UserSchema(id: EntityID<UUID>) : UUIDEntity(id) {
+internal class UserSchema(id: EntityID<UUID>) : UUIDEntity(id) {
   companion object : UUIDEntityClass<UserSchema>(UserTable)
 
   val uuid by UserTable.uuid

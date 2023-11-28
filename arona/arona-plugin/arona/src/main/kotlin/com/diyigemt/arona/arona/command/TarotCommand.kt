@@ -2,8 +2,12 @@ package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.tarot.Tarot
-import com.diyigemt.arona.arona.database.tarot.TarotRecord
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
+import com.diyigemt.arona.arona.database.image.ImageCacheSchema
+import com.diyigemt.arona.arona.database.image.ImageCacheTable
+import com.diyigemt.arona.arona.database.image.update
+import com.diyigemt.arona.arona.database.tarot.TarotSchema
+import com.diyigemt.arona.arona.database.tarot.TarotRecordSchema
 import com.diyigemt.arona.arona.tools.queryTeacherNameFromDB
 import com.diyigemt.arona.arona.tools.randomBoolean
 import com.diyigemt.arona.arona.tools.randomInt
@@ -25,18 +29,18 @@ object TarotCommand : AbstractCommand(
     val id = user.id
     val today = currentLocalDateTime().date.dayOfMonth
     val record = dbQuery {
-      TarotRecord.findById(id)
+      TarotRecordSchema.findById(id)
     }
     if (record != null && record.day == today) {
       val tarot = dbQuery {
-        Tarot.findById(record.tarot)
+        TarotSchema.findById(record.tarot)
       }!!
       send(this, tarot, record.positive)
       return
     }
     val tarotIndex = randomInt(TarotCount) + 1
     val tarot = dbQuery {
-      Tarot.findById(tarotIndex)
+      TarotSchema.findById(tarotIndex)
     }!!
     val positive = randomBoolean()
     send(this, tarot, positive)
@@ -46,7 +50,7 @@ object TarotCommand : AbstractCommand(
         record.tarot = tarotIndex
         record.positive = positive
       } else {
-        TarotRecord.new(id) {
+        TarotRecordSchema.new(id) {
           this@new.day = today
           this@new.tarot = tarotIndex
           this@new.positive = positive
@@ -54,14 +58,22 @@ object TarotCommand : AbstractCommand(
       }
     }
   }
-  private suspend fun send(commandSender: UserCommandSender, tarot: Tarot, positive: Boolean) {
+
+  private suspend fun send(commandSender: UserCommandSender, tarot: TarotSchema, positive: Boolean) {
     val res = if (positive) tarot.positive else tarot.negative
     val resName = if (positive) "正位" else "逆位"
     val fileSuffix = if (positive) "up" else "down"
-    val path = "/tarot/${tarot.id.value}-${fileSuffix}.png"
+    val name = "${tarot.id.value}-${fileSuffix}"
+    val path = "/tarot/$name.png"
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
     if (commandSender.isGroupOrPrivate()) {
-      val im = commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path")
+      val im = dbQuerySuspended {
+        ImageCacheSchema.findImage(name, name)
+          ?: commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also {
+            it.update(name, name)
+          }
+      }
+
       MessageChainBuilder()
         .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
         .build().also { ch -> commandSender.sendMessage(ch) }

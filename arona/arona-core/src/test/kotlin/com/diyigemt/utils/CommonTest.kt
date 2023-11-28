@@ -1,13 +1,11 @@
 package com.diyigemt.utils
 
 import com.diyigemt.arona.communication.message.TencentRichMessage
-import com.diyigemt.arona.communication.message.TencentRichMessageType
-import com.diyigemt.arona.utils.currentDate
-import com.diyigemt.arona.utils.currentDateTime
-import com.diyigemt.arona.utils.currentTime
+import com.diyigemt.arona.utils.*
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.plus
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlin.reflect.full.declaredMembers
 import kotlin.test.Test
 
 class CommonTest {
@@ -16,6 +14,7 @@ class CommonTest {
     println(currentDate())
     println(currentTime())
     println(currentDateTime())
+    println(now().plus(60, DateTimeUnit.SECOND).toDateTime())
   }
 
   @Test
@@ -46,4 +45,5 @@ class CommonTest {
     }.onFailure { println(1) }
       .getOrElse { println(2) }
   }
+
 }

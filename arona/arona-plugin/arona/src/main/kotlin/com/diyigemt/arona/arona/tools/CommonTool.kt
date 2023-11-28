@@ -1,11 +1,11 @@
 package com.diyigemt.arona.arona.tools
 
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.name.TeacherName
+import com.diyigemt.arona.arona.database.name.TeacherNameSchema
 
 fun queryTeacherNameFromDB(id: String): String {
   return dbQuery {
-    TeacherName.findById(id)
+    TeacherNameSchema.findById(id)
   }?.name ?: "老师"
 }
 

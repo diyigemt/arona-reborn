@@ -2,7 +2,7 @@ package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.name.TeacherName
+import com.diyigemt.arona.arona.database.name.TeacherNameSchema
 import com.diyigemt.arona.arona.tools.queryTeacherNameFromDB
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
@@ -35,9 +35,9 @@ object CallMeCommand : AbstractCommand(
 
   private fun updateTeacherName(id: String, name: String) {
     dbQuery {
-      val record = TeacherName.findById(id)
+      val record = TeacherNameSchema.findById(id)
       if (record == null) {
-        TeacherName.new(id) {
+        TeacherNameSchema.new(id) {
           this@new.name = name
         }
       } else {

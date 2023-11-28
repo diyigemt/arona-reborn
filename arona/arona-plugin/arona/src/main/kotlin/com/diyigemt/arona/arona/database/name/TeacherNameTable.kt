@@ -15,7 +15,7 @@ object TeacherNameTable: IdTable<String>(name = "TeacherName") {
   override val primaryKey: PrimaryKey = PrimaryKey(id)
 }
 
-class TeacherName(id: EntityID<String>): Entity<String>(id) {
-  companion object: EntityClass<String, TeacherName>(TeacherNameTable)
+class TeacherNameSchema(id: EntityID<String>): Entity<String>(id) {
+  companion object: EntityClass<String, TeacherNameSchema>(TeacherNameTable)
   var name by TeacherNameTable.name
 }

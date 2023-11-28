@@ -29,17 +29,20 @@ fun currentTimestamp() = now().epochSeconds
  * 获取当前日期 yyyy-MM-dd
  */
 fun currentDate() = currentLocalDateTime().date.toString()
-
+fun Instant.toDate() = toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
 /**
  * 获取当前时间 HH:mm:ss
  */
 fun currentTime() = currentLocalDateTime().time.toSecond()
 fun LocalTime.toSecond() = toString().substringBeforeLast(".")
+fun Instant.toTime() = toLocalDateTime(TimeZone.currentSystemDefault()).time.toSecond()
 
 /**
  * 获取当前日期和时间 yyyy-MM-dd HH:mm:ss
  */
 fun currentDateTime() = currentLocalDateTime().let { "${it.date} ${it.time.toSecond()}" }
+
+fun Instant.toDateTime() = "${toDate()} ${toTime()}"
 
 /**
  * 将形如 yyyy-MM-dd HH:mm:ss 格式的字符串转化回Instant

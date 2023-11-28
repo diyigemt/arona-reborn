@@ -1,11 +1,17 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
+import com.diyigemt.arona.arona.command.TrainerCommand.trainer
+import com.diyigemt.arona.arona.database.DatabaseProvider
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
+import com.diyigemt.arona.arona.database.image.ImageCacheSchema
+import com.diyigemt.arona.arona.database.image.update
 import com.diyigemt.arona.arona.tools.BackendEndpoint
 import com.diyigemt.arona.arona.tools.NetworkTool
 import com.diyigemt.arona.arona.tools.ServerResponse
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextMessage
+import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.MessageChainBuilder
@@ -42,6 +48,28 @@ object TrainerCommand : AbstractCommand(
     }.getOrThrow()
   }
 
+  private suspend fun CommandSender.sendImage(query: ImageQueryData) {
+    if (isGroupOrPrivate()) {
+      with(query) {
+        dbQuerySuspended {
+          ImageCacheSchema.findImage(name, hash)
+            ?: subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also {
+              it.update(name, hash)
+            }
+        }.also {
+          sendMessage(it)
+        }
+      }
+    } else {
+      MessageChainBuilder()
+        .append(
+          TencentGuildImage(
+            url = "https://arona.cdn.diyigemt.com/image/s${query.content}"
+          )
+        ).build().also { im -> sendMessage(im) }
+    }
+  }
+
   suspend fun UserCommandSender.trainer() {
     getImage(arg).run {
       data?.run r1@{
@@ -64,36 +92,14 @@ object TrainerCommand : AbstractCommand(
               }.onSuccess { i ->
                 getImage(this@r1[i - 1].name).run {
                   data?.run {
-                    if (isGroupOrPrivate()) {
-                      subject.uploadImage("https://arona.cdn.diyigemt.com/image${get(0).content}").also { im ->
-                        sendMessage(im)
-                      }
-                    } else {
-                      MessageChainBuilder()
-                        .append(
-                          TencentGuildImage(
-                            url = "https://arona.cdn.diyigemt.com/image/s${get(0).content}"
-                          )
-                        ).build().also { ch -> this@trainer.sendMessage(ch) }
-                    }
+                    sendImage(get(0))
                   }
                 }
               }
             }
           }
         } else {
-          if (isGroupOrPrivate()) {
-            subject.uploadImage("https://arona.cdn.diyigemt.com/image${first().content}").also { im ->
-              sendMessage(im)
-            }
-          } else {
-            MessageChainBuilder()
-              .append(
-                TencentGuildImage(
-                  url = "https://arona.cdn.diyigemt.com/image/s${first().content}"
-                )
-              ).build().also { ch -> this@trainer.sendMessage(ch) }
-          }
+          sendImage(get(0))
         }
       } ?: sendMessage("空结果")
     }

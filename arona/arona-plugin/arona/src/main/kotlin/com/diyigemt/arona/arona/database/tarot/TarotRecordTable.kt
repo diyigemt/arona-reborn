@@ -17,8 +17,8 @@ object TarotRecordTable : IdTable<String>(name = "TarotRecord") {
   override val primaryKey: PrimaryKey = PrimaryKey(id)
 }
 
-class TarotRecord(id: EntityID<String>) : Entity<String>(id) {
-  companion object : EntityClass<String, TarotRecord>(TarotRecordTable)
+class TarotRecordSchema(id: EntityID<String>) : Entity<String>(id) {
+  companion object : EntityClass<String, TarotRecordSchema>(TarotRecordTable)
 
   var day by TarotRecordTable.day
   var tarot by TarotRecordTable.tarot

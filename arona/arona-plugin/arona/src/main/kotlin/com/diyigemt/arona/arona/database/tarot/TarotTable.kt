@@ -15,8 +15,8 @@ object TarotTable : IntIdTable(name = "Tarot") {
 
 }
 
-class Tarot(id: EntityID<Int>) : IntEntity(id) {
-  companion object : IntEntityClass<Tarot>(TarotTable)
+class TarotSchema(id: EntityID<Int>) : IntEntity(id) {
+  companion object : IntEntityClass<TarotSchema>(TarotTable)
 
   val name by TarotTable.name
   val positive by TarotTable.positive

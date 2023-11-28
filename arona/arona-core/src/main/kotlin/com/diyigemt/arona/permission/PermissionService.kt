@@ -1,10 +1,12 @@
 package com.diyigemt.arona.permission
 
+import com.diyigemt.arona.plugins.AbstractPlugin
+import com.diyigemt.arona.plugins.AronaPlugin
 import java.util.concurrent.ConcurrentHashMap
 
 class PermissionRegistryConflictException(
-  val newInstance: Permission,
-  val existingInstance: Permission,
+  newInstance: Permission,
+  existingInstance: Permission,
 ) : Exception("Conflicting Permission registry. new: $newInstance, existing: $existingInstance")
 
 internal object PermissionService {
@@ -18,5 +20,12 @@ internal object PermissionService {
   }
   fun createPermission(id: PermissionId, description: String, parent: Permission): PermissionImpl =
     PermissionImpl(id, description, parent)
+  fun allocatePermissionIdForPlugin(
+    plugin: AbstractPlugin,
+    permissionName: String,
+  ): PermissionId = PermissionId(
+    plugin.description.id.lowercase(),
+    permissionName.lowercase()
+  )
   operator fun get(id: PermissionId): PermissionImpl? = permissions[id]
 }

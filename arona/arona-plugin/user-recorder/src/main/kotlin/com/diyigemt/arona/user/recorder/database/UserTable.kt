@@ -12,7 +12,7 @@ import org.jetbrains.exposed.sql.Column
  */
 object UserTable : IdTable<String>(name = "User") {
   override val id: Column<EntityID<String>> = text("id").entityId()
-  val active = bool("active")
+  val active = bool("active").clientDefault { true }
   val registerTime = char("register_time", length = 25).clientDefault { currentDateTime() } // 注册时间
 
   override val primaryKey: PrimaryKey = PrimaryKey(id)

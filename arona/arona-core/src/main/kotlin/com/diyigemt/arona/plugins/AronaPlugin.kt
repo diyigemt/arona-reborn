@@ -48,10 +48,19 @@ abstract class AbstractPlugin(
   }
   final override val permission: Permission by lazy {
     PermissionService.register(
-      PermissionId(this.description.id.lowercase(), "*"),
+      PermissionService.allocatePermissionIdForPlugin(
+        this,
+        "*"
+      ),
       "${this.description.id} plugin base permission"
     )
   }
+
+  final override fun permissionId(name: String): PermissionId = PermissionService.allocatePermissionIdForPlugin(
+    this,
+    name
+  )
+
   override val autoSaveIntervalMillis: LongRange = (30 * 1000L)..(10 * 1000L)
 
   internal val coroutineContextInitializer = {
@@ -91,9 +100,11 @@ abstract class AbstractPlugin(
   final override val coroutineContext: CoroutineContext
     get() = _coroutineContext
       ?: contextUpdateLock.withLock { _coroutineContext ?: refreshCoroutineContext() }
+
   internal fun internalOnEnable() {
     permission
   }
+
   internal fun internalOnDisable() {
     // TODO
   }

@@ -75,6 +75,9 @@ internal object TencentWebsocketDirectMessageCreateHandler :
     val memberId = payload.author.id
     val guildId = payload.guildId
     val guild = bot.guilds.getOrCreate(guildId)
+    if (payload.member.user == null) {
+      payload.member.user = payload.author
+    }
     val tmp = GuildMemberImpl(
       guild,
       guild.findOrCreateMemberPrivateChannel(memberId, payload.channelId),

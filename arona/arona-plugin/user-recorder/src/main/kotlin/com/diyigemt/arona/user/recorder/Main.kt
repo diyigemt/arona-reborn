@@ -21,22 +21,28 @@ object PluginMain : AronaPlugin(
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
       dbQuery {
-        Contact.find { ContactTable.id eq it.subject.id }.firstOrNull() ?: {
-          Contact.new(it.subject.id) {
-            type = when (it) {
-              is TencentFriendEvent -> ContactType.Private
-              is TencentGroupEvent -> ContactType.Group
-              is TencentGuildEvent -> ContactType.Channel
-              else -> ContactType.PrivateChannel
+        when (Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
+          is Contact -> { }
+          else -> {
+            Contact.new(it.subject.id) {
+              type = when (it) {
+                is TencentFriendEvent -> ContactType.Private
+                is TencentGroupEvent -> ContactType.Group
+                is TencentGuildEvent -> ContactType.Channel
+                else -> ContactType.PrivateChannel
+              }
             }
           }
         }
       }
       dbQuery {
-        User.find { UserTable.id eq sender.id }.firstOrNull() ?: {
-          User.new(
-            id = sender.id
-          ) { }
+        when (User.find { UserTable.id eq sender.id }.firstOrNull()) {
+          is User -> { }
+          else -> {
+            User.new(
+              id = sender.id
+            ) { }
+          }
         }
       }
       val messageString =
@@ -46,12 +52,13 @@ object PluginMain : AronaPlugin(
       val command =
         CommandManager.matchCommand(commandStr.replace("/", "")) as? AbstractCommand ?: return@subscribeAlways
       dbQuery {
-        Command.find { CommandTable.name eq command.primaryName }.firstOrNull()?.run {
-          this.count++
-        } ?: {
-          Command.new {
-            name = command.primaryName
-            count = 1
+        when (val fCommand = Command.find { CommandTable.name eq command.primaryName }.firstOrNull()) {
+          is Command -> fCommand.count++
+          else -> {
+            Command.new {
+              name = command.primaryName
+              count = 1
+            }
           }
         }
       }
@@ -60,27 +67,33 @@ object PluginMain : AronaPlugin(
       when (val subject = it.subject) {
         is com.diyigemt.arona.communication.contact.User -> {
           dbQuery {
-            User.find { UserTable.id eq subject.id }.firstOrNull() ?: {
-              User.new(
-                id = subject.id
-              ) { }
+            when (User.find { UserTable.id eq subject.id }.firstOrNull()) {
+              is User -> { }
+              else -> {
+                User.new(
+                  id = subject.id
+                ) { }
+              }
             }
           }
         }
       }
       dbQuery {
-        Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()?.also { schema ->
-          schema.active = when(it) {
-            is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> true
-            else -> false
+        when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
+          is Contact -> {
+            contact.active = when(it) {
+              is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> true
+              else -> false
+            }
           }
-        } ?: {
-          Contact.new(it.subject.id) {
-            type = when (it) {
-              is TencentFriendEvent -> ContactType.Private
-              is TencentGroupEvent -> ContactType.Group
-              is TencentGuildEvent -> ContactType.Channel
-              else -> ContactType.PrivateChannel
+          else -> {
+            Contact.new(it.subject.id) {
+              type = when (it) {
+                is TencentFriendEvent -> ContactType.Private
+                is TencentGroupEvent -> ContactType.Group
+                is TencentGuildEvent -> ContactType.Channel
+                else -> ContactType.PrivateChannel
+              }
             }
           }
         }

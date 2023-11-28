@@ -37,6 +37,7 @@ dependencies {
   api("org.jetbrains.exposed:exposed-core:$exposedVersion")
   api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
 
+  implementation("org.jline:jline:3.24.1")
   implementation("com.github.Towdium:PinIn:1.6.0")
   implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
   implementation("io.github.crackthecodeabhi:kreds:0.9.0")
@@ -54,8 +55,6 @@ dependencies {
 
   api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
   api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
-
-
 
   testImplementation("io.ktor:ktor-server-tests-jvm")
   testImplementation("io.ktor:ktor-server-test-host-jvm:2.3.3")

@@ -82,7 +82,7 @@ internal data class TencentGuildMemberRaw(
   val joinedAt: String,
   val nick: String = "",
   val roles: List<String> = listOf(),
-  val user: TencentGuildUserRaw? = null,
+  var user: TencentGuildUserRaw? = null,
   @SerialName("guild_id")
   val guildIid: String = "",
 ) {

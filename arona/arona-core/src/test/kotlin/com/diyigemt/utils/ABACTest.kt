@@ -5,7 +5,6 @@ import codes.laurence.warden.atts.HasAtts
 import codes.laurence.warden.enforce.EnforcementPointDefault
 import codes.laurence.warden.enforce.NotAuthorizedException
 import codes.laurence.warden.policy.bool.allOf
-import com.diyigemt.arona.permission.PermissionId
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 

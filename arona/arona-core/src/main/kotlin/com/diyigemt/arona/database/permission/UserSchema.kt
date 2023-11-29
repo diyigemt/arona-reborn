@@ -25,7 +25,3 @@ internal class UserSchema(id: EntityID<String>) : Entity<String>(id) {
   var unionOpenId by UserTable.unionOpenId
   val registerTime by UserTable.registerTime
 }
-
-internal data class UserDocument(
-  val id: String
-)

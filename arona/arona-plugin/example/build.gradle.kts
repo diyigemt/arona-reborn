@@ -1,30 +1,36 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
-    kotlin("jvm") version "1.9.10"
+  kotlin("jvm") version "1.9.10"
 }
 
 val projectMainClass = "com.diyigemt.arona.example.PluginMain"
 version = "0.1.0"
 dependencies {
-    compileOnly(project(":arona-core"))
-    testImplementation(kotlin("test"))
+  compileOnly(project(":arona-core"))
+  testImplementation(kotlin("test"))
 }
 
 tasks.test {
-    useJUnitPlatform()
+  useJUnitPlatform()
 }
 
 kotlin {
-    jvmToolchain(17)
+  jvmToolchain(17)
 }
 
 tasks.withType<Jar> {
-    manifest {
-        attributes["Main-Class"] = projectMainClass
-    }
+  manifest {
+    attributes["Main-Class"] = projectMainClass
+  }
 }
-
+tasks.withType<ShadowJar> {
+  dependsOn("distTar", "distZip")
+  archiveFileName.set("${project.name}-${project.version}.jar")
+}
 //task("copyToPlugins") {
-//    val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/plugins"
+//    dependsOn("distTar", "distZip")
+//    val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox/plugins"
 //    val buildJar = file(project.buildDir.path + "/libs")
 //        .listFiles { it -> it.isFile && it.name.contains(version.toString()) }
 //        ?.firstOrNull()

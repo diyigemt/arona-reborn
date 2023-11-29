@@ -4,10 +4,9 @@ import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema
-import com.diyigemt.arona.arona.database.image.ImageCacheTable
 import com.diyigemt.arona.arona.database.image.update
-import com.diyigemt.arona.arona.database.tarot.TarotSchema
 import com.diyigemt.arona.arona.database.tarot.TarotRecordSchema
+import com.diyigemt.arona.arona.database.tarot.TarotSchema
 import com.diyigemt.arona.arona.tools.queryTeacherNameFromDB
 import com.diyigemt.arona.arona.tools.randomBoolean
 import com.diyigemt.arona.arona.tools.randomInt
@@ -68,9 +67,9 @@ object TarotCommand : AbstractCommand(
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
     if (commandSender.isGroupOrPrivate()) {
       val im = dbQuerySuspended {
-        ImageCacheSchema.findImage(name, name)
+        ImageCacheSchema.findImage(name)
           ?: commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also {
-            it.update(name, name)
+            it.update(name)
           }
       }
 

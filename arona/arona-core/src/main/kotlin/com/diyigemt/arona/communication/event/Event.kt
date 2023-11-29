@@ -7,13 +7,9 @@ import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemb
 import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
 import com.diyigemt.arona.communication.contact.GuildMemberImpl
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.database.guild.GuildMemberSchema
-import com.diyigemt.arona.database.guild.GuildMemberTable
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
-import org.jetbrains.exposed.sql.and
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 

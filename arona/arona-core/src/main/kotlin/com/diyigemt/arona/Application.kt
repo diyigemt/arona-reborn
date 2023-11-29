@@ -1,6 +1,5 @@
 package com.diyigemt.arona
 
-import com.diyigemt.arona.console.CommandMain
 import com.diyigemt.arona.communication.TencentBotClient
 import com.diyigemt.arona.console.launchConsole
 import com.diyigemt.arona.plugins.PluginManager

@@ -12,7 +12,7 @@ redis:
 mongodb:
   host: ''
   port: 27017
-  user: ""
+  user: ''
   password: ""
-  db: ""
+  db: ''
 debug: false

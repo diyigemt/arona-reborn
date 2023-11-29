@@ -14,11 +14,25 @@ data class RedisConfig(
 )
 
 @Serializable
+data class MongoConfig(
+  val host: String,
+  val port: Int,
+  val user: String,
+  val password: String,
+  val db: String
+) {
+  companion object {
+    fun MongoConfig.toConnectionString() = "mongodb://$user:$password@$host:$port"
+  }
+}
+
+@Serializable
 data class AronaConfig(
-  val debug: Boolean = false,
   val bot: TencentBotConfig,
   val adminToken: String,
   val redis: RedisConfig,
+  val mongodb: MongoConfig,
+  val debug: Boolean = false,
 )
 
 internal val aronaConfig: AronaConfig by lazy {

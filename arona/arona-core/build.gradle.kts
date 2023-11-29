@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 val kotlinVersion: String by project
 val exposedVersion: String by project
 plugins {
@@ -5,7 +7,7 @@ plugins {
   id("io.ktor.plugin") version "2.3.3"
   id("org.jetbrains.kotlin.plugin.serialization") version "1.9.10"
 }
-
+version = "0.1.8"
 application {
   mainClass.set("com.diyigemt.arona.ApplicationKt")
 
@@ -20,7 +22,10 @@ tasks.withType<Tar>{
 tasks.withType<Zip>{
   duplicatesStrategy = DuplicatesStrategy.WARN
 }
-
+tasks.withType<ShadowJar> {
+  dependsOn("distTar", "distZip")
+  archiveFileName.set("${project.name}-${project.version}.jar")
+}
 dependencies {
   implementation("io.ktor:ktor-server-cors")
   implementation("io.ktor:ktor-server-core-jvm")

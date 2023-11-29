@@ -1,7 +1,7 @@
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.communication.command.CommandSender
-import com.diyigemt.arona.permission.*
+import com.diyigemt.arona.permission.Permission
 import com.diyigemt.arona.permission.PermissionService
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.requireObject
@@ -20,6 +20,7 @@ interface Command {
   val owner: CommandOwner
   val targetExtensionFunction: KFunction<*>
   val permission: Permission
+
   companion object {
     fun checkCommandName(name: String) {
       when {
@@ -104,9 +105,10 @@ internal class CommandReflector(
       .toList()
   }
 
-  fun findTargetExtensionFunction() = command::class.declaredMemberExtensionFunctions.filter {
+  fun findTargetExtensionFunction() = command::class.declaredMemberExtensionFunctions.first {
     it.extensionReceiverParameter!!.type.isSubtypeOf(CommandSender::class.starProjectedType)
-  }.first()
+        && it.parameters.size == 2
+  }
 }
 
 /**

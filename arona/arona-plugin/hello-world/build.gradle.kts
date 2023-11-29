@@ -30,7 +30,8 @@ tasks.withType<Jar> {
 }
 
 //task("copyToPlugins") {
-//    val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/plugins"
+//    dependsOn("distTar", "distZip")
+//    val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox/plugins"
 //    val buildJar = file(project.buildDir.path + "/libs")
 //        .listFiles { it -> it.isFile && it.name.contains(version.toString()) }
 //        ?.firstOrNull()

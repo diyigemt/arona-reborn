@@ -1,8 +1,6 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
-import com.diyigemt.arona.arona.command.TrainerCommand.trainer
-import com.diyigemt.arona.arona.database.DatabaseProvider
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema
 import com.diyigemt.arona.arona.database.image.update
@@ -17,7 +15,6 @@ import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.TencentGuildImage
-import com.diyigemt.arona.communication.message.TencentOfflineImage
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.coroutines.withTimeout
@@ -52,9 +49,9 @@ object TrainerCommand : AbstractCommand(
     if (isGroupOrPrivate()) {
       with(query) {
         dbQuerySuspended {
-          ImageCacheSchema.findImage(name, hash)
+          ImageCacheSchema.findImage(hash)
             ?: subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also {
-              it.update(name, hash)
+              it.update(hash)
             }
         }.also {
           sendMessage(it)

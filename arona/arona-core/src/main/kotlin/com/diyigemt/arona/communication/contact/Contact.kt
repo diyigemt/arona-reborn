@@ -4,7 +4,7 @@ import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
 import com.diyigemt.arona.database.guild.GuildMemberSchema
 import com.diyigemt.arona.database.guild.GuildMemberTable
 import com.diyigemt.arona.utils.childScopeContext
@@ -117,7 +117,7 @@ interface Guild : Contact {
 
   companion object {
     fun Guild.findOrCreateMemberPrivateChannel(memberId: String, channelId: String = "0"): Channel {
-      return when (val channel = dbQuery {
+      return when (val channel = sqlDbQuery {
         GuildMemberSchema.find {
           (GuildMemberTable.botId eq bot.id) and (GuildMemberTable.id eq memberId) and (GuildMemberTable.guildId eq id)
         }.firstOrNull()
@@ -135,7 +135,7 @@ interface Guild : Contact {
           ).also {
             if (channelId != "0") {
               // 记录私聊频道
-              dbQuery {
+              sqlDbQuery {
                 GuildMemberSchema.new(memberId) {
                   this@new.botId = bot.id
                   this@new.guildId = this@findOrCreateMemberPrivateChannel.id

@@ -1,6 +1,6 @@
 package com.diyigemt.arona.webui.endpoints
 
-import com.diyigemt.arona.database.UserSchema
+import com.diyigemt.arona.database.permission.UserSchema
 import com.diyigemt.arona.webui.plugins.AronaAdminToken
 import com.diyigemt.arona.webui.plugins.AronaInstanceVersion
 import com.diyigemt.arona.webui.plugins.XRealIp

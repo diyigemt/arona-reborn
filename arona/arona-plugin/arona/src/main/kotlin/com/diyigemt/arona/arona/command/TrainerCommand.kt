@@ -70,7 +70,7 @@ object TrainerCommand : AbstractCommand(
   suspend fun UserCommandSender.trainer() {
     getImage(arg).run {
       data?.run r1@{
-        if (size != 1) {
+        if (code != 200) {
           sendMessage("没有与${arg}对应的信息, 是否想要输入:\n${
             filterIndexed { index, _ -> index < 4 }
               .mapIndexed { index, it -> "${index + 1}. /攻略 ${it.name}" }

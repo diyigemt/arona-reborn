@@ -22,10 +22,10 @@ tasks.withType<Tar>{
 tasks.withType<Zip>{
   duplicatesStrategy = DuplicatesStrategy.WARN
 }
-tasks.withType<ShadowJar> {
-  dependsOn("distTar", "distZip")
-  archiveFileName.set("${project.name}-${project.version}.jar")
-}
+//tasks.withType<ShadowJar> {
+//  dependsOn("distTar", "distZip")
+//  archiveFileName.set("${project.name}-${project.version}.jar")
+//}
 dependencies {
   implementation("io.ktor:ktor-server-cors")
   implementation("io.ktor:ktor-server-core-jvm")

@@ -48,22 +48,22 @@ object LoggerInterceptor {
       else -> if (isJsonPost) context.receiveText() else "post blob data"
     }
     val method = context.request.httpMethod.value
-    val user = kotlin.runCatching {
-      UUID.fromString(this.authorization)
-    }.getOrElse { UUID.randomUUID() }.let { UserSchema.findById(it) }
-    when (user) {
-      is UserSchema -> {
-        this.aronaUser = user
-        // 更新在线时间
-        user.updateOffline()
-        user.updateOnline()
-        user.version = this.version ?: user.version
-        apiLogger.info("$method: $path with $query by $ip using $version")
-      }
-      else -> {
-        apiLogger.info("unauthorized access: $method: $path with $query by $ip")
-      }
-    }
+//    val user = kotlin.runCatching {
+//      UUID.fromString(this.authorization)
+//    }.getOrElse { UUID.randomUUID() }.let { UserSchema.findById(it) }
+//    when (user) {
+//      is UserSchema -> {
+//        this.aronaUser = user
+//        // 更新在线时间
+//        user.updateOffline()
+//        user.updateOnline()
+//        user.version = this.version ?: user.version
+//        apiLogger.info("$method: $path with $query by $ip using $version")
+//      }
+//      else -> {
+//        apiLogger.info("unauthorized access: $method: $path with $query by $ip")
+//      }
+//    }
   }
 
 }

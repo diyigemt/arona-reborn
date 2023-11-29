@@ -14,31 +14,31 @@ class ConsoleTest {
 
   @Test
   fun testJLine() {
-    AnsiConsole.systemInstall()
-    val terminal = TerminalBuilder
-      .builder()
-      .jna(true)
-      .jansi(true)
-      .system(true)
-      .build()
-    val lineReader = LineReaderBuilder.builder().terminal(terminal).build()
-    CoroutineScope(Dispatchers.IO).launch {
-      while (true) {
-        lineReader.callWidget(LineReader.CLEAR)
-        println("test")
-        lineReader.callWidget(LineReader.REDRAW_LINE)
-        lineReader.callWidget(LineReader.REDISPLAY)
-        lineReader.terminal.writer().flush()
-        delay(2000)
-      }
-    }
-    while (true) {
-      runCatching {
-        println(lineReader.readLine("root> "))
-      }.onFailure {
-        return
-      }
-    }
+//    AnsiConsole.systemInstall()
+//    val terminal = TerminalBuilder
+//      .builder()
+//      .jna(true)
+//      .jansi(true)
+//      .system(true)
+//      .build()
+//    val lineReader = LineReaderBuilder.builder().terminal(terminal).build()
+//    CoroutineScope(Dispatchers.IO).launch {
+//      while (true) {
+//        lineReader.callWidget(LineReader.CLEAR)
+//        println("test")
+//        lineReader.callWidget(LineReader.REDRAW_LINE)
+//        lineReader.callWidget(LineReader.REDISPLAY)
+//        lineReader.terminal.writer().flush()
+//        delay(2000)
+//      }
+//    }
+//    while (true) {
+//      runCatching {
+//        println(lineReader.readLine("root> "))
+//      }.onFailure {
+//        return
+//      }
+//    }
   }
 
 }

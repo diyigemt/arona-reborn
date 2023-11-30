@@ -48,12 +48,7 @@ object TrainerCommand : AbstractCommand(
   private suspend fun CommandSender.sendImage(query: ImageQueryData) {
     if (isGroupOrPrivate()) {
       with(query) {
-        dbQuerySuspended {
-          ImageCacheSchema.findImage(hash)
-            ?: subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also {
-              it.update(hash)
-            }
-        }.also {
+        subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also {
           sendMessage(it)
         }
       }

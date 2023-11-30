@@ -36,8 +36,8 @@ object PluginMain : AronaPlugin(
         }
       }
       dbQuery {
-        when (User.find { UserTable.id eq sender.id }.firstOrNull()) {
-          is User -> { }
+        when (val user = User.find { UserTable.id eq sender.id }.firstOrNull()) {
+          is User -> { user.actionCount++ }
           else -> {
             User.new(
               id = sender.id

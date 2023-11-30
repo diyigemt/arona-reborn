@@ -66,13 +66,7 @@ object TarotCommand : AbstractCommand(
     val path = "/tarot/$name.png"
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
     if (commandSender.isGroupOrPrivate()) {
-      val im = dbQuerySuspended {
-        ImageCacheSchema.findImage(name)
-          ?: commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also {
-            it.update(name)
-          }
-      }
-
+      val im = commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path")
       MessageChainBuilder()
         .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
         .build().also { ch -> commandSender.sendMessage(ch) }

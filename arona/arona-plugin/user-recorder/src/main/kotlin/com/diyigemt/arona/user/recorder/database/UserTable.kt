@@ -13,6 +13,7 @@ import org.jetbrains.exposed.sql.Column
 object UserTable : IdTable<String>(name = "User") {
   override val id: Column<EntityID<String>> = text("id").entityId()
   val active = bool("active").clientDefault { true }
+  val actionCount = integer("action_count").default(0)
   val registerTime = char("register_time", length = 25).clientDefault { currentDateTime() } // 注册时间
 
   override val primaryKey: PrimaryKey = PrimaryKey(id)
@@ -22,5 +23,6 @@ class User(id: EntityID<String>) : Entity<String>(id) {
   companion object : EntityClass<String, User>(UserTable)
 
   val active by UserTable.active
+  var actionCount by UserTable.actionCount
   val registerTime by UserTable.registerTime
 }

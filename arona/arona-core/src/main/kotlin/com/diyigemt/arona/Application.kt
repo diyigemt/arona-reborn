@@ -1,5 +1,6 @@
 package com.diyigemt.arona
 
+import com.diyigemt.arona.command.BuiltInCommands
 import com.diyigemt.arona.communication.TencentBotClient
 import com.diyigemt.arona.console.launchConsole
 import com.diyigemt.arona.plugins.PluginManager
@@ -15,6 +16,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
+    BuiltInCommands.registerAll()
     runSuspend {
       launchConsole()
     }
@@ -26,7 +28,7 @@ object AronaApplication : CoroutineScope {
         port = 8081
         host = "0.0.0.0"
       }
-      rootPath = "/api/v2"
+      rootPath = "/api/v1"
       module(Application::module)
     }
     embeddedServer(Netty, environment).start(wait = true)

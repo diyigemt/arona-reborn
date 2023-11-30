@@ -10,6 +10,9 @@ import com.mongodb.ServerApi
 import com.mongodb.ServerApiVersion
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
+import io.github.crackthecodeabhi.kreds.connection.Endpoint
+import io.github.crackthecodeabhi.kreds.connection.KredsClient
+import io.github.crackthecodeabhi.kreds.connection.newClient
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -41,6 +44,13 @@ internal object DatabaseProvider {
       .build()
     MongoClient.create(settings).getDatabase(aronaConfig.mongodb.db)
   }
+  private val redisDatabase: KredsClient by lazy {
+    newClient(Endpoint(aronaConfig.redis.host, aronaConfig.redis.port)).apply {
+      runSuspend {
+        select(aronaConfig.redis.db)
+      }
+    }
+  }
 
   suspend fun <T> sqlDbQuerySuspended(block: suspend () -> T): T =
     newSuspendedTransaction(Dispatchers.IO, sqlDatabase) { block() }
@@ -48,6 +58,8 @@ internal object DatabaseProvider {
   fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
 
   fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = noSqlDatabase.run(block)
+
+  suspend fun <T> redisDbQuery(block: suspend KredsClient.() -> T) = block.invoke(redisDatabase)
 
 }
 

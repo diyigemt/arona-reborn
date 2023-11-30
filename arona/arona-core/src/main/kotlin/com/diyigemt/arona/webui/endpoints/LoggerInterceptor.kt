@@ -32,6 +32,7 @@ internal var PipelineContext<Unit, ApplicationCall>.aronaUser: UserSchema?
   get() = context.attributes.getOrNull(ContextUserAttrKey)
   set(value) = context.attributes.put(ContextUserAttrKey, value as UserSchema)
 
+@Suppress("unused")
 @AronaBackendEndpoint("")
 object LoggerInterceptor {
   private val AdminAccessRegexp = Regex("/api/v\\d/admin/.*")
@@ -48,22 +49,9 @@ object LoggerInterceptor {
       else -> if (isJsonPost) context.receiveText() else "post blob data"
     }
     val method = context.request.httpMethod.value
-//    val user = kotlin.runCatching {
-//      UUID.fromString(this.authorization)
-//    }.getOrElse { UUID.randomUUID() }.let { UserSchema.findById(it) }
-//    when (user) {
-//      is UserSchema -> {
-//        this.aronaUser = user
-//        // 更新在线时间
-//        user.updateOffline()
-//        user.updateOnline()
-//        user.version = this.version ?: user.version
-//        apiLogger.info("$method: $path with $query by $ip using $version")
-//      }
-//      else -> {
-//        apiLogger.info("unauthorized access: $method: $path with $query by $ip")
-//      }
-//    }
+    this.authorization?.let { UserSchema.findById(it) }?.also {
+      this.aronaUser = it
+    }
   }
 
 }

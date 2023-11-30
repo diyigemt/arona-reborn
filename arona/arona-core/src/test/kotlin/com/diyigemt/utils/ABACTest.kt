@@ -78,7 +78,13 @@ class ABACTest {
       PolicyRuleType.Subject,
       PolicyRuleOperator.Equal,
       "type",
-      "admin"
+      "member"
+    )
+    val rule3 = PolicyRule(
+      PolicyRuleType.Environment,
+      PolicyRuleOperator.GreaterThan,
+      "time",
+      "16:00"
     )
     val root = PolicyRoot(
       PolicyNodeEffect.ALLOW,
@@ -91,7 +97,18 @@ class ABACTest {
         ), PolicyNode(
           PolicyNodeEffect.ALLOW,
           PolicyNodeGroupType.ALL,
-          rule2
+          children = listOf(
+            PolicyNode(
+              PolicyNodeEffect.ALLOW,
+              PolicyNodeGroupType.ALL,
+              rule2
+            ),
+            PolicyNode(
+              PolicyNodeEffect.ALLOW,
+              PolicyNodeGroupType.ALL,
+              rule3
+            )
+          )
         )
       )
     )
@@ -103,7 +120,7 @@ class ABACTest {
             subject = User("", "member").atts(),
             action = mapOf("type" to "effect"),
             resource = Resource("com.diyigemt.arona:command.call_me").atts(),
-            environment = mapOf("time" to "15:15")
+            environment = mapOf("time" to "16:15")
           )
         )
       }.onSuccess {

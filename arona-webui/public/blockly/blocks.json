@@ -1,0 +1,90 @@
+[{
+  "type": "masterBlock",
+  "message0": "收到 %1 时，当 %2 执行 %3",
+  "args0": [
+    {
+      "type": "field_dropdown_view",
+      "name": "TriggerType",
+      "options": [
+        [
+          "群消息",
+          "GroupMessageEvent"
+        ],
+        [
+          "好友消息",
+          "FriendMessageEvent"
+        ]
+      ]
+    },
+    {
+      "type": "input_value",
+      "name": "Expressions0",
+      "check": [
+        "ExpressionType",
+        "LogicType"
+      ]
+    },
+    {
+      "type": "input_statement",
+      "name": "Actions0",
+      "check": "ActionType"
+    }
+  ],
+  "colour": 230,
+  "tooltip": "",
+  "helpUrl": "",
+  "mutator": "masterBlockMutator"
+},
+{
+  "type": "logicBlock",
+  "message0": "%1 %2",
+  "args0": [
+    {
+      "type": "field_dropdown_view",
+      "name": "logicInput",
+      "options": [
+        [
+          "且",
+          "And"
+        ],
+        [
+          "或",
+          "Or"
+        ],
+        [
+          "非",
+          "Not"
+        ]
+      ]
+    },
+    {
+      "type": "input_value",
+      "name": "logicValueInput",
+      "check": [
+        "ExpressionType",
+        "LogicType"
+      ]
+    }
+  ],
+  "output": "LogicType",
+  "extensions": ["logic_block_extension"],
+  "colour": 230,
+  "tooltip": "",
+  "helpUrl": ""
+},
+{
+  "type": "sendMsgBlock",
+  "message0": "发送消息： %1",
+  "args0": [
+    {
+      "type": "field_input",
+      "name": "msgFieldInput",
+      "text": "Hallo"
+    }
+  ],
+  "previousStatement": "ActionType",
+  "nextStatement": "ActionType",
+  "colour": 230,
+  "tooltip": "",
+  "helpUrl": ""
+}]

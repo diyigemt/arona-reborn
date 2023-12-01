@@ -1,0 +1,13 @@
+{
+  "home": "主页",
+  "change light": "点击切换为亮色主题",
+  "change dark": "点击切换为暗黑主题",
+  "change lang": "切换国际化语言",
+  "method to using": "使用模板的方法",
+  "template process": "模板配置流程",
+  "config": {
+    "arona": {
+      "desc": "arona主配置文件"
+    }
+  }
+}

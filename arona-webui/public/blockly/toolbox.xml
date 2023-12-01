@@ -1,0 +1,26 @@
+<xml id="toolbox" style="display: none">
+    <category name="条件">
+        <block type="groupIDBlock">
+            <value name="groupIDValueInput">
+                <block type="logicBlock">
+                    <field name="logicInput">And</field>
+                </block>
+            </value>
+        </block>
+        <block type="senderBlock">
+            <value name="IDValueInput">
+                <block type="logicBlock">
+                    <field name="logicInput">And</field>
+                </block>
+            </value>
+        </block>
+        <block type="logicBlock"/>
+        <block type="friend_search_block"/>
+    </category>
+    <category name="行为">
+        <block type="sendMsgBlock">
+            <field name="msgFieldInput">Hallo</field>
+        </block>
+        <block type="randomBlock"/>
+    </category>
+</xml>

@@ -230,7 +230,7 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
   noinline action: suspend C.(TencentMessageEvent) -> Unit,
 ) {
   when (this) {
-    is SingleUserCommandSender -> TODO()
+    is FriendUserCommandSender -> TODO()
     is GroupCommandSender -> {
       val mapper = createMapper<C, TencentGroupMessageEvent>(filter)
       val event = (if (timeoutMillis == -1L) {

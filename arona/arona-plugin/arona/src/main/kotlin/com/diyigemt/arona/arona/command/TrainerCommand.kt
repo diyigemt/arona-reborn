@@ -1,20 +1,21 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
-import com.diyigemt.arona.arona.database.image.ImageCacheSchema
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.arona.database.image.ImageCacheContactType
+import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
+import com.diyigemt.arona.arona.database.image.contactType
 import com.diyigemt.arona.arona.database.image.update
 import com.diyigemt.arona.arona.tools.BackendEndpoint
 import com.diyigemt.arona.arona.tools.NetworkTool
 import com.diyigemt.arona.arona.tools.ServerResponse
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextMessage
-import com.diyigemt.arona.communication.command.CommandSender
-import com.diyigemt.arona.communication.command.UserCommandSender
-import com.diyigemt.arona.communication.command.isGroupOrPrivate
+import com.diyigemt.arona.communication.command.*
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.TencentGuildImage
+import com.diyigemt.arona.communication.message.TencentImage
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.coroutines.withTimeout
@@ -46,11 +47,26 @@ object TrainerCommand : AbstractCommand(
   }
 
   private suspend fun CommandSender.sendImage(query: ImageQueryData) {
+    val from = contactType()
     if (isGroupOrPrivate()) {
       with(query) {
-        subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also {
-          sendMessage(it)
+        val im = dbQuery {
+          findImage(hash, from)
         }
+        when (im) {
+          is TencentImage -> {
+            sendMessage(im)
+          }
+
+          else -> {
+            subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also {
+              sendMessage(it)
+            }.also {
+              dbQuery { it.update(hash, from) }
+            }
+          }
+        }
+
       }
     } else {
       MessageChainBuilder()
@@ -72,12 +88,12 @@ object TrainerCommand : AbstractCommand(
               .joinToString("\n")
           }")
           withTimeout(50000) {
-            nextMessage ( filter =  filter@{ event ->
+            nextMessage(filter = filter@{ event ->
               val fb = event.message.filterIsInstance<PlainText>().firstOrNull() ?: return@filter false
               runCatching {
                 fb.toString().toInt().let { this@r1.size >= it && it > 0 }
               }.getOrDefault(false)
-            } ) {
+            }) {
               val feedback = it.message.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: "1"
               runCatching {
                 feedback.toInt()

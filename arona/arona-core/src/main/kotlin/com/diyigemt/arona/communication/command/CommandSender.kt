@@ -40,7 +40,7 @@ interface CommandSender : CoroutineScope {
       else -> throw IllegalArgumentException("Unsupported MessageEvent: ${this::class.qualifiedNameOrTip}")
     }
 
-    fun FriendUser.asCommandSender() = SingleUserCommandSender(this, EmptyMessageId)
+    fun FriendUser.asCommandSender() = FriendUserCommandSender(this, EmptyMessageId)
   }
 }
 
@@ -65,10 +65,10 @@ interface UserCommandSender : CommandSender {
 /**
  * 单聊
  */
-class SingleUserCommandSender internal constructor(
+class FriendUserCommandSender internal constructor(
   override val user: FriendUser,
   override val sourceId: String,
-) : AbstractUserCommandSender(), CoroutineScope by user.childScope("SingleUserCommandSender") {
+) : AbstractUserCommandSender(), CoroutineScope by user.childScope("FriendUserCommandSender") {
   override val subject get() = user
   override var messageSequence: Int = 1
   override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
@@ -145,6 +145,22 @@ fun CommandSender.isGroupOrPrivate(): Boolean {
     returns(true) implies (this@isGroupOrPrivate is GroupCommandSender)
   }
   return this is GroupCommandSender
+}
+
+@OptIn(ExperimentalContracts::class)
+fun CommandSender.isGroup(): Boolean {
+  contract {
+    returns(true) implies (this@isGroup is GroupCommandSender)
+  }
+  return this is GroupCommandSender
+}
+
+@OptIn(ExperimentalContracts::class)
+fun CommandSender.isPrivate(): Boolean {
+  contract {
+    returns(true) implies (this@isPrivate is FriendUserCommandSender)
+  }
+  return this is FriendUserCommandSender
 }
 
 fun CommandSender.isNotConsole(): Boolean {

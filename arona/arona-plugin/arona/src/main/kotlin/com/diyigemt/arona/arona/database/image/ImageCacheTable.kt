@@ -1,6 +1,8 @@
 package com.diyigemt.arona.arona.database.image
 
 import com.diyigemt.arona.arona.database.Database
+import com.diyigemt.arona.communication.command.CommandSender
+import com.diyigemt.arona.communication.command.isGroup
 import com.diyigemt.arona.communication.message.TencentImage
 import com.diyigemt.arona.communication.message.TencentOfflineImage
 import com.diyigemt.arona.utils.currentDateTime
@@ -21,6 +23,8 @@ enum class ImageCacheContactType {
   Group
 }
 
+fun CommandSender.contactType() = if (isGroup()) ImageCacheContactType.Group else ImageCacheContactType.Private
+
 @Database
 object ImageCacheTable : IntIdTable(name = "ImageCache") {
   val hash = text("hash")
@@ -31,15 +35,17 @@ object ImageCacheTable : IntIdTable(name = "ImageCache") {
 
 class ImageCacheSchema(id: EntityID<Int>) : IntEntity(id) {
   companion object : IntEntityClass<ImageCacheSchema>(ImageCacheTable) {
-    fun findImage(hash: String) =
+    fun findImage(hash: String, from: ImageCacheContactType = ImageCacheContactType.Group) =
       ImageCacheSchema.find {
-        (ImageCacheTable.hash eq hash) and (ImageCacheTable.expired less currentDateTime())
+        (ImageCacheTable.hash eq hash) and
+            (ImageCacheTable.expired less currentDateTime()) and
+            (ImageCacheTable.from eq from)
       }.firstOrNull()?.toTencentImage()
   }
 
   var hash by ImageCacheTable.hash
   var resourceId by ImageCacheTable.resourceId
-  val from by ImageCacheTable.from
+  var from by ImageCacheTable.from
   var expired by ImageCacheTable.expired
 
   fun toTencentImage(): TencentImage = TencentOfflineImage(
@@ -65,6 +71,7 @@ fun TencentImage.update(hash: String, from: ImageCacheContactType = ImageCacheCo
     else -> {
       ImageCacheSchema.new {
         this@new.hash = hash
+        this@new.from = from
         this@new.resourceId = this@update.resourceId
         this.expired = expired
       }

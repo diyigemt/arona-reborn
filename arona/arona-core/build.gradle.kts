@@ -7,7 +7,7 @@ plugins {
   id("io.ktor.plugin") version "2.3.3"
   id("org.jetbrains.kotlin.plugin.serialization") version "1.9.10"
 }
-version = "0.1.8"
+version = "0.1.9"
 application {
   mainClass.set("com.diyigemt.arona.ApplicationKt")
 

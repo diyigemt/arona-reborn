@@ -4,6 +4,8 @@ import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema
+import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
+import com.diyigemt.arona.arona.database.image.contactType
 import com.diyigemt.arona.arona.database.image.update
 import com.diyigemt.arona.arona.database.tarot.TarotRecordSchema
 import com.diyigemt.arona.arona.database.tarot.TarotSchema
@@ -59,6 +61,7 @@ object TarotCommand : AbstractCommand(
   }
 
   private suspend fun send(commandSender: UserCommandSender, tarot: TarotSchema, positive: Boolean) {
+    val from = commandSender.contactType()
     val res = if (positive) tarot.positive else tarot.negative
     val resName = if (positive) "正位" else "逆位"
     val fileSuffix = if (positive) "up" else "down"
@@ -66,7 +69,11 @@ object TarotCommand : AbstractCommand(
     val path = "/tarot/$name.png"
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
     if (commandSender.isGroupOrPrivate()) {
-      val im = commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path")
+      val im = dbQuery {
+        findImage(name, from)
+      } ?: commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also {
+        dbQuery { it.update(name, from) }
+      }
       MessageChainBuilder()
         .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
         .build().also { ch -> commandSender.sendMessage(ch) }

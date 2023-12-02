@@ -1,21 +1,10 @@
 <template>
-  <el-form :model="formData">
-    <el-form-item prop="api" label="api:">
-      <el-input v-model="formData.api" />
-    </el-form-item>
-  </el-form>
+  <h1>ConfigHome</h1>
 </template>
 
 <script setup lang="ts">
-interface FormData {
-  api: string;
-  params: any;
-  response: any;
-}
-const formData = reactive<FormData>({
-  api: "",
-  params: {},
-  response: {},
+defineOptions({
+  name: "ConfigHome",
 });
 </script>
 

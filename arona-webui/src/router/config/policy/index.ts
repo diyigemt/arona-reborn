@@ -1,6 +1,6 @@
 import { RouteRecordRaw } from "vue-router";
 
-const ConfigRouter: Array<RouteRecordRaw> = [
+const PolicyRouter: Array<RouteRecordRaw> = [
   {
     path: "config",
     meta: {
@@ -18,9 +18,9 @@ const ConfigRouter: Array<RouteRecordRaw> = [
         meta: {
           title: "策略配置",
         },
-        component: () => import("@/views/config/config/UserPolicy.vue"),
+        component: () => import("@/views/config/policy/UserPolicy.vue"),
       },
     ],
   },
 ];
-export default ConfigRouter;
+export default PolicyRouter;

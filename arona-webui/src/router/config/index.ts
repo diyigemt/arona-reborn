@@ -1,7 +1,7 @@
 // 需要鉴权的业务路由
 import { RouteRecordRaw } from "vue-router";
-import ConfigMenu from "@/router/config/config";
-import DatabaseMenu from "@/router/config/database";
+import PolicyRouter from "@/router/config/policy";
+import DatabaseRouter from "@/router/config/database";
 import SettingRouter from "@/router/config/setting";
 
 const ConfigRoutes: Array<RouteRecordRaw> = [
@@ -24,8 +24,8 @@ const ConfigRoutes: Array<RouteRecordRaw> = [
         },
         component: () => import("@/views/config/home/ConfigHome.vue"),
       },
-      ...ConfigMenu,
-      ...DatabaseMenu,
+      ...PolicyRouter,
+      ...DatabaseRouter,
       ...SettingRouter,
     ],
   },

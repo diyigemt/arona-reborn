@@ -15,16 +15,19 @@ import io.ktor.util.pipeline.*
 import java.util.*
 
 val PipelineContext<Unit, ApplicationCall>.version: String?
-  get() = context.request.header(HttpHeaders.AronaInstanceVersion)
+  get() = request.header(HttpHeaders.AronaInstanceVersion)
 
 val PipelineContext<Unit, ApplicationCall>.token: String?
-  get() = context.request.header(HttpHeaders.AronaAdminToken)
+  get() = request.header(HttpHeaders.AronaAdminToken)
 
 val PipelineContext<Unit, ApplicationCall>.authorization: String?
-  get() = context.request.header(HttpHeaders.Authorization)
+  get() = request.header(HttpHeaders.Authorization)
 
 val PipelineContext<Unit, ApplicationCall>.ip: String
-  get() = context.request.header(HttpHeaders.XRealIp) ?: context.request.origin.remoteAddress
+  get() = request.header(HttpHeaders.XRealIp) ?: request.origin.remoteAddress
+
+val PipelineContext<Unit, ApplicationCall>.request: ApplicationRequest
+  get() = context.request
 
 private val ContextUserAttrKey = AttributeKey<UserSchema>("user")
 

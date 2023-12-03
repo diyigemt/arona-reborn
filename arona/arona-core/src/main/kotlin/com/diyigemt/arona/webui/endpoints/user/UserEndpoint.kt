@@ -1,25 +1,87 @@
 package com.diyigemt.arona.webui.endpoints.user
 
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
+import com.diyigemt.arona.database.RedisPrefixKey
+import com.diyigemt.arona.utils.badRequest
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
+import com.diyigemt.arona.webui.endpoints.request
 import io.ktor.server.application.*
 import io.ktor.util.pipeline.*
-import java.util.UUID
+
+data class AuthResp(
+  val status: String, // 0 1 2 无效 等待 成功
+  val token: String = "",
+)
 
 @Suppress("unused")
 @AronaBackendEndpoint("/user")
 object UserEndpoint {
-  private fun generateNumber(): String = (1 .. 6).map { "0123456789".random() }.joinToString("")
+  private fun generateNumber(): String = (1..6).map { "0123456789".random() }.joinToString("")
+
+  /**
+   * 获取登录凭证/登录结果
+   */
   @AronaBackendEndpointGet("/login")
   suspend fun PipelineContext<Unit, ApplicationCall>.login() {
-    val token = UUID.randomUUID().toString()
-    val password = generateNumber()
-    redisDbQuery {
-      set(password, token)
-      expire(password, 600u)
+    return when (val token = request.queryParameters["token"]?.let {
+      RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, it)
+    }) {
+      // 请求参数有token, 证明为获取登录结果
+      is String -> {
+        when (val userId = redisDbQuery { get(token) }) {
+          "1" -> {
+            success(AuthResp("1"))
+          }
+
+          is String -> {
+            val uuid = generateNumber()
+            val uuidKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, uuid)
+            redisDbQuery {
+              with(pipelined()) {
+                del(token)
+                set(uuidKey, userId)
+                expire(uuidKey, 3600u)
+                execute()
+              }
+            }
+            success(AuthResp("2", uuid))
+          }
+
+          else -> {
+            success(AuthResp("0"))
+          }
+        }
+      }
+      // 请求参数无token, 证明为获取token认证结果
+      else -> {
+        val password = generateNumber()
+        val passwordKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, password)
+        redisDbQuery {
+          set(passwordKey, "1")
+          expire(passwordKey, 600u)
+        }
+        success(password)
+      }
     }
-    return success(token to password)
+
+  }
+
+  /**
+   * 获取绑定凭证/绑定结果
+   */
+  @AronaBackendEndpointGet("/bind")
+  suspend fun PipelineContext<Unit, ApplicationCall>.bind() {
+    when (val token = request.queryParameters["token"]?.let {
+      RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, it)
+    }) {
+      is String -> {
+
+      }
+      else -> {
+
+      }
+    }
   }
 }

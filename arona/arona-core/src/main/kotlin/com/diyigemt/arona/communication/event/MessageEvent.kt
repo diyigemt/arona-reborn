@@ -69,60 +69,61 @@ class TencentGroupMessageEvent internal constructor(
 
 interface TencentBotUserChangeEvent : TencentBotEvent {
   val subject: Contact
+  val user: User
 }
 
 class TencentFriendAddEvent internal constructor(
   val id: String,
-  override val bot: TencentBot
-) : TencentFriendEvent, TencentBotUserChangeEvent, TencentEvent() {
   override val friend: FriendUser
-    get() = TODO("Not yet implemented")
+) : TencentFriendEvent, TencentBotUserChangeEvent, TencentEvent() {
+  override val user get() = friend
   override val subject get() = friend
+  override val bot get() = user.bot
 }
 
 class TencentFriendDeleteEvent internal constructor(
   val id: String,
-  override val bot: TencentBot
-) : TencentFriendEvent, TencentBotUserChangeEvent, TencentEvent() {
   override val friend: FriendUser
-    get() = TODO("Not yet implemented")
+) : TencentFriendEvent, TencentBotUserChangeEvent, TencentEvent() {
+  override val user get() = friend
   override val subject get() = friend
+  override val bot get() = user.bot
 }
 
 class TencentGroupAddEvent internal constructor(
   val id: String,
-  override val bot: TencentBot
+  override val user: GroupMember
 ) : TencentGroupEvent, TencentBotUserChangeEvent, TencentEvent() {
-  override val group: Group
-    get() = TODO("Not yet implemented")
+  override val group get() = user.group
   override val subject get() = group
+  override val bot get() = user.bot
 }
 
 class TencentGroupDeleteEvent internal constructor(
   val id: String,
-  override val bot: TencentBot
+  override val user: GroupMember
 ) : TencentGroupEvent, TencentBotUserChangeEvent, TencentEvent() {
-  override val group: Group
-    get() = TODO("Not yet implemented")
+  override val group get() = user.group
   override val subject get() = group
+  override val bot get() = user.bot
 }
 
 class TencentGuildAddEvent internal constructor(
   val id: String,
-  override val bot: TencentBot
+  override val user: GuildMember
 ) : TencentGuildEvent, TencentBotUserChangeEvent, TencentEvent() {
-  override val guild: Guild
-    get() = TODO("Not yet implemented")
+  override val guild get() = user.guild
   override val subject get() = guild
+  override val bot get() = user.bot
 }
 
 class TencentGuildDeleteEvent internal constructor(
   val id: String,
-  override val bot: TencentBot
+  override val user: GuildMember,
 ) : TencentGuildEvent, TencentBotUserChangeEvent, TencentEvent() {
-  override val guild: Guild
-    get() = TODO("Not yet implemented")
+  override val guild get() = user.guild
   override val subject get() = guild
+  override val bot get() = user.bot
 }
 
 suspend inline fun <reified P : TencentMessageEvent> P.nextMessage(

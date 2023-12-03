@@ -18,7 +18,9 @@ application {
 tasks.withType<Tar>{
   duplicatesStrategy = DuplicatesStrategy.WARN
 }
-
+tasks.withType<Test> {
+  workingDir = projectDir.resolve("sandbox")
+}
 tasks.withType<Zip>{
   duplicatesStrategy = DuplicatesStrategy.WARN
 }

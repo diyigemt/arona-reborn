@@ -6,6 +6,7 @@ import codes.laurence.warden.enforce.EnforcementPointDefault
 import codes.laurence.warden.enforce.NotAuthorizedException
 import codes.laurence.warden.policy.bool.allOf
 import com.diyigemt.arona.database.permission.*
+import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
 import com.diyigemt.arona.database.permission.Policy.Companion.build
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -13,6 +14,7 @@ import org.junit.Test
 data class User(
   val id: String,
   val type: String,
+  val role: List<String> = listOf()
 ) : HasAtts()
 
 data class Resource(
@@ -87,37 +89,55 @@ class ABACTest {
       "16:00"
     )
     val root = PolicyRoot(
-      PolicyNodeEffect.ALLOW,
       PolicyNodeGroupType.ALL,
       children = listOf(
         PolicyNode(
-          PolicyNodeEffect.ALLOW,
           PolicyNodeGroupType.ALL,
-          rule1
+          listOf(rule1)
         ), PolicyNode(
-          PolicyNodeEffect.ALLOW,
           PolicyNodeGroupType.ALL,
           children = listOf(
             PolicyNode(
-              PolicyNodeEffect.ALLOW,
               PolicyNodeGroupType.ALL,
-              rule2
+              listOf(rule2)
             ),
             PolicyNode(
-              PolicyNodeEffect.ALLOW,
               PolicyNodeGroupType.ALL,
-              rule3
+              listOf(rule3)
             )
           )
         )
       )
     )
-    val rule = Policy("1", "1", listOf(root)).build()
+    val rule = Policy("1", "1", PolicyNodeEffect.ALLOW, listOf(root)).build()
     runBlocking {
       runCatching {
         EnforcementPointDefault(rule).enforceAuthorization(
           AccessRequest(
             subject = User("", "member").atts(),
+            action = mapOf("type" to "effect"),
+            resource = Resource("com.diyigemt.arona:command.call_me").atts(),
+            environment = mapOf("time" to "16:15")
+          )
+        )
+      }.onSuccess {
+        println("success")
+      }.onFailure {
+        println("failed")
+      }
+    }
+  }
+  @Test
+  fun testContactBaseAdminPolicy() {
+    runBlocking {
+      val contact = createContactDocument("123")
+      val allow = contact.policies.filter { it.effect == PolicyNodeEffect.ALLOW }.map { it.build() }.flatten()
+      val deny = contact.policies.filter { it.effect == PolicyNodeEffect.DENY }.map { it.build() }.flatten()
+      runCatching {
+
+        EnforcementPointDefault(allow, deny).enforceAuthorization(
+          AccessRequest(
+            subject = User("", "member", listOf(contact.roles[0].id)).atts(),
             action = mapOf("type" to "effect"),
             resource = Resource("com.diyigemt.arona:command.call_me").atts(),
             environment = mapOf("time" to "16:15")

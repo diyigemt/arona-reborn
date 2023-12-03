@@ -1,5 +1,6 @@
 package com.diyigemt.arona.database
 
+import com.diyigemt.arona.database.DatabaseProvider.noSqlDbQuerySuspended
 import com.diyigemt.arona.utils.MongoConfig.Companion.toConnectionString
 import com.diyigemt.arona.utils.ReflectionUtil
 import com.diyigemt.arona.utils.aronaConfig
@@ -8,7 +9,9 @@ import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.ServerApi
 import com.mongodb.ServerApiVersion
+import com.mongodb.client.model.Filters
 import com.mongodb.kotlin.client.coroutine.MongoClient
+import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import io.github.crackthecodeabhi.kreds.connection.Endpoint
 import io.github.crackthecodeabhi.kreds.connection.KredsClient
@@ -51,17 +54,39 @@ internal object DatabaseProvider {
       }
     }
   }
+  fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
 
   suspend fun <T> sqlDbQuerySuspended(block: suspend () -> T): T =
     newSuspendedTransaction(Dispatchers.IO, sqlDatabase) { block() }
 
-  fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
-
-  fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = noSqlDatabase.run(block)
+  fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
+   suspend fun <T> noSqlDbQuerySuspended(block: suspend MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
 
   suspend fun <T> redisDbQuery(block: suspend KredsClient.() -> T) = block.invoke(redisDatabase)
 
 }
 
 @Target(AnnotationTarget.CLASS)
-annotation class AronaDatabase
+internal annotation class AronaDatabase
+
+internal enum class RedisPrefixKey(val prefix: String) {
+  WEB_LOGIN("login"),
+  WEB_TOKEN("token"),
+  WEB_BINDING("bind");
+  companion object {
+    fun buildKey(type: RedisPrefixKey, key: String) = "${type.prefix}.$key"
+  }
+}
+
+internal interface DocumentCompanionObject {
+  val documentName: String
+}
+
+internal suspend inline fun <reified T : Any, R> DocumentCompanionObject.withCollection(
+  crossinline block: suspend MongoCollection<T>.() -> R
+) : R =
+  noSqlDbQuerySuspended {
+    block(getCollection(documentName))
+  }
+
+internal fun <T : Any> MongoCollection<T>.idFilter(id: String) = Filters.eq("_id", id)

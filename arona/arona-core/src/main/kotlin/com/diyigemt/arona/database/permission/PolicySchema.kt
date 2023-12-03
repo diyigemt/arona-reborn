@@ -2,7 +2,6 @@ package com.diyigemt.arona.database.permission
 
 import codes.laurence.warden.policy.bool.allOf
 import codes.laurence.warden.policy.bool.anyOf
-import codes.laurence.warden.policy.bool.not
 import codes.laurence.warden.policy.collections.CollectionBasedPolicy
 import com.diyigemt.arona.database.permission.PolicyNode.Companion.build
 import com.diyigemt.arona.database.permission.PolicyRule.Companion.build
@@ -74,61 +73,39 @@ internal data class PolicyRule(
 
 @Serializable
 internal data class PolicyNode(
-  val effect: PolicyNodeEffect,
   val groupType: PolicyNodeGroupType,
-  val rule: PolicyRule? = null, // 当children == null是认为是叶子节点
+  val rule: List<PolicyRule>? = null, // 当children == null是认为是叶子节点
   val children: List<PolicyNode>? = null,
 ) {
   companion object {
-    internal val PolicyNode.isLeaf get() = children == null && rule != null
-    internal val PolicyNode.isNode get() = children != null
-    internal fun PolicyNode.build(parent: CollectionBasedPolicy? = null): List<P> {
-      return if (parent == null) {
-        // root
-        if (isLeaf) {
-          CollectionBasedPolicy(mutableListOf()).also {
-            rule!!.build(it)
-          }.policies
-        } else {
-          val base = when (groupType) {
-            PolicyNodeGroupType.ALL -> {
-              allOf {
-                children!!.forEach {
-                  it.build(this@allOf)
-                }
-              }
-            }
 
-            PolicyNodeGroupType.ANY -> {
-              anyOf {
-                children!!.forEach {
-                  it.build(this@anyOf)
-                }
+    /**
+     * allow to deny
+     */
+    internal fun PolicyNode.build(parent: CollectionBasedPolicy? = null): List<P> {
+      val father = parent ?: CollectionBasedPolicy(mutableListOf())
+      rule?.forEach { it.build(father) }
+      if (!children.isNullOrEmpty()) {
+        val base = when (groupType) {
+          PolicyNodeGroupType.ALL -> {
+            allOf {
+              children.forEach {
+                it.build(this@allOf)
               }
             }
-          } as P
-          when (effect) {
-            PolicyNodeEffect.ALLOW -> listOf(base)
-            PolicyNodeEffect.DENY -> listOf(not(base))
           }
-        }
-      } else {
-        // node
-        if (isLeaf) {
-          rule!!.build(parent)
-          when (effect) {
-            PolicyNodeEffect.ALLOW -> {}
-            PolicyNodeEffect.DENY -> parent.policies.removeLast().also {
-              parent.add(not(it))
+
+          PolicyNodeGroupType.ANY -> {
+            anyOf {
+              children.forEach {
+                it.build(this@anyOf)
+              }
             }
           }
-        } else {
-          children!!.forEach {
-            it.build(parent)
-          }
-        }
-        parent.policies
+        } as P
+        father.policies.add(base)
       }
+      return father.policies
     }
 
   }
@@ -139,34 +116,96 @@ internal typealias PolicyRoot = PolicyNode
 internal data class Policy(
   val id: String,
   val name: String,
+  val effect: PolicyNodeEffect,
   val rules: List<PolicyRoot>,
 ) {
   companion object {
-    internal fun Policy.build(): List<codes.laurence.warden.policy.Policy> {
-      return rules.map {
+
+    internal fun Policy.build(): List<P> {
+      val base = rules.map {
         it.build()
-      }.flatten()
+      }
+      return base.flatten()
+    }
+
+    fun ContactDocument.createBaseContactAdminPolicy(adminRoleId: String): Policy {
+      return Policy(
+        id = "$id.admin",
+        name = "管理员权限",
+        effect = PolicyNodeEffect.ALLOW,
+        rules = listOf(
+          PolicyRoot(
+            groupType = PolicyNodeGroupType.ALL,
+            rule = listOf(
+              PolicyRule(
+                type = PolicyRuleType.Subject,
+                operator = PolicyRuleOperator.Contains,
+                key = "role",
+                value = adminRoleId
+              ),
+              PolicyRule(
+                type = PolicyRuleType.Resource,
+                operator = PolicyRuleOperator.IsCHILD,
+                key = "id",
+                value = "*"
+              )
+            )
+          )
+        )
+      )
+    }
+
+    fun ContactDocument.createBaseMemberPolicy(memberRoleId: String): List<Policy> {
+      return listOf(
+        Policy(
+          id = "$id.member",
+          name = "普通成员权限",
+          effect = PolicyNodeEffect.ALLOW,
+          rules = listOf(
+            PolicyRoot(
+              groupType = PolicyNodeGroupType.ALL,
+              rule = listOf(
+                PolicyRule(
+                  type = PolicyRuleType.Subject,
+                  operator = PolicyRuleOperator.Contains,
+                  key = "role",
+                  value = memberRoleId
+                ),
+                PolicyRule(
+                  type = PolicyRuleType.Resource,
+                  operator = PolicyRuleOperator.IsCHILD,
+                  key = "id",
+                  value = "*"
+                )
+              )
+            )
+          )
+        ),
+        Policy(
+          id = "$id.member",
+          name = "普通成员不允许执行管理员指令",
+          effect = PolicyNodeEffect.DENY,
+          rules = listOf(
+            PolicyRoot(
+              groupType = PolicyNodeGroupType.ALL,
+              rule = listOf(
+                PolicyRule(
+                  type = PolicyRuleType.Subject,
+                  operator = PolicyRuleOperator.Contains,
+                  key = "role",
+                  value = memberRoleId
+                ),
+                PolicyRule(
+                  type = PolicyRuleType.Resource,
+                  operator = PolicyRuleOperator.IsCHILD,
+                  key = "id",
+                  value = "buildIn.owner.*"
+                )
+              )
+            )
+          )
+        )
+      )
     }
   }
 }
-
-@Serializable
-internal data class ContactRole(
-  val id: String,
-  val name: String,
-)
-
-@Serializable
-internal data class ContactMember(
-  val id: String,
-  val name: String,
-  val roles: List<String>, // 指向ContactDocument.roles.id
-)
-
-@Serializable
-internal data class ContactDocument(
-  val id: String,
-  val policies: List<Policy>,
-  val roles: List<ContactRole>,
-  val members: List<ContactMember>,
-)

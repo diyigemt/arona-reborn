@@ -11,6 +11,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 import org.slf4j.Logger
+import java.util.UUID
 
 typealias SemVersion = Version
 
@@ -64,3 +65,5 @@ val PipelineContext<Unit, ApplicationCall>.isJsonPost
   get() = context.request.header(HttpHeaders.ContentType) == "application/json"
 
 fun Logger.error(exception: Throwable) = error(exception.message ?: "Exception of type ${exception::class}", exception)
+
+fun uuid(prefix: String = "") = if (prefix.isNotBlank()) "$prefix.${UUID.randomUUID()}" else UUID.randomUUID().toString()

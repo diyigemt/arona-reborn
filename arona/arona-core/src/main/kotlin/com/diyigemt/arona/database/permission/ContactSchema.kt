@@ -1,13 +1,19 @@
 package com.diyigemt.arona.database.permission
 
-import com.diyigemt.arona.database.AronaDatabase
+import com.diyigemt.arona.database.DocumentCompanionObject
+import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.permission.Policy.Companion.createBaseContactAdminPolicy
+import com.diyigemt.arona.database.permission.Policy.Companion.createBaseMemberPolicy
+import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.currentDateTime
-import org.jetbrains.exposed.dao.Entity
-import org.jetbrains.exposed.dao.EntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IdTable
-import org.jetbrains.exposed.sql.Column
+import com.diyigemt.arona.utils.uuid
+import com.mongodb.client.model.Filters
+import com.mongodb.client.model.Updates
+import com.mongodb.client.result.UpdateResult
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class ContactType {
   Private,
   PrivateGuild,
@@ -15,18 +21,102 @@ enum class ContactType {
   Guild,
 }
 
-@AronaDatabase
-internal object ContactTable : IdTable<String>(name = "User") {
-  override val id: Column<EntityID<String>> = text("id").entityId()
-  val contactName = text("contact_name") // 自定义的聊天特定名称, 仅公开频道和群有效
-  val contactType = enumerationByName<ContactType>("type", 20)
-  val registerTime = char("register_time", length = 25).clientDefault { currentDateTime() } // 注册时间
-  override val primaryKey: PrimaryKey = PrimaryKey(id)
+@Serializable
+internal data class ContactRole(
+  val id: String,
+  val name: String,
+)
+
+@Serializable
+internal data class ContactMember(
+  val id: String, // 指向UserDocument.id
+  val name: String,
+  val roles: List<String>, // 指向ContactDocument.roles.id
+)
+
+@Serializable
+internal data class ContactDocument(
+  val id: String,
+  val contactName: String = "",
+  val contactType: ContactType = ContactType.Group,
+  var policies: List<Policy> = listOf(),
+  var roles: List<ContactRole> = listOf(),
+  var members: List<ContactMember> = listOf(),
+  val registerTime: String = currentDateTime(),
+) {
+  companion object : DocumentCompanionObject {
+    override val documentName = "Contact"
+
+    suspend fun findContactDocumentById(id: String): ContactDocument? = withCollection {
+      find(idFilter(id)).limit(1).firstOrNull()
+    }
+
+    fun ContactDocument.createRole(name: String) = ContactRole("", name)
+    fun ContactDocument.createBaseAdminRole() = ContactRole("role.admin", "管理员")
+    fun ContactDocument.createBaseMemberRole() = ContactRole("role.default", "普通成员")
+
+    suspend fun ContactDocument.addMember(userId: String): ContactMember {
+      return when (val existMember = members.firstOrNull { it.id == userId }) {
+        is ContactMember -> existMember
+        else -> {
+          val defaultRole = roles.first { it.id == "role.default" }
+          val member = ContactMember(userId, "用户", listOf(defaultRole.id))
+          withCollection<ContactDocument, UpdateResult> {
+            updateOne(
+              filter = idFilter(id),
+              update = Updates.addToSet("members", member)
+            )
+          }
+          withCollection<UserDocument, UpdateResult> {
+            updateOne(
+              filter = idFilter(member.id),
+              update = Updates.addToSet("contacts", id)
+            )
+          }
+          member
+        }
+      }
+    }
+    suspend fun ContactDocument.updateMemberRole(memberId: String, roleId: String): ContactDocumentUpdateException {
+      val member = members.firstOrNull { it.id == memberId } ?: return ContactDocumentUpdateException.MemberNotFoundException(memberId)
+      val role = roles.firstOrNull { it.id == roleId } ?: return ContactDocumentUpdateException.RoleNotFoundException(roleId)
+      withCollection<ContactDocument, UpdateResult> {
+        ContactMember(memberId, member.name, member.roles.toMutableSet().apply { add(roleId) }.toList()).let {
+          updateOne(
+            filter = Filters.and(Filters.eq("_id", id), Filters.eq("member._id", memberId)),
+            update = Updates.addToSet("member.$.list", role.id)
+          )
+        }
+      }
+      return ContactDocumentUpdateException.Success()
+    }
+    suspend fun createContactDocument(id: String, type: ContactType = ContactType.Group) = ContactDocument(
+      id,
+      contactType = type,
+    )
+      .apply {
+        roles = listOf(createBaseAdminRole(), createBaseMemberRole())
+        policies =
+          mutableListOf(createBaseContactAdminPolicy(roles[0].id)).apply { addAll(createBaseMemberPolicy(roles[1].id)) }
+      }
+      .also {
+        withCollection { insertOne(it) }
+      }
+  }
 }
 
-internal class ContactSchema(id: EntityID<String>) : Entity<String>(id) {
-  companion object : EntityClass<String, ContactSchema>(ContactTable)
-  var contactName by ContactTable.contactName
-  val contactType by ContactTable.contactType
-  val registerTime by ContactTable.registerTime
+internal sealed class ContactDocumentUpdateException {
+  abstract val cause: String
+  class Success : ContactDocumentUpdateException() {
+    override val cause: String = ""
+  }
+  class MemberNotFoundException(memberId: String) : ContactDocumentUpdateException() {
+    override val cause: String = "member: $memberId not found"
+  }
+  class RoleNotFoundException(roleId: String) : ContactDocumentUpdateException() {
+    override val cause: String = "role: $roleId not found"
+  }
+  class PolicyNotFoundException(policyId: String) : ContactDocumentUpdateException() {
+    override val cause: String = "policy: $policyId not found"
+  }
 }

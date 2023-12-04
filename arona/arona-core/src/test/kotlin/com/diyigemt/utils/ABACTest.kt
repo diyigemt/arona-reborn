@@ -169,8 +169,8 @@ class ABACTest {
     runBlocking {
       val contact = createContactDocument("123")
       val member = ContactMember("id", "成员", listOf("role.default"))
-      val permission = PermissionImpl(PermissionId("buildIn.owner", "admin"), "")
-      val permission2 = PermissionImpl(PermissionId("com.diyigemt.arona", "*"), "")
+      val permission = PermissionImpl(PermissionId("buildIn.owner", "admin"), "", RootPermission)
+      val permission2 = PermissionImpl(PermissionId("com.diyigemt.arona", "*"), "", RootPermission)
       println(permission.testPermission(member, contact.policies))
       println(permission2.testPermission(member, contact.policies))
     }

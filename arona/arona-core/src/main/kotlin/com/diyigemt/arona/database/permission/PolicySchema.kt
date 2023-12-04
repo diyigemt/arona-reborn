@@ -1,5 +1,7 @@
 package com.diyigemt.arona.database.permission
 
+import codes.laurence.warden.policy.bool.AllOf
+import codes.laurence.warden.policy.bool.AnyOf
 import codes.laurence.warden.policy.bool.allOf
 import codes.laurence.warden.policy.bool.anyOf
 import codes.laurence.warden.policy.collections.CollectionBasedPolicy
@@ -82,30 +84,11 @@ internal data class PolicyNode(
     /**
      * allow to deny
      */
-    internal fun PolicyNode.build(parent: CollectionBasedPolicy? = null): List<P> {
-      val father = parent ?: CollectionBasedPolicy(mutableListOf())
+    internal fun PolicyNode.build(): P {
+      val father = if (groupType == PolicyNodeGroupType.ALL) AllOf(mutableListOf()) else AnyOf(mutableListOf())
       rule?.forEach { it.build(father) }
-      if (!children.isNullOrEmpty()) {
-        val base = when (groupType) {
-          PolicyNodeGroupType.ALL -> {
-            allOf {
-              children.forEach {
-                it.build(this@allOf)
-              }
-            }
-          }
-
-          PolicyNodeGroupType.ANY -> {
-            anyOf {
-              children.forEach {
-                it.build(this@anyOf)
-              }
-            }
-          }
-        } as P
-        father.policies.add(base)
-      }
-      return father.policies
+      children?.forEach { father.policies.add(it.build()) }
+      return father
     }
 
   }
@@ -125,7 +108,7 @@ internal data class Policy(
       val base = rules.map {
         it.build()
       }
-      return base.flatten()
+      return base
     }
 
     fun createBaseContactAdminPolicy(): Policy {
@@ -158,7 +141,7 @@ internal data class Policy(
     fun createBaseMemberPolicy(): List<Policy> {
       return listOf(
         Policy(
-          id = "policy.member.allow",
+          id = "role.default.allow",
           name = "普通成员权限",
           effect = PolicyNodeEffect.ALLOW,
           rules = listOf(
@@ -168,8 +151,8 @@ internal data class Policy(
                 PolicyRule(
                   type = PolicyRuleType.Subject,
                   operator = PolicyRuleOperator.Contains,
-                  key = "role",
-                  value = "role.member"
+                  key = "roles",
+                  value = "role.default"
                 ),
                 PolicyRule(
                   type = PolicyRuleType.Resource,
@@ -182,7 +165,7 @@ internal data class Policy(
           )
         ),
         Policy(
-          id = "policy.member.deny",
+          id = "policy.default.deny",
           name = "普通成员不允许执行管理员指令",
           effect = PolicyNodeEffect.DENY,
           rules = listOf(
@@ -192,8 +175,8 @@ internal data class Policy(
                 PolicyRule(
                   type = PolicyRuleType.Subject,
                   operator = PolicyRuleOperator.Contains,
-                  key = "role",
-                  value = "role.member"
+                  key = "roles",
+                  value = "role.default"
                 ),
                 PolicyRule(
                   type = PolicyRuleType.Resource,

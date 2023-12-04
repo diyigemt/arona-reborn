@@ -1,3 +1,5 @@
+@file:Suppress("UNUSED")
+
 package com.diyigemt.arona.communication.event
 
 import com.diyigemt.arona.communication.TencentBot
@@ -13,7 +15,6 @@ import kotlinx.serialization.KSerializer
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
-@Suppress("UNUSED")
 internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHandler<TencentWebsocketIdentifyResp>() {
   override val type = TencentWebsocketEventType.READY
   override val decoder = TencentWebsocketIdentifyResp.serializer()
@@ -25,7 +26,6 @@ internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHand
   }
 }
 
-@Suppress("UNUSED")
 internal object TencentWebsocketMessageCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentChannelMessageRaw>() {
   override val type = TencentWebsocketEventType.MESSAGE_CREATE
@@ -41,7 +41,9 @@ internal object TencentWebsocketMessageCreateHandler :
   }
 }
 
-@Suppress("UNUSED")
+/**
+ * 频道@机器人消息
+ */
 internal object TencentWebsocketAtMessageCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentChannelMessageRaw>() {
   override val type = TencentWebsocketEventType.AT_MESSAGE_CREATE
@@ -61,7 +63,6 @@ internal object TencentWebsocketAtMessageCreateHandler :
 }
 
 // 频道私聊事件
-@Suppress("UNUSED")
 internal object TencentWebsocketDirectMessageCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentChannelMessageRaw>() {
   override val type = TencentWebsocketEventType.DIRECT_MESSAGE_CREATE
@@ -86,7 +87,6 @@ internal object TencentWebsocketDirectMessageCreateHandler :
   }
 }
 
-@Suppress("UNUSED")
 internal object TencentWebsocketGroupAtMessageCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentGroupMessageRaw>() {
   override val type = TencentWebsocketEventType.GROUP_AT_MESSAGE_CREATE
@@ -98,13 +98,47 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
   }
 }
 
+internal object TencentWebsocketGuildCreateHandler :
+  TencentWebsocketDispatchEventHandler<TencentGuildRaw>() {
+  override val type = TencentWebsocketEventType.GUILD_CREATE
+  override val decoder = TencentGuildRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildRaw) {
+    val guild = bot.guilds.getOrCreate(payload.id)
+    val member = guild.members.getOrCreate(payload.opUserId)
+    TencentGuildAddEvent(member).broadcast()
+  }
+}
+
+internal object TencentWebsocketGroupAddBotHandler :
+  TencentWebsocketDispatchEventHandler<TencentBotGroupEventRaw>() {
+  override val type = TencentWebsocketEventType.GROUP_ADD_ROBOT
+  override val decoder = TencentBotGroupEventRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotGroupEventRaw) {
+    val group = bot.groups.getOrCreate(payload.id)
+    val member = group.members.getOrCreate(payload.opMemberId)
+    TencentGroupAddEvent(member).broadcast()
+  }
+}
+
+internal object TencentWebsocketFriendAddBotHandler :
+  TencentWebsocketDispatchEventHandler<TencentBotFriendEventRaw>() {
+  override val type = TencentWebsocketEventType.FRIEND_ADD
+  override val decoder = TencentBotFriendEventRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotFriendEventRaw) {
+    val friend = bot.friends.getOrCreate(payload.id)
+    TencentFriendAddEvent(friend).broadcast()
+  }
+}
+
 internal abstract class TencentWebsocketDispatchEventHandler<T> {
   abstract val type: TencentWebsocketEventType
   abstract val decoder: KSerializer<T>
   abstract suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: T)
 }
 
-@Suppress("UNUSED")
 internal object TencentWebsocketDispatchEventManager {
   private val map by lazy {
     ReflectionUtil.scanInterfacePetObjectInstance(TencentWebsocketDispatchEventHandler::class).associateBy { it.type }

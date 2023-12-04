@@ -1,13 +1,24 @@
 package com.diyigemt.arona.permission
 
+import codes.laurence.warden.AccessRequest
+import codes.laurence.warden.atts.HasAtts
+import codes.laurence.warden.enforce.EnforcementPointDefault
+import com.diyigemt.arona.database.permission.ContactMember
+import com.diyigemt.arona.database.permission.ContactMember.Companion.toPermissionSubject
+import com.diyigemt.arona.database.permission.Policy
+import com.diyigemt.arona.database.permission.Policy.Companion.build
+import com.diyigemt.arona.database.permission.PolicyNodeEffect
+
 interface PermissionNameSpace {
   fun permissionId(name: String): PermissionId
 }
 
 data class PermissionId(
   val nameSpace: String,
-  val name: String
-)
+  val name: String,
+) {
+  override fun toString(): String = "$nameSpace:$name"
+}
 
 interface Permission {
   val id: PermissionId
@@ -15,13 +26,48 @@ interface Permission {
   val description: String
 
   companion object {
+    data class Resource(
+      val id: String,
+    ) : HasAtts()
+
     val RootPermission = PermissionImpl(PermissionId("*", "*"), "The root permission").also { it.parent = it }
+    fun Permission.fullPermissionId(): String {
+      return if (parent == RootPermission) {
+        id.toString()
+      } else {
+        val fathers = mutableListOf<Permission>()
+        var tmpParent: Permission = parent
+        while (tmpParent != RootPermission) {
+          fathers.add(tmpParent)
+          tmpParent = tmpParent.parent
+        }
+        fathers.reverse()
+        fathers.joinToString(":") { it.id.nameSpace } + ":$id"
+      }
+    }
+
+    @PublishedApi
+    internal suspend fun Permission.testPermission(subject: ContactMember, policies: List<Policy>): Boolean {
+      val allow = policies.filter { it.effect == PolicyNodeEffect.ALLOW }.map { it.build() }.flatten()
+      val deny = policies.filter { it.effect == PolicyNodeEffect.DENY }.map { it.build() }.flatten()
+      return runCatching {
+        EnforcementPointDefault(allow, deny).enforceAuthorization(
+          AccessRequest(
+            subject = subject.toPermissionSubject().atts(),
+            action = mapOf("type" to "effect"),
+            resource = Resource(fullPermissionId()).atts(),
+            environment = mapOf("time" to "16:15")
+          )
+        )
+        true
+      }.getOrDefault(false)
+    }
   }
 }
 
 data class PermissionImpl(
   override val id: PermissionId,
-  override val description: String
+  override val description: String,
 ) : Permission {
   override lateinit var parent: Permission
 
@@ -48,4 +94,7 @@ data class PermissionImpl(
     result = 31 * result + if (parent == this) 1 else parent.hashCode()
     return result
   }
+
+  override fun toString(): String =
+    "PermissionImpl(id=$id, description='$description', parent=${if (parent === this) "<self>" else parent.toString()})"
 }

@@ -40,7 +40,7 @@ interface TencentBot : Contact, CoroutineScope {
   override val id: String
   val guilds: ContactList<Guild>
   val groups: ContactList<Group>
-  val users: ContactList<FriendUser>
+  val friends: ContactList<FriendUser>
   val isPublic: Boolean
   val isDebug: Boolean
   suspend fun <T> callOpenapi(
@@ -76,7 +76,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   override val coroutineContext: CoroutineContext = EmptyCoroutineContext + CoroutineName("Bot.${config.appId}")
   override val guilds: ContactList<Guild> = GuildContactList { EmptyGuildImpl(this, it) }
   override val groups: ContactList<Group> = GroupContactList { EmptyGroupImpl(this, it) }
-  override val users: ContactList<FriendUser> = SingleUserContactList { EmptyFriendUserImpl(this, it) }
+  override val friends: ContactList<FriendUser> = SingleUserContactList { EmptyFriendUserImpl(this, it) }
   override val isPublic = config.public
   override val isDebug = config.debug
   private val timer = Timer("Bot.${config.appId}", true)

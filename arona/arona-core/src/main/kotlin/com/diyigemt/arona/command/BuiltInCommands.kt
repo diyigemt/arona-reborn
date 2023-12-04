@@ -7,11 +7,11 @@ import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.addMember
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentById
+import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.updateMemberRole
 import com.diyigemt.arona.database.permission.ContactType
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
-import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUid
+import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
 import com.diyigemt.arona.database.permission.UserDocument.Companion.updateUserContact
 import com.diyigemt.arona.database.permission.UserSchema
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -33,7 +33,7 @@ object BuiltInCommands {
     suspend fun UserCommandSender.login() {
       val tokenKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, token)
       if (redisDbQuery { get(tokenKey) } == "1") {
-        val documentUser = findUserDocumentByUid(user.id) ?: createUserDocument(user.id, subject.id)
+        val documentUser = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
         when (val saveUser = UserSchema.findById(user.id)) {
           is UserSchema -> {
             saveUser.uid = documentUser.id
@@ -78,7 +78,7 @@ object BuiltInCommands {
       when (it) {
         is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> {
           // 检查有无记录, 无则创建并初始化
-          val contact = findContactDocumentById(it.subject.id) ?: createContactDocument(
+          val contact = findContactDocumentByIdOrNull(it.subject.id) ?: createContactDocument(
             it.subject.id,
             when (it) {
               is TencentFriendAddEvent -> ContactType.Private
@@ -88,7 +88,7 @@ object BuiltInCommands {
             }
           )
           // 防止用户删了又加回来的情况
-          val user = findUserDocumentByUid(user.id) ?: createUserDocument(user.id, subject.id)
+          val user = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
           val member = contact.addMember(user.id)
           contact.updateMemberRole(member.id, "role.admin")
         }

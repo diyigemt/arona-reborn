@@ -1,12 +1,12 @@
 package com.diyigemt.arona.database.permission
 
+import codes.laurence.warden.atts.HasAtts
 import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseContactAdminPolicy
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseMemberPolicy
 import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.currentDateTime
-import com.diyigemt.arona.utils.uuid
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
@@ -32,7 +32,19 @@ internal data class ContactMember(
   val id: String, // 指向UserDocument.id
   val name: String,
   val roles: List<String>, // 指向ContactDocument.roles.id
-)
+) {
+  companion object {
+    data class ContactMemberPermissionSubject(
+      val id: String,
+      val roles: List<String>,
+    ) : HasAtts()
+
+    internal fun ContactMember.toPermissionSubject() = ContactMemberPermissionSubject(
+      id,
+      roles
+    )
+  }
+}
 
 @Serializable
 internal data class ContactDocument(
@@ -47,7 +59,7 @@ internal data class ContactDocument(
   companion object : DocumentCompanionObject {
     override val documentName = "Contact"
 
-    suspend fun findContactDocumentById(id: String): ContactDocument? = withCollection {
+    suspend fun findContactDocumentByIdOrNull(id: String): ContactDocument? = withCollection {
       find(idFilter(id)).limit(1).firstOrNull()
     }
 
@@ -77,19 +89,22 @@ internal data class ContactDocument(
         }
       }
     }
+
     suspend fun ContactDocument.updateMemberRole(memberId: String, roleId: String): ContactDocumentUpdateException {
-      val member = members.firstOrNull { it.id == memberId } ?: return ContactDocumentUpdateException.MemberNotFoundException(memberId)
-      val role = roles.firstOrNull { it.id == roleId } ?: return ContactDocumentUpdateException.RoleNotFoundException(roleId)
+      members.firstOrNull { it.id == memberId } ?: return ContactDocumentUpdateException.MemberNotFoundException(
+        memberId
+      )
+      val role =
+        roles.firstOrNull { it.id == roleId } ?: return ContactDocumentUpdateException.RoleNotFoundException(roleId)
       withCollection<ContactDocument, UpdateResult> {
-        ContactMember(memberId, member.name, member.roles.toMutableSet().apply { add(roleId) }.toList()).let {
-          updateOne(
-            filter = Filters.and(Filters.eq("_id", id), Filters.eq("member._id", memberId)),
-            update = Updates.addToSet("member.$.list", role.id)
-          )
-        }
+        updateOne(
+          filter = Filters.and(Filters.eq("_id", id), Filters.eq("member._id", memberId)),
+          update = Updates.addToSet("member.$.list", role.id)
+        )
       }
       return ContactDocumentUpdateException.Success()
     }
+
     suspend fun createContactDocument(id: String, type: ContactType = ContactType.Group) = ContactDocument(
       id,
       contactType = type,
@@ -97,7 +112,7 @@ internal data class ContactDocument(
       .apply {
         roles = listOf(createBaseAdminRole(), createBaseMemberRole())
         policies =
-          mutableListOf(createBaseContactAdminPolicy(roles[0].id)).apply { addAll(createBaseMemberPolicy(roles[1].id)) }
+          mutableListOf(createBaseContactAdminPolicy()).apply { addAll(createBaseMemberPolicy()) }
       }
       .also {
         withCollection { insertOne(it) }
@@ -107,15 +122,19 @@ internal data class ContactDocument(
 
 internal sealed class ContactDocumentUpdateException {
   abstract val cause: String
+
   class Success : ContactDocumentUpdateException() {
     override val cause: String = ""
   }
+
   class MemberNotFoundException(memberId: String) : ContactDocumentUpdateException() {
     override val cause: String = "member: $memberId not found"
   }
+
   class RoleNotFoundException(roleId: String) : ContactDocumentUpdateException() {
     override val cause: String = "role: $roleId not found"
   }
+
   class PolicyNotFoundException(policyId: String) : ContactDocumentUpdateException() {
     override val cause: String = "policy: $policyId not found"
   }

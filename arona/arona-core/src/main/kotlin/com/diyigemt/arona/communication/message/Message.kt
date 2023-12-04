@@ -85,13 +85,7 @@ internal data class TencentGuildMemberRaw(
   var user: TencentGuildUserRaw? = null,
   @SerialName("guild_id")
   val guildIid: String = "",
-) {
-  companion object {
-    val EmptyTencentGuildMemberRaw = TencentGuildMemberRaw(
-      "",
-    )
-  }
-}
+)
 
 @Serializable
 internal data class TencentMessageAttachmentRaw(
@@ -200,6 +194,8 @@ internal data class TencentGuildRaw(
   val description: String,
   @SerialName("joined_at")
   val joinedAt: String,
+  @SerialName("op_user_id")
+  val opUserId: String = "",
 ) : ContactRaw
 
 @Serializable
@@ -228,6 +224,25 @@ internal data class TencentGuildChannelRaw(
 
 internal interface ContactRaw {
   val id: String
+}
+
+@Serializable
+internal data class TencentBotGroupEventRaw(
+  @SerialName("group_openid")
+  val groupOpenId: String,
+  @SerialName("op_member_openid")
+  val opMemberId: String,
+  val timestamp: String
+) : ContactRaw {
+  override val id get() = groupOpenId
+}
+
+@Serializable
+internal data class TencentBotFriendEventRaw(
+  val openid: String,
+  val timestamp: String
+) : ContactRaw {
+  override val id get() = openid
 }
 
 internal interface TencentMessageRaw : ContactRaw {

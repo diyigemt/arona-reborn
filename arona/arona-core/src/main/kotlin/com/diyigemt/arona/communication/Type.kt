@@ -53,7 +53,18 @@ internal enum class TencentWebsocketEventType(val type: String) {
   AT_MESSAGE_CREATE("AT_MESSAGE_CREATE"), // 频道@机器人消息
   DIRECT_MESSAGE_CREATE("DIRECT_MESSAGE_CREATE"), // 频道私聊消息
   C2C_MESSAGE_CREATE("C2C_MESSAGE_CREATE"), // 私聊消息发送
-  GROUP_AT_MESSAGE_CREATE("GROUP_AT_MESSAGE_CREATE"); // 群聊@机器人消息
+  GROUP_AT_MESSAGE_CREATE("GROUP_AT_MESSAGE_CREATE"),// 群聊@机器人消息
+  GUILD_CREATE("GUILD_CREATE"), // 机器人被加入频道
+  GUILD_DELETE("GUILD_DELETE"), // 机器人被踢出频道/频道解散
+  GROUP_ADD_ROBOT("GROUP_ADD_ROBOT"), // 机器人被加入群
+  GROUP_DEL_ROBOT("GROUP_DEL_ROBOT"), // 机器人被踢出群
+  GROUP_MSG_REJECT("GROUP_MSG_REJECT"), // 群拒绝机器人的主动消息
+  GROUP_MSG_RECEIVE("GROUP_MSG_RECEIVE"), // 群允许机器人的主动消息
+  FRIEND_ADD("FRIEND_ADD"), // 机器人被加入好友
+  FRIEND_DEL("FRIEND_DEL"), // 机器人被删除好友
+  C2C_MSG_REJECT("C2C_MSG_REJECT"), // 好友拒绝机器人的主动消息
+  C2C_MSG_RECEIVE("C2C_MSG_RECEIVE"), // 好友允许机器人的主动消息
+  A("GUILD_CREATE");
 
   companion object {
     private val TypeMap = entries.associateBy { it.type }

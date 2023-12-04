@@ -9,7 +9,6 @@ import com.diyigemt.arona.utils.currentDateTime
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
-import com.mongodb.kotlin.client.coroutine.MongoCollection
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
@@ -80,7 +79,7 @@ internal data class UserDocument(
       }
     }
 
-    suspend fun findUserDocumentByUid(uid: String): UserDocument? = withCollection {
+    suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? = withCollection {
       find(uidFilter(uid)).limit(1).firstOrNull()
     }
 

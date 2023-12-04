@@ -8,6 +8,11 @@ import codes.laurence.warden.policy.bool.allOf
 import com.diyigemt.arona.database.permission.*
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
 import com.diyigemt.arona.database.permission.Policy.Companion.build
+import com.diyigemt.arona.permission.Permission.Companion.RootPermission
+import com.diyigemt.arona.permission.Permission.Companion.fullPermissionId
+import com.diyigemt.arona.permission.Permission.Companion.testPermission
+import com.diyigemt.arona.permission.PermissionId
+import com.diyigemt.arona.permission.PermissionImpl
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
@@ -149,5 +154,26 @@ class ABACTest {
         println("failed")
       }
     }
+  }
+  @Test
+  fun testPermissionFather() {
+    val root = PermissionImpl(PermissionId("buildIn", "*"), "root permission", RootPermission)
+    val firstChild = PermissionImpl(PermissionId("command.bind", "*"), "第一个子代", root)
+    val secondChild = PermissionImpl(PermissionId("bind_a", "*"), "第二个子代", firstChild)
+    println(root.fullPermissionId())
+    println(firstChild.fullPermissionId())
+    println(secondChild.fullPermissionId())
+  }
+  @Test
+  fun testCheckPermission() {
+    runBlocking {
+      val contact = createContactDocument("123")
+      val member = ContactMember("id", "成员", listOf("role.default"))
+      val permission = PermissionImpl(PermissionId("buildIn.owner", "admin"), "")
+      val permission2 = PermissionImpl(PermissionId("com.diyigemt.arona", "*"), "")
+      println(permission.testPermission(member, contact.policies))
+      println(permission2.testPermission(member, contact.policies))
+    }
+
   }
 }

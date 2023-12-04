@@ -128,9 +128,9 @@ internal data class Policy(
       return base.flatten()
     }
 
-    fun ContactDocument.createBaseContactAdminPolicy(adminRoleId: String): Policy {
+    fun createBaseContactAdminPolicy(): Policy {
       return Policy(
-        id = "$id.admin",
+        id = "policy.admin",
         name = "管理员权限",
         effect = PolicyNodeEffect.ALLOW,
         rules = listOf(
@@ -141,7 +141,7 @@ internal data class Policy(
                 type = PolicyRuleType.Subject,
                 operator = PolicyRuleOperator.Contains,
                 key = "role",
-                value = adminRoleId
+                value = "role.admin"
               ),
               PolicyRule(
                 type = PolicyRuleType.Resource,
@@ -155,10 +155,10 @@ internal data class Policy(
       )
     }
 
-    fun ContactDocument.createBaseMemberPolicy(memberRoleId: String): List<Policy> {
+    fun createBaseMemberPolicy(): List<Policy> {
       return listOf(
         Policy(
-          id = "$id.member",
+          id = "policy.member.allow",
           name = "普通成员权限",
           effect = PolicyNodeEffect.ALLOW,
           rules = listOf(
@@ -169,7 +169,7 @@ internal data class Policy(
                   type = PolicyRuleType.Subject,
                   operator = PolicyRuleOperator.Contains,
                   key = "role",
-                  value = memberRoleId
+                  value = "role.member"
                 ),
                 PolicyRule(
                   type = PolicyRuleType.Resource,
@@ -182,7 +182,7 @@ internal data class Policy(
           )
         ),
         Policy(
-          id = "$id.member",
+          id = "policy.member.deny",
           name = "普通成员不允许执行管理员指令",
           effect = PolicyNodeEffect.DENY,
           rules = listOf(
@@ -193,7 +193,7 @@ internal data class Policy(
                   type = PolicyRuleType.Subject,
                   operator = PolicyRuleOperator.Contains,
                   key = "role",
-                  value = memberRoleId
+                  value = "role.member"
                 ),
                 PolicyRule(
                   type = PolicyRuleType.Resource,

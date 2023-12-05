@@ -7,6 +7,9 @@ import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
 import com.diyigemt.arona.database.guild.GuildMemberSchema
 import com.diyigemt.arona.database.guild.GuildMemberTable
+import com.diyigemt.arona.database.permission.ContactDocument
+import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
+import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.utils.childScopeContext
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -39,6 +42,17 @@ interface Contact : CoroutineScope {
   suspend fun sendMessage(message: MessageChain, messageSequence: Int = 1): MessageReceipt
 
   suspend fun uploadImage(url: String): TencentImage
+
+  companion object {
+    internal suspend fun Contact.toContactDocumentOrNull(): ContactDocument? {
+      return when(this) {
+        is Group, is Guild -> {
+          findContactDocumentByIdOrNull(id)
+        }
+        else -> null
+      }
+    }
+  }
 }
 
 internal abstract class AbstractContact(
@@ -272,7 +286,11 @@ internal class GroupImpl(
   }
 }
 
-interface User : Contact
+interface User : Contact {
+  companion object {
+    internal suspend fun User.toUserDocumentOrNull() = UserDocument.findUserDocumentByUidOrNull(id)
+  }
+}
 
 interface FriendUser : User // 单纯用户 私聊情况下
 

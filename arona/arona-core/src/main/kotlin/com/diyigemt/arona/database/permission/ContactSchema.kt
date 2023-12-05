@@ -66,6 +66,7 @@ internal data class ContactDocument(
     fun ContactDocument.createRole(name: String) = ContactRole("", name)
     fun ContactDocument.createBaseAdminRole() = ContactRole("role.admin", "管理员")
     fun ContactDocument.createBaseMemberRole() = ContactRole("role.default", "普通成员")
+    fun ContactDocument.findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
 
     suspend fun ContactDocument.addMember(userId: String): ContactMember {
       return when (val existMember = members.firstOrNull { it.id == userId }) {

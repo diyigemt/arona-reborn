@@ -62,6 +62,10 @@ object PluginMain : AronaPlugin(
             }
           }
 
+          is CommandExecuteResult.PermissionDenied -> {
+            commandSender.sendMessage("权限不足")
+          }
+
           else -> result.exception?.let { it1 -> logger.error(it1) }
         }
       }

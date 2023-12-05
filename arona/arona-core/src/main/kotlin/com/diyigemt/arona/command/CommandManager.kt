@@ -4,12 +4,16 @@ package com.diyigemt.arona.command
 
 import com.diyigemt.arona.communication.command.*
 import com.diyigemt.arona.communication.command.CommandSender.Companion.toCommandSender
+import com.diyigemt.arona.communication.contact.Contact.Companion.toContactDocumentOrNull
+import com.diyigemt.arona.communication.contact.User.Companion.toUserDocumentOrNull
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.Message
 import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toReadableTencentAt
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import com.diyigemt.arona.communication.message.toMessageChain
+import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactMemberOrNull
+import com.diyigemt.arona.permission.Permission.Companion.testPermission
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.output.Localization
@@ -154,6 +158,17 @@ internal suspend fun executeCommandImpl(
   val command =
     CommandManager.matchCommand(commandStr.replace("/", "")) as? AbstractCommand ?: return CommandExecuteResult
       .UnresolvedCommand()
+  if (checkPermission) {
+    val document = caller.subject?.toContactDocumentOrNull()
+    val user = caller.user?.toUserDocumentOrNull()
+    if (document != null && user != null) {
+      document.findContactMemberOrNull(user.id)?.also {
+        if (!command.permission.testPermission(it, document.policies)) {
+          return CommandExecuteResult.PermissionDenied(command)
+        }
+      }
+    }
+  }
   val arg = call.toString()
   return runCatching {
     command.context {

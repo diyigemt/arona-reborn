@@ -1,42 +1,49 @@
 <template>
   <VideoBackground src="/video/pv.webm" style="width: 100%; height: 100%">
-    <div v-if="!showLogin" class="absolute-wrapper login-wrapper bg-white">
-      <div class="login-header">登录</div>
-      <el-divider />
-      <el-row>
-        <el-col :span="12" class="text-center">
-          <el-button class="login-card" @click="onClickThirdPartLogin">
-            <img src="/image/facebook.webp" alt="" class="login-icon" />
-            FaceBook登录
-          </el-button>
-        </el-col>
-        <el-col :span="12" class="text-center">
-          <el-button class="login-card" @click="onClickThirdPartLogin">
-            <img src="/image/twitter.webp" alt="" class="login-icon" />
-            Twitter登录
-          </el-button>
-        </el-col>
-      </el-row>
-      <el-row class="mt-4">
-        <el-col :span="12" class="text-center">
-          <el-button class="login-card" @click="onClickThirdPartLogin">
-            <img src="/image/google.webp" alt="" class="login-icon" />
-            Google登录
-          </el-button>
-        </el-col>
-        <el-col :span="12" class="text-center">
-          <el-button class="login-card" @click="onClickAronaLogin">
-            <img src="/image/arona.webp" alt="" class="login-icon" />
-            Arona登录
-          </el-button>
-        </el-col>
-      </el-row>
-    </div>
-    <div v-else class="absolute-wrapper arona-login-wrapper bg-white">
+    <transition name="el-fade-in">
+      <div v-if="!showLogin" class="absolute-wrapper login-wrapper bg-white">
+        <div class="login-header">登录</div>
+        <el-divider />
+        <el-row>
+          <el-col :span="12" class="text-center">
+            <el-button class="login-card" @click="onClickThirdPartLogin">
+              <img src="/image/facebook.webp" alt="" class="login-icon" />
+              FaceBook登录
+            </el-button>
+          </el-col>
+          <el-col :span="12" class="text-center">
+            <el-button class="login-card" @click="onClickThirdPartLogin">
+              <img src="/image/twitter.webp" alt="" class="login-icon" />
+              Twitter登录
+            </el-button>
+          </el-col>
+        </el-row>
+        <el-row class="mt-4">
+          <el-col :span="12" class="text-center">
+            <el-button class="login-card" @click="onClickThirdPartLogin">
+              <img src="/image/google.webp" alt="" class="login-icon" />
+              Google登录
+            </el-button>
+          </el-col>
+          <el-col :span="12" class="text-center">
+            <el-button class="login-card" @click="onClickAronaLogin">
+              <img src="/image/arona.webp" alt="" class="login-icon" />
+              Arona登录
+            </el-button>
+          </el-col>
+        </el-row>
+      </div>
+    </transition>
+    <div v-if="showLogin" class="absolute-wrapper arona-login-wrapper bg-white">
       <div>
         <div class="text-2xl">您的登录认证码为:</div>
         <div class="text-4xl arona-color m-8">{{ code }}</div>
-        <el-text>不会使用? <el-link type="primary">访问arona在线文档</el-link></el-text>
+        <el-text
+          >不会使用?
+          <el-link type="primary" href="https://doc.arona.diyigemt.com/" target="_blank"
+            >访问arona在线文档</el-link
+          ></el-text
+        >
       </div>
     </div>
   </VideoBackground>

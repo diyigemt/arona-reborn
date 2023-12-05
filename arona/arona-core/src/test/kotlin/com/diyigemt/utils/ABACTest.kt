@@ -176,4 +176,41 @@ class ABACTest {
     }
 
   }
+  @Test
+  fun testPermissionIdMatch() {
+    val r = "buildIn.*"
+    val l = "buildIn.owner:min.action:test.m"
+    if (r == "*") {
+      println("t")
+      return
+    }
+    val rL = r.split(":")
+    val lL = l.split(":")
+    fun test(right: String, left: String): Boolean {
+      return if (right.endsWith("*")) {
+        if (right == "*") true
+        else {
+          val leftList = left.split(".")
+          val rightList = right.split(".")
+          if (leftList.size < rightList.size) false
+          else if (leftList.size == rightList.size && rightList.last() != "*") left == right
+          else {
+            rightList.mapIndexed { i, v ->
+              leftList[i] == v
+            }.toMutableList().also {
+              it.removeLast()
+            }.reduce { acc, b -> acc && b } && rightList.last() == "*"
+          }
+        }
+      } else {
+        right == left
+      }
+    }
+    val b = if (rL.size > lL.size) false else {
+      rL.mapIndexed { i, v ->
+        test(v, lL[i])
+      }.reduceOrNull { acc, b -> acc && b } ?: false
+    }
+    println(b)
+  }
 }

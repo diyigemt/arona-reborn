@@ -8,6 +8,7 @@ import com.diyigemt.arona.database.permission.ContactMember.Companion.toPermissi
 import com.diyigemt.arona.database.permission.Policy
 import com.diyigemt.arona.database.permission.Policy.Companion.build
 import com.diyigemt.arona.database.permission.PolicyNodeEffect
+import com.diyigemt.arona.utils.currentTime
 
 interface PermissionNameSpace {
   fun permissionId(name: String): PermissionId
@@ -56,7 +57,7 @@ interface Permission {
             subject = subject.toPermissionSubject().atts(),
             action = mapOf("type" to "effect"),
             resource = Resource(fullPermissionId()).atts(),
-            environment = mapOf("time" to "16:15")
+            environment = mapOf("time" to currentTime().substringAfter(":"))
           )
         )
         true

@@ -13,8 +13,11 @@ hero:
     alt: VitePress
   actions:
     - theme: brand
-      text: Get Started
-      link: /guide/what-is
+      text: 官方版
+      link: /v2/guide/what-is
+    - theme: alt
+      text: 自行部署版
+      link: /v1/guide/what-is
     - theme: alt
       text: View on Github
       link: https://github.com/diyigemt/arona

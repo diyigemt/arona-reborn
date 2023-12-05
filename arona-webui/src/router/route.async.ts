@@ -5,7 +5,7 @@ import ConfigRoutes from "@/router/config";
 const asyncRoutes: Array<RouteRecordRaw> = [
   {
     path: "/",
-    redirect: "/home",
+    redirect: "/login",
   },
   {
     path: "/home",

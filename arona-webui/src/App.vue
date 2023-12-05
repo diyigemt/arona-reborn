@@ -6,7 +6,8 @@
 </template>
 
 <script setup lang="ts">
-import zhCn from "element-plus/lib/locale/lang/zh-cn";
+// @ts-ignore
+import zhCn from "element-plus/dist/locale/zh-cn.mjs";
 import { AdvancedBloomFilter } from "@pixi/filter-advanced-bloom";
 import { Sprite } from "pixi.js";
 import SpineManager, { SpineInstanceReactConfig } from "@/utils/spine";

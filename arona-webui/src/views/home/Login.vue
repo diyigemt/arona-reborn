@@ -1,7 +1,17 @@
 <template>
-  <VideoBackground src="/video/pv.webm" style="width: 100%; height: 100%">
+  <VideoBackground
+    @click="onClick"
+    ref="video"
+    src="/video/pv.webm"
+    poster="/image/BG_View_Kivotos.webp"
+    :muted="false"
+    :autoplay="false"
+    :loop="false"
+    @ended="onEnded"
+    style="width:100%;height:100%"
+  >
     <transition name="el-fade-in">
-      <div v-if="!showLogin" class="absolute-wrapper login-wrapper bg-white">
+      <div v-if="!showLogin && touch" class="absolute-wrapper login-wrapper bg-white">
         <div class="login-header">登录</div>
         <el-divider />
         <el-row>
@@ -46,6 +56,9 @@
         >
       </div>
     </div>
+    <div class="start" v-if="!touch">
+      touch to start
+    </div>
   </VideoBackground>
 </template>
 
@@ -58,6 +71,7 @@ defineOptions({
   name: "LoginIndex",
 });
 const showLogin = ref(false);
+const touch = ref(false);
 const code = ref("XXXXXX");
 function onClickThirdPartLogin() {
   infoMessage("没做");
@@ -65,9 +79,51 @@ function onClickThirdPartLogin() {
 function onClickAronaLogin() {
   showLogin.value = true;
 }
+const video = ref<{ player: { play(): void } }>();
+function onClick() {
+  touch.value = true;
+  video.value?.player.play();
+}
+function onEnded() {
+  // @ts-ignore
+  video.value?.player.$refs.video.load();
+  setTimeout(() => {
+    // @ts-ignore
+    video.value?.player.$refs.video.play();
+  }, 1000);
+}
 </script>
 
 <style scoped lang="scss">
+.start {
+  position: absolute;
+  pointer-events: none;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+  width: 50%;
+  text-align: center;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, transparent 0%, white 50px, white calc(100% - 50px), transparent 100%);
+  animation: kira 2s infinite;
+  animation-direction: alternate;
+  animation-timing-function: ease-in-out;
+}
+@keyframes kira {
+  0% {
+    opacity: 0.3;
+  }
+  //25% {
+  //  opacity: 1;
+  //}
+  //75% {
+  //  opacity: 0;
+  //}
+  100% {
+    opacity: 1;
+  }
+}
 .absolute-wrapper {
   position: absolute;
   top: 50%;

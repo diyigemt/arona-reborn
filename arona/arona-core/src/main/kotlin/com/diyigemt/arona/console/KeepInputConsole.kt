@@ -1,12 +1,16 @@
 package com.diyigemt.arona.console
 
-import kotlinx.coroutines.*
+import ch.qos.logback.classic.PatternLayout
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.AppenderBase
+import ch.qos.logback.core.encoder.LayoutWrappingEncoder
+import kotlinx.coroutines.delay
 import org.fusesource.jansi.AnsiConsole
 import org.jline.reader.LineReader
 import org.jline.reader.LineReaderBuilder
 import org.jline.terminal.TerminalBuilder
 
-suspend fun launchConsole() {
+val lineReader: LineReader by lazy {
   AnsiConsole.systemInstall()
   val terminal = TerminalBuilder
     .builder()
@@ -14,20 +18,10 @@ suspend fun launchConsole() {
     .jansi(true)
     .system(true)
     .build()
-  val lineReader = LineReaderBuilder.builder().terminal(terminal).build()
-  CoroutineScope(currentCoroutineContext() + SupervisorJob() + CoroutineName("console flush")).launch {
-    // TODO remove
-    return@launch
-    while (true) {
-      if (lineReader.isReading) {
-        lineReader.callWidget(LineReader.CLEAR)
-        lineReader.callWidget(LineReader.REDRAW_LINE)
-        lineReader.callWidget(LineReader.REDISPLAY)
-        lineReader.terminal.writer().flush()
-      }
-      delay(1000)
-    }
-  }
+  LineReaderBuilder.builder().terminal(terminal).build()
+}
+
+suspend fun launchConsole() {
   while (true) {
     runCatching {
       val input = lineReader.readLine("> ")
@@ -39,3 +33,31 @@ suspend fun launchConsole() {
   }
 }
 
+fun appendConsole(message: String? = null) {
+  lineReader.printAbove(message)
+}
+
+class CustomAppender : AppenderBase<ILoggingEvent>() {
+  private val encoder: LayoutWrappingEncoder<ILoggingEvent> = LayoutWrappingEncoder()
+  private val layout: PatternLayout = PatternLayout()
+  private var pattern: String = "%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+  override fun start() {
+    super.start()
+    encoder.context = context
+    encoder.layout = layout
+    layout.context = context
+    layout.pattern = pattern
+    layout.start()
+    encoder.start()
+  }
+
+  override fun stop() {
+    encoder.stop()
+    super.stop()
+  }
+
+  override fun append(event: ILoggingEvent) {
+    lineReader.printAbove(layout.doLayout(event))
+  }
+}

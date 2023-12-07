@@ -1,7 +1,7 @@
 <configuration debug="false" scan="false">
     <property name="log.root" value="logs" />
     <property name="log.file" value="log" />
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <appender name="STDOUT" class="com.diyigemt.arona.console.CustomAppender">
         <encoder>
             <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>

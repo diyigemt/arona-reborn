@@ -15,7 +15,7 @@ import com.diyigemt.arona.communication.message.toMessageChain
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactMemberOrNull
 import com.diyigemt.arona.permission.Permission.Companion.testPermission
 import com.github.ajalt.clikt.core.MissingArgument
-import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.Terminal
@@ -43,6 +43,7 @@ object CommandManager {
       command.secondaryNames // init lazy
       command.description // init lazy
       command.targetExtensionFunction // init lazy
+      (command as? AbstractCommand)
     }.onFailure {
       throw IllegalStateException("Failed to init command ${command}.", it)
     }
@@ -171,11 +172,12 @@ internal suspend fun executeCommandImpl(
   }
   val arg = call.toString()
   return runCatching {
-    command.context {
+    command.context2 {
       obj = caller
       terminal = commandTerminal
       localization = crsiveLocalization
-    }.parse(
+    }
+    command.parse(
       arg
         .split(" ")
         .filter { it.isNotEmpty() }
@@ -258,6 +260,7 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
 
       action.invoke(event.toCommandSender() as C, event)
     }
+
     is GuildUserCommandSender -> {
       val mapper = createMapper<C, TencentGuildPrivateMessageEvent>(filter)
       val event = (if (timeoutMillis == -1L) {
@@ -270,6 +273,7 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
 
       action.invoke(event.toCommandSender() as C, event)
     }
+
     is GuildChannelCommandSender -> {
       val mapper = createMapper<C, TencentGuildMessageEvent>(filter)
       val event = (if (timeoutMillis == -1L) {
@@ -282,6 +286,7 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
 
       action.invoke(event.toCommandSender() as C, event)
     }
+
     else -> TODO()
   }
 }

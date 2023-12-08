@@ -10,6 +10,7 @@ import com.diyigemt.arona.database.permission.ContactDocument.Companion.createCo
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.updateMemberRole
 import com.diyigemt.arona.database.permission.ContactType
+import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
 import com.diyigemt.arona.database.permission.UserDocument.Companion.updateUserContact
@@ -69,7 +70,29 @@ object BuiltInCommands {
   ) {
     private val token by argument("在个人信息界面生成的唯一token")
     suspend fun UserCommandSender.bind() {
-
+      val bindKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, token)
+      when (val userId = redisDbQuery {
+        get(bindKey)
+      }) {
+        is String -> {
+          // 拿到目标id
+          when (val user = findUserDocumentByUidOrNull(userId)) {
+            is UserDocument -> {
+              redisDbQuery {
+                set(bindKey, "success")
+                expire(bindKey, 600u)
+              }
+              sendMessage("绑定成功")
+            }
+            else -> {
+              sendMessage("用户未找到, 请再试一次")
+            }
+          }
+        }
+        else -> {
+          sendMessage("token无效")
+        }
+      }
     }
   }
 

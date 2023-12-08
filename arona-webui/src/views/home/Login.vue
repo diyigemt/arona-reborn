@@ -1,47 +1,69 @@
 <template>
   <VideoBackground
-    @click="onClick"
     ref="video"
     src="/video/pv.webm"
     poster="/image/BG_View_Kivotos.webp"
     :muted="false"
     :autoplay="false"
     :loop="false"
+    style="width: 100%; height: 100%"
+    @click="onClick"
     @ended="onEnded"
-    style="width:100%;height:100%"
   >
     <transition name="el-fade-in">
-      <div v-if="!showLogin && touch" class="absolute-wrapper login-wrapper bg-white">
-        <div class="login-header">登录</div>
-        <el-divider />
-        <el-row>
-          <el-col :span="12" class="text-center">
-            <el-button class="login-card" @click="onClickThirdPartLogin">
-              <img src="/image/facebook.webp" alt="" class="login-icon" />
-              FaceBook登录
-            </el-button>
-          </el-col>
-          <el-col :span="12" class="text-center">
-            <el-button class="login-card" @click="onClickThirdPartLogin">
-              <img src="/image/twitter.webp" alt="" class="login-icon" />
-              Twitter登录
-            </el-button>
-          </el-col>
-        </el-row>
-        <el-row class="mt-4">
-          <el-col :span="12" class="text-center">
-            <el-button class="login-card" @click="onClickThirdPartLogin">
-              <img src="/image/google.webp" alt="" class="login-icon" />
-              Google登录
-            </el-button>
-          </el-col>
-          <el-col :span="12" class="text-center">
-            <el-button class="login-card" @click="onClickAronaLogin">
-              <img src="/image/arona.webp" alt="" class="login-icon" />
-              Arona登录
-            </el-button>
-          </el-col>
-        </el-row>
+      <div v-if="!showLogin && touch" class="absolute-wrapper login-wrapper">
+        <div class="login-wrapper-body" style="transform: translateY(-25%)">
+          <div class="login-header">Arona</div>
+          <div class="tips">请选择要进行游戏的登入方法</div>
+          <el-divider />
+          <el-row>
+            <el-col :span="12" class="text-center">
+              <el-button class="login-card" @click="onClickThirdPartLogin">
+                <span class="inner">
+                  <img src="/image/facebook.webp" alt="" />
+                  <span>FaceBook登录</span>
+                </span>
+              </el-button>
+            </el-col>
+            <el-col :span="12" class="text-center">
+              <el-button class="login-card" @click="onClickThirdPartLogin">
+                <span class="inner">
+                  <img src="/image/twitter.webp" alt="" />
+                  <span>Twitter登录</span>
+                </span>
+              </el-button>
+            </el-col>
+          </el-row>
+          <el-row class="mt-4">
+            <el-col :span="12" class="text-center">
+              <el-button class="login-card" @click="onClickThirdPartLogin">
+                <span class="inner">
+                  <img src="/image/google.webp" alt="" />
+                  <span>Google登录</span>
+                </span>
+              </el-button>
+            </el-col>
+            <el-col :span="12" class="text-center">
+              <el-button class="login-card" @click="onClickAronaLogin">
+                <span class="inner">
+                  <img src="/image/arona.webp" alt="" />
+                  <span>Arona登录</span>
+                </span>
+              </el-button>
+            </el-col>
+          </el-row>
+          <el-row class="mt-4">
+            <el-col :span="12" class="text-center">
+              <el-button class="login-card" @click="onClickThirdPartLogin">
+                <span class="inner">
+                  <el-icon><User /></el-icon>
+                  <span>以访客身份登入</span>
+                </span>
+              </el-button>
+            </el-col>
+          </el-row>
+          <div class="mt-4 tips">登入我们的服务即表示您同意我们的使用条款和隐私政策</div>
+        </div>
       </div>
     </transition>
     <div v-if="showLogin" class="absolute-wrapper arona-login-wrapper bg-white">
@@ -56,13 +78,12 @@
         >
       </div>
     </div>
-    <div class="start" v-if="!touch">
-      touch to start
-    </div>
+    <div v-if="!touch" class="start">touch to start</div>
   </VideoBackground>
 </template>
 
 <script setup lang="ts">
+import { User } from "@element-plus/icons-vue";
 // @ts-ignore
 import VideoBackground from "vue-responsive-video-background-player";
 import { infoMessage } from "@/utils/message";
@@ -71,7 +92,8 @@ defineOptions({
   name: "LoginIndex",
 });
 const showLogin = ref(false);
-const touch = ref(false);
+const touchCount = ref(0);
+const touch = computed(() => touchCount.value > 1);
 const code = ref("XXXXXX");
 function onClickThirdPartLogin() {
   infoMessage("没做");
@@ -81,8 +103,11 @@ function onClickAronaLogin() {
 }
 const video = ref<{ player: { play(): void } }>();
 function onClick() {
-  touch.value = true;
+  touchCount.value++;
   video.value?.player.play();
+}
+function onCloseLogin() {
+  touchCount.value = 1;
 }
 function onEnded() {
   // @ts-ignore
@@ -132,17 +157,41 @@ function onEnded() {
   transform: translate(-50%, -50%);
 }
 .login-wrapper {
-  width: 500px;
-  height: 200px;
+  width: 100%;
+  height: 100%;
+  background-color: #00000080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  .login-wrapper-body {
+    width: 500px;
+    height: 200px;
+  }
   .login-header {
     text-align: center;
     font-size: 24px;
+    color: white;
+    text-transform: uppercase;
   }
   .login-card {
     width: 80%;
-    .login-icon {
-      width: 1em;
-      margin-right: 8px;
+    :deep(> span) {
+      width: 100%;
+    }
+    :deep(.inner) {
+      width: 100%;
+      display: flex;
+      flex-direction: row;
+      img {
+        width: 1em;
+        margin-right: 8px;
+        transform: translateY(1px);
+      }
+      span {
+        text-align: center;
+        flex-grow: 1;
+      }
     }
   }
 }
@@ -156,5 +205,9 @@ function onEnded() {
   .code {
     font-size: 36px;
   }
+}
+.tips {
+  color: white;
+  font-size: 12px;
 }
 </style>

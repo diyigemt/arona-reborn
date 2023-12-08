@@ -13,7 +13,7 @@
             <!-- each archived file's size will be max 10MB -->
             <maxFileSize>10MB</maxFileSize>
             <!-- total size of all archive files, if total size > 100GB, it will delete old archived file -->
-            <totalSizeCap>100GB</totalSizeCap>
+            <totalSizeCap>10GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
             <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>

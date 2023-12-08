@@ -8,6 +8,7 @@ import codes.laurence.warden.policy.collections.CollectionBasedPolicy
 import com.diyigemt.arona.database.permission.PolicyNode.Companion.build
 import com.diyigemt.arona.database.permission.PolicyRule.Companion.build
 import kotlinx.serialization.Serializable
+import org.bson.codecs.pojo.annotations.BsonId
 import codes.laurence.warden.policy.Policy as P
 
 enum class PolicyNodeEffect {
@@ -97,6 +98,7 @@ internal typealias PolicyRoot = PolicyNode
 
 @Serializable
 internal data class Policy(
+  @BsonId
   val id: String,
   val name: String,
   val effect: PolicyNodeEffect,

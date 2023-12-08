@@ -83,6 +83,10 @@ internal data class UserDocument(
       find(uidFilter(uid)).limit(1).firstOrNull()
     }
 
+    suspend fun findUserDocumentByIdOrNull(id: String): UserDocument? = withCollection {
+      find(idFilter(id)).limit(1).firstOrNull()
+    }
+
     suspend fun UserDocument.updateUserContact(contactId: String) = withCollection<UserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),

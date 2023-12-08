@@ -6,12 +6,13 @@ import com.diyigemt.arona.utils.badRequest
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
+import com.diyigemt.arona.webui.endpoints.aronaUser
 import com.diyigemt.arona.webui.endpoints.request
 import io.ktor.server.application.*
 import io.ktor.util.pipeline.*
 
 data class AuthResp(
-  val status: String, // 0 1 2 无效 等待 成功
+  val status: Int, // 0 1 2 无效 等待 成功
   val token: String = "",
 )
 
@@ -32,7 +33,7 @@ object UserEndpoint {
       is String -> {
         when (val userId = redisDbQuery { get(token) }) {
           "1" -> {
-            success(AuthResp("1"))
+            success(AuthResp(1))
           }
 
           is String -> {
@@ -46,11 +47,11 @@ object UserEndpoint {
                 execute()
               }
             }
-            success(AuthResp("2", uuid))
+            success(AuthResp(2, uuid))
           }
 
           else -> {
-            success(AuthResp("0"))
+            success(AuthResp(0))
           }
         }
       }
@@ -77,10 +78,28 @@ object UserEndpoint {
       RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, it)
     }) {
       is String -> {
-
+        val res = redisDbQuery {
+          get(token)
+        }
+        when (res) {
+          null -> success(AuthResp(0))
+          "success" -> {
+            redisDbQuery {
+              del(token)
+            }
+            success(AuthResp(2))
+          }
+          else -> success(AuthResp(1))
+        }
       }
       else -> {
-
+        val password = generateNumber()
+        val key = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, password)
+        redisDbQuery {
+          set(key, aronaUser?.uid ?: "")
+          expire(key, 600u)
+        }
+        success(password)
       }
     }
   }

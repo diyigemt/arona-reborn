@@ -12,6 +12,7 @@ import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.Serializable
+import org.bson.codecs.pojo.annotations.BsonId
 
 @Serializable
 enum class ContactType {
@@ -23,12 +24,14 @@ enum class ContactType {
 
 @Serializable
 internal data class ContactRole(
+  @BsonId
   val id: String,
   val name: String,
 )
 
 @Serializable
 internal data class ContactMember(
+  @BsonId
   val id: String, // 指向UserDocument.id
   val name: String,
   val roles: List<String>, // 指向ContactDocument.roles.id
@@ -48,6 +51,7 @@ internal data class ContactMember(
 
 @Serializable
 internal data class ContactDocument(
+  @BsonId
   val id: String,
   val contactName: String = "",
   val contactType: ContactType = ContactType.Group,

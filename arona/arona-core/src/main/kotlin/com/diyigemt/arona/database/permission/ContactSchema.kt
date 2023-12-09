@@ -60,6 +60,12 @@ internal data class ContactDocument(
   var members: List<ContactMember> = listOf(),
   val registerTime: String = currentDateTime(),
 ) {
+  @Serializable
+  data class ContactDocumentWithName(
+    @BsonId
+    val id: String,
+    val contactName: String,
+  )
   companion object : DocumentCompanionObject {
     override val documentName = "Contact"
 
@@ -67,7 +73,6 @@ internal data class ContactDocument(
       find(idFilter(id)).limit(1).firstOrNull()
     }
 
-    fun ContactDocument.createRole(name: String) = ContactRole("", name)
     fun ContactDocument.createBaseAdminRole() = ContactRole("role.admin", "管理员")
     fun ContactDocument.createBaseMemberRole() = ContactRole("role.default", "普通成员")
     fun ContactDocument.findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
@@ -81,13 +86,13 @@ internal data class ContactDocument(
           withCollection<ContactDocument, UpdateResult> {
             updateOne(
               filter = idFilter(id),
-              update = Updates.addToSet("members", member)
+              update = Updates.addToSet(ContactDocument::members.name, member)
             )
           }
           withCollection<UserDocument, UpdateResult> {
             updateOne(
               filter = idFilter(member.id),
-              update = Updates.addToSet("contacts", id)
+              update = Updates.addToSet(UserDocument::contacts.name, id)
             )
           }
           member
@@ -103,8 +108,8 @@ internal data class ContactDocument(
         roles.firstOrNull { it.id == roleId } ?: return ContactDocumentUpdateException.RoleNotFoundException(roleId)
       withCollection<ContactDocument, UpdateResult> {
         updateOne(
-          filter = Filters.and(Filters.eq("_id", id), Filters.eq("member._id", memberId)),
-          update = Updates.addToSet("member.$.list", role.id)
+          filter = Filters.and(Filters.eq("_id", id), Filters.eq("${ContactDocument::members.name}._id", memberId)),
+          update = Updates.addToSet("${ContactDocument::members.name}.$.${ContactMember::roles.name}", role.id)
         )
       }
       return ContactDocumentUpdateException.Success()

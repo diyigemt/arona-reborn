@@ -90,10 +90,10 @@ internal data class UserDocument(
     suspend fun UserDocument.updateUserContact(contactId: String) = withCollection<UserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
-        update = Updates.addToSet("contacts", contactId)
+        update = Updates.addToSet(UserDocument::contacts.name, contactId)
       )
     }
   }
 }
 
-internal fun uidFilter(uid: String) = Filters.elemMatch("uid", Filters.eq(uid))
+internal fun uidFilter(uid: String) = Filters.elemMatch(UserDocument::uid.name, Filters.eq(uid))

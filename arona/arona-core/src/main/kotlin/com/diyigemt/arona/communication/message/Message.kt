@@ -232,7 +232,7 @@ internal data class TencentBotGroupEventRaw(
   val groupOpenId: String,
   @SerialName("op_member_openid")
   val opMemberId: String,
-  val timestamp: String
+  val timestamp: Long
 ) : ContactRaw {
   override val id get() = groupOpenId
 }

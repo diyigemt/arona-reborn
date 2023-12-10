@@ -17,6 +17,9 @@ suspend fun PipelineContext<Unit, ApplicationCall>.forbidden() = context.respond
 suspend fun PipelineContext<Unit, ApplicationCall>.internalServerError() =
   context.respond(HttpStatusCode.InternalServerError)
 
+suspend fun PipelineContext<Unit, ApplicationCall>.errorMessage(message: String) =
+  context.respond(ServerResponse(HttpStatusCode(601, message), null))
+
 suspend inline fun <reified T : Any> PipelineContext<Unit, ApplicationCall>.success(data: T) =
   context.respond(ServerResponse(data))
 

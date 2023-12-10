@@ -1,3 +1,4 @@
+@file:Suppress("unused")
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.command.CommandManager.register
@@ -8,10 +9,13 @@ import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.addMember
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
+import com.diyigemt.arona.database.permission.ContactDocument.Companion.updateContactDocumentName
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.updateMemberRole
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactType
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
+import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
 import com.diyigemt.arona.database.permission.UserDocument.Companion.updateUserContact
 import com.diyigemt.arona.database.permission.UserSchema
@@ -63,9 +67,26 @@ object BuiltInCommands {
     }
   }
 
-  object BindCommand : AbstractCommand(
+  object BindContactNameCommand : AbstractCommand(
     BuildInCommandOwner,
     "绑定",
+    help = "绑定群/频道名称"
+  ) {
+    private val name by argument("要设置的群名/频道名称")
+    suspend fun UserCommandSender.bindContactName() {
+      val contact = findContactDocumentByIdOrNull(subject.id)
+      if (contact == null) {
+        sendMessage("当前环境信息查找失败, 去翻文档看看怎么解决吧")
+        return
+      }
+      contact.updateContactDocumentName(name)
+      sendMessage("绑定成功")
+    }
+  }
+  // TODO 总之没做完
+  object BindCommand : AbstractCommand(
+    BuildInCommandOwner,
+    "绑定账号",
     help = "绑定已经注册的用户信息"
   ) {
     private val token by argument("在个人信息界面生成的唯一token")
@@ -75,9 +96,10 @@ object BuiltInCommands {
         get(bindKey)
       }) {
         is String -> {
-          // 拿到目标id
-          when (val user = findUserDocumentByUidOrNull(userId)) {
+          // 拿到绑定的用户本体
+          when (val user = findUserDocumentByIdOrNull(userId)) {
             is UserDocument -> {
+              // TODO 询问是否合并信息?
               redisDbQuery {
                 set(bindKey, "success")
                 expire(bindKey, 600u)
@@ -113,7 +135,7 @@ object BuiltInCommands {
           // 防止用户删了又加回来的情况
           val user = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
           val member = contact.addMember(user.id)
-          contact.updateMemberRole(member.id, "role.admin")
+          contact.updateMemberRole(member.id, DEFAULT_ADMIN_CONTACT_ROLE_ID)
         }
 
         else -> {

@@ -6,8 +6,8 @@ import codes.laurence.warden.enforce.EnforcementPointDefault
 import codes.laurence.warden.enforce.NotAuthorizedException
 import codes.laurence.warden.policy.bool.allOf
 import com.diyigemt.arona.database.permission.*
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.Policy.Companion.build
 import com.diyigemt.arona.permission.Permission.Companion.RootPermission
 import com.diyigemt.arona.permission.Permission.Companion.fullPermissionId
@@ -169,7 +169,7 @@ class ABACTest {
   fun testCheckPermission() {
     runBlocking {
       val contact = findContactDocumentByIdOrNull("") ?: return@runBlocking
-      val member = ContactMember("id", "成员", listOf("role.default"))
+      val member = ContactMember("id", "成员", listOf(DEFAULT_MEMBER_CONTACT_ROLE_ID))
       val permission = PermissionImpl(PermissionId("buildIn.owner", "admin"), "", RootPermission)
       val permission2 = PermissionImpl(PermissionId("com.diyigemt.arona", "*"), "", RootPermission)
       println(permission.testPermission(member, contact.policies))

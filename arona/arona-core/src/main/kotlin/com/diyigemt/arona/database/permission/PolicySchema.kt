@@ -2,9 +2,9 @@ package com.diyigemt.arona.database.permission
 
 import codes.laurence.warden.policy.bool.AllOf
 import codes.laurence.warden.policy.bool.AnyOf
-import codes.laurence.warden.policy.bool.allOf
-import codes.laurence.warden.policy.bool.anyOf
 import codes.laurence.warden.policy.collections.CollectionBasedPolicy
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.PolicyNode.Companion.build
 import com.diyigemt.arona.database.permission.PolicyRule.Companion.build
 import kotlinx.serialization.Serializable
@@ -126,7 +126,7 @@ internal data class Policy(
                 type = PolicyRuleType.Subject,
                 operator = PolicyRuleOperator.Contains,
                 key = "role",
-                value = "role.admin"
+                value = DEFAULT_ADMIN_CONTACT_ROLE_ID
               ),
               PolicyRule(
                 type = PolicyRuleType.Resource,
@@ -154,7 +154,7 @@ internal data class Policy(
                   type = PolicyRuleType.Subject,
                   operator = PolicyRuleOperator.Contains,
                   key = "roles",
-                  value = "role.default"
+                  value = DEFAULT_MEMBER_CONTACT_ROLE_ID
                 ),
                 PolicyRule(
                   type = PolicyRuleType.Resource,
@@ -178,7 +178,7 @@ internal data class Policy(
                   type = PolicyRuleType.Subject,
                   operator = PolicyRuleOperator.Contains,
                   key = "roles",
-                  value = "role.default"
+                  value = DEFAULT_MEMBER_CONTACT_ROLE_ID
                 ),
                 PolicyRule(
                   type = PolicyRuleType.Resource,

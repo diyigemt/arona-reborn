@@ -15,6 +15,11 @@ import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.hasAnnotation
 
+/**
+ * 被标记的类/方法不会被扫描
+ */
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
+internal annotation class ReflectionIgnore
 object ReflectionUtil : ReflectionUtils() {
   private val reflections by lazy {
     Reflections(ConfigurationBuilder().apply {
@@ -23,14 +28,29 @@ object ReflectionUtil : ReflectionUtils() {
     })
   }
 
-  fun <T : Annotation> scanTypeAnnotatedClass(annotation: KClass<T>) =
-    reflections.get(Scanners.TypesAnnotated.with(annotation.java))
+  fun <T : Annotation> scanTypeAnnotatedClass(annotation: KClass<T>): List<String> {
+    val ignores = reflections
+      .get(Scanners.TypesAnnotated.with(ReflectionIgnore::class.java))
+    val all = reflections
+      .get(Scanners.TypesAnnotated.with(annotation.java))
+      .filterNot { ignores.contains(it) }
+    return all
+  }
 
-  fun <T : Annotation> scanTypeAnnotatedClass(scanner: Reflections, annotation: KClass<T>) =
-    scanner.get(Scanners.TypesAnnotated.with(annotation.java))
+
+  fun <T : Annotation> scanTypeAnnotatedClass(scanner: Reflections, annotation: KClass<T>): List<String> {
+    val ignores = scanner
+      .get(Scanners.TypesAnnotated.with(ReflectionIgnore::class.java))
+    val all = scanner
+      .get(Scanners.TypesAnnotated.with(annotation.java))
+      .filterNot { ignores.contains(it) }
+    return all
+  }
 
   inline fun <reified T : Annotation> scanMethodWithAnnotated(clazz: KClass<*>) = clazz
-    .declaredFunctions.filter { it.hasAnnotation<T>() }
+    .declaredFunctions
+    .filterNot { it.hasAnnotation<ReflectionIgnore>() }
+    .filter { it.hasAnnotation<T>() }
 
   private fun <T : Any> scanInterfacePetClass(clazz: KClass<T>) = reflections.get(Scanners.SubTypes.with(clazz.java))
   private fun <T : Any> scanInterfacePetClass(scanner: Reflections, clazz: KClass<T>) =

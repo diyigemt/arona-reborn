@@ -3,6 +3,8 @@ package com.diyigemt.arona.database.permission
 import codes.laurence.warden.atts.HasAtts
 import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseContactAdminPolicy
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseMemberPolicy
 import com.diyigemt.arona.database.withCollection
@@ -27,7 +29,12 @@ internal data class ContactRole(
   @BsonId
   val id: String,
   val name: String,
-)
+) {
+  companion object {
+    internal const val DEFAULT_MEMBER_CONTACT_ROLE_ID = "role.default"
+    internal const val DEFAULT_ADMIN_CONTACT_ROLE_ID = "role.admin"
+  }
+}
 
 @Serializable
 internal data class ContactMember(
@@ -73,15 +80,22 @@ internal data class ContactDocument(
       find(idFilter(id)).limit(1).firstOrNull()
     }
 
-    fun ContactDocument.createBaseAdminRole() = ContactRole("role.admin", "管理员")
-    fun ContactDocument.createBaseMemberRole() = ContactRole("role.default", "普通成员")
+    fun ContactDocument.createBaseAdminRole() = ContactRole(DEFAULT_ADMIN_CONTACT_ROLE_ID, "管理员")
+    fun ContactDocument.createBaseMemberRole() = ContactRole(DEFAULT_MEMBER_CONTACT_ROLE_ID, "普通成员")
     fun ContactDocument.findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
-
+    suspend fun ContactDocument.updateContactDocumentName(name: String) {
+      withCollection<ContactDocument, UpdateResult> {
+        updateOne(
+          filter = idFilter(id),
+          update = Updates.set(ContactDocument::contactName.name, name)
+        )
+      }
+    }
     suspend fun ContactDocument.addMember(userId: String): ContactMember {
       return when (val existMember = members.firstOrNull { it.id == userId }) {
         is ContactMember -> existMember
         else -> {
-          val defaultRole = roles.first { it.id == "role.default" }
+          val defaultRole = roles.first { it.id == DEFAULT_MEMBER_CONTACT_ROLE_ID }
           val member = ContactMember(userId, "用户", listOf(defaultRole.id))
           withCollection<ContactDocument, UpdateResult> {
             updateOne(

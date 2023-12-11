@@ -550,7 +550,31 @@ data class TencentGuildImage(
   override val width: Int = 0
   override val size: Long = 0L
 }
+@Serializable
+data class TencentMarkdown(
+  @SerialName("custom_template_id")
+  val id: String,
+  val params: List<TencentMarkdownParam>,
+  val content: String? = null,
+)
 
+@Serializable
+data class TencentMarkdownParam(
+  val key: String,
+  val value: String
+) {
+  companion object {
+    class TencentMarkdownParamBuilder {
+      private val store: MutableList<TencentMarkdownParam> = mutableListOf()
+      fun append(key: String, value: String) = apply { store.add(TencentMarkdownParam(key, value)) }
+      fun build() = store.toList()
+    }
+  }
+}
+@Serializable
+data class TencentKeyboard(
+  val id: String
+) // TODO custom keyboard
 data class TencentAt(
   val target: String,
 ) : Message {
@@ -657,9 +681,9 @@ data class TencentMessage constructor(
   var image: String? = null,
   var media: TencentMessageMediaInfo? = null,
   @EncodeDefault
-  val markdown: String? = null,
+  var markdown: TencentMarkdown? = null,
   @EncodeDefault
-  val keyboard: String? = null,
+  var keyboard: TencentKeyboard? = null,
   @EncodeDefault
   val ark: String? = null,
   @SerialName("msg_id")
@@ -758,7 +782,7 @@ class TencentMessageBuilder private constructor(
     messageId = sourceMessageId,
     messageSequence = messageSequence
   ).apply {
-    when (val im = container.filterIsInstance<TencentImage>().firstOrNull()) {
+    when (val im = container.filterIsInstance<TencentImage>().lastOrNull()) {
       is TencentOfflineImage -> {
         messageType = TencentMessageType.FILE
         media = TencentMessageMediaInfo(
@@ -768,6 +792,21 @@ class TencentMessageBuilder private constructor(
       is TencentGuildImage -> {
         messageType = TencentMessageType.IMAGE
         image = im.url.encodeURLPath()
+      }
+      else -> {}
+    }
+  }.apply {
+    when (val md = container.filterIsInstance<TencentMarkdown>().lastOrNull()) {
+      is TencentMarkdown -> {
+        messageType = TencentMessageType.MARKDOWN
+        markdown = md
+      }
+      else -> {}
+    }
+    when (val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()) {
+      is TencentKeyboard -> {
+        messageType = TencentMessageType.MARKDOWN
+        keyboard = kb
       }
       else -> {}
     }

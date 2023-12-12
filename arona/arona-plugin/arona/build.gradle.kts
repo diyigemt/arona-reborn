@@ -7,7 +7,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.arona.Arona"
-version = "0.1.15"
+version = "0.1.16"
 dependencies {
   compileOnly(project(":arona-core"))
 

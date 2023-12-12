@@ -12,7 +12,7 @@ object Arona : AronaPlugin(
     id = "com.diyigemt.arona",
     name = "arona",
     author = "diyigemt",
-    version = "0.1.8",
+    version = "0.1.16",
     description = "hello world"
   )
 ) {

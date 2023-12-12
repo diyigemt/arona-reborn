@@ -556,17 +556,24 @@ data class TencentMarkdown(
   val id: String,
   val params: List<TencentMarkdownParam>,
   val content: String? = null,
-)
+) : Message {
+  constructor(id: String, block: TencentMarkdownParam.Companion.TencentMarkdownParamBuilder.() -> Unit) :
+      this(id, TencentMarkdownParam.Companion.TencentMarkdownParamBuilder().apply(block).build())
+
+  override fun serialization(): String {
+    TODO("Not yet implemented")
+  }
+}
 
 @Serializable
 data class TencentMarkdownParam(
   val key: String,
-  val value: String
+  val values: List<String>
 ) {
   companion object {
     class TencentMarkdownParamBuilder {
       private val store: MutableList<TencentMarkdownParam> = mutableListOf()
-      fun append(key: String, value: String) = apply { store.add(TencentMarkdownParam(key, value)) }
+      fun append(key: String, value: String) = apply { store.add(TencentMarkdownParam(key, listOf(value))) }
       fun build() = store.toList()
     }
   }
@@ -574,7 +581,12 @@ data class TencentMarkdownParam(
 @Serializable
 data class TencentKeyboard(
   val id: String
-) // TODO custom keyboard
+) : Message { // TODO custom keyboard
+  override fun serialization(): String {
+    TODO("Not yet implemented")
+  }
+}
+
 data class TencentAt(
   val target: String,
 ) : Message {

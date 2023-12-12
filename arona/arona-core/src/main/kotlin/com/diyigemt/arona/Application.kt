@@ -16,8 +16,8 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
-    BuiltInCommands.registerAll()
-    BuiltInCommands.registerListeners()
+//    BuiltInCommands.registerAll()
+//    BuiltInCommands.registerListeners()
     runSuspend {
       launchConsole()
     }

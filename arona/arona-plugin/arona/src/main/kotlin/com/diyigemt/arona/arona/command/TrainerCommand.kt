@@ -12,10 +12,7 @@ import com.diyigemt.arona.arona.tools.ServerResponse
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextMessage
 import com.diyigemt.arona.communication.command.*
-import com.diyigemt.arona.communication.message.MessageChainBuilder
-import com.diyigemt.arona.communication.message.PlainText
-import com.diyigemt.arona.communication.message.TencentGuildImage
-import com.diyigemt.arona.communication.message.TencentImage
+import com.diyigemt.arona.communication.message.*
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.coroutines.withTimeout
@@ -82,11 +79,14 @@ object TrainerCommand : AbstractCommand(
     getImage(arg).run {
       data?.run r1@{
         if (code != 200) {
-          sendMessage("没有与${arg}对应的信息, 是否想要输入:\n${
-            filterIndexed { index, _ -> index < 4 }
-              .mapIndexed { index, it -> "${index + 1}. /攻略 ${it.name}" }
-              .joinToString("\n")
-          }")
+          val md = TencentMarkdown("102057194_1702305572") {
+            append("search_target", arg)
+            filterIndexed { index, _ -> index < 4 }.forEachIndexed { index, it ->
+              append("option_${index + 1}", it.name)
+            }
+          }
+          val btn = TencentKeyboard("102057194_1702305246")
+          sendMessage(MessageChainBuilder().append(md).append(btn).build())
           withTimeout(50000) {
             nextMessage(filter = filter@{ event ->
               val fb = event.message.filterIsInstance<PlainText>().firstOrNull() ?: return@filter false

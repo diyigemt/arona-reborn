@@ -19,24 +19,24 @@
       </div>
     </div>
   </div>
-    <div class="menu">
-      <div class="filter">
-        <el-space class="menu-content" wrap>
-          <ShadowCard class="button-card kivotos" role="button" tabindex="0" @click="routerJump('/')">
-            <div>基沃托斯</div>
-          </ShadowCard>
-          <ShadowCard class="button-card arona" role="button" tabindex="1" @click="routerJump('/config')">
-            <div>设置</div>
-          </ShadowCard>
-          <ShadowCard class="button-card" style="opacity: 0; user-select: none; pointer-events: none">
-            <div>管理</div>
-          </ShadowCard>
-          <ShadowCard class="button-card setting" role="button" tabindex="2" @click="routerJump('/admin')">
-            <div>管理</div>
-          </ShadowCard>
-        </el-space>
-      </div>
+  <div class="menu">
+    <div class="filter">
+      <el-space class="menu-content" wrap>
+        <ShadowCard class="button-card kivotos" role="button" tabindex="0" @click="doNothing">
+          <div>基沃托斯</div>
+        </ShadowCard>
+        <ShadowCard class="button-card arona" role="button" tabindex="1" @click="routerJump('/config')">
+          <div>设置</div>
+        </ShadowCard>
+        <ShadowCard class="button-card" style="opacity: 0; user-select: none; pointer-events: none">
+          <div>管理</div>
+        </ShadowCard>
+        <ShadowCard class="button-card setting" role="button" tabindex="2" @click="doNothing">
+          <div>管理</div>
+        </ShadowCard>
+      </el-space>
     </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -60,6 +60,7 @@ import {
   WorkConfig,
 } from "@/constant/spine";
 import { deepCopy, pickRandomArrayItemAndPutBack, randomArrayItem, randomInt } from "@/utils";
+import { infoMessage } from "@/utils/message";
 
 let mainApp: Application;
 const backgroundContainer = ref<HTMLElement>();
@@ -103,12 +104,17 @@ const chatStyleStatic = {
 const VoiceResourceUrl = "https://yuuka.cdn.diyigemt.com/image/home_page/voice/";
 const SpineResourceUrl = "https://yuuka.cdn.diyigemt.com/image/home_page/spine/";
 const ImageResourceUrl = "https://yuuka.cdn.diyigemt.com/image/home_page/image/";
-const PlanaHome = ["UIWorkPlanaSit",
+const PlanaHome = [
+  "UIWorkPlanaSit",
   "UIWorkPlanaCabinet",
   "UIWorkPlanaUmbrella",
   "UIWorkCoexist_PlanaWatchSky",
-  "UIWorkCoexist_PlanaSitPeek"];
-
+  "UIWorkCoexist_PlanaSitPeek",
+];
+let randomTalkVoiceList: VoiceGroup[] = [];
+function stopListVoice(list: VoiceGroup) {
+  list.forEach((voice) => sound.stop(voice.voice));
+}
 function initBackground(el: HTMLElement) {
   const backgroundStyle = getComputedStyle(el);
   backgroundWidth = styleToPxNumber(backgroundStyle.width);
@@ -118,7 +124,7 @@ function initBackground(el: HTMLElement) {
   standardRate = backgroundWidth / standardWidth;
   middleOffset = (backgroundHeight - viewHeight) / 2;
   const animationConfig = randomArrayItem(PlanaPageAnimationConfig);
-  const appearArona = PlanaHome.indexOf(animationConfig.name) == -1;
+  const appearArona = PlanaHome.indexOf(animationConfig.name) === -1;
   // const animationConfig = PlanaPageAnimationConfig[8];
   const interactionPoint = animationConfig.interaction;
   const disappearMaskPaths = animationConfig.masks.map((it) => it.path);
@@ -127,40 +133,40 @@ function initBackground(el: HTMLElement) {
   const exitVoiceList = animationConfig.voice.exit;
   const aronaWorkVoiceList = WorkConfig.arona;
   const planaWorkVoiceList = WorkConfig.plana;
-  let randomTalkVoiceList = [...deepCopy(talkVoiceList), ...deepCopy(inVoiceList)];
+  randomTalkVoiceList = [...deepCopy(talkVoiceList), ...deepCopy(inVoiceList)];
   const randomInVoice = randomArrayItem(inVoiceList);
   const randomExitVoice = randomArrayItem(exitVoiceList);
   randomInVoice.forEach((voice) => {
     sound.add(voice.voice, {
-      url: `${ VoiceResourceUrl }${ voice.voice }.mp3`,
+      url: `${VoiceResourceUrl}${voice.voice}.mp3`,
       preload: true,
     });
   });
   randomExitVoice.forEach((voice) => {
     sound.add(voice.voice, {
-      url: `${ VoiceResourceUrl }${ voice.voice }.mp3`,
+      url: `${VoiceResourceUrl}${voice.voice}.mp3`,
     });
   });
   sound.add("mute", {
-    url: `${ VoiceResourceUrl }Mute.mp3`,
+    url: `${VoiceResourceUrl}Mute.mp3`,
     preload: true,
   });
   sound.add("sensei-arona", {
-    url: `${ VoiceResourceUrl }Arona_Default_TTS.mp3`,
+    url: `${VoiceResourceUrl}Arona_Default_TTS.mp3`,
   });
   sound.add("sensei-plana", {
-    url: `${ VoiceResourceUrl }NP0035_Default_TTS.mp3`,
+    url: `${VoiceResourceUrl}NP0035_Default_TTS.mp3`,
   });
   randomTalkVoiceList.flat().forEach((voice) => {
     sound.add(voice.voice, {
-      url: `${ VoiceResourceUrl }${ voice.voice }.mp3`,
+      url: `${VoiceResourceUrl}${voice.voice}.mp3`,
     });
   });
   aronaWorkVoiceList.forEach((voice) => {
     voice.voice.forEach((name) => {
       const fName = name.indexOf("CALLNAME") !== -1 ? "Arona_Default_TTS" : name;
       sound.add(fName, {
-        url: `${ VoiceResourceUrl }${ fName }.mp3`,
+        url: `${VoiceResourceUrl}${fName}.mp3`,
       });
     });
   });
@@ -168,25 +174,25 @@ function initBackground(el: HTMLElement) {
     voice.voice.forEach((name) => {
       const fName = name.indexOf("CALLNAME") !== -1 ? "NP0035_Default_TTS" : name;
       sound.add(fName, {
-        url: `${ VoiceResourceUrl }${ fName }.mp3`,
+        url: `${VoiceResourceUrl}${fName}.mp3`,
       });
     });
   });
-  const app = new Application({width: backgroundWidth, height: backgroundHeight});
+  const app = new Application({ width: backgroundWidth, height: backgroundHeight });
   (window as any).__PIXI_APP__ = app;
-  app.view.style.transform = `translateY(${ -middleOffset }px) scale(${ superResolutionBack })`;
+  app.view.style.transform = `translateY(${-middleOffset}px) scale(${superResolutionBack})`;
   app.view.style.transformOrigin = "0";
   el.appendChild(app.view);
   app.stage.sortableChildren = true;
   // app.loader.add("space", `${SpineResourceUrl}${animationConfig.space}`);
-  app.loader.add("space", `${ SpineResourceUrl }${ animationConfig.space }`);
+  app.loader.add("space", `${SpineResourceUrl}${animationConfig.space}`);
   disappearMaskPaths.forEach((it, index) => {
-    app.loader.add(`disappearMask-${ index }`, `${ ImageResourceUrl }${ it }`);
+    app.loader.add(`disappearMask-${index}`, `${ImageResourceUrl}${it}`);
   });
-  app.loader.add("arona", `${ SpineResourceUrl }arona_spr.skel`);
-  app.loader.add("aronaMask", `${ ImageResourceUrl }FX_TEX_Arona_Stand.png`);
-  app.loader.add("plana", `${ SpineResourceUrl }NP0035_spr.skel`);
-  app.loader.add("planaMask", `${ ImageResourceUrl }FX_TEX_Plana_Stand.png`);
+  app.loader.add("arona", `${SpineResourceUrl}arona_spr.skel`);
+  app.loader.add("aronaMask", `${ImageResourceUrl}FX_TEX_Arona_Stand.png`);
+  app.loader.add("plana", `${SpineResourceUrl}NP0035_spr.skel`);
+  app.loader.add("planaMask", `${ImageResourceUrl}FX_TEX_Plana_Stand.png`);
   app.stage.interactive = true;
   (window as any).__PIXI_APP = app;
 
@@ -221,10 +227,6 @@ function initBackground(el: HTMLElement) {
     };
   }
 
-  function stopListVoice(list: VoiceGroup) {
-    list.forEach((voice) => sound.stop(voice.voice));
-  }
-
   function playIdleVoice() {
     // clearChatDialog();
     const pickResult = pickRandomArrayItemAndPutBack(randomTalkVoiceList);
@@ -256,22 +258,22 @@ function initBackground(el: HTMLElement) {
       },
     });
     const disappearMasks = loadMask(
-      disappearMaskPaths.map((_0, index) => Reflect.get(resources, `disappearMask-${ index }`)),
+      disappearMaskPaths.map((_0, index) => Reflect.get(resources, `disappearMask-${index}`)),
       app.stage,
       animationConfig.masks,
       animationConfig.masks.map((it) => it.path.indexOf("Arona") !== -1),
     );
     const resourceKey = appearArona ? "arona" : "plana";
     const positionKey = appearArona ? 0 : 1;
-    const {waifu, container} = loadWaifuSpine(
+    const { waifu, container } = loadWaifuSpine(
       Reflect.get(resources, resourceKey),
       app.stage,
-      Reflect.get(WaifuAppearConfig, resourceKey).position[positionKey]
+      Reflect.get(WaifuAppearConfig, resourceKey).position[positionKey],
     );
     const AppearEmitterConfig = appearArona ? AronaEmitterConfig : PlanaEmitterConfig;
     const AppearEmitter = loadEmitter(
       container,
-      [{scale: 3, offset: {x: 0, y: 0}, config: AppearEmitterConfig}],
+      [{ scale: 3, offset: { x: 0, y: 0 }, config: AppearEmitterConfig }],
       false,
     )[0];
     const MaskKey = appearArona ? "aronaMask" : "planaMask";
@@ -303,7 +305,7 @@ function initBackground(el: HTMLElement) {
       new Promise<void>((resolve) => {
         const text = pickResult.textJP;
         playListVoice(
-          pickResult.voice.map((it) => ({AnimationName: "", textJP: "", voice: it})),
+          pickResult.voice.map((it) => ({ AnimationName: "", textJP: "", voice: it })),
           resolve,
           stereo,
         );
@@ -440,7 +442,7 @@ function loadMask(
     const sprite = Sprite.from(resource.texture!);
     sprite.alpha = 0.8;
     sprite.filters = [
-      new AdvancedBloomFilter({bloomScale: 1.5, brightness: 1.5}),
+      new AdvancedBloomFilter({ bloomScale: 1.5, brightness: 1.5 }),
       new ColorOverlayFilter(arona[index] ? AronaColor : PlanaColor, 1),
     ];
     sprite.scale.set(baseScaleRate * config[index].scale);
@@ -489,7 +491,7 @@ function loadEmitter(app: Container, configs: EmitterConfig[], loadOffset = true
   return configs.map((config) => {
     const sourceParticleContainer = new Container();
     sourceParticleContainer.visible = false;
-    sourceParticleContainer.filters = [new AdvancedBloomFilter({bloomScale: 3, brightness: 1.5})];
+    sourceParticleContainer.filters = [new AdvancedBloomFilter({ bloomScale: 3, brightness: 1.5 })];
     sourceParticleContainer.position.set(baseScaleRate * config.offset.x, baseScaleRate * config.offset.y);
     sourceParticleContainer.scale.set(baseScaleRate * config.scale);
     sourceParticleContainer.zIndex = 10;
@@ -595,6 +597,9 @@ const router = useRouter();
 function routerJump(path: string) {
   router.push(path);
 }
+function doNothing() {
+  infoMessage("没做");
+}
 
 onMounted(() => {
   mainApp = initBackground(backgroundContainer.value!);
@@ -608,6 +613,9 @@ onUnmounted(() => {
     }
   }
   clearTimeout(randomTalkVoiceIntervalHandler.timeout);
+  randomTalkVoiceList.forEach((it) => {
+    stopListVoice(it);
+  });
   if (randomTalkVoiceIntervalHandler.stop) {
     randomTalkVoiceIntervalHandler.stop();
   }
@@ -729,26 +737,44 @@ $button-card-size: 200px;
       rgba(240, 240, 240, 0.1) 0%,
       rgba(240, 240, 240, 0.1) 30%,
       rgba(240, 240, 240, 1) 70%
-  ),
-  url("/image/poli-light.png"), url("/image/BG_View_Kivotos.jpg");
+    ),
+    url("/image/poli-light.png"), url("/image/BG_View_Kivotos.jpg");
   background-repeat: no-repeat;
-  background-position: 100% 100%, 20% 20%, 35% 75%;
-  background-size: auto, auto, 300% 300%;
+  background-position:
+    100% 100%,
+    20% 20%,
+    35% 75%;
+  background-size:
+    auto,
+    auto,
+    300% 300%;
 }
 
 .setting {
   background: linear-gradient(340deg, rgba(240, 240, 240, 0.1) 0%, rgba(240, 240, 240, 0.1) 30%, rgb(240, 240, 240) 70%),
-  url("/image/poli-light.png"), url("/image/BG_CS_PR_05.jpg");
+    url("/image/poli-light.png"), url("/image/BG_CS_PR_05.jpg");
   background-repeat: no-repeat;
-  background-position: 100% 100%, 20% 20%, 50%;
-  background-size: auto, auto, 200% 150%;
+  background-position:
+    100% 100%,
+    20% 20%,
+    50%;
+  background-size:
+    auto,
+    auto,
+    200% 150%;
 }
 
 .arona {
   background: linear-gradient(340deg, rgba(240, 240, 240, 0.1) 0%, rgba(240, 240, 240, 0.1) 30%, rgb(240, 240, 240) 70%),
-  url("/image/poli-light.png"), url("/image/BG_CS_PR_03.jpg");
+    url("/image/poli-light.png"), url("/image/BG_CS_PR_03.jpg");
   background-repeat: no-repeat;
-  background-position: 100% 100%, 20% 20%, 50%;
-  background-size: auto, auto, 200% 200%;
+  background-position:
+    100% 100%,
+    20% 20%,
+    50%;
+  background-size:
+    auto,
+    auto,
+    200% 200%;
 }
 </style>

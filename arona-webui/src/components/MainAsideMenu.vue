@@ -4,7 +4,13 @@
       <template #title>
         <span>策略</span>
       </template>
-      <el-menu-item index="/config/config/config-arona-policy">策略配置</el-menu-item>
+      <el-menu-item index="/config/config/config-policy">策略配置</el-menu-item>
+    </el-sub-menu>
+    <el-sub-menu index="2">
+      <template #title>
+        <span>插件偏好</span>
+      </template>
+      <el-menu-item index="/config/config/config-arona-preferences">Arona</el-menu-item>
     </el-sub-menu>
   </el-menu>
 </template>

@@ -123,6 +123,7 @@ function onEnded() {
 .start {
   position: absolute;
   pointer-events: none;
+  opacity: 0.6;
   bottom: 8%;
   left: 50%;
   transform: translateX(-50%);

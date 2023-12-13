@@ -1,16 +1,19 @@
 package com.diyigemt.arona.database.permission
 
+import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.database.*
 import com.diyigemt.arona.database.AronaDatabase
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
 import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.SystemPropertiesSchema
+import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.bson.codecs.pojo.annotations.BsonId
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
@@ -57,7 +60,7 @@ internal class UserSchema(id: EntityID<String>) : Entity<String>(id) {
 }
 
 @Serializable
-internal data class UserDocument(
+data class UserDocument(
   @BsonId
   val id: String, // 自己定义的唯一id
   val username: String = "Arona用户$id", // 显示在前端的用户名
@@ -66,6 +69,7 @@ internal data class UserDocument(
   val uid: List<String> = listOf(), // 藤子给定的不同聊天环境下的id
   val contacts: List<String> = listOf(), // 存在的不同的群/频道的id
   val policies: List<Policy> = listOf(), // 用户自定义的规则
+  val config: Map<String, Map<String, String>> = mapOf(), // 用户自定义的,插件专有的配置项
 ) {
   companion object : DocumentCompanionObject {
     override val documentName = "User"
@@ -92,6 +96,24 @@ internal data class UserDocument(
         filter = idFilter(id),
         update = Updates.addToSet(UserDocument::contacts.name, contactId)
       )
+    }
+
+    inline fun <reified T> UserDocument.readConfigOrNull(plugin: CommandOwner, key: String): T? {
+      return config[plugin.permission.id.nameSpace]?.get(key)?.let {
+        JsonIgnoreUnknownKeys.decodeFromString(it)
+      }
+    }
+
+    inline fun <reified T> UserDocument.readConfigOrDefault(plugin: CommandOwner, key: String, default: T): T {
+      return config[plugin.permission.id.nameSpace]?.get(key)?.let {
+        JsonIgnoreUnknownKeys.decodeFromString(it)
+      } ?: default
+    }
+
+    inline fun <reified T> UserDocument.readConfig(plugin: CommandOwner, key: String): T {
+      return config[plugin.permission.id.nameSpace]!![key]!!.let {
+        JsonIgnoreUnknownKeys.decodeFromString(it)
+      }
     }
   }
 }

@@ -1,8 +1,8 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
+import com.diyigemt.arona.arona.config.MarkdownCompatiblyConfig
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.image.ImageCacheContactType
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
 import com.diyigemt.arona.arona.database.image.update
@@ -11,8 +11,11 @@ import com.diyigemt.arona.arona.tools.NetworkTool
 import com.diyigemt.arona.arona.tools.ServerResponse
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextMessage
-import com.diyigemt.arona.communication.command.*
+import com.diyigemt.arona.communication.command.CommandSender
+import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.database.permission.UserDocument.Companion.readConfigOrDefault
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.coroutines.withTimeout
@@ -79,14 +82,23 @@ object TrainerCommand : AbstractCommand(
     getImage(arg).run {
       data?.run r1@{
         if (code != 200) {
-          val md = TencentMarkdown("102057194_1702305572") {
-            append("search_target", arg)
-            filterIndexed { index, _ -> index < 4 }.forEachIndexed { index, it ->
-              append("option_${index + 1}", it.name)
+          val mdConfig = userDocument().readConfigOrDefault(Arona, "md", MarkdownCompatiblyConfig())
+          if (mdConfig.enable) {
+            val md = TencentMarkdown("102057194_1702305572") {
+              append("search_target", arg)
+              filterIndexed { index, _ -> index < 4 }.forEachIndexed { index, it ->
+                append("option_${index + 1}", it.name)
+              }
             }
+            val btn = TencentKeyboard("102057194_1702305246")
+            sendMessage(MessageChainBuilder().append(md).append(btn).build())
+          } else {
+            sendMessage("没有与${arg}对应的信息, 是否想要输入:\n${
+              filterIndexed { index, _ -> index < 4 }
+                .mapIndexed { index, it -> "${index + 1}. /攻略 ${it.name}" }
+                .joinToString("\n")
+            }")
           }
-          val btn = TencentKeyboard("102057194_1702305246")
-          sendMessage(MessageChainBuilder().append(md).append(btn).build())
           withTimeout(50000) {
             nextMessage(filter = filter@{ event ->
               val fb = event.message.filterIsInstance<PlainText>().firstOrNull() ?: return@filter false

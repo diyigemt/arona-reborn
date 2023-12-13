@@ -42,7 +42,7 @@ enum class PolicyRuleOperator {
 }
 
 @Serializable
-internal data class PolicyRule(
+data class PolicyRule(
   val type: PolicyRuleType,
   val operator: PolicyRuleOperator,
   val key: String,
@@ -75,7 +75,7 @@ internal data class PolicyRule(
 }
 
 @Serializable
-internal data class PolicyNode(
+data class PolicyNode(
   val groupType: PolicyNodeGroupType,
   val rule: List<PolicyRule>? = null, // 当children == null是认为是叶子节点
   val children: List<PolicyNode>? = null,
@@ -94,10 +94,10 @@ internal data class PolicyNode(
 
   }
 }
-internal typealias PolicyRoot = PolicyNode
+typealias PolicyRoot = PolicyNode
 
 @Serializable
-internal data class Policy(
+data class Policy(
   @BsonId
   val id: String,
   val name: String,

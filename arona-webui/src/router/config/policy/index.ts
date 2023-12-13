@@ -10,15 +10,23 @@ const PolicyRouter: Array<RouteRecordRaw> = [
     children: [
       {
         path: "",
-        redirect: "config-arona-policy",
+        redirect: "config-policy",
       },
       {
-        path: "config-arona-policy",
-        name: "config-arona-policy",
+        path: "config-policy",
+        name: "config-policy",
         meta: {
           title: "策略配置",
         },
         component: () => import("@/views/config/policy/UserPolicy.vue"),
+      },
+      {
+        path: "config-arona-preferences",
+        name: "config-arona-preferences",
+        meta: {
+          title: "Arona偏好设置",
+        },
+        component: () => import("@/views/config/plugin/AronaPreferences.vue"),
       },
     ],
   },

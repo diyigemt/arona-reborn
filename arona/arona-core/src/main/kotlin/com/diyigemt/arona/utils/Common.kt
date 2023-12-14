@@ -13,6 +13,7 @@ import kotlinx.datetime.*
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import java.util.UUID
+import kotlin.reflect.KClass
 
 typealias SemVersion = Version
 
@@ -70,3 +71,6 @@ fun Logger.error(exception: Throwable) = error(exception.message ?: "Exception o
 fun uuid(prefix: String = "") = if (prefix.isNotBlank()) "$prefix.${UUID.randomUUID()}" else UUID.randomUUID().toString()
 
 val JsonIgnoreUnknownKeys = Json { ignoreUnknownKeys = true }
+
+val KClass<*>.name
+  get() = simpleName ?: qualifiedName ?: "<anonymous>"

@@ -8,6 +8,7 @@ import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.SystemPropertiesSchema
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
+import com.diyigemt.arona.utils.name
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
@@ -98,23 +99,33 @@ data class UserDocument(
       )
     }
 
-    inline fun <reified T> UserDocument.readConfigOrNull(plugin: CommandOwner, key: String): T? {
-      return config[plugin.permission.id.nameSpace]?.get(key)?.let {
+    inline fun <reified T> UserDocument.readConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
+      readConfigOrNull<T>(plugin.permission.id.nameSpace, key)
+
+    inline fun <reified T> UserDocument.readConfigOrDefault(plugin: CommandOwner, key: String = T::class.name, default: T) =
+      readConfigOrDefault<T>(plugin.permission.id.nameSpace, key, default)
+
+    inline fun <reified T> UserDocument.readConfig(plugin: CommandOwner, key: String = T::class.name) =
+      readConfig<T>(plugin.permission.id.nameSpace, key)
+
+    inline fun <reified T> UserDocument.readConfigOrNull(pluginId: String, key: String = T::class.name): T? {
+      return config[pluginId]?.get(key)?.let {
         JsonIgnoreUnknownKeys.decodeFromString(it)
       }
     }
 
-    inline fun <reified T> UserDocument.readConfigOrDefault(plugin: CommandOwner, key: String, default: T): T {
-      return config[plugin.permission.id.nameSpace]?.get(key)?.let {
+    inline fun <reified T> UserDocument.readConfigOrDefault(pluginId: String, key: String = T::class.name, default: T): T {
+      return config[pluginId]?.get(key)?.let {
         JsonIgnoreUnknownKeys.decodeFromString(it)
       } ?: default
     }
 
-    inline fun <reified T> UserDocument.readConfig(plugin: CommandOwner, key: String): T {
-      return config[plugin.permission.id.nameSpace]!![key]!!.let {
+    inline fun <reified T> UserDocument.readConfig(pluginId: String, key: String = T::class.name): T {
+      return config[pluginId]!![key]!!.let {
         JsonIgnoreUnknownKeys.decodeFromString(it)
       }
     }
+
   }
 }
 

@@ -1,5 +1,7 @@
 package com.diyigemt.arona.webui.endpoints
 
+import com.diyigemt.arona.database.permission.UserDocument
+import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.UserSchema
 import com.diyigemt.arona.webui.plugins.AronaAdminToken
 import com.diyigemt.arona.webui.plugins.AronaInstanceVersion
@@ -12,7 +14,6 @@ import io.ktor.server.request.*
 import io.ktor.util.*
 import io.ktor.util.logging.*
 import io.ktor.util.pipeline.*
-import java.util.*
 
 val PipelineContext<Unit, ApplicationCall>.version: String?
   get() = request.header(HttpHeaders.AronaInstanceVersion)
@@ -29,11 +30,15 @@ val PipelineContext<Unit, ApplicationCall>.ip: String
 val PipelineContext<Unit, ApplicationCall>.request: ApplicationRequest
   get() = context.request
 
-private val ContextUserAttrKey = AttributeKey<UserSchema>("user")
+private val ContextUserAttrKey = AttributeKey<UserDocument>("user")
 
-internal var PipelineContext<Unit, ApplicationCall>.aronaUser: UserSchema?
+internal var PipelineContext<Unit, ApplicationCall>._aronaUser: UserDocument?
   get() = context.attributes.getOrNull(ContextUserAttrKey)
-  set(value) = context.attributes.put(ContextUserAttrKey, value as UserSchema)
+  set(value) = context.attributes.put(ContextUserAttrKey, value as UserDocument)
+
+internal val PipelineContext<Unit, ApplicationCall>.aronaUser: UserDocument
+  get() = context.attributes[ContextUserAttrKey]
+
 
 @Suppress("unused")
 @AronaBackendEndpoint("")
@@ -52,8 +57,10 @@ object LoggerInterceptor {
       else -> if (isJsonPost) context.receiveText() else "post blob data"
     }
     val method = context.request.httpMethod.value
-    this.authorization?.let { UserSchema.findById(it) }?.also {
-      this.aronaUser = it
+    this.authorization?.let {
+      findUserDocumentByIdOrNull(it)
+    }?.also {
+      this._aronaUser = it
     }
   }
 

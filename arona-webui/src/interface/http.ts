@@ -12,11 +12,13 @@ export interface IRequestConfig<D = any> extends AxiosRequestConfig<D> {
   isBlob?: boolean;
 }
 
+// @ts-ignore
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface IResponseError<T = any, D = any> extends AxiosError<T, D> {
   config: IRequestConfig<D>;
 }
 
+// @ts-ignore
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface IResponse<T = any, D = any> extends AxiosResponse<T, D> {
   config: IRequestConfig<D>;

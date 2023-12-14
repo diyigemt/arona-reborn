@@ -2,11 +2,10 @@ package com.diyigemt.arona.webui.endpoints.user
 
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
-import com.diyigemt.arona.utils.badRequest
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
-import com.diyigemt.arona.webui.endpoints.aronaUser
+import com.diyigemt.arona.webui.endpoints._aronaUser
 import com.diyigemt.arona.webui.endpoints.request
 import io.ktor.server.application.*
 import io.ktor.util.pipeline.*
@@ -96,7 +95,7 @@ object UserEndpoint {
         val password = generateNumber()
         val key = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, password)
         redisDbQuery {
-          set(key, aronaUser?.uid ?: "")
+          set(key, _aronaUser?.uid ?: "")
           expire(key, 600u)
         }
         success(password)

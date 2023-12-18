@@ -16,8 +16,8 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
-//    BuiltInCommands.registerAll()
-//    BuiltInCommands.registerListeners()
+    BuiltInCommands.registerAll()
+    BuiltInCommands.registerListeners()
     runSuspend {
       launchConsole()
     }
@@ -26,8 +26,8 @@ object AronaApplication : CoroutineScope {
     TencentBotClient.invoke(aronaConfig.bot).auth()
     val environment = applicationEngineEnvironment {
       connector {
-        port = 8081
-        host = "0.0.0.0"
+        port = 8080
+        host = "127.0.0.1"
       }
       rootPath = "/api/v1"
       module(Application::module)

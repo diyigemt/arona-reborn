@@ -3,8 +3,10 @@ package com.diyigemt.arona.command
 
 import com.diyigemt.arona.command.CommandManager.register
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
+import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.addMember
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
@@ -12,6 +14,7 @@ import com.diyigemt.arona.database.permission.ContactDocument.Companion.findCont
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.updateContactDocumentName
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.updateMemberRole
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactType
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
@@ -38,15 +41,17 @@ object BuiltInCommands {
       val tokenKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, token)
       if (redisDbQuery { get(tokenKey) } == "1") {
         val documentUser = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
-        when (val saveUser = UserSchema.findById(user.id)) {
+        when (val saveUser = sqlDbQuery { UserSchema.findById(user.id) }) {
           is UserSchema -> {
             saveUser.uid = documentUser.id
           }
 
           else -> {
-            UserSchema.new(user.id) {
-              from = subject.id
-              uid = documentUser.id
+            sqlDbQuery {
+              UserSchema.new(user.id) {
+                from = subject.id
+                uid = documentUser.id
+              }
             }.also {
               if (it.id.value !in documentUser.uid) {
                 documentUser.updateUserContact(subject.id)
@@ -121,20 +126,7 @@ object BuiltInCommands {
     GlobalEventChannel.subscribeAlways<TencentBotUserChangeEvent> {
       when (it) {
         is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> {
-          // 检查有无记录, 无则创建并初始化
-          val contact = findContactDocumentByIdOrNull(it.subject.id) ?: createContactDocument(
-            it.subject.id,
-            when (it) {
-              is TencentFriendAddEvent -> ContactType.Private
-              is TencentGroupAddEvent -> ContactType.Group
-              is TencentGuildAddEvent -> ContactType.Guild
-              else -> ContactType.PrivateGuild
-            }
-          )
-          // 防止用户删了又加回来的情况
-          val user = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
-          val member = contact.addMember(user.id)
-          contact.updateMemberRole(member.id, DEFAULT_ADMIN_CONTACT_ROLE_ID)
+          createContactAndUser(it.subject, it.user, DEFAULT_ADMIN_CONTACT_ROLE_ID)
         }
 
         else -> {
@@ -142,6 +134,31 @@ object BuiltInCommands {
         }
       }
     }
+
+    GlobalEventChannel.subscribeAlways<TencentMessageEvent> {
+      createContactAndUser(it.subject, it.sender, DEFAULT_MEMBER_CONTACT_ROLE_ID)
+    }
+  }
+
+  private suspend fun createContactAndUser(contact: Contact, user: User, role: String) {
+    val contactDocument = findContactDocumentByIdOrNull(contact.id)?.run {
+      return
+    } ?: createContactDocument(
+      contact.id,
+      when (contact) {
+        is FriendUser -> ContactType.Private
+        is Group -> ContactType.Group
+        is Guild, is Channel -> ContactType.Guild
+        else -> ContactType.PrivateGuild
+      }
+    )
+
+    // 防止用户删了又加回来的情况
+    val userDocument = findUserDocumentByUidOrNull(user.id)?.run {
+      return
+    } ?: createUserDocument(user.id, contact.id)
+    val member = contactDocument.addMember(userDocument.id)
+    contactDocument.updateMemberRole(member.id, role)
   }
 
 }

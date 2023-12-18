@@ -43,6 +43,12 @@ internal class TencentMessageIntentsBuilder {
     append(TencentMessageIntentSuperType.PUBLIC_GUILD_MESSAGES)
   }
 
+  fun buildGuildBot() = this.apply {
+    append(TencentMessageIntentSuperType.GUILDS)
+    append(TencentMessageIntentSuperType.DIRECT_MESSAGE)
+    append(TencentMessageIntentSuperType.PUBLIC_GUILD_MESSAGES)
+  }
+
   fun buildAll() = this.apply {
     append(TencentMessageIntentSuperType.entries.toTypedArray())
   }.build()

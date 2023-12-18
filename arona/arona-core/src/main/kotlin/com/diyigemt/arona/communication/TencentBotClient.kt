@@ -167,7 +167,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
                 token = botToken,
                 intents = TencentMessageIntentsBuilder().apply {
                   if (this@TencentBotClient.isPublic) buildPublicBot()
-                  else append(TencentMessageIntentSuperType.DIRECT_MESSAGE)
+                  else buildGuildBot()
                 }
                   .build(),
                 shard = listOf(0, 1)

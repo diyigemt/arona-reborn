@@ -44,6 +44,7 @@ declare module 'vue' {
     MainAsideMenu: typeof import('./components/MainAsideMenu.vue')['default']
     MainBanner: typeof import('./components/MainBanner.vue')['default']
     PageHeader: typeof import('./components/PageHeader.vue')['default']
+    PluginPreferenceForm: typeof import('./components/plugin/PluginPreferenceForm.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ShadowCard: typeof import('./components/ShadowCard.vue')['default']

@@ -157,7 +157,7 @@ internal suspend fun executeCommandImpl(
   val commandStr =
     messageString.split(" ").toMutableList().removeFirstOrNull() ?: return CommandExecuteResult.UnresolvedCommand()
   val command =
-    CommandManager.matchCommand(commandStr.replace("/", "")) as? AbstractCommand ?: return CommandExecuteResult
+    CommandManager.matchCommand(commandStr.replaceFirst("/", "")) as? AbstractCommand ?: return CommandExecuteResult
       .UnresolvedCommand()
   if (checkPermission) {
     val document = caller.subject?.toContactDocumentOrNull()

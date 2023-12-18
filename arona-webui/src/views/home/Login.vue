@@ -70,7 +70,13 @@
       <div>
         <div class="text-2xl">您的登录认证码为:</div>
         <div class="text-4xl arona-color m-8">{{ code }}</div>
-        <el-text
+        <div>
+          <ElButton :disabled="countDown > 0" @click="onClickGetCode"
+            >重新获取 <span v-if="countDown">({{ countDown }})</span></ElButton
+          >
+        </div>
+        <div v-if="respErrorMessage">{{ respErrorMessage }}</div>
+        <el-text class="mt-4"
           >不会使用?
           <el-link type="primary" href="https://doc.arona.diyigemt.com/" target="_blank"
             >访问arona在线文档</el-link
@@ -86,7 +92,9 @@
 import { User } from "@element-plus/icons-vue";
 // @ts-ignore
 import VideoBackground from "vue-responsive-video-background-player";
-import { infoMessage } from "@/utils/message";
+import { infoMessage, successMessage } from "@/utils/message";
+import { UserApi } from "@/api";
+import { HTTP_OK } from "@/constant";
 
 defineOptions({
   name: "LoginIndex",
@@ -95,10 +103,58 @@ const showLogin = ref(false);
 const touchCount = ref(0);
 const touch = computed(() => touchCount.value > 1);
 const code = ref("XXXXXX");
+const respErrorMessage = ref("");
+const countDown = ref(0);
+const router = useRouter();
+let loginStateCheckHandler = 0;
+let codeCountDownHandler = 0;
 function onClickThirdPartLogin() {
   infoMessage("没做");
 }
+function startCheckLoginState() {
+  loginStateCheckHandler = window.setInterval(() => {
+    UserApi.fetchLoginState(code.value).then((res) => {
+      if (res.code === HTTP_OK) {
+        // eslint-disable-next-line default-case
+        switch (res.data.status) {
+          case 0: {
+            clearInterval(loginStateCheckHandler);
+            code.value = "XXXXXX";
+            respErrorMessage.value = "验证码已过期, 请重新获取";
+            break;
+          }
+          case 1: {
+            break;
+          }
+          case 2: {
+            successMessage("登录成功");
+            router.push("/home");
+            break;
+          }
+        }
+      }
+    });
+  }, 3000);
+}
+function onClickGetCode() {
+  UserApi.login().then((res) => {
+    if (res.code === HTTP_OK) {
+      code.value = res.data;
+      respErrorMessage.value = "验证码十分钟内有效";
+      countDown.value = 59;
+      startCheckLoginState();
+      codeCountDownHandler = window.setInterval(() => {
+        countDown.value--;
+        if (countDown.value < 1) {
+          clearInterval(codeCountDownHandler);
+          countDown.value = 0;
+        }
+      }, 1000);
+    }
+  });
+}
 function onClickAronaLogin() {
+  onClickGetCode();
   showLogin.value = true;
 }
 const video = ref<{ player: { play(): void } }>();
@@ -117,6 +173,10 @@ function onEnded() {
     video.value?.player.$refs.video.play();
   }, 1000);
 }
+onUnmounted(() => {
+  clearInterval(loginStateCheckHandler);
+  clearInterval(codeCountDownHandler);
+});
 </script>
 
 <style scoped lang="scss">

@@ -2,10 +2,7 @@ package com.diyigemt.arona.database.permission
 
 import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.database.*
-import com.diyigemt.arona.database.AronaDatabase
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
-import com.diyigemt.arona.database.DocumentCompanionObject
-import com.diyigemt.arona.database.SystemPropertiesSchema
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.name
@@ -14,6 +11,7 @@ import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import org.bson.codecs.pojo.annotations.BsonId
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
@@ -104,9 +102,19 @@ data class UserDocument(
       JsonIgnoreUnknownKeys.decodeFromString(it)
     }
   }
-  suspend fun <T: Any> updatePluginConfig(pluginId: String, value: T, key: String = value::class.name) {
 
+  internal suspend inline fun <reified T : Any> updatePluginConfig(
+    pluginId: String, value: T,
+    key: String = value::class.name,
+  ) {
+    withCollection<UserDocument, UpdateResult> {
+      updateOne(
+        filter = idFilter(id),
+        update = Updates.set("${UserDocument::config.name}.$pluginId.$key", JsonIgnoreUnknownKeys.encodeToString(value))
+      )
+    }
   }
+
   companion object : DocumentCompanionObject {
     override val documentName = "User"
     suspend fun createUserDocument(uid: String, contactId: String) = UserDocument(

@@ -9,7 +9,9 @@ import com.diyigemt.arona.webui.endpoints._aronaUser
 import com.diyigemt.arona.webui.endpoints.request
 import io.ktor.server.application.*
 import io.ktor.util.pipeline.*
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class AuthResp(
   val status: Int, // 0 1 2 无效 等待 成功
   val token: String = "",
@@ -54,7 +56,7 @@ object UserEndpoint {
           }
         }
       }
-      // 请求参数无token, 证明为获取token认证结果
+      // 请求参数无token, 证明为获取登录凭证
       else -> {
         val password = generateNumber()
         val passwordKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, password)

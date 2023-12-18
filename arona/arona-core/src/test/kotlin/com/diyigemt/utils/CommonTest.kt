@@ -1,5 +1,6 @@
 package com.diyigemt.utils
 
+import com.diyigemt.arona.communication.message.TencentMessageIntentsBuilder
 import com.diyigemt.arona.communication.message.TencentRichMessage
 import com.diyigemt.arona.utils.*
 import kotlinx.datetime.DateTimeUnit
@@ -31,6 +32,11 @@ class CommonTest {
   fun testBitOp() {
     val a = 1 shl 0 or 1 shl 9 or 1 shl 1
     println(1 shl 0 or 1 shl 9 or 1 shl 1)
+  }
+
+  @Test
+  fun testIntentBuilder() {
+    println(TencentMessageIntentsBuilder().buildPublicBot().build())
   }
 
   @Test

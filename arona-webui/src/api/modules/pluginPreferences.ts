@@ -21,7 +21,7 @@ export const PluginPreferenceApi = {
       },
     });
   },
-  savePluginPreference(pluginId: string, preferenceKey: string, preference: string | object) {
+  updatePluginPreference(pluginId: string, preferenceKey: string, preference: string | object) {
     return service.raw<void>({
       url: "/plugin/preference",
       method: "POST",

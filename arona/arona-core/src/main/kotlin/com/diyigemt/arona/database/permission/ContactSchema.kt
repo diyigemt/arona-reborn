@@ -73,6 +73,7 @@ internal data class ContactDocument(
     val id: String,
     val contactName: String,
   )
+
   companion object : DocumentCompanionObject {
     override val documentName = "Contact"
 
@@ -91,6 +92,7 @@ internal data class ContactDocument(
         )
       }
     }
+
     suspend fun ContactDocument.addMember(userId: String): ContactMember {
       return when (val existMember = members.firstOrNull { it.id == userId }) {
         is ContactMember -> existMember
@@ -115,15 +117,10 @@ internal data class ContactDocument(
     }
 
     suspend fun ContactDocument.updateMemberRole(memberId: String, roleId: String): ContactDocumentUpdateException {
-      members.firstOrNull { it.id == memberId } ?: return ContactDocumentUpdateException.MemberNotFoundException(
-        memberId
-      )
-      val role =
-        roles.firstOrNull { it.id == roleId } ?: return ContactDocumentUpdateException.RoleNotFoundException(roleId)
       withCollection<ContactDocument, UpdateResult> {
         updateOne(
-          filter = Filters.and(Filters.eq("_id", id), Filters.eq("${ContactDocument::members.name}._id", memberId)),
-          update = Updates.addToSet("${ContactDocument::members.name}.$.${ContactMember::roles.name}", role.id)
+          filter = Filters.and(idFilter(id), Filters.eq("${ContactDocument::members.name}._id", memberId)),
+          update = Updates.addToSet("${ContactDocument::members.name}.$.${ContactMember::roles.name}", roleId)
         )
       }
       return ContactDocumentUpdateException.Success()

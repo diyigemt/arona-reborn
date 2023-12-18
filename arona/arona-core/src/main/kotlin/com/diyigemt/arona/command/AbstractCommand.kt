@@ -1,5 +1,6 @@
 package com.diyigemt.arona.command
 
+import com.diyigemt.arona.communication.command.AbstractCommandSender
 import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.permission.Permission
 import com.diyigemt.arona.permission.PermissionService
@@ -126,7 +127,7 @@ abstract class AbstractCommand(
   override val description: String = "<no description available>",
   help: String = "",
 ) : CliktCommand(name = primaryName, help = help, epilog = description), Command {
-  private val commandSender by requireObject<CommandSender>()
+  private val commandSender by requireObject<AbstractCommandSender>()
   private val reflector by lazy {
     CommandReflector(this)
   }
@@ -145,6 +146,9 @@ abstract class AbstractCommand(
   }
 
   final override fun run() {
+    if (!commandSender.kType.isSubtypeOf(targetExtensionFunction.parameters[1].type)) {
+      return
+    }
     runBlocking(commandSender.coroutineContext) {
       targetExtensionFunction.callSuspend(this@AbstractCommand, commandSender)
     }

@@ -15,7 +15,6 @@ import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.database.permission.UserDocument.Companion.readConfigOrDefault
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.coroutines.withTimeout
@@ -82,7 +81,7 @@ object TrainerCommand : AbstractCommand(
     getImage(arg).run {
       data?.run r1@{
         if (code != 200) {
-          val mdConfig = userDocument().readConfigOrDefault(Arona, default = MarkdownCompatiblyConfig())
+          val mdConfig = userDocument().readPluginConfigOrDefault(Arona, default = MarkdownCompatiblyConfig())
           if (mdConfig.enable) {
             val md = TencentMarkdown("102057194_1702305572") {
               append("search_target", arg)

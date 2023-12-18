@@ -14,7 +14,6 @@ import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.bson.codecs.pojo.annotations.BsonId
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
@@ -72,6 +71,42 @@ data class UserDocument(
   val policies: List<Policy> = listOf(), // 用户自定义的规则
   val config: Map<String, Map<String, String>> = mapOf(), // 用户自定义的,插件专有的配置项
 ) {
+  suspend fun updateUserContact(contactId: String) = withCollection<UserDocument, UpdateResult> {
+    updateOne(
+      filter = idFilter(id),
+      update = Updates.addToSet(UserDocument::contacts.name, contactId)
+    )
+  }
+
+  inline fun <reified T> readPluginConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
+    readPluginConfigOrNull<T>(plugin.permission.id.nameSpace, key)
+
+  inline fun <reified T> readPluginConfigOrDefault(plugin: CommandOwner, default: T, key: String = T::class.name) =
+    readPluginConfigOrDefault<T>(plugin.permission.id.nameSpace, default, key)
+
+  inline fun <reified T> readPluginConfig(plugin: CommandOwner, key: String = T::class.name) =
+    readPluginConfig<T>(plugin.permission.id.nameSpace, key)
+
+  inline fun <reified T> readPluginConfigOrNull(pluginId: String, key: String = T::class.name): T? {
+    return config[pluginId]?.get(key)?.let {
+      JsonIgnoreUnknownKeys.decodeFromString(it)
+    }
+  }
+
+  inline fun <reified T> readPluginConfigOrDefault(pluginId: String, default: T, key: String = T::class.name): T {
+    return config[pluginId]?.get(key)?.let {
+      JsonIgnoreUnknownKeys.decodeFromString(it)
+    } ?: default
+  }
+
+  inline fun <reified T> readPluginConfig(pluginId: String, key: String = T::class.name): T {
+    return config[pluginId]!![key]!!.let {
+      JsonIgnoreUnknownKeys.decodeFromString(it)
+    }
+  }
+  suspend fun <T: Any> updatePluginConfig(pluginId: String, value: T, key: String = value::class.name) {
+
+  }
   companion object : DocumentCompanionObject {
     override val documentName = "User"
     suspend fun createUserDocument(uid: String, contactId: String) = UserDocument(
@@ -91,41 +126,6 @@ data class UserDocument(
     suspend fun findUserDocumentByIdOrNull(id: String): UserDocument? = withCollection {
       find(idFilter(id)).limit(1).firstOrNull()
     }
-
-    suspend fun UserDocument.updateUserContact(contactId: String) = withCollection<UserDocument, UpdateResult> {
-      updateOne(
-        filter = idFilter(id),
-        update = Updates.addToSet(UserDocument::contacts.name, contactId)
-      )
-    }
-
-    inline fun <reified T> UserDocument.readConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
-      readConfigOrNull<T>(plugin.permission.id.nameSpace, key)
-
-    inline fun <reified T> UserDocument.readConfigOrDefault(plugin: CommandOwner, key: String = T::class.name, default: T) =
-      readConfigOrDefault<T>(plugin.permission.id.nameSpace, key, default)
-
-    inline fun <reified T> UserDocument.readConfig(plugin: CommandOwner, key: String = T::class.name) =
-      readConfig<T>(plugin.permission.id.nameSpace, key)
-
-    inline fun <reified T> UserDocument.readConfigOrNull(pluginId: String, key: String = T::class.name): T? {
-      return config[pluginId]?.get(key)?.let {
-        JsonIgnoreUnknownKeys.decodeFromString(it)
-      }
-    }
-
-    inline fun <reified T> UserDocument.readConfigOrDefault(pluginId: String, key: String = T::class.name, default: T): T {
-      return config[pluginId]?.get(key)?.let {
-        JsonIgnoreUnknownKeys.decodeFromString(it)
-      } ?: default
-    }
-
-    inline fun <reified T> UserDocument.readConfig(pluginId: String, key: String = T::class.name): T {
-      return config[pluginId]!![key]!!.let {
-        JsonIgnoreUnknownKeys.decodeFromString(it)
-      }
-    }
-
   }
 }
 

@@ -1,18 +1,19 @@
 bot:
+  id: ""
   appId: ""
   token: ""
   secret: ""
   public: false
   debug: false
-adminToken: ''
+adminToken: ""
 redis:
-  host: '172.18.100.39'
+  host: "127.0.0.1"
   port: 6379
   db: 0
 mongodb:
-  host: ''
+  host: ""
   port: 27017
-  user: ''
+  user: ""
   password: ""
-  db: ''
+  db: ""
 debug: false

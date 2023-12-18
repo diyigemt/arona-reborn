@@ -15,10 +15,6 @@ tasks.test {
   useJUnitPlatform()
 }
 
-kotlin {
-  jvmToolchain(17)
-}
-
 tasks.withType<Jar> {
   manifest {
     attributes["Main-Class"] = projectMainClass

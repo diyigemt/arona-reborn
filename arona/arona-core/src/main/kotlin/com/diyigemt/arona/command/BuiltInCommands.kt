@@ -17,7 +17,6 @@ import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
-import com.diyigemt.arona.database.permission.UserDocument.Companion.updateUserContact
 import com.diyigemt.arona.database.permission.UserSchema
 import com.github.ajalt.clikt.parameters.arguments.argument
 

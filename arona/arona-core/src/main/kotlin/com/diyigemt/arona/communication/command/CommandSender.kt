@@ -22,6 +22,7 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 import kotlin.coroutines.CoroutineContext
+import kotlin.reflect.full.starProjectedType
 
 interface CommandSender : CoroutineScope {
   val bot: TencentBot?
@@ -29,6 +30,7 @@ interface CommandSender : CoroutineScope {
   val user: User?
   val sourceId: String?
   var messageSequence: Int // 消息序列, 回复同一条sourceId时自增, 从1开始
+
   suspend fun sendMessage(message: String): MessageReceipt = sendMessage(PlainText(message))
   suspend fun sendMessage(message: Message): MessageReceipt
 
@@ -51,6 +53,7 @@ sealed class AbstractCommandSender : CommandSender {
   abstract override val bot: TencentBot?
   abstract override val subject: Contact?
   abstract override val user: User?
+  internal val kType = this::class.starProjectedType
 }
 
 sealed class AbstractUserCommandSender : UserCommandSender, AbstractCommandSender() {

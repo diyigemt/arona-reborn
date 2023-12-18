@@ -21,14 +21,14 @@ export const PluginPreferenceApi = {
       },
     });
   },
-  savePluginPreference(pluginId: string, preferenceKey: string, preference: string) {
+  savePluginPreference(pluginId: string, preferenceKey: string, preference: string | object) {
     return service.raw<void>({
       url: "/plugin/preference",
       method: "POST",
       data: {
-        pluginId,
-        preferenceKey,
-        preference,
+        id: pluginId,
+        key: preferenceKey,
+        value: typeof preference === "string" ? preference : JSON.stringify(preference),
       },
     });
   },

@@ -23,10 +23,6 @@ tasks.test {
   useJUnitPlatform()
 }
 
-kotlin {
-  jvmToolchain(17)
-}
-
 application {
   mainClass.set(projectMainClass)
 }

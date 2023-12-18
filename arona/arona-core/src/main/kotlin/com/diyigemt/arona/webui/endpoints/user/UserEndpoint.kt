@@ -95,7 +95,7 @@ object UserEndpoint {
         val password = generateNumber()
         val key = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, password)
         redisDbQuery {
-          set(key, _aronaUser?.uid ?: "")
+          set(key, _aronaUser?.id ?: "")
           expire(key, 600u)
         }
         success(password)

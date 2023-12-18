@@ -13,6 +13,9 @@ import kotlinx.datetime.*
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import java.util.UUID
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 import kotlin.reflect.KClass
 
 typealias SemVersion = Version
@@ -74,3 +77,16 @@ val JsonIgnoreUnknownKeys = Json { ignoreUnknownKeys = true }
 
 val KClass<*>.name
   get() = simpleName ?: qualifiedName ?: "<anonymous>"
+
+@OptIn(ExperimentalContracts::class)
+@Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER", "UnusedParameter")
+@kotlin.internal.LowPriorityInOverloadResolution
+internal inline fun <T : Any> T?.ifNull(block: () -> T): T {
+  contract { callsInPlace(block, InvocationKind.AT_MOST_ONCE) }
+  return this ?: block()
+}
+
+@Suppress("DeprecatedCallableAddReplaceWith", "UnusedParameter", "UNUSED_PARAMETER")
+@Deprecated("Useless ifNull on not null value.") // diagnostic deprecation
+@JvmName("ifNull1")
+internal inline fun <T : Any> T.ifNull(block: () -> T): T = this

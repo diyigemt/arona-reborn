@@ -67,12 +67,6 @@ internal data class ContactDocument(
   var members: List<ContactMember> = listOf(),
   val registerTime: String = currentDateTime(),
 ) {
-  @Serializable
-  data class ContactDocumentWithName(
-    @BsonId
-    val id: String,
-    val contactName: String,
-  )
 
   companion object : DocumentCompanionObject {
     override val documentName = "Contact"
@@ -81,8 +75,8 @@ internal data class ContactDocument(
       find(idFilter(id)).limit(1).firstOrNull()
     }
 
-    fun ContactDocument.createBaseAdminRole() = ContactRole(DEFAULT_ADMIN_CONTACT_ROLE_ID, "管理员")
-    fun ContactDocument.createBaseMemberRole() = ContactRole(DEFAULT_MEMBER_CONTACT_ROLE_ID, "普通成员")
+    fun createBaseAdminRole() = ContactRole(DEFAULT_ADMIN_CONTACT_ROLE_ID, "管理员")
+    fun createBaseMemberRole() = ContactRole(DEFAULT_MEMBER_CONTACT_ROLE_ID, "普通成员")
     fun ContactDocument.findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
     suspend fun ContactDocument.updateContactDocumentName(name: String) {
       withCollection<ContactDocument, UpdateResult> {
@@ -126,18 +120,16 @@ internal data class ContactDocument(
       return ContactDocumentUpdateException.Success()
     }
 
-    suspend fun createContactDocument(id: String, type: ContactType = ContactType.Group) = ContactDocument(
-      id,
-      contactType = type,
-    )
-      .apply {
-        roles = listOf(createBaseAdminRole(), createBaseMemberRole())
-        policies =
-          mutableListOf(createBaseContactAdminPolicy()).apply { addAll(createBaseMemberPolicy()) }
-      }
-      .also {
-        withCollection { insertOne(it) }
-      }
+    suspend fun createContactDocument(id: String, type: ContactType = ContactType.Group): ContactDocument {
+      val cd = ContactDocument(
+        id,
+        roles = listOf(createBaseAdminRole(), createBaseMemberRole()),
+        policies = mutableListOf(createBaseContactAdminPolicy()).apply { addAll(createBaseMemberPolicy()) },
+        contactType = type,
+      )
+      withCollection { insertOne(cd) }
+      return cd
+    }
   }
 }
 

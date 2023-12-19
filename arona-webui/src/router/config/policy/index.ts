@@ -2,7 +2,7 @@ import { RouteRecordRaw } from "vue-router";
 
 const PolicyRouter: Array<RouteRecordRaw> = [
   {
-    path: "config",
+    path: "policy",
     meta: {
       title: "策略",
     },
@@ -19,14 +19,6 @@ const PolicyRouter: Array<RouteRecordRaw> = [
           title: "策略配置",
         },
         component: () => import("@/views/config/policy/UserPolicy.vue"),
-      },
-      {
-        path: "config-arona-preferences",
-        name: "config-arona-preferences",
-        meta: {
-          title: "Arona偏好设置",
-        },
-        component: () => import("@/views/config/plugin/AronaPreferences.vue"),
       },
     ],
   },

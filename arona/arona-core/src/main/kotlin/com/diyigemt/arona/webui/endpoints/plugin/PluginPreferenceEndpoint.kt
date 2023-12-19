@@ -26,7 +26,7 @@ object PluginPreferenceEndpoint {
     val pluginId = context.parameters["id"] ?: return badRequest()
     when (val preferenceKey = context.parameters["key"]) {
       is String -> {
-        aronaUser.config[pluginId]?.get(preferenceKey)?.also {
+        aronaUser.readPluginConfigOrNull(pluginId, preferenceKey)?.also {
           success(it)
         } ?: success()
       }
@@ -40,13 +40,11 @@ object PluginPreferenceEndpoint {
   @AronaBackendEndpointPost
   suspend fun PipelineContext<Unit, ApplicationCall>.savePreference() {
     val obj = kotlin.runCatching { context.receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
-    aronaUser.config[obj.id]?.run {
-      aronaUser.updatePluginConfig(
-        obj.id,
-        obj.key,
-        obj.value
-      )
-    }
+    aronaUser.updatePluginConfig(
+      obj.id,
+      obj.key,
+      obj.value
+    )
     return success()
   }
 }

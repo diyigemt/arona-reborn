@@ -31,7 +31,7 @@ function onConfirm() {
     <slot />
     <ElFormItem>
       <ElButton @click="onCancel">取消</ElButton>
-      <ElButton @click="onConfirm">提交</ElButton>
+      <ElButton type="primary" @click="onConfirm">提交</ElButton>
     </ElFormItem>
   </ElForm>
 </template>

@@ -14,6 +14,7 @@ object UserTable : IdTable<String>(name = "User") {
   override val id: Column<EntityID<String>> = text("id").entityId()
   val active = bool("active").clientDefault { true }
   val actionCount = integer("action_count").default(0)
+  val lastActive = char("last_active", length = 25).clientDefault { currentDateTime() }
   val registerTime = char("register_time", length = 25).clientDefault { currentDateTime() } // 注册时间
 
   override val primaryKey: PrimaryKey = PrimaryKey(id)
@@ -24,5 +25,6 @@ class User(id: EntityID<String>) : Entity<String>(id) {
 
   val active by UserTable.active
   var actionCount by UserTable.actionCount
+  var lastActive by UserTable.lastActive
   val registerTime by UserTable.registerTime
 }

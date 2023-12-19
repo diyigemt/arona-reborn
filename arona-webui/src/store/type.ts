@@ -1,4 +1,5 @@
 export interface BaseStoreState {
+  token: string;
 }
 
 export interface SettingStoreState {

@@ -4,6 +4,7 @@ import { HTTP_OK } from "@/constant";
 import { errorMessage, infoMessage, warningMessage } from "@/utils/message";
 import showCodeMessage from "@/api/code";
 import { formatJsonToUrlParams, instanceObject } from "@/utils/format";
+import useBaseStore from "@/store/base";
 
 const BASE_PREFIX = import.meta.env.VITE_API_BASEURL;
 
@@ -24,6 +25,7 @@ const axiosInstance: AxiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   // @ts-ignore
   (config: IRequestConfig) => {
+    Reflect.set(config.headers || {}, "Authorization", useBaseStore().token);
     config.showServerResponseError = config.showServerResponseError || true;
     return config;
   },

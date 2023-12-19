@@ -27,7 +27,9 @@ export default defineConfig((env) => {
           },
         ],
       }),
-      compression(),
+      compression({
+        exclude: /\.(skel|atlas|webm|webp)(\?.*|)$/
+      }),
     ],
     // 别名设置
     resolve: {

@@ -10,9 +10,12 @@ import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
 import com.diyigemt.arona.communication.event.TencentGuildPrivateMessageEvent
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuerySuspended
+import com.diyigemt.arona.database.permission.PluginUserDocument
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
+import com.diyigemt.arona.database.permission.UserSchema
 import com.diyigemt.arona.utils.childScope
 import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
@@ -60,7 +63,7 @@ sealed class AbstractUserCommandSender : UserCommandSender, AbstractCommandSende
   private var _userDocument: UserDocument? = null
   override val bot: TencentBot get() = user.bot
   override suspend fun sendMessage(message: Message) = user.sendMessage(message)
-  override suspend fun userDocument(): UserDocument {
+  override suspend fun userDocument(): PluginUserDocument {
     if (_userDocument == null) {
       _userDocument = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
     }
@@ -73,7 +76,7 @@ interface UserCommandSender : CommandSender {
   override val subject: Contact
   override val user: User
   override val sourceId: String
-  suspend fun userDocument(): UserDocument
+  suspend fun userDocument(): PluginUserDocument
 }
 
 /**

@@ -95,6 +95,7 @@ import VideoBackground from "vue-responsive-video-background-player";
 import { infoMessage, successMessage } from "@/utils/message";
 import { UserApi } from "@/api";
 import { HTTP_OK } from "@/constant";
+import useBaseStore from "@/store/base";
 
 defineOptions({
   name: "LoginIndex",
@@ -106,6 +107,7 @@ const code = ref("XXXXXX");
 const respErrorMessage = ref("");
 const countDown = ref(0);
 const router = useRouter();
+const baseStore = useBaseStore();
 let loginStateCheckHandler = 0;
 let codeCountDownHandler = 0;
 function onClickThirdPartLogin() {
@@ -127,6 +129,7 @@ function startCheckLoginState() {
             break;
           }
           case 2: {
+            baseStore.setToken(res.data.token);
             successMessage("登录成功");
             router.push("/home");
             break;

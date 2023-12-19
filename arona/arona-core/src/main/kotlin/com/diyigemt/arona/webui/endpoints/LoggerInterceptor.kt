@@ -1,16 +1,21 @@
 package com.diyigemt.arona.webui.endpoints
 
+import com.diyigemt.arona.database.DatabaseProvider
+import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
-import com.diyigemt.arona.database.permission.UserSchema
+import com.diyigemt.arona.utils.aronaConfig
+import com.diyigemt.arona.utils.badRequest
+import com.diyigemt.arona.utils.forbidden
+import com.diyigemt.arona.utils.isJsonPost
 import com.diyigemt.arona.webui.plugins.AronaAdminToken
 import com.diyigemt.arona.webui.plugins.AronaInstanceVersion
 import com.diyigemt.arona.webui.plugins.XRealIp
-import com.diyigemt.arona.utils.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
+import io.ktor.server.response.*
 import io.ktor.util.*
 import io.ktor.util.logging.*
 import io.ktor.util.pipeline.*
@@ -47,23 +52,32 @@ object LoggerInterceptor {
 
   @AronaBackendRouteInterceptor
   suspend fun PipelineContext<Unit, ApplicationCall>.accessLogging() {
+    val method = context.request.httpMethod.value
     val path = context.request.path()
     if (AdminAccessRegexp.matches(path)) {
       // 将admin访问交由adminAccessInterceptor处理
       return
     }
+    if (path.endsWith("/login")) {
+      return
+    }
+    this.authorization?.let {
+      val key = DatabaseProvider.redisDbQuery {
+        get(RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, it))
+      } ?: return@let null
+      findUserDocumentByIdOrNull(key)
+    }?.also {
+      this._aronaUser = it
+    }
+    if (this.authorization == null || _aronaUser == null) {
+      badRequest()
+      return finish()
+    }
     val query = when (context.request.httpMethod) {
       HttpMethod.Get -> context.request.queryString()
       else -> if (isJsonPost) context.receiveText() else "post blob data"
     }
-    val method = context.request.httpMethod.value
-    this.authorization?.let {
-      findUserDocumentByIdOrNull(it)
-    }?.also {
-      this._aronaUser = it
-    }
   }
-
 }
 
 @AronaBackendEndpoint("/admin")

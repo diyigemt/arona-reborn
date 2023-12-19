@@ -11,11 +11,15 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-suspend fun PipelineContext<Unit, ApplicationCall>.badRequest() = context.respond(HttpStatusCode.BadRequest)
-suspend fun PipelineContext<Unit, ApplicationCall>.unauthorized() = context.respond(HttpStatusCode.Unauthorized)
-suspend fun PipelineContext<Unit, ApplicationCall>.forbidden() = context.respond(HttpStatusCode.Forbidden)
+suspend fun PipelineContext<Unit, ApplicationCall>.badRequest() =
+  context.respond(ServerResponse(HttpStatusCode.BadRequest, null))
+suspend fun PipelineContext<Unit, ApplicationCall>.unauthorized() =
+  context.respond(ServerResponse(HttpStatusCode.Unauthorized, null))
+suspend fun PipelineContext<Unit, ApplicationCall>.forbidden() =
+  context.respond(ServerResponse(HttpStatusCode.Forbidden, null))
+
 suspend fun PipelineContext<Unit, ApplicationCall>.internalServerError() =
-  context.respond(HttpStatusCode.InternalServerError)
+  context.respond(ServerResponse(HttpStatusCode.InternalServerError, null))
 
 suspend fun PipelineContext<Unit, ApplicationCall>.errorMessage(message: String) =
   context.respond(ServerResponse(HttpStatusCode(601, message), null))

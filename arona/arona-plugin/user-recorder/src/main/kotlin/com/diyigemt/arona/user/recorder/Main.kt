@@ -8,21 +8,24 @@ import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.diyigemt.arona.user.recorder.database.*
 import com.diyigemt.arona.user.recorder.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.utils.currentDateTime
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.0.0",
+    version = "1.0.1",
     description = "record user data"
   )
 ) {
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
       dbQuery {
-        when (Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
-          is Contact -> { }
+        when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
+          is Contact -> {
+            contact.lastActive = currentDateTime()
+          }
           else -> {
             Contact.new(it.subject.id) {
               type = when (it) {
@@ -37,7 +40,10 @@ object PluginMain : AronaPlugin(
       }
       dbQuery {
         when (val user = User.find { UserTable.id eq sender.id }.firstOrNull()) {
-          is User -> { user.actionCount++ }
+          is User -> {
+            user.actionCount
+            user.lastActive = currentDateTime()
+          }
           else -> {
             User.new(
               id = sender.id

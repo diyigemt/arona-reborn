@@ -3,6 +3,7 @@ package com.diyigemt.arona.database.permission
 import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.database.*
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
+import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuerySuspended
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.name
@@ -10,8 +11,7 @@ import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.*
 import org.bson.codecs.pojo.annotations.BsonId
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
@@ -57,18 +57,57 @@ internal class UserSchema(id: EntityID<String>) : Entity<String>(id) {
   val registerTime by UserTable.registerTime
 }
 
+abstract class PluginUserDocument {
+  abstract val id: String
+  abstract val unionOpenId: String
+  abstract val qq: Long
+  internal abstract val config: Map<String, Map<String, String>>
+  fun String.toMongodbKey() = this.replace(".", "·")
+  fun String.fromMongodbKey() = this.replace("·", ".")
+  @OptIn(InternalSerializationApi::class)
+  inline fun <reified T : Any> readPluginConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
+    readPluginConfigOrNull(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
+
+  @OptIn(InternalSerializationApi::class)
+  inline fun <reified T : Any> readPluginConfigOrDefault(plugin: CommandOwner, default: T, key: String = T::class.name) =
+    readPluginConfigOrDefault(plugin.permission.id.nameSpace.toMongodbKey(), default, key, T::class.serializer())
+
+  @OptIn(InternalSerializationApi::class)
+  inline fun <reified T : Any> readPluginConfig(plugin: CommandOwner, key: String = T::class.name) =
+    readPluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
+
+  fun <T> readPluginConfigOrNull(pluginId: String, key: String, serializer: KSerializer<T>): T? {
+    return config[pluginId.toMongodbKey()]?.get(key)?.let {
+      JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
+    }
+  }
+
+  fun <T> readPluginConfigOrDefault(pluginId: String, default: T, key: String, serializer: KSerializer<T>): T {
+    return config[pluginId.toMongodbKey()]?.get(key)?.let {
+      JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
+    } ?: default
+  }
+
+  fun <T> readPluginConfig(pluginId: String, key: String, serializer: KSerializer<T>): T {
+    return config[pluginId.toMongodbKey()]!![key]!!.let {
+      JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
+    }
+  }
+
+}
+
 @Serializable
-data class UserDocument(
+internal data class UserDocument(
   @BsonId
-  val id: String, // 自己定义的唯一id
+  override val id: String, // 自己定义的唯一id
   val username: String = "Arona用户$id", // 显示在前端的用户名
-  val unionOpenId: String = "", // 藤子定义的唯一id
-  val qq: Long = 0L, // 用户绑定的qq号
+  override val unionOpenId: String = "", // 藤子定义的唯一id
+  override val qq: Long = 0L, // 用户绑定的qq号
   val uid: List<String> = listOf(), // 藤子给定的不同聊天环境下的id
   val contacts: List<String> = listOf(), // 存在的不同的群/频道的id
   val policies: List<Policy> = listOf(), // 用户自定义的规则
-  val config: Map<String, Map<String, String>> = mapOf(), // 用户自定义的,插件专有的配置项
-) {
+  override val config: Map<String, Map<String, String>> = mapOf(), // 用户自定义的,插件专有的配置项
+) : PluginUserDocument() {
   suspend fun updateUserContact(contactId: String) = withCollection<UserDocument, UpdateResult> {
     updateOne(
       filter = idFilter(id),
@@ -76,31 +115,8 @@ data class UserDocument(
     )
   }
 
-  inline fun <reified T> readPluginConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
-    readPluginConfigOrNull<T>(plugin.permission.id.nameSpace, key)
-
-  inline fun <reified T> readPluginConfigOrDefault(plugin: CommandOwner, default: T, key: String = T::class.name) =
-    readPluginConfigOrDefault<T>(plugin.permission.id.nameSpace, default, key)
-
-  inline fun <reified T> readPluginConfig(plugin: CommandOwner, key: String = T::class.name) =
-    readPluginConfig<T>(plugin.permission.id.nameSpace, key)
-
-  inline fun <reified T> readPluginConfigOrNull(pluginId: String, key: String = T::class.name): T? {
-    return config[pluginId]?.get(key)?.let {
-      JsonIgnoreUnknownKeys.decodeFromString(it)
-    }
-  }
-
-  inline fun <reified T> readPluginConfigOrDefault(pluginId: String, default: T, key: String = T::class.name): T {
-    return config[pluginId]?.get(key)?.let {
-      JsonIgnoreUnknownKeys.decodeFromString(it)
-    } ?: default
-  }
-
-  inline fun <reified T> readPluginConfig(pluginId: String, key: String = T::class.name): T {
-    return config[pluginId]!![key]!!.let {
-      JsonIgnoreUnknownKeys.decodeFromString(it)
-    }
+  fun readPluginConfigOrNull(pluginId: String, key: String): String? {
+    return config[pluginId.toMongodbKey()]?.get(key)
   }
 
   internal suspend inline fun <reified T : Any> updatePluginConfig(
@@ -110,21 +126,54 @@ data class UserDocument(
     withCollection<UserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
-        update = Updates.set("${UserDocument::config.name}.$pluginId.$key", JsonIgnoreUnknownKeys.encodeToString(value))
+        update = Updates.set("${UserDocument::config.name}.${pluginId.toMongodbKey()}.$key", JsonIgnoreUnknownKeys.encodeToString(value))
+      )
+    }
+  }
+
+  suspend fun updatePluginConfig(
+    pluginId: String,
+    key: String,
+    value: String,
+  ) {
+    withCollection<UserDocument, UpdateResult> {
+      updateOne(
+        filter = idFilter(id),
+        update = Updates.set("${UserDocument::config.name}.${pluginId.toMongodbKey()}.$key", value)
       )
     }
   }
 
   companion object : DocumentCompanionObject {
     override val documentName = "User"
-    suspend fun createUserDocument(uid: String, contactId: String) = UserDocument(
-      BASE_ID,
-      uid = mutableListOf(uid),
-      contacts = mutableListOf(contactId)
-    ).also {
+    suspend fun createUserDocument(uid: String, contactId: String): UserDocument {
+      val ud = UserDocument(
+        BASE_ID,
+        uid = mutableListOf(uid),
+        contacts = mutableListOf(contactId)
+      )
       withCollection {
-        insertOne(it)
+        insertOne(ud)
       }
+      sqlDbQuerySuspended {
+        when (val saveUser = UserSchema.findById(uid)) {
+          is UserSchema -> {
+            saveUser.uid = ud.id
+          }
+
+          else -> {
+            UserSchema.new(uid) {
+              this@new.from = contactId
+              this@new.uid = ud.id
+            }.also { newUser ->
+              if (newUser.id.value !in ud.uid) {
+                ud.updateUserContact(contactId)
+              }
+            }
+          }
+        }
+      }
+      return ud
     }
 
     suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? = withCollection {

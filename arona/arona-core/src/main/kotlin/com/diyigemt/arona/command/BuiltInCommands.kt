@@ -1,4 +1,5 @@
 @file:Suppress("unused")
+
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.command.CommandManager.register
@@ -6,7 +7,6 @@ import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
-import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.addMember
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
@@ -20,7 +20,6 @@ import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
-import com.diyigemt.arona.database.permission.UserSchema
 import com.github.ajalt.clikt.parameters.arguments.argument
 
 object BuiltInCommands {
@@ -40,26 +39,7 @@ object BuiltInCommands {
     suspend fun UserCommandSender.login() {
       val tokenKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, token)
       if (redisDbQuery { get(tokenKey) } == "1") {
-        val documentUser = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
-        when (val saveUser = sqlDbQuery { UserSchema.findById(user.id) }) {
-          is UserSchema -> {
-            saveUser.uid = documentUser.id
-          }
-
-          else -> {
-            sqlDbQuery {
-              UserSchema.new(user.id) {
-                from = subject.id
-                uid = documentUser.id
-              }
-            }.also {
-              if (it.id.value !in documentUser.uid) {
-                documentUser.updateUserContact(subject.id)
-              }
-            }
-          }
-        }
-
+        val documentUser = createContactAndUser(subject, user, DEFAULT_MEMBER_CONTACT_ROLE_ID)
         redisDbQuery {
           set(tokenKey, documentUser.id)
           expire(tokenKey, 100u)
@@ -87,6 +67,7 @@ object BuiltInCommands {
       sendMessage("绑定成功")
     }
   }
+
   // TODO 总之没做完
   object BindCommand : AbstractCommand(
     BuildInCommandOwner,
@@ -110,11 +91,13 @@ object BuiltInCommands {
               }
               sendMessage("绑定成功")
             }
+
             else -> {
               sendMessage("用户未找到, 请再试一次")
             }
           }
         }
+
         else -> {
           sendMessage("token无效")
         }
@@ -135,15 +118,13 @@ object BuiltInCommands {
       }
     }
 
-    GlobalEventChannel.subscribeAlways<TencentMessageEvent> {
-      createContactAndUser(it.subject, it.sender, DEFAULT_MEMBER_CONTACT_ROLE_ID)
-    }
+//    GlobalEventChannel.subscribeAlways<TencentMessageEvent> {
+//      createContactAndUser(it.subject, it.sender, DEFAULT_MEMBER_CONTACT_ROLE_ID)
+//    }
   }
 
-  private suspend fun createContactAndUser(contact: Contact, user: User, role: String) {
-    val contactDocument = findContactDocumentByIdOrNull(contact.id)?.run {
-      return
-    } ?: createContactDocument(
+  private suspend fun createContactAndUser(contact: Contact, user: User, role: String): UserDocument {
+    val contactDocument = findContactDocumentByIdOrNull(contact.id) ?: createContactDocument(
       contact.id,
       when (contact) {
         is FriendUser -> ContactType.Private
@@ -153,12 +134,10 @@ object BuiltInCommands {
       }
     )
 
-    // 防止用户删了又加回来的情况
-    val userDocument = findUserDocumentByUidOrNull(user.id)?.run {
-      return
-    } ?: createUserDocument(user.id, contact.id)
+    val userDocument = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, contact.id)
     val member = contactDocument.addMember(userDocument.id)
     contactDocument.updateMemberRole(member.id, role)
+    return userDocument
   }
 
 }

@@ -3,9 +3,15 @@ import { BaseStoreState } from "./type";
 
 const useBaseStore = defineStore({
   id: "common",
-  state: (): BaseStoreState => ({}),
+  state: (): BaseStoreState => ({
+    token: "",
+  }),
   getters: {},
-  actions: {},
+  actions: {
+    setToken(token: string) {
+      this.token = token;
+    },
+  },
   persist: {
     key: "base",
   },

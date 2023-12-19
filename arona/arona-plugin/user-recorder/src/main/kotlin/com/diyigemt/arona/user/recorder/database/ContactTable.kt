@@ -21,6 +21,7 @@ object ContactTable : IdTable<String>(name = "Contact") {
   override val id: Column<EntityID<String>> = text("id").entityId()
   val type = enumerationByName<ContactType>("type", 20)
   val active = bool("active").clientDefault { true }
+  val lastActive = char("last_active", length = 25).clientDefault { currentDateTime() } // 最后交互时间
   val registerTime = char("register_time", length = 25).clientDefault { currentDateTime() } // 注册时间
   override val primaryKey: PrimaryKey = PrimaryKey(id)
 }
@@ -30,5 +31,6 @@ class Contact(id: EntityID<String>) : Entity<String>(id) {
   companion object : EntityClass<String, Contact>(ContactTable)
   var type by ContactTable.type
   var active by ContactTable.active
+  var lastActive by ContactTable.lastActive
   val registerTime by ContactTable.registerTime
 }

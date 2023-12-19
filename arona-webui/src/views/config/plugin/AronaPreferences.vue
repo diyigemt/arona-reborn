@@ -1,5 +1,4 @@
 <template>
-  <div>Arona Preferences</div>
   <PluginPreferenceForm :form="preference" p-id="com.diyigemt.arona" p-key="MarkdownCompatiblyConfig">
     <ElFormItem label="启用markdown" prop="enable">
       <ElSwitch
@@ -30,7 +29,7 @@ const defaultConfig: MarkdownCompatiblyConfig = {
 const preference = ref<MarkdownCompatiblyConfig>(defaultConfig);
 PluginPreferenceApi.fetchPluginPreference("com.diyigemt.arona", "MarkdownCompatiblyConfig").then((data) => {
   if (data.code === HTTP_OK) {
-    preference.value = JSON.parse(data.data);
+    preference.value = JSON.parse(data.data) || defaultConfig;
   }
 });
 </script>

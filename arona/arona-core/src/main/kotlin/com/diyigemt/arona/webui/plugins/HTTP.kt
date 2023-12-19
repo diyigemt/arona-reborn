@@ -38,6 +38,7 @@ fun Application.configureHTTP() {
     allowHeader(HttpHeaders.AronaInstanceVersion)
     allowHeader(HttpHeaders.AronaAdminToken)
     allowHeader(HttpHeaders.XRealIp)
+    allowNonSimpleContentTypes = true
     anyHost() // @TODO: Don't do this in production if possible. Try to limit it.
   }
 }

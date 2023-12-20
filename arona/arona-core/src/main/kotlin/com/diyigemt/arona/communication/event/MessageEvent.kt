@@ -94,6 +94,9 @@ class TencentGroupAddEvent internal constructor(
   override val group get() = user.group
   override val subject get() = group
   override val bot get() = user.bot
+  override fun toString(): String {
+    return "TencentGroupAddEvent(group=${group.id}, user=${user.id})"
+  }
 }
 
 class TencentGroupDeleteEvent internal constructor(

@@ -6,7 +6,6 @@ import Components from 'unplugin-vue-components/vite';
 import Icons from 'unplugin-icons/vite';
 import IconsResolver from 'unplugin-icons/resolver';
 import { ElementPlusResolver, VueUseComponentsResolver } from 'unplugin-vue-components/resolvers';
-import WindiCSS from 'vite-plugin-windicss';
 // @ts-ignore
 import Markdown from 'vite-plugin-md';
 import Prism from 'markdown-it-prism';
@@ -23,6 +22,10 @@ export default (env: ConfigEnv) => {
   return [
     vue({
       include: [/\.vue$/, /\.md$/],
+      script: {
+        propsDestructure: true,
+        defineModel: true,
+      },
     }),
     vueJsx(),
     svgLoader(),
@@ -58,9 +61,6 @@ export default (env: ConfigEnv) => {
     }),
     VueI18n({
       include: [resolve(__dirname, '../locales/**')],
-    }),
-    WindiCSS({
-      safelist: defaultClasses,
     }),
     Markdown({
       wrapperClasses: defaultClasses,

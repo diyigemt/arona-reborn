@@ -16,10 +16,10 @@ export type PolicyRuleOperator =
 export interface Policy {
   id: string;
   name: string;
+  effect: PolicyNodeEffect;
   rules: PolicyNode[];
 }
 export interface PolicyNode {
-  effect: PolicyNodeEffect;
   groupType: PolicyNodeGroupType;
   rule?: PolicyRule;
   children?: PolicyNode[];

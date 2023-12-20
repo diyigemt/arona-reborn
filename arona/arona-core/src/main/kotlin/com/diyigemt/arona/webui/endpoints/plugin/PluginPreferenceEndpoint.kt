@@ -31,7 +31,7 @@ object PluginPreferenceEndpoint {
         } ?: success()
       }
       else -> {
-        aronaUser.config[pluginId]?.also {
+        aronaUser.readAllConfig(pluginId)?.also {
           success(it)
         } ?: success()
       }

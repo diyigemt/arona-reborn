@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PluginPreferenceApi } from "@/api";
 import { HTTP_OK } from "@/constant";
-import { successMessage } from "@/utils/message";
+import { errorMessage, successMessage } from "@/utils/message";
 
 defineOptions({
   name: "PluginPreferenceForm",
@@ -18,11 +18,13 @@ function onCancel() {
 }
 function onConfirm() {
   emits("confirm");
-  PluginPreferenceApi.updatePluginPreference(props.pId, props.pKey, props.form).then((res) => {
-    if (res.code === HTTP_OK) {
+  PluginPreferenceApi.updatePluginPreference(props.pId, props.pKey, props.form)
+    .then(() => {
       successMessage("保存成功");
-    }
-  });
+    })
+    .catch(() => {
+      errorMessage("保存失败");
+    });
 }
 </script>
 

@@ -7,9 +7,7 @@ import router from "@/router/index";
 import store from "@/store";
 import App from "./App.vue";
 
-import "virtual:windi.css";
-// Devtools: https://windicss.org/integrations/vite.html#design-in-devtools
-import "virtual:windi-devtools";
+import "virtual:uno.css";
 import "@/assets/styles/index.scss";
 import "element-plus/dist/index.css";
 import { setApp } from "@/utils/vueTools";

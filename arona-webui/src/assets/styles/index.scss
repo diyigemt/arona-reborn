@@ -24,11 +24,18 @@ $arona-blue: rgb(0,215,251);
   position: relative;
 }
 
+body {
+  margin: 0;
+  color: black;
+  background-color: #fff;
+}
+
 * {
   font-family: "Game Font", "Chinese Game Font", ui-sans-serif, system-ui,
   -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
   Helvetica, Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji',
   'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  box-sizing: border-box;
 }
 
 // 隐藏横向滚动条

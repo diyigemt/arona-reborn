@@ -8,17 +8,22 @@ import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.diyigemt.arona.user.recorder.database.*
 import com.diyigemt.arona.user.recorder.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
+import java.util.Timer
+import kotlin.concurrent.scheduleAtFixedRate
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.0.1",
+    version = "1.0.2",
     description = "record user data"
   )
 ) {
+  private val timer = Timer("user-recorder", true)
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
       dbQuery {
@@ -100,6 +105,22 @@ object PluginMain : AronaPlugin(
                 is TencentGuildEvent -> ContactType.Channel
                 else -> ContactType.PrivateChannel
               }
+            }
+          }
+        }
+      }
+    }
+    timer.scheduleAtFixedRate(0L, 10 * 60 * 1000L) {
+      dbQuery {
+        val today = currentDate()
+        val c = User.find( UserTable.lastActive greater today ).count().toInt()
+        when (val record = DailyActiveUser.findById(today)) {
+          is DailyActiveUser -> {
+            record.count = c
+          }
+          else -> {
+            DailyActiveUser.new(today) {
+              count = c
             }
           }
         }

@@ -4,10 +4,8 @@
       <template #title>
         <span>群</span>
       </template>
-      <el-menu-item index="1-1" :route="{ path: '/config/contact/contact-manage' }">我管理的群</el-menu-item>
-      <el-menu-item index="1-2" :route="{ path: '/config/contact/contact-join', query: { type: 'join' } }"
-        >我加入的群
-      </el-menu-item>
+      <el-menu-item index="/config/contact/contact-manage">我管理的群</el-menu-item>
+      <el-menu-item index="/config/contact/contact-join">我加入的群 </el-menu-item>
     </el-sub-menu>
     <el-sub-menu index="2">
       <template #title>

@@ -16,15 +16,15 @@ const ContactRouter: Array<RouteRecordRaw> = [
         path: "contact-manage",
         name: "contact-manage",
         meta: {
-          title: "群管理",
+          title: "我管理的群",
         },
-        component: () => import("@/views/config/contact/Contact.vue"),
+        component: () => import("@/views/config/contact/ContactManage.vue"),
       },
       {
         path: "contact-join",
         name: "contact-join",
         meta: {
-          title: "群管理",
+          title: "我加入的群",
         },
         component: () => import("@/views/config/contact/Contact.vue"),
       },

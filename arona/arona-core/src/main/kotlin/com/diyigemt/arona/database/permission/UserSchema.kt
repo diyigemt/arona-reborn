@@ -18,6 +18,7 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.id.IdTable
 import org.jetbrains.exposed.sql.Column
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 
 private const val BASE_ID_KEY = "BASE_ID"
 private val BASE_ID: String
@@ -119,6 +120,10 @@ internal data class UserDocument(
     return config[pluginId.toMongodbKey()]?.get(key)
   }
 
+  internal fun readAllConfig(pluginId: String): Map<String, String>? {
+    return config[pluginId.toMongodbKey()]
+  }
+
   internal suspend inline fun <reified T : Any> updatePluginConfig(
     pluginId: String, value: T,
     key: String = value::class.name,
@@ -176,8 +181,17 @@ internal data class UserDocument(
       return ud
     }
 
-    suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? = withCollection {
-      find(uidFilter(uid)).limit(1).firstOrNull()
+    suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? {
+      val u = sqlDbQuery {
+        UserSchema.findById(uid)
+      }
+      return if (u == null) {
+        null
+      } else {
+        withCollection {
+          find(idFilter(u.uid)).limit(1).firstOrNull()
+        }
+      }
     }
 
     suspend fun findUserDocumentByIdOrNull(id: String): UserDocument? = withCollection {

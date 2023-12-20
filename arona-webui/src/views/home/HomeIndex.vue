@@ -726,7 +726,6 @@ $button-card-size: 200px;
   cursor: pointer;
   width: $button-card-size;
   height: $button-card-size;
-  justify-content: center;
   border-radius: 6px;
   background: url("/image/poli-light.png") rgba(164, 216, 237, 0.3) no-repeat 0 40%;
 }

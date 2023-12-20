@@ -115,25 +115,25 @@ function onClickThirdPartLogin() {
 }
 function startCheckLoginState() {
   loginStateCheckHandler = window.setInterval(() => {
-    UserApi.fetchLoginState(code.value).then((res) => {
-      if (res.code === HTTP_OK) {
-        // eslint-disable-next-line default-case
-        switch (res.data.status) {
-          case 0: {
-            clearInterval(loginStateCheckHandler);
-            code.value = "XXXXXX";
-            respErrorMessage.value = "验证码已过期, 请重新获取";
-            break;
-          }
-          case 1: {
-            break;
-          }
-          case 2: {
-            baseStore.setToken(res.data.token);
-            successMessage("登录成功");
-            router.push("/home");
-            break;
-          }
+    UserApi.fetchLoginState(code.value).then((data) => {
+      switch (data.status) {
+        case 0: {
+          clearInterval(loginStateCheckHandler);
+          code.value = "XXXXXX";
+          respErrorMessage.value = "验证码已过期, 请重新获取";
+          break;
+        }
+        case 1: {
+          break;
+        }
+        case 2: {
+          baseStore.setToken(data.token);
+          successMessage("登录成功");
+          router.push("/home");
+          break;
+        }
+        default: {
+          /* empty */
         }
       }
     });
@@ -141,19 +141,17 @@ function startCheckLoginState() {
 }
 function onClickGetCode() {
   UserApi.login().then((res) => {
-    if (res.code === HTTP_OK) {
-      code.value = res.data;
-      respErrorMessage.value = "验证码十分钟内有效";
-      countDown.value = 59;
-      startCheckLoginState();
-      codeCountDownHandler = window.setInterval(() => {
-        countDown.value--;
-        if (countDown.value < 1) {
-          clearInterval(codeCountDownHandler);
-          countDown.value = 0;
-        }
-      }, 1000);
-    }
+    code.value = res;
+    respErrorMessage.value = "验证码十分钟内有效";
+    countDown.value = 59;
+    startCheckLoginState();
+    codeCountDownHandler = window.setInterval(() => {
+      countDown.value--;
+      if (countDown.value < 1) {
+        clearInterval(codeCountDownHandler);
+        countDown.value = 0;
+      }
+    }, 1000);
   });
 }
 function onClickAronaLogin() {

@@ -47,5 +47,5 @@ fun Application.module() {
   configureRouting()
   configureSerialize()
   configureDoubleReceive()
-//  configureErrorHandler()
+  configureErrorHandler()
 }

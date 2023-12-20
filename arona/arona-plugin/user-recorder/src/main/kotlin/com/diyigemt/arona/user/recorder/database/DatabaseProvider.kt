@@ -11,7 +11,7 @@ internal object DatabaseProvider {
   private val database: Database by lazy {
     val database = Database.connect("jdbc:sqlite:${PluginMain.dataFolder}/contact.db", "org.sqlite.JDBC")
     transaction(database) {
-      SchemaUtils.createMissingTablesAndColumns(UserTable, ContactTable, CommandTable)
+      SchemaUtils.createMissingTablesAndColumns(UserTable, ContactTable, CommandTable, DailyActiveUserTable)
     }
     database
   }

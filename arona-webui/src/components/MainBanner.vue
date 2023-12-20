@@ -5,7 +5,6 @@
 </template>
 
 <script setup lang="ts">
-
 const router = useRouter();
 function goHome() {
   router.push("/config");
@@ -21,7 +20,6 @@ function goHome() {
   $font-size: 36px;
   line-height: $font-size + 12px;
   top: 0;
-  width: 100%;
   left: 0;
   padding: 0 20px;
   border-bottom: 1px solid var(--el-border-color);

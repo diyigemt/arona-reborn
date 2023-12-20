@@ -1,4 +1,4 @@
-import service from "@/api/http";
+import service, { simplifiedApiService } from "@/api/http";
 
 // eslint-disable-next-line import/prefer-default-export
 export const PluginPreferenceApi = {
@@ -22,14 +22,16 @@ export const PluginPreferenceApi = {
     });
   },
   updatePluginPreference(pluginId: string, preferenceKey: string, preference: string | object) {
-    return service.raw<void>({
-      url: "/plugin/preference",
-      method: "POST",
-      data: {
-        id: pluginId,
-        key: preferenceKey,
-        value: typeof preference === "string" ? preference : JSON.stringify(preference),
-      },
-    });
+    return simplifiedApiService(
+      service.raw<void>({
+        url: "/plugin/preference",
+        method: "POST",
+        data: {
+          id: pluginId,
+          key: preferenceKey,
+          value: typeof preference === "string" ? preference : JSON.stringify(preference),
+        },
+      }),
+    );
   },
 };

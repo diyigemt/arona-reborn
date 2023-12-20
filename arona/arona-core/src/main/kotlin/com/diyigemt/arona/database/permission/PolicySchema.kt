@@ -143,7 +143,7 @@ data class Policy(
     fun createBaseMemberPolicy(): List<Policy> {
       return listOf(
         Policy(
-          id = "role.default.allow",
+          id = "policy.default.allow",
           name = "普通成员权限",
           effect = PolicyNodeEffect.ALLOW,
           rules = listOf(

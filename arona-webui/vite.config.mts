@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, normalizePath } from "vite";
 import { resolve } from "path";
 import VueTypeImports from "vite-plugin-vue-type-imports";
 import { compression } from "vite-plugin-compression2";
+import UnoCss from "unocss/vite";
 
 // @ts-ignore
 import path from "node:path";
@@ -27,6 +28,7 @@ export default defineConfig((env) => {
           },
         ],
       }),
+      UnoCss(),
       compression({
         exclude: /\.(skel|atlas|webm|webp)(\?.*|)$/
       }),

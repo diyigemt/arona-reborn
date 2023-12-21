@@ -4,7 +4,7 @@
       <ContactList :contact="contacts" @select="onSelectContact" />
     </ElCol>
     <ElCol :span="20">
-      <ContactProfile v-if="contact && contact.id" :contact="contact" @update="onContactUpdate" />
+      <ContactProfile v-if="contactId" :contact-id="contactId" @update="onContactUpdate" />
     </ElCol>
   </ElRow>
 </template>
@@ -20,14 +20,12 @@ defineOptions({
   name: "ContactManage",
 });
 const contacts = ref<Contact[]>([]);
-const contact = ref<EditableContact>() as Ref<EditableContact>;
+const contactId = ref<string>() as Ref<string>;
 function onSelectContact(id: string) {
   if (!contacts.value.some((it) => it.id === id)) {
     return;
   }
-  ContactApi.fetchContact(id).then((data) => {
-    contact.value = data;
-  });
+  contactId.value = id;
 }
 function onContactUpdate(id: string) {
   fetchContacts().then(() => {

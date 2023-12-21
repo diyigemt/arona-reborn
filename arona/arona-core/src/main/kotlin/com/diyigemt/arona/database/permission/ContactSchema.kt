@@ -11,6 +11,7 @@ import com.diyigemt.arona.database.permission.Policy.Companion.createBaseContact
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseMemberPolicy
 import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.currentDateTime
+import com.diyigemt.arona.utils.uuid
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
@@ -37,6 +38,10 @@ internal data class ContactRole(
     internal const val DEFAULT_ADMIN_CONTACT_ROLE_ID = "role.admin"
     fun createBaseAdminRole() = ContactRole(DEFAULT_ADMIN_CONTACT_ROLE_ID, "管理员")
     fun createBaseMemberRole() = ContactRole(DEFAULT_MEMBER_CONTACT_ROLE_ID, "普通成员")
+    fun createRole(name: String) = ContactRole(
+      "role.${uuid()}",
+      name
+    )
   }
 }
 

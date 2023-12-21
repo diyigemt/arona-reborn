@@ -1,5 +1,5 @@
 import service, { simplifiedApiService } from "@/api/http";
-import { Contact, EditableContact, ContactUpdateReq, ContactMember } from "@/interface";
+import { Contact, EditableContact, ContactUpdateReq, ContactMember, ContactRole } from "@/interface";
 
 // eslint-disable-next-line import/prefer-default-export
 export const ContactApi = {
@@ -43,6 +43,44 @@ export const ContactApi = {
         url: `/contact/${id}/member`,
         method: "PUT",
         data,
+      }),
+    );
+  },
+  createContactRole(id: string, data: ContactRole) {
+    return simplifiedApiService(
+      service.raw<null>({
+        url: `/contact/${id}/role`,
+        method: "POST",
+        data,
+      }),
+    );
+  },
+  updateContactRole(id: string, data: ContactRole) {
+    return simplifiedApiService(
+      service.raw<null>({
+        url: `/contact/${id}/role`,
+        method: "PUT",
+        data,
+      }),
+    );
+  },
+  deleteContactRole(id: string, data: ContactRole) {
+    return simplifiedApiService(
+      service.raw<null>({
+        url: `/contact/${id}/role`,
+        method: "DELETE",
+        data,
+      }),
+    );
+  },
+  fetchContactPolicy(id: string, policyId: string) {
+    return simplifiedApiService(
+      service.raw<null>({
+        url: `/contact/${id}/policy`,
+        method: "GET",
+        params: {
+          id: policyId,
+        },
       }),
     );
   },

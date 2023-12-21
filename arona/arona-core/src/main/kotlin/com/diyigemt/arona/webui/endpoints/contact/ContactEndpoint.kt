@@ -54,11 +54,16 @@ internal data class ContactMemberUpdateReq(
   val name: String,
   val roles: List<String>,
 )
+@Serializable
+internal data class ContactRoleCreateReq(
+  val id: String,
+  val name: String,
+)
 
 @AronaBackendEndpoint("/contact")
 internal object ContactEndpoint {
   private val NoRequestContactIdPath = listOf("/contacts")
-  private val RequestContactAdminPath = listOf("/contact", "/contact-basic", "/roles", "/members")
+  private val RequestContactAdminPath = listOf("/contact", "/contact-basic", "/roles", "/members", "/policies", "/role")
   private val PipelineContext<Unit, ApplicationCall>.contactId
     get() = request.queryParameters["id"] ?: context.parameters["id"]!!
 
@@ -83,7 +88,7 @@ internal object ContactEndpoint {
     }
     // 检查权限?
     if (method == HttpMethod.Get) {
-      request.queryParameters["id"]
+      context.parameters["id"] ?: request.queryParameters["id"]
     } else {
       context.parameters["id"] ?: context.receiveJsonOrNull<IdBody>()?.id
     }?.let {
@@ -193,23 +198,33 @@ internal object ContactEndpoint {
   suspend fun PipelineContext<Unit, ApplicationCall>.contactMembers() {
     return success(contact.members)
   }
+  /**
+   * 获取某个群/频道策略列表
+   */
+  @AronaBackendEndpointGet("/policies")
+  suspend fun PipelineContext<Unit, ApplicationCall>.contactPolicies() {
+    return success(contact.policies)
+  }
 
+  /**
+   * 更新用户信息
+   */
   @AronaBackendEndpointPut("/{id}/member")
   suspend fun PipelineContext<Unit, ApplicationCall>.updateMember() {
-    val target = context.receiveJsonOrNull<ContactMemberUpdateReq>() ?: return badRequest()
-    // 检查权限
-    val permit = target.id == aronaUser.id || contact.checkAdminPermission(aronaUser.id)
+    val data = context.receiveJsonOrNull<ContactMemberUpdateReq>() ?: return badRequest()
+    // 检查权限 只能更新自己的或者自己管理的他人的
+    val permit = data.id == aronaUser.id || contact.checkAdminPermission(aronaUser.id)
     if (permit) {
       return if (
         ContactDocument.withCollection<ContactDocument, UpdateResult> {
           updateOne(
             filter = Filters.and(
               idFilter(contact.id),
-              Filters.eq("${ContactDocument::members.name}._id", target.id)
+              Filters.eq("${ContactDocument::members.name}._id", data.id)
             ),
             update = Updates.combine(
-              Updates.set("${ContactDocument::members.name}.$.${ContactMember::name.name}", target.name),
-              Updates.set("${ContactDocument::members.name}.$.${ContactMember::roles.name}", target.roles),
+              Updates.set("${ContactDocument::members.name}.$.${ContactMember::name.name}", data.name),
+              Updates.set("${ContactDocument::members.name}.$.${ContactMember::roles.name}", data.roles),
             )
           )
         }.modifiedCount == 1L
@@ -218,5 +233,77 @@ internal object ContactEndpoint {
     } else {
       return errorPermissionDeniedMessage()
     }
+  }
+
+  /**
+   * 创建角色
+   */
+  @AronaBackendEndpointPost("/{id}/role")
+  suspend fun PipelineContext<Unit, ApplicationCall>.createRole() {
+    val data = context.receiveJsonOrNull<ContactRoleCreateReq>() ?: return badRequest()
+    return if (
+      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+        updateOne(
+          filter = idFilter(contact.id),
+          update = Updates.addToSet(
+            ContactDocument::roles.name,
+            ContactRole.createRole(data.name)
+          )
+        )
+      }.modifiedCount == 1L
+    ) success()
+    else internalServerError()
+  }
+  /**
+   * 删除角色
+   */
+  @AronaBackendEndpointDelete("/{id}/role")
+  suspend fun PipelineContext<Unit, ApplicationCall>.deleteRole() {
+    val data = context.receiveJsonOrNull<IdBody>() ?: return badRequest()
+    // TODO
+    // 删除 contact document 的 roles
+    // 删除所有 member 的 role
+    // 删除 policy 与 role 有关的
+    internalServerError()
+  }
+  /**
+   * 更新角色
+   */
+  @AronaBackendEndpointPut("/{id}/role")
+  suspend fun PipelineContext<Unit, ApplicationCall>.updateRole() {
+    val data = context.receiveJsonOrNull<ContactRoleCreateReq>() ?: return badRequest()
+    return if (
+      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+        updateOne(
+          filter = Filters.and(
+            idFilter(contact.id),
+            Filters.eq("${ContactDocument::roles.name}._id", data.id)
+          ),
+          update = Updates.set("${ContactDocument::roles.name}.$.${ContactRole::name.name}", data.name),
+        )
+      }.modifiedCount == 1L
+    ) success()
+    else internalServerError()
+  }
+  /**
+   * 更新策略
+   */
+  @AronaBackendEndpointPut("/{id}/policy")
+  suspend fun PipelineContext<Unit, ApplicationCall>.updatePolicy() {
+
+  }
+  /**
+   * 创建策略
+   */
+  @AronaBackendEndpointPost("/{id}/policy")
+  suspend fun PipelineContext<Unit, ApplicationCall>.createPolicy() {
+
+  }
+  /**
+   * 删除策略
+   */
+  @AronaBackendEndpointDelete("/{id}/policy")
+  suspend fun PipelineContext<Unit, ApplicationCall>.deletePolicy() {
+
   }
 }

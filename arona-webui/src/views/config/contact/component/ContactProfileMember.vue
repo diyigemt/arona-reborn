@@ -8,6 +8,9 @@ import { successMessage } from "@/utils/message";
 defineOptions({
   name: "ContactProfileMember",
 });
+const emit = defineEmits<{
+  (e: "update"): void;
+}>();
 const contact = inject<ComputedRef<EditableContact>>("contact") as ComputedRef<EditableContact>;
 const roles = computed(() => contact.value.roles);
 function roleNameMapper(mem: EditableContactMember) {
@@ -17,6 +20,7 @@ const { onConfirm, onEdit, onCancel, cache: member } = useTableInlineEditor(cont
 function onMemberConfirmEdit(): Promise<unknown> {
   return ContactApi.updateContactMember(contact.value.id, member.value).then(() => {
     successMessage("更新成功");
+    emit("update");
   });
 }
 </script>

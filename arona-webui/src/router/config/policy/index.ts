@@ -14,7 +14,7 @@ const PolicyRouter: Array<RouteRecordRaw> = [
       },
       {
         path: "config",
-        name: "config",
+        name: "policy-config",
         meta: {
           title: "策略配置",
         },

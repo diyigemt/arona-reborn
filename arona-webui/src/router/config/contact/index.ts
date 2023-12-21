@@ -14,7 +14,7 @@ const ContactRouter: Array<RouteRecordRaw> = [
       },
       {
         path: "manage",
-        name: "manage",
+        name: "contact-manage",
         meta: {
           title: "我管理的群",
         },
@@ -22,7 +22,7 @@ const ContactRouter: Array<RouteRecordRaw> = [
       },
       {
         path: "join",
-        name: "join",
+        name: "contact-join",
         meta: {
           title: "我加入的群",
         },

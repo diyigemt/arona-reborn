@@ -1,5 +1,5 @@
 import service, { simplifiedApiService } from "@/api/http";
-import { Contact, EditableContact, ContactUpdateReq, ContactMember, ContactRole } from "@/interface";
+import { Contact, EditableContact, ContactUpdateReq, ContactMember, ContactRole, Policy } from "@/interface";
 
 // eslint-disable-next-line import/prefer-default-export
 export const ContactApi = {
@@ -75,11 +75,11 @@ export const ContactApi = {
   },
   fetchContactPolicy(id: string, policyId: string) {
     return simplifiedApiService(
-      service.raw<null>({
+      service.raw<Policy>({
         url: `/contact/${id}/policy`,
         method: "GET",
         params: {
-          id: policyId,
+          pid: policyId,
         },
       }),
     );

@@ -48,12 +48,14 @@ internal data class ContactUpdateReq(
   val id: String,
   val contactName: String,
 )
+
 @Serializable
 internal data class ContactMemberUpdateReq(
   val id: String,
   val name: String,
   val roles: List<String>,
 )
+
 @Serializable
 internal data class ContactRoleCreateReq(
   val id: String,
@@ -63,7 +65,10 @@ internal data class ContactRoleCreateReq(
 @AronaBackendEndpoint("/contact")
 internal object ContactEndpoint {
   private val NoRequestContactIdPath = listOf("/contacts")
-  private val RequestContactAdminPath = listOf("/contact", "/contact-basic", "/roles", "/members", "/policies", "/role")
+  private val RequestContactAdminPath = listOf(
+    "/contact", "/contact-basic", "/roles", "/members", "/policies",
+    "/role", "/policy"
+  )
   private val PipelineContext<Unit, ApplicationCall>.contactId
     get() = request.queryParameters["id"] ?: context.parameters["id"]!!
 
@@ -81,7 +86,7 @@ internal object ContactEndpoint {
     val method = context.request.httpMethod
     val path = context.request.path()
     if (method == HttpMethod.Get && NoRequestContactIdPath.none { path.endsWith(it) }) {
-      if (request.queryParameters["id"] == null) {
+      if ((context.parameters["id"] ?: request.queryParameters["id"]) == null) {
         errorMessage("缺少请求参数")
         return finish()
       }
@@ -198,6 +203,7 @@ internal object ContactEndpoint {
   suspend fun PipelineContext<Unit, ApplicationCall>.contactMembers() {
     return success(contact.members)
   }
+
   /**
    * 获取某个群/频道策略列表
    */
@@ -254,6 +260,7 @@ internal object ContactEndpoint {
     ) success()
     else internalServerError()
   }
+
   /**
    * 删除角色
    */
@@ -266,6 +273,7 @@ internal object ContactEndpoint {
     // 删除 policy 与 role 有关的
     internalServerError()
   }
+
   /**
    * 更新角色
    */
@@ -285,6 +293,18 @@ internal object ContactEndpoint {
     ) success()
     else internalServerError()
   }
+
+  /**
+   * 获取策略
+   */
+  @AronaBackendEndpointGet("/{id}/policy")
+  suspend fun PipelineContext<Unit, ApplicationCall>.policy() {
+    val id = request.queryParameters["pid"] ?: return badRequest()
+    return contact.policies.firstOrNull { it.id == id }?.let {
+      success(it)
+    } ?: success()
+  }
+
   /**
    * 更新策略
    */
@@ -292,6 +312,7 @@ internal object ContactEndpoint {
   suspend fun PipelineContext<Unit, ApplicationCall>.updatePolicy() {
 
   }
+
   /**
    * 创建策略
    */
@@ -299,6 +320,7 @@ internal object ContactEndpoint {
   suspend fun PipelineContext<Unit, ApplicationCall>.createPolicy() {
 
   }
+
   /**
    * 删除策略
    */

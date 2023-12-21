@@ -14,7 +14,7 @@ const UserRouter: Array<RouteRecordRaw> = [
       },
       {
         path: "profile",
-        name: "profile",
+        name: "user-profile",
         meta: {
           title: "个人信息",
         },

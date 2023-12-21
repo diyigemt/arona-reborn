@@ -10,11 +10,11 @@ const PolicyRouter: Array<RouteRecordRaw> = [
     children: [
       {
         path: "",
-        redirect: "config-policy",
+        redirect: "config",
       },
       {
-        path: "config-policy",
-        name: "config-policy",
+        path: "config",
+        name: "config",
         meta: {
           title: "策略配置",
         },

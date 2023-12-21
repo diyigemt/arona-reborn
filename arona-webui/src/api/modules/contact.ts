@@ -1,5 +1,5 @@
 import service, { simplifiedApiService } from "@/api/http";
-import { Contact, ContactUpdateReq } from "@/interface";
+import { Contact, EditableContact, ContactUpdateReq, ContactMember } from "@/interface";
 
 // eslint-disable-next-line import/prefer-default-export
 export const ContactApi = {
@@ -13,20 +13,35 @@ export const ContactApi = {
   },
   fetchContact(id: string) {
     return simplifiedApiService(
-      service.raw<Contact>({
+      service.raw<EditableContact>({
         url: "/contact/contact",
         method: "GET",
         params: {
           id,
         },
       }),
-    );
+    ).then((data) => {
+      // eslint-disable-next-line no-return-assign
+      data.roles.forEach((it) => (it.edit = false));
+      // eslint-disable-next-line no-return-assign
+      data.members.forEach((it) => (it.edit = false));
+      return data;
+    });
   },
   updateContact(data: ContactUpdateReq) {
     return simplifiedApiService(
       service.raw<null>({
         url: "/contact/contact-basic",
         method: "POST",
+        data,
+      }),
+    );
+  },
+  updateContactMember(id: string, data: ContactMember) {
+    return simplifiedApiService(
+      service.raw<null>({
+        url: `/contact/${id}/member`,
+        method: "PUT",
         data,
       }),
     );

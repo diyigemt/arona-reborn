@@ -12,7 +12,6 @@ import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toReadableTencentAt
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import com.diyigemt.arona.communication.message.toMessageChain
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactMemberOrNull
 import com.diyigemt.arona.permission.Permission.Companion.testPermission
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.context2

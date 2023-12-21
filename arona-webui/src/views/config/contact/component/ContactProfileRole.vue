@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ComputedRef } from "vue";
-import { Contact } from "@/interface";
+import { EditableContact } from "@/interface";
 
 defineOptions({
   name: "ContactProfileRole",
 });
-const contact = inject<ComputedRef<Contact>>("contact") as ComputedRef<Contact>;
+const contact = inject<ComputedRef<EditableContact>>("contact") as ComputedRef<EditableContact>;
 </script>
 
 <template>

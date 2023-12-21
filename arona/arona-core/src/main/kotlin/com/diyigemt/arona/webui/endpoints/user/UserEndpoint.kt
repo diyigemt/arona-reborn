@@ -2,24 +2,39 @@ package com.diyigemt.arona.webui.endpoints.user
 
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
+import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.permission.UserDocument
+import com.diyigemt.arona.database.withCollection
+import com.diyigemt.arona.utils.badRequest
+import com.diyigemt.arona.utils.internalServerError
 import com.diyigemt.arona.utils.success
-import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
-import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
+import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints._aronaUser
-import com.diyigemt.arona.webui.endpoints.request
+import com.diyigemt.arona.webui.endpoints.contact.ContactMemberUpdateReq
+import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
+import com.mongodb.client.model.Updates
+import com.mongodb.client.result.UpdateResult
 import io.ktor.server.application.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class AuthResp(
+internal data class AuthResp(
   val status: Int, // 0 1 2 无效 等待 成功
   val token: String = "",
 )
-
+@Serializable
+internal data class UserProfileResp(
+  val id: String,
+  val username: String,
+)
+@Serializable
+internal data class UserProfileUpdateReq(
+  val username: String,
+)
 @Suppress("unused")
 @AronaBackendEndpoint("/user")
-object UserEndpoint {
+internal object UserEndpoint {
   private fun generateNumber(): String = (1..6).map { "0123456789".random() }.joinToString("")
 
   /**
@@ -70,6 +85,37 @@ object UserEndpoint {
 
   }
 
+  /**
+   * 获取个人信息
+   */
+  @AronaBackendEndpointGet("")
+  suspend fun PipelineContext<Unit, ApplicationCall>.profile() {
+    return success(
+      UserProfileResp(
+        aronaUser.id,
+        aronaUser.username
+      )
+    )
+  }
+  /**
+   * 更新个人信息
+   */
+  @AronaBackendEndpointPut("")
+  suspend fun PipelineContext<Unit, ApplicationCall>.updateProfile() {
+    val data = context.receiveJsonOrNull<UserProfileUpdateReq>() ?: return badRequest()
+    return if (
+      UserDocument.withCollection<UserDocument, UpdateResult> {
+        updateOne(
+          filter = idFilter(aronaUser.id),
+          update = Updates.set(UserDocument::username.name, data.username)
+        )
+      }.modifiedCount == 1L
+    ) {
+      success()
+    } else {
+      internalServerError()
+    }
+  }
   /**
    * 获取绑定凭证/绑定结果
    */

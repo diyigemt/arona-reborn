@@ -1,4 +1,5 @@
 import service, { simplifiedApiService } from "@/api/http";
+import { User } from "@/interface";
 
 interface AuthResp {
   status: 0 | 1 | 2; // 0 1 2 无效 等待 成功
@@ -25,4 +26,21 @@ export const UserApi = {
       }),
     );
   },
+  fetchUserProfile() {
+    return simplifiedApiService(
+      service.raw<User>({
+        url: "/user",
+        method: "GET",
+      }),
+    );
+  },
+  updateUserProfile(data: User) {
+    return simplifiedApiService(
+      service.raw<void>({
+        url: "/user",
+        method: "PUT",
+        data,
+      }),
+    );
+  }
 };

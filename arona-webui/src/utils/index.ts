@@ -1,3 +1,5 @@
+import { Ref } from "vue";
+
 export function deepCopy<T>(data: T): T {
   return JSON.parse(JSON.stringify(data));
 }
@@ -65,5 +67,41 @@ export function pickRandomArrayItemAndPutBack<T>(arr: T[]) {
   return {
     arr,
     item: pickItem,
+  };
+}
+
+export function useTableInlineEditor<T extends { id: string; edit: boolean }>(
+  datasource: T[],
+  onConfirm: (data: T) => Promise<unknown>,
+  onEdit: (data: T) => Promise<unknown> = () => Promise.resolve(),
+  onCancel: (data: T) => Promise<unknown> = () => Promise.resolve(),
+) {
+  const cache = ref<T>() as Ref<T>;
+  return {
+    cache,
+    onEdit(data: T) {
+      onEdit(data).then(() => {
+        if (cache.value) {
+          this.onCancel(datasource.filter((it) => it.id === cache.value.id)[0]).then(() => {
+            cache.value = data;
+            cache.value.edit = true;
+          });
+        } else {
+          cache.value = data;
+          cache.value.edit = true;
+        }
+      });
+    },
+    onConfirm(data: T) {
+      onConfirm(data).then((next) => {
+        cache.value.edit = false;
+      });
+    },
+    onCancel(data: T) {
+      return onCancel(data).then((next) => {
+        cache.value = data;
+        data.edit = false;
+      });
+    },
   };
 }

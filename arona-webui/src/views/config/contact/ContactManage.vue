@@ -11,7 +11,7 @@
 
 <script setup lang="ts">
 import { Ref } from "vue";
-import { Contact } from "@/interface";
+import { Contact, EditableContact } from "@/interface";
 import { ContactApi } from "@/api";
 import ContactList from "@/views/config/contact/component/ContactList.vue";
 import ContactProfile from "@/views/config/contact/component/ContactProfile.vue";
@@ -20,7 +20,7 @@ defineOptions({
   name: "ContactManage",
 });
 const contacts = ref<Contact[]>([]);
-const contact = ref<Contact>() as Ref<Contact>;
+const contact = ref<EditableContact>() as Ref<EditableContact>;
 function onSelectContact(id: string) {
   if (!contacts.value.some((it) => it.id === id)) {
     return;

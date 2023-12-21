@@ -71,10 +71,4 @@ function onCancelUpdateBasicInfo() {
   </div>
 </template>
 
-<style scoped lang="scss">
-.custom-description {
-  :deep(.el-descriptions__label) {
-    width: 120px;
-  }
-}
-</style>
+<style scoped lang="scss"></style>

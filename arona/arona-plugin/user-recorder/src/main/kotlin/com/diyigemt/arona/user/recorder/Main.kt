@@ -4,15 +4,18 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.diyigemt.arona.user.recorder.database.*
 import com.diyigemt.arona.user.recorder.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
+import com.github.ajalt.clikt.core.CliktCommand
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import java.util.Timer
 import kotlin.concurrent.scheduleAtFixedRate
+import kotlin.system.exitProcess
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
@@ -125,6 +128,17 @@ object PluginMain : AronaPlugin(
           }
         }
       }
+    }
+  }
+}
+
+class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显示当日dau") {
+  override fun run() {
+    dbQuery {
+      val contactCount = Contact.count()
+      val userCount = User.count()
+      val dau = DailyActiveUser.findById(currentDate())?.count
+      echo("contact: $contactCount, user: $userCount, dau: $dau")
     }
   }
 }

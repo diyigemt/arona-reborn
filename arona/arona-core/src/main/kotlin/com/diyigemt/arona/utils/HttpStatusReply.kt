@@ -21,6 +21,8 @@ suspend fun PipelineContext<Unit, ApplicationCall>.forbidden() =
 suspend fun PipelineContext<Unit, ApplicationCall>.internalServerError() =
   context.respond(ServerResponse(HttpStatusCode.InternalServerError, null))
 
+suspend fun PipelineContext<Unit, ApplicationCall>.errorPermissionDeniedMessage() = errorMessage("权限不足")
+
 suspend fun PipelineContext<Unit, ApplicationCall>.errorMessage(message: String) =
   context.respond(ServerResponse(HttpStatusCode(601, message), null))
 

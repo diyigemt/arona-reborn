@@ -26,6 +26,7 @@ axiosInstance.interceptors.request.use(
   // @ts-ignore
   (config: IRequestConfig) => {
     Reflect.set(config.headers || {}, "Authorization", useBaseStore().token);
+    config.showResponseError = config.showResponseError || true;
     config.showServerResponseError = config.showServerResponseError || true;
     return config;
   },

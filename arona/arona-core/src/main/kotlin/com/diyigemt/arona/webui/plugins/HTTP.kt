@@ -1,12 +1,14 @@
 package com.diyigemt.arona.webui.plugins
 
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
+import com.diyigemt.arona.utils.badRequest
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.server.request.*
+import io.ktor.util.pipeline.*
 import io.ktor.utils.io.core.*
 
 val HttpHeaders.AronaInstanceVersion: String
@@ -22,12 +24,19 @@ suspend inline fun <reified T> ApplicationCall.receiveJson(): T {
   return JsonIgnoreUnknownKeys.decodeFromString(receiveText())
 }
 
+suspend inline fun <reified T> ApplicationCall.receiveJsonOrNull(): T? {
+  return runCatching {
+    receiveJson<T>()
+  }.getOrNull()
+}
+
 fun Application.configureHTTP() {
   install(ForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy
   install(XForwardedHeaders) // WARNING: for security, do not include this if not behind a reverse proxy
   install(CORS) {
     allowMethod(HttpMethod.Options)
     allowMethod(HttpMethod.Get)
+    allowMethod(HttpMethod.Put)
     allowMethod(HttpMethod.Post)
     allowMethod(HttpMethod.Delete)
     allowHeader(HttpHeaders.Host)

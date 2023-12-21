@@ -54,7 +54,12 @@ fun Application.configureRouting() {
           .map { method -> method.findAnnotation<AronaBackendEndpointPost>()!!.path to method }
         val delete = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointDelete>(it::class)
           .map { method -> method.findAnnotation<AronaBackendEndpointDelete>()!!.path to method }
-        val methodList = listOf(HttpMethod.Get to get, HttpMethod.Post to post, HttpMethod.Delete to delete)
+        val put = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointPut>(it::class)
+          .map { method -> method.findAnnotation<AronaBackendEndpointPut>()!!.path to method }
+        val methodList = listOf(
+          HttpMethod.Get to get, HttpMethod.Post to post, HttpMethod.Delete to delete,
+          HttpMethod.Put to put
+        )
         route(basePath) {
           methodList.forEach { (httpMethod, handlers) ->
             handlers.forEach { (path, method) ->

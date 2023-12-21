@@ -19,7 +19,16 @@ export interface Contact {
   members: ContactMember[];
   registerTime: string;
 }
-
+export interface EditableContactRole extends ContactRole {
+  edit: boolean;
+}
+export interface EditableContactMember extends ContactMember {
+  edit: boolean;
+}
+export interface EditableContact extends Contact {
+  roles: EditableContactRole[];
+  members: EditableContactMember[];
+}
 export interface ContactUpdateReq {
   id: string;
   contactName: string;

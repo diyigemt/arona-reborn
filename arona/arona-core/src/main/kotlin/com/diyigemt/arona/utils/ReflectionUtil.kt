@@ -52,8 +52,8 @@ object ReflectionUtil : ReflectionUtils() {
     .filterNot { it.hasAnnotation<ReflectionIgnore>() }
     .filter { it.hasAnnotation<T>() }
 
-  private fun <T : Any> scanInterfacePetClass(clazz: KClass<T>) = reflections.get(Scanners.SubTypes.with(clazz.java))
-  private fun <T : Any> scanInterfacePetClass(scanner: Reflections, clazz: KClass<T>) =
+  fun <T : Any> scanInterfacePetClass(clazz: KClass<T>) = reflections.get(Scanners.SubTypes.with(clazz.java))
+  fun <T : Any> scanInterfacePetClass(scanner: Reflections, clazz: KClass<T>) =
     scanner.get(Scanners.SubTypes.with(clazz.java))
 
   fun <T : Annotation> scanTypeAnnotatedObjectInstance(clazz: KClass<T>) = runCatching {

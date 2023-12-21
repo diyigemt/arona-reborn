@@ -7,13 +7,12 @@ import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactRole
-import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactType
 import com.diyigemt.arona.database.withCollection
-import com.diyigemt.arona.utils.errorMessage
-import com.diyigemt.arona.utils.success
+import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.plugins.receiveJson
+import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Projections
@@ -49,13 +48,19 @@ internal data class ContactUpdateReq(
   val id: String,
   val contactName: String,
 )
+@Serializable
+internal data class ContactMemberUpdateReq(
+  val id: String,
+  val name: String,
+  val roles: List<String>,
+)
 
 @AronaBackendEndpoint("/contact")
 internal object ContactEndpoint {
   private val NoRequestContactIdPath = listOf("/contacts")
   private val RequestContactAdminPath = listOf("/contact", "/contact-basic", "/roles", "/members")
   private val PipelineContext<Unit, ApplicationCall>.contactId
-    get() = request.queryParameters["id"]!!
+    get() = request.queryParameters["id"] ?: context.parameters["id"]!!
 
   private val ContextContactAttrKey = AttributeKey<ContactDocument>("contact")
 
@@ -77,29 +82,24 @@ internal object ContactEndpoint {
       }
     }
     // 检查权限?
+    if (method == HttpMethod.Get) {
+      request.queryParameters["id"]
+    } else {
+      context.parameters["id"] ?: context.receiveJsonOrNull<IdBody>()?.id
+    }?.let {
+      findContactDocumentByIdOrNull(it)
+    }?.run {
+      _contact = this
+    }
     if (RequestContactAdminPath.any { path.endsWith(it) }) {
-      val id: String? = if (method == HttpMethod.Get) {
-        contactId
-      } else {
-        kotlin.runCatching {
-          context.receiveJson<IdBody>().id
-        }.getOrNull()
-      }
-      if (id != null) {
-        when (val contact = findContactDocumentByIdOrNull(id)) {
-          is ContactDocument -> {
-            if (contact.members.none { it.roles.contains(DEFAULT_ADMIN_CONTACT_ROLE_ID) && it.id == aronaUser.id }) {
-              errorMessage("权限不足")
-              return finish()
-            }
-            _contact = contact
-          }
-
-          else -> {
-            errorMessage("群/频道信息查询失败")
-            return finish()
-          }
+      if (_contact != null) {
+        if (!contact.checkAdminPermission(aronaUser.id)) {
+          errorPermissionDeniedMessage()
+          return finish()
         }
+      } else {
+        errorMessage("群/频道信息查询失败")
+        return finish()
       }
     }
   }
@@ -192,5 +192,31 @@ internal object ContactEndpoint {
   @AronaBackendEndpointGet("/members")
   suspend fun PipelineContext<Unit, ApplicationCall>.contactMembers() {
     return success(contact.members)
+  }
+
+  @AronaBackendEndpointPut("/{id}/member")
+  suspend fun PipelineContext<Unit, ApplicationCall>.updateMember() {
+    val target = context.receiveJsonOrNull<ContactMemberUpdateReq>() ?: return badRequest()
+    // 检查权限
+    val permit = target.id == aronaUser.id || contact.checkAdminPermission(aronaUser.id)
+    if (permit) {
+      return if (
+        ContactDocument.withCollection<ContactDocument, UpdateResult> {
+          updateOne(
+            filter = Filters.and(
+              idFilter(contact.id),
+              Filters.eq("${ContactDocument::members.name}._id", target.id)
+            ),
+            update = Updates.combine(
+              Updates.set("${ContactDocument::members.name}.$.${ContactMember::name.name}", target.name),
+              Updates.set("${ContactDocument::members.name}.$.${ContactMember::roles.name}", target.roles),
+            )
+          )
+        }.modifiedCount == 1L
+      ) success()
+      else internalServerError()
+    } else {
+      return errorPermissionDeniedMessage()
+    }
   }
 }

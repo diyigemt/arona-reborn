@@ -6,11 +6,11 @@ import ch.qos.logback.core.AppenderBase
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder
 import kotlinx.coroutines.delay
 import org.fusesource.jansi.AnsiConsole
-import org.jline.reader.LineReader
-import org.jline.reader.LineReaderBuilder
+import org.jline.reader.*
 import org.jline.terminal.TerminalBuilder
+import org.jline.utils.AttributedString
 
-val lineReader: LineReader by lazy {
+internal val lineReader: LineReader by lazy {
   AnsiConsole.systemInstall()
   val terminal = TerminalBuilder
     .builder()
@@ -18,7 +18,13 @@ val lineReader: LineReader by lazy {
     .jansi(true)
     .system(true)
     .build()
-  LineReaderBuilder.builder().terminal(terminal).build()
+  LineReaderBuilder.builder().terminal(terminal).completer { _, _, candidates ->
+    candidates.addAll(
+      CommandMain.registeredCommands().map {
+        Candidate(AttributedString.stripAnsi(it), it, null, null, null, null, true)
+      }
+    )
+  }.build()
 }
 
 suspend fun launchConsole() {
@@ -40,7 +46,7 @@ fun appendConsole(message: String? = null) {
 class CustomAppender : AppenderBase<ILoggingEvent>() {
   private val encoder: LayoutWrappingEncoder<ILoggingEvent> = LayoutWrappingEncoder()
   private val layout: PatternLayout = PatternLayout()
-  private var pattern: String = "%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  private var pattern: String = "%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %logger{36} - %msg%n"
 
   override fun start() {
     super.start()

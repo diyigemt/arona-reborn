@@ -5,6 +5,7 @@ import ContactRouter from "@/router/config/contact";
 import PluginRouter from "@/router/config/plugin";
 import DatabaseRouter from "@/router/config/database";
 import SettingRouter from "@/router/config/setting";
+import UserRouter from "@/router/config/user";
 
 const ConfigRoutes: Array<RouteRecordRaw> = [
   {
@@ -31,6 +32,7 @@ const ConfigRoutes: Array<RouteRecordRaw> = [
       ...PluginRouter,
       ...DatabaseRouter,
       ...SettingRouter,
+      ...UserRouter,
     ],
   },
 ];

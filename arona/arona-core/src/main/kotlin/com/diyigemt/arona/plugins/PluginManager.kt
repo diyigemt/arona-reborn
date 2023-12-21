@@ -4,7 +4,10 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.internal.MultiFilePluginDataStorageImpl
+import com.diyigemt.arona.console.CommandLineSubCommand
+import com.diyigemt.arona.console.CommandMain
 import com.diyigemt.arona.utils.commandLineLogger
+import com.github.ajalt.clikt.core.CliktCommand
 import io.ktor.util.logging.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -86,6 +89,16 @@ object PluginManager {
         }
         storage.load(pluginInstance, dataInstance)
       }
+      // 注册控制台指令
+      val consoleCommandQuery = org.reflections.scanners.Scanners.SubTypes
+        .of(CommandLineSubCommand::class.java)
+        .asClass<CommandLineSubCommand>(pluginClassLoader)
+      consoleCommandQuery.apply(reflections.store)
+        .filter { CliktCommand::class.java.isAssignableFrom(it) }
+        .map { it.getDeclaredConstructor().newInstance() }
+        .also {
+          CommandMain.registerCommands(it as List<CliktCommand>)
+        }
       pluginInstance.internalOnEnable()
       plugins.add(pluginInstance)
     }

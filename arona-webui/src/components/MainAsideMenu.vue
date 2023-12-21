@@ -4,14 +4,14 @@
       <template #title>
         <span>群</span>
       </template>
-      <el-menu-item index="/config/contact/contact-manage">我管理的群</el-menu-item>
-      <el-menu-item index="/config/contact/contact-join">我加入的群 </el-menu-item>
+      <el-menu-item index="/config/contact/manage">我管理的群</el-menu-item>
+      <el-menu-item index="/config/contact/join">我加入的群 </el-menu-item>
     </el-sub-menu>
     <el-sub-menu index="2">
       <template #title>
         <span>策略</span>
       </template>
-      <el-menu-item index="/config/policy/config-policy">策略配置</el-menu-item>
+      <el-menu-item index="/config/policy/config">策略配置</el-menu-item>
     </el-sub-menu>
     <el-sub-menu index="3">
       <template #title>
@@ -19,6 +19,7 @@
       </template>
       <el-menu-item index="/config/plugin/arona-preferences">Arona</el-menu-item>
     </el-sub-menu>
+    <el-menu-item index="/config/user/profile">个人中心</el-menu-item>
   </el-menu>
 </template>
 

@@ -8,11 +8,8 @@ import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.addMember
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.updateContactDocumentName
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.updateMemberRole
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactType

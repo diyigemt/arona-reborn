@@ -1,5 +1,4 @@
 <template>
-  <div>Contact</div>
   <ContactList :contact="contacts" @select="onSelectContact" />
 </template>
 

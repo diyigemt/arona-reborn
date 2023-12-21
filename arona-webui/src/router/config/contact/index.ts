@@ -13,16 +13,16 @@ const ContactRouter: Array<RouteRecordRaw> = [
         redirect: "contact-manage",
       },
       {
-        path: "contact-manage",
-        name: "contact-manage",
+        path: "manage",
+        name: "manage",
         meta: {
           title: "我管理的群",
         },
         component: () => import("@/views/config/contact/ContactManage.vue"),
       },
       {
-        path: "contact-join",
-        name: "contact-join",
+        path: "join",
+        name: "join",
         meta: {
           title: "我加入的群",
         },

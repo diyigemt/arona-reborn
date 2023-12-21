@@ -25,6 +25,12 @@ annotation class AronaBackendEndpointPost(
 )
 
 @Target(AnnotationTarget.FUNCTION)
+annotation class AronaBackendEndpointPut(
+  val path: String = "",
+  val withoutTransaction: Boolean = false
+)
+
+@Target(AnnotationTarget.FUNCTION)
 annotation class AronaBackendEndpointDelete(
   val path: String = "",
   val withoutTransaction: Boolean = false

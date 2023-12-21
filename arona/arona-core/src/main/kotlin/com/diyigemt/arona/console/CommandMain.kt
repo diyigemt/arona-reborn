@@ -6,12 +6,12 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.*
 import io.ktor.util.logging.*
 import kotlin.system.exitProcess
 
-@Target(AnnotationTarget.CLASS)
-annotation class CommandLineSubCommand
+interface CommandLineSubCommand
 
 internal val commandTerminal = Terminal(JLineTerminalInterface())
 
@@ -19,16 +19,25 @@ class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invo
   @Suppress("UNCHECKED_CAST")
   companion object {
     private val instance = CommandMain().subcommands(ReflectionUtil
-      .scanTypeAnnotatedClass(CommandLineSubCommand::class)
+      .scanInterfacePetClass(CommandLineSubCommand::class)
       .map { Class.forName(it) }
+      .filter { CliktCommand::class.java.isAssignableFrom(it) }
       .map { it.getDeclaredConstructor().newInstance() }
         as List<CliktCommand>).apply {
       context {
         terminal = commandTerminal
       }
     }
-
-    fun run(argv: List<String>) {
+    internal fun registerCommands(command: List<CliktCommand>) {
+      command.forEach {
+        it.context {
+          terminal = commandTerminal
+        }
+      }
+      instance.subcommands(command)
+    }
+    internal fun registeredCommands() = instance.registeredSubcommands().map { it.commandName }
+    internal fun run(argv: List<String>) {
       runCatching {
         instance.parse(argv)
       }.onFailure {
@@ -43,18 +52,26 @@ class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invo
   override fun run() {}
 }
 
-@CommandLineSubCommand
-class ExitCommand : CliktCommand(name = "exit", help = "安全退出程序") {
+@Suppress("unused")
+class ExitCommand : CommandLineSubCommand, CliktCommand(name = "exit", help = "安全退出程序") {
   override fun run() {
     echo("exiting")
     exitProcess(0)
   }
 }
 
-@CommandLineSubCommand
-class PermissionManagerCommand : CliktCommand(name = "perm", help = "查看权限") {
+@Suppress("unused")
+class PermissionManagerCommand : CommandLineSubCommand, CliktCommand(name = "perm", help = "查看权限") {
   override fun run() {
     echo("permission")
+  }
+}
+
+@Suppress("unused")
+class GlobalAnnouncementCommand : CommandLineSubCommand, CliktCommand(name = "anno", help = "主动消息通知") {
+  override fun run() {
+    // todo
+    echo("还没做")
   }
 }
 

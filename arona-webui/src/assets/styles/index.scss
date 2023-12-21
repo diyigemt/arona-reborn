@@ -86,3 +86,9 @@ body {
     padding-bottom: 0;
   }
 }
+
+.custom-description {
+  .el-descriptions__label {
+    width: 120px;
+  }
+}

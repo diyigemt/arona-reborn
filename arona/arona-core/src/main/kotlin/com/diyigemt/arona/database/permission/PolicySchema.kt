@@ -2,6 +2,7 @@ package com.diyigemt.arona.database.permission
 
 import codes.laurence.warden.policy.bool.AllOf
 import codes.laurence.warden.policy.bool.AnyOf
+import codes.laurence.warden.policy.bool.Not
 import codes.laurence.warden.policy.collections.CollectionBasedPolicy
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
@@ -18,7 +19,9 @@ enum class PolicyNodeEffect {
 
 enum class PolicyNodeGroupType {
   ALL,
-  ANY
+  ANY,
+  NOT_ALL,
+  NOT_ANY,
 }
 
 enum class PolicyRuleType {
@@ -38,7 +41,7 @@ enum class PolicyRuleOperator {
   ContainsAll, // 将key和value对应值看作list
   ContainsAny, // 将key和value对应值看作list
   IsIn, // 将value对应值看作list
-  IsCHILD, // 检查形如  xxx.xxx.xx:*的依赖关系
+  IsChild, // 检查形如  xxx.xxx.xx:*的依赖关系
 }
 
 @Serializable
@@ -67,7 +70,7 @@ data class PolicyRule(
           PolicyRuleOperator.ContainsAll -> left containsAll value.split(",")
           PolicyRuleOperator.ContainsAny -> left containsAny value.split(",")
           PolicyRuleOperator.IsIn -> left isIn value.split(",")
-          PolicyRuleOperator.IsCHILD -> left isChild value
+          PolicyRuleOperator.IsChild -> left isChild value
         }
       }
     }
@@ -86,10 +89,17 @@ data class PolicyNode(
      * allow to deny
      */
     internal fun PolicyNode.build(): P {
-      val father = if (groupType == PolicyNodeGroupType.ALL) AllOf(mutableListOf()) else AnyOf(mutableListOf())
+      val father = when (groupType) {
+        PolicyNodeGroupType.ALL, PolicyNodeGroupType.NOT_ALL -> AllOf()
+        PolicyNodeGroupType.ANY, PolicyNodeGroupType.NOT_ANY -> AnyOf()
+      }
       rule?.forEach { it.build(father) }
       children?.forEach { father.policies.add(it.build()) }
-      return father
+      return if (groupType == PolicyNodeGroupType.NOT_ANY || groupType == PolicyNodeGroupType.NOT_ALL) {
+        Not(father)
+      } else {
+        father
+      }
     }
 
   }
@@ -130,7 +140,7 @@ data class Policy(
               ),
               PolicyRule(
                 type = PolicyRuleType.Resource,
-                operator = PolicyRuleOperator.IsCHILD,
+                operator = PolicyRuleOperator.IsChild,
                 key = "id",
                 value = "*"
               )
@@ -158,7 +168,7 @@ data class Policy(
                 ),
                 PolicyRule(
                   type = PolicyRuleType.Resource,
-                  operator = PolicyRuleOperator.IsCHILD,
+                  operator = PolicyRuleOperator.IsChild,
                   key = "id",
                   value = "*"
                 )
@@ -182,7 +192,7 @@ data class Policy(
                 ),
                 PolicyRule(
                   type = PolicyRuleType.Resource,
-                  operator = PolicyRuleOperator.IsCHILD,
+                  operator = PolicyRuleOperator.IsChild,
                   key = "id",
                   value = "buildIn.owner.*"
                 )

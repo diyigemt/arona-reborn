@@ -12,6 +12,7 @@
     "mock": "nodemon --exec ts-node mock/index.ts --watch src/ --watch mock/ -e ts"
   },
   "dependencies": {
+    "@antv/g6": "^4.8.24",
     "@element-plus/icons-vue": "^2.3.1",
     "@jsplumb/browser-ui": "^5.13.2",
     "@jsplumb/connector-bezier": "^5.13.2",

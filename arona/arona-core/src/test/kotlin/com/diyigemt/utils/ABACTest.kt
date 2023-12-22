@@ -78,7 +78,7 @@ class ABACTest {
   fun testGeneratePolicy() {
     val rule1 = PolicyRule(
       PolicyRuleType.Resource,
-      PolicyRuleOperator.IsCHILD,
+      PolicyRuleOperator.IsChild,
       "id",
       "com.diyigemt.arona:*"
     )

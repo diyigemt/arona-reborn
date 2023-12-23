@@ -1,10 +1,16 @@
 <template>
   <div class="text-xl">{{ contactId ? `编辑群${contact.contactName}的策略` : "创建策略" }}</div>
-  <ElForm v-if="contactId" inline class="mt-4">
+  <ElForm inline class="mt-4">
     <ElFormItem label="策略选择:">
       <ElSelect v-model="selectPolicyId" @change="onPolicyChange">
         <ElOption v-for="(e, index) in policies" :key="index" :label="e.name" :value="e.id" />
       </ElSelect>
+    </ElFormItem>
+    <ElFormItem>
+      <ElButton @click="onCreate">创建</ElButton>
+      <ElButton type="danger" @click="onReset">重置</ElButton>
+      <ElButton type="primary" @click="onSave">保存</ElButton>
+      <ElButton type="success" @click="onTest">测试</ElButton>
     </ElFormItem>
   </ElForm>
   <div ref="container" class="w-100% h-500px rounded-5px container"></div>
@@ -21,16 +27,24 @@
     </ElForm>
   </CancelConfirmDialog>
   <CancelConfirmDialog v-model:show="showPolicyNodeForm" title="策略节点" width="700" @confirm="onPolicyNodeChange">
-    <ElForm :model="policyNodeForm">
+    <ElForm :model="policyNodeForm" label-width="100" label-position="left">
       <ElFormItem prop="name" label="节点类型">
         <ElSelect v-model="policyNodeForm.groupType">
           <ElOption v-for="e in PolicyNodeTypeSelect" :key="e" :label="e" :value="e" />
         </ElSelect>
       </ElFormItem>
+      <ElFormItem v-if="showRuleAddBtn" prop="create">
+        <ElButton @click="onPolicyRuleAddRule">新增规则</ElButton>
+      </ElFormItem>
     </ElForm>
   </CancelConfirmDialog>
-  <CancelConfirmDialog v-model:show="showPolicyRuleForm" title="规则" width="700" @confirm="onPolicyRuleChange">
-    <ElForm :model="policyRuleForm" label-width="120" label-position="left">
+  <CancelConfirmDialog
+    v-model:show="showPolicyRuleForm"
+    :on-before-confirm="onPolicyRuleChange"
+    title="规则"
+    width="700"
+  >
+    <ElForm ref="RuleForm" :model="policyRuleForm" :rules="PolicyRuleFormRule" label-width="120" label-position="left">
       <ElFormItem prop="name" label="对象">
         <ElSelect v-model="policyRuleForm.type" class="w-full" @change="onPropertySelectChange('object')">
           <ElOption v-for="e in PolicyRuleObjectSelect" :key="e" :label="e" :value="e" />
@@ -78,6 +92,7 @@
 <script setup lang="ts">
 import { IG6GraphEvent, TreeGraph } from "@antv/g6";
 import { Ref } from "vue";
+import { FormValidateCallback } from "element-plus";
 import { ContactApi, PolicyApi } from "@/api";
 import {
   Policy,
@@ -86,12 +101,12 @@ import {
   PolicyRuleType,
   PolicyRuleOperator,
   Contact,
-  SelectOptions,
-  PolicyResource, PolicyRule, PolicyNode,
+  PolicyResource,
 } from "@/interface";
 import { initGraph } from "@/views/config/policy/graph";
-import { errorMessage, IConfirm } from "@/utils/message";
+import { IAlert, IConfirm } from "@/utils/message";
 import { randomInt, useForceUpdate } from "@/utils";
+import { GraphPolicyRoot, mapPolicyToGraph, PolicyRuleFormRule } from "@/views/config/policy/util";
 
 defineOptions({
   name: "UserPolicy",
@@ -105,50 +120,42 @@ interface PolicyNodeForm {
   groupType: PolicyNodeGroupType;
 }
 interface PolicyRuleForm {
-  formType: "modify" | "append";
+  formType: "modify" | "append" | "append-child";
   type: PolicyRuleType;
   operator: PolicyRuleOperator;
   key: string;
   value: string | string[];
 }
-interface GraphDataBase {
-  id: string;
-  type: "policy-root" | "policy-node" | "policy-rule";
-  parent: string;
-}
-// @ts-ignore
-interface GraphPolicyRule extends PolicyRule, GraphDataBase {
-  type: "policy-rule";
-  oType: PolicyRuleType;
-}
-// @ts-ignore
-interface GraphPolicyNode extends PolicyNode, GraphDataBase {
-  children?: (GraphPolicyNode | GraphPolicyRule)[];
-}
-interface GraphPolicyRoot extends Policy, GraphDataBase {
-  children: GraphPolicyNode[];
-}
+
 const PolicyRootEffectSelect: PolicyRootEffect[] = ["ALLOW", "DENY"];
 const PolicyNodeTypeSelect: PolicyNodeGroupType[] = ["ALL", "ANY", "NOT_ALL", "NOT_ANY"];
 const PolicyRuleObjectSelect: PolicyRuleType[] = ["Resource", "Action", "Subject", "Environment"];
 const route = useRoute();
+const router = useRouter();
 const contactId = route.query.id as string;
 const policyId = route.query.pid as string;
 // @ts-ignore
 const contact = ref<Contact>({ contactName: "" }) as Ref<Contact>;
 const container = ref<HTMLDivElement>();
-const policy = ref<Policy>() as Ref<Policy>;
+const policy = ref<Policy>({
+  id: `policy.${randomInt(0, 100)}`,
+  name: "新建策略",
+  effect: "ALLOW",
+  rules: [],
+});
 const selectPolicyId = ref<string>() as Ref<string>;
 const resources = ref<PolicyResource[]>([]);
 const policies = computed(() => contact.value.policies);
 const members = computed(() => contact.value.members);
 const roles = computed(() => contact.value.roles);
+const showRuleAddBtn = computed(() => parentNodeId.value !== policy.value.id);
 const { visible, update } = useForceUpdate();
 const showPolicyBaseForm = ref(false);
 const policyBaseForm = ref<PolicyBaseForm>({ name: "", effect: "ALLOW" });
 const showPolicyNodeForm = ref(false);
 const policyNodeForm = ref<PolicyNodeForm>({ type: "modify", groupType: "ALL" });
 const showPolicyRuleForm = ref(false);
+const RuleForm = ref() as Ref<{ validate: (callback?: FormValidateCallback) => Promise<void> }>;
 const policyRuleForm = ref<PolicyRuleForm>({
   formType: "modify",
   type: "Resource",
@@ -303,37 +310,30 @@ function onOperatorSelectChange() {
   }
   update();
 }
-let parentNodeId: string;
+const parentNodeId = ref("");
 let destroyGraphHandler: () => void;
 let graph: TreeGraph;
-let graphData: GraphPolicyRoot = {
-  id: `policy.${randomInt(0, 100)}`,
-  name: "新建策略",
-  type: "policy-root",
-  effect: "ALLOW",
-  rules: [],
-  parent: "",
-  children: [],
-};
+let graphData: GraphPolicyRoot;
 function onPolicyChange(id: string) {
-  IConfirm("警告", "确认要切换编辑的权限吗，所有修改将会丢失").then(() => {
-    policy.value = policies.value.find((it) => it.id === policyId) as Policy;
-    graph.layout();
+  IConfirm("警告", "确认要切换编辑的策略吗，所有修改将会丢失").then(() => {
+    policy.value = policies.value.find((it) => it.id === id) as Policy;
+    graphData = mapPolicyToGraph(policy.value);
+    graph.changeData(graphData);
   });
 }
 function onPolicyBaseChange() {
   graphData.name = policyBaseForm.value.name;
   graphData.effect = policyBaseForm.value.effect;
-  graph.updateItem(parentNodeId, {
+  graph.updateItem(parentNodeId.value, {
     form: true,
   });
 }
 function onPolicyNodeChange() {
-  const item = graph.findById(parentNodeId);
+  const item = graph.findById(parentNodeId.value);
   const nodeModel = item.getModel();
   if (policyNodeForm.value.type === "modify") {
     nodeModel.groupType = policyNodeForm.value.groupType;
-    graph.updateItem(parentNodeId, {
+    graph.updateItem(parentNodeId.value, {
       form: true,
     });
   } else {
@@ -345,128 +345,112 @@ function onPolicyNodeChange() {
         parent: parentNodeId,
         children: [],
       },
-      parentNodeId,
+      parentNodeId.value,
     );
   }
+}
+function onPolicyRuleAddRule() {
+  showPolicyNodeForm.value = false;
+  nextTick(() => {
+    policyRuleForm.value.formType = "append-child";
+    showPolicyRuleForm.value = true;
+  });
 }
 function onPolicyRuleChange() {
-  const item = graph.findById(parentNodeId);
-  const nodeModel = item.getModel();
-  if (policyRuleForm.value.formType === "modify") {
-    nodeModel.oType = policyRuleForm.value.type;
-    nodeModel.operator = policyRuleForm.value.operator;
-    nodeModel.key = policyRuleForm.value.key;
-    nodeModel.value = policyRuleForm.value.value;
-    graph.updateItem(parentNodeId, {
-      form: true,
+  return new Promise<void>((resolve, reject) => {
+    RuleForm.value.validate((isValid) => {
+      if (!isValid) {
+        reject();
+        return;
+      }
+      const item = graph.findById(parentNodeId.value);
+      const nodeModel = item.getModel();
+      if (policyRuleForm.value.formType === "modify") {
+        nodeModel.oType = policyRuleForm.value.type;
+        nodeModel.operator = policyRuleForm.value.operator;
+        nodeModel.key = policyRuleForm.value.key;
+        nodeModel.value = policyRuleForm.value.value;
+        graph.updateItem(parentNodeId.value, {
+          form: true,
+        });
+      } else {
+        const parent = graph.findById(nodeModel.parent as string);
+        const parentModel = policyRuleForm.value.formType === "append" ? parent.getModel() : nodeModel;
+        graph.addChild(
+          {
+            id: `${parentModel.id}.rule${((parentModel.children as []) || []).length + 1}`,
+            type: "policy-rule",
+            parent: parentModel.id,
+            oType: policyRuleForm.value.type,
+            operator: policyRuleForm.value.operator,
+            key: policyRuleForm.value.key,
+            value: policyRuleForm.value.value,
+          },
+          parentModel.id as string,
+        );
+      }
+      resolve();
     });
-  } else {
-    const parent = graph.findById(nodeModel.parent as string);
-    const parentModel = parent.getModel();
-    graph.addChild(
-      {
-        id: `${parentModel.id}.rule${((parentModel.children as []) || []).length + 1}`,
-        type: "policy-rule",
-        parent: parentModel.id,
-        oType: policyRuleForm.value.type,
-        operator: policyRuleForm.value.operator,
-        key: policyRuleForm.value.key,
-        value: policyRuleForm.value.value,
-      },
-      parentModel.id as string,
-    );
-  }
-}
-interface Tmp {
-  id: string;
-  children: Tmp[];
-}
-function onNodeRemove(id: string) {
-  const father = findParentToRoot(id);
-  if (father[0] !== graphData.id) {
-    errorMessage("未知错误");
-    return;
-  }
-  let tmp = graphData as unknown as Tmp;
-  father.splice(0, 1);
-  father.forEach((it) => {
-    // eslint-disable-next-line prefer-destructuring
-    tmp = tmp.children.filter((item) => item.id === it)[0];
   });
-  const index = tmp.children.findIndex((it) => it.id === id);
-  tmp.children.splice(index, 1);
 }
 
+function onCreate() {
+  IConfirm("警告", "确认要创建吗，所有修改将会丢失").then(() => {
+    policy.value = {
+      id: `policy.${randomInt(0, 100)}`,
+      name: "新建策略",
+      effect: "ALLOW",
+      rules: [],
+    };
+    selectPolicyId.value = policy.value.id;
+    graphData = mapPolicyToGraph(policy.value);
+    graph.changeData(graphData);
+  });
+}
+
+function onReset() {
+  if (policyId) {
+    onPolicyChange(selectPolicyId.value);
+  } else {
+    onCreate();
+  }
+}
+
+function onSave() {
+  if (policyId) {
+    // 修改
+  } else {
+    // 创建
+  }
+}
+
+function onTest() {}
+
 onMounted(() => {
-  if (contactId && policyId) {
-    ContactApi.fetchContact(contactId).then((data) => {
-      contact.value = data;
+  if (!contactId) {
+    IAlert("错误", "请从我管理的群->策略->新增进入本页面", { type: "warning" }).then(() => {
+      router.go(-1);
+    });
+    return;
+  }
+  ContactApi.fetchContact(contactId).then((data) => {
+    contact.value = data;
+    if (policyId) {
       selectPolicyId.value = policyId;
       policy.value = policies.value.find((it) => it.id === policyId) as Policy;
       policyBaseForm.value.effect = policy.value.effect;
       policyBaseForm.value.name = policy.value.name;
-      graphData = mapPolicyToGraph(policy.value);
-      initPolicyEdit();
-    });
-  } else {
+    }
+    graphData = mapPolicyToGraph(policy.value);
     initPolicyEdit();
-  }
+  });
   PolicyApi.fetchResources().then((data) => {
+    data.push("*");
+    data.sort((a, b) => a.length - b.length);
     resources.value = data;
   });
 });
-function findParentToRoot(id: string): string[] {
-  if (!id) {
-    return [];
-  }
-  const item = graph.findById(id);
-  if (item) {
-    const model = item.getModel();
-    return [...findParentToRoot(model.parent as string), model.parent as string].filter((it) => it);
-  }
-  return [];
-}
-function mapPolicyRuleToGraph(r: PolicyRule, parent: GraphPolicyNode): GraphPolicyRule {
-  const index = (parent.children?.length || 0) + 1;
-  return {
-    id: `${parent.id}.rule${index}`,
-    parent: parent.id,
-    type: "policy-rule",
-    oType: r.type,
-    key: r.key,
-    value: r.value,
-    operator: r.operator,
-  };
-}
-function mapPolicyNodeToGraph(r: PolicyNode, parent: GraphPolicyRoot | GraphPolicyNode): GraphPolicyNode {
-  const index = (parent.children?.length || 0) + 1;
-  const node: GraphPolicyNode = {
-    id: `${parent.id}.node${index}`,
-    parent: parent.id,
-    type: "policy-node",
-    groupType: r.groupType,
-    children: [],
-  };
-  (r.children || []).forEach((it) => {
-    node.children?.push(mapPolicyNodeToGraph(it, node));
-  });
-  (r.rule || []).forEach((it) => {
-    node.children?.push(mapPolicyRuleToGraph(it, node));
-  });
-  return node;
-}
-function mapPolicyToGraph(p: Policy): GraphPolicyRoot {
-  const copy = JSON.parse(JSON.stringify(p)) as GraphPolicyRoot;
-  copy.type = "policy-root";
-  copy.children = [];
-  (copy.rules || []).forEach((it) => {
-    copy.children.push(mapPolicyNodeToGraph(it, copy));
-  });
-  return copy;
-}
-function mapGraphToPolicy(g: GraphPolicyRoot): Policy {
 
-}
 function initPolicyEdit() {
   const { graph: g, destroy } = initGraph(container.value!, graphData);
   g.on("edit-text:click", (e: IG6GraphEvent) => {
@@ -474,7 +458,7 @@ function initPolicyEdit() {
     const id = target.get("modelId");
     const item = graph.findById(id);
     const nodeModel = item.getModel();
-    parentNodeId = nodeModel.id as string;
+    parentNodeId.value = nodeModel.id as string;
     switch (nodeModel.type) {
       case "policy-root": {
         policyBaseForm.value.name = nodeModel.name as string;
@@ -507,7 +491,7 @@ function initPolicyEdit() {
     const id = target.get("modelId");
     const item = graph.findById(id);
     const nodeModel = item.getModel();
-    parentNodeId = nodeModel.id as string;
+    parentNodeId.value = nodeModel.id as string;
     switch (nodeModel.type) {
       case "policy-root": {
         policyNodeForm.value.type = "append";
@@ -555,7 +539,7 @@ function initPolicyEdit() {
   destroyGraphHandler = destroy;
 }
 onUnmounted(() => {
-  destroyGraphHandler();
+  destroyGraphHandler && destroyGraphHandler();
 });
 </script>
 

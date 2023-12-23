@@ -58,9 +58,8 @@ function showAddDialog() {
   } else {
     router.push({
       path: "/config/policy/config",
-      params: {
+      query: {
         id: contact.value.id,
-        policy: "",
       },
     });
   }
@@ -115,7 +114,7 @@ function fetchContactProfile(id: string) {
       <ElTabPane label="角色" name="role">
         <ContactProfileRole @update="fetchContactProfile(contactId)" />
       </ElTabPane>
-      <ElTabPane label="权限" name="policy">
+      <ElTabPane label="策略" name="policy">
         <ContactProfilePolicy />
       </ElTabPane>
     </ElTabs>

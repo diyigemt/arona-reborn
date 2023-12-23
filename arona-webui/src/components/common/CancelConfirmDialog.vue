@@ -12,11 +12,13 @@ const props = withDefaults(
     show: boolean;
     title: string;
     width?: string | number;
+    onBeforeConfirm?: () => Promise<void>;
   }>(),
   {
     show: false,
     title: "",
     width: "",
+    onBeforeConfirm: () => Promise.resolve(),
   },
 );
 const show = ref(props.show);
@@ -37,13 +39,18 @@ function onCancel() {
   emit("cancel");
 }
 function onConfirm() {
-  show.value = false;
-  emit("confirm");
+  props
+    .onBeforeConfirm()
+    .then(() => {
+      show.value = false;
+      emit("confirm");
+    })
+    .catch();
 }
 </script>
 
 <template>
-  <ElDialog v-model="show" append-to-body :title="title" :width="width">
+  <ElDialog v-model="show" append-to-body :title="title" :width="width" :close-on-click-modal="false">
     <slot />
     <template #footer>
       <div class="text-right">

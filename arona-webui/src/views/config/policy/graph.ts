@@ -283,37 +283,37 @@ function registerNodes(graph: TreeGraph) {
       update(config, item) {
         const { level, form, effect, name } = config;
         const group = item.getContainer();
-        let maskLabel = group.find((ele) => ele.get("name") === "mask-label-shape");
-        if (level === 0) {
-          group.get("children").forEach((child) => {
-            if (child.get("name")?.includes("collapse")) return;
-            if (child.get("name")?.includes("root-shape")) return;
-            child.hide();
-          });
-          if (!maskLabel) {
-            maskLabel = group.addShape("text", {
-              attrs: {
-                fontSize: 20,
-                x: 0,
-                y: 0,
-                text: effect,
-                textAlign: "center",
-                textBaseline: "middle",
-                fill: colors.Normal,
-              },
-
-              name: "mask-label-shape",
-            });
-            const collapseRect = group.find((ele) => ele.get("name") === "collapse-back");
-            const collapseText = group.find((ele) => ele.get("name") === "collapse-text");
-            collapseRect?.toFront();
-            collapseText?.toFront();
-          } else {
-            maskLabel.show();
-          }
-          maskLabel.animate({ opacity: 1 }, 200);
-          return maskLabel;
-        }
+        const maskLabel = group.find((ele) => ele.get("name") === "mask-label-shape");
+        // if (level === 0) {
+        //   group.get("children").forEach((child) => {
+        //     if (child.get("name")?.includes("collapse")) return;
+        //     if (child.get("name")?.includes("root-shape")) return;
+        //     child.hide();
+        //   });
+        //   if (!maskLabel) {
+        //     maskLabel = group.addShape("text", {
+        //       attrs: {
+        //         fontSize: 20,
+        //         x: 0,
+        //         y: 0,
+        //         text: effect,
+        //         textAlign: "center",
+        //         textBaseline: "middle",
+        //         fill: colors.Normal,
+        //       },
+        //
+        //       name: "mask-label-shape",
+        //     });
+        //     const collapseRect = group.find((ele) => ele.get("name") === "collapse-back");
+        //     const collapseText = group.find((ele) => ele.get("name") === "collapse-text");
+        //     collapseRect?.toFront();
+        //     collapseText?.toFront();
+        //   } else {
+        //     maskLabel.show();
+        //   }
+        //   maskLabel.animate({ opacity: 1 }, 200);
+        //   return maskLabel;
+        // }
         group.get("children").forEach((child) => {
           if (child.get("name")?.includes("collapse")) return;
           child.show();

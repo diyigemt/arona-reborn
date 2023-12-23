@@ -21,6 +21,10 @@ export function IPrompt(title: string, message: string, config?: ElMessageBoxOpt
   return ElMessageBox.prompt(message, title, config);
 }
 
+export function IAlert(title: string, message: string, config?: ElMessageBoxOptions): Promise<MessageBoxData> {
+  return ElMessageBox.alert(message, title, config);
+}
+
 export function IConfirm(title: string, message: string, config?: ElMessageBoxOptions) {
   return ElMessageBox.confirm(message, title, config);
 }

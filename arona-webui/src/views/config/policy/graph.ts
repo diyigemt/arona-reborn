@@ -190,6 +190,42 @@ function addEdit(group: IGroup, id: string) {
     modelId: id,
   });
 }
+function addChild(group: IGroup, id: string) {
+  // collpase text
+  group.addShape("text", {
+    attrs: {
+      x: rectConfig.width / 2 - 32,
+      y: -rectConfig.height / 2 + 13,
+      textAlign: "center",
+      textBaseline: "middle",
+      text: "+",
+      fontSize: 20,
+      cursor: "pointer",
+      fill: colors.Normal,
+    },
+
+    name: "append-child",
+    modelId: id,
+  });
+}
+function addRemove(group: IGroup, id: string) {
+  // collpase text
+  group.addShape("text", {
+    attrs: {
+      x: rectConfig.width / 2 - 16,
+      y: rectConfig.height / 2 - 8,
+      textAlign: "center",
+      textBaseline: "middle",
+      text: "-",
+      fontSize: 24,
+      cursor: "pointer",
+      fill: colors.Reject,
+    },
+
+    name: "remove-self",
+    modelId: id,
+  });
+}
 function registerNodes(graph: TreeGraph) {
   G6.registerNode(
     "policy-root",
@@ -234,8 +270,9 @@ function registerNodes(graph: TreeGraph) {
           name: "effect",
         });
         addEdit(group, config.id);
+        addChild(group, config.id);
         // collapse rect
-        if (config.children && config.children.length) {
+        if (config.children) {
           addCollapse(group, config.id, collapsed);
         }
 
@@ -244,7 +281,7 @@ function registerNodes(graph: TreeGraph) {
       },
       // eslint-disable-next-line consistent-return
       update(config, item) {
-        const { level, status, name, effect } = config;
+        const { level, form, effect, name } = config;
         const group = item.getContainer();
         let maskLabel = group.find((ele) => ele.get("name") === "mask-label-shape");
         if (level === 0) {
@@ -288,7 +325,14 @@ function registerNodes(graph: TreeGraph) {
             callback: () => maskLabel.hide(),
           },
         );
-
+        if (form) {
+          // 更新表单信息
+          const effectEl = group.findAllByName("effect")[0];
+          const nameShapeEl = group.findAllByName("name-shape")[0];
+          effectEl?.attr("text", effect);
+          nameShapeEl?.attr("text", name);
+          maskLabel?.attr("text", effect);
+        }
         this.updateLinkPoints(config, group);
       },
       setState(name, value, item) {
@@ -350,13 +394,26 @@ function registerNodes(graph: TreeGraph) {
           name: "name-item",
         });
         addEdit(group, config.id);
+        addChild(group, config.id);
+        addRemove(group, config.id);
         // collapse rect
-        if (config.children && config.children.length) {
+        if (config.children) {
           addCollapse(group, config.id, collapsed);
         }
 
         this.drawLinkPoints(config, group);
         return rect;
+      },
+      update(config, item) {
+        const { form, groupType } = config;
+        const group = item.getContainer();
+        if (form) {
+          // 更新表单信息
+          const nameEl = group.findAllByName("name-item")[0];
+          nameEl?.attr("text", groupType);
+        }
+        this.updateLinkPoints(config, group);
+        this.updateLinkPoints(config, group);
       },
       setState(name, value, item) {
         if (name === "collapse") {
@@ -400,8 +457,9 @@ function registerNodes(graph: TreeGraph) {
         });
 
         const rectBBox = rect.getBBox();
-        const text = `${oType}.${key} ${operator}\n${value}`;
-        config.name = `[${oType}.${key}] ${operator}\n[${value}]`;
+        const valueMap = Array.isArray(value) ? value.join(",") : value;
+        const text = `${oType}.${key} ${operator}\n${valueMap}`;
+        config.name = `[${oType}.${key}] ${operator}\n[${valueMap}]`;
         // label title
         group.addShape("text", {
           attrs: {
@@ -420,9 +478,24 @@ function registerNodes(graph: TreeGraph) {
           name: "rule-name-item",
         });
         addEdit(group, config.id);
+        addChild(group, config.id);
+        addRemove(group, config.id);
 
         this.drawLinkPoints(config, group);
         return rect;
+      },
+      update(config, item) {
+        const { form, oType, operator, key, value } = config;
+        const group = item.getContainer();
+        const valueMap = Array.isArray(value) ? value.join(",") : value;
+        if (form) {
+          // 更新表单信息
+          const nameEl = group.findAllByName("rule-name-item")[0];
+          const text = `${oType}.${key} ${operator}\n${valueMap}`;
+          config.name = `[${oType}.${key}] ${operator}\n[${valueMap}]`;
+          nameEl?.attr("text", text);
+        }
+        this.updateLinkPoints(config, group);
       },
       setState(name, value, item) {},
       getAnchorPoints() {

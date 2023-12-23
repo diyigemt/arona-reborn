@@ -9,7 +9,7 @@ const contact = inject<ComputedRef<Contact>>("contact") as ComputedRef<Contact>;
 const router = useRouter();
 
 function onEdit(policy: Policy) {
-  router.push({ path: "/config/policy/config", query: { id: contact.value.id, policy: policy.id } });
+  router.push({ path: "/config/policy/config", query: { id: contact.value.id, pid: policy.id } });
 }
 </script>
 

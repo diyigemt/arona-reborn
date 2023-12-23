@@ -11,10 +11,12 @@ const props = withDefaults(
   defineProps<{
     show: boolean;
     title: string;
+    width?: string | number;
   }>(),
   {
     show: false,
     title: "",
+    width: "",
   },
 );
 const show = ref(props.show);
@@ -41,7 +43,7 @@ function onConfirm() {
 </script>
 
 <template>
-  <ElDialog v-model="show" append-to-body :title="title">
+  <ElDialog v-model="show" append-to-body :title="title" :width="width">
     <slot />
     <template #footer>
       <div class="text-right">

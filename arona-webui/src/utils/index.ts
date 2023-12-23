@@ -105,3 +105,16 @@ export function useTableInlineEditor<T extends { id: string; edit: boolean }>(
     },
   };
 }
+
+export function useForceUpdate(init: boolean = true) {
+  const visible = ref(init);
+  return {
+    visible,
+    update() {
+      visible.value = false;
+      nextTick(() => {
+        visible.value = true;
+      }).then();
+    },
+  };
+}

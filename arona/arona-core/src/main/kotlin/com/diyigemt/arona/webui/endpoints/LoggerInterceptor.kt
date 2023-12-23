@@ -62,12 +62,14 @@ object LoggerInterceptor {
       return
     }
     this.authorization?.let {
-      val key = DatabaseProvider.redisDbQuery {
+      DatabaseProvider.redisDbQuery {
         get(RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, it))
       } ?: return@let null
-      findUserDocumentByIdOrNull(key)
     }?.also {
-      this._aronaUser = it
+      this._aronaUser = findUserDocumentByIdOrNull(it)
+      DatabaseProvider.redisDbQuery {
+        expire(it, 3600u)
+      }
     }
     if (this.authorization == null || _aronaUser == null) {
       badRequest()

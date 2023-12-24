@@ -60,15 +60,13 @@ object LoggerInterceptor {
       return
     }
     this.authorization?.let {
-      RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, it)
-    }?.also {
-      val id = DatabaseProvider.redisDbQuery {
-        get(it)
-      } ?: return@also
-      this._aronaUser = findUserDocumentByIdOrNull(id)
+      val transfer = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, it)
       DatabaseProvider.redisDbQuery {
-        expire(it, 3600u)
-      }
+        expire(transfer, 3600u)
+        get(transfer)
+      } ?: return@let null
+    }?.also {
+      this._aronaUser = findUserDocumentByIdOrNull(it)
     }
     if (this.authorization == null || _aronaUser == null) {
       unauthorized()

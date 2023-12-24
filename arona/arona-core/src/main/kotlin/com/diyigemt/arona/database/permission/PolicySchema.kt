@@ -6,8 +6,10 @@ import codes.laurence.warden.policy.bool.Not
 import codes.laurence.warden.policy.collections.CollectionBasedPolicy
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_SUPER_ROLE_ID
 import com.diyigemt.arona.database.permission.PolicyNode.Companion.build
 import com.diyigemt.arona.database.permission.PolicyRule.Companion.build
+import com.diyigemt.arona.utils.uuid
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import codes.laurence.warden.policy.Policy as P
@@ -115,7 +117,35 @@ data class Policy(
   val rules: List<PolicyRoot>,
 ) {
   companion object {
-
+    internal const val PROTECTED_BUILD_IN_POLICY_ID = "policy.buildIn"
+    internal val PROTECTED_POLICY_ID = listOf(
+      PROTECTED_BUILD_IN_POLICY_ID
+    )
+    val BuildInPolicy = Policy(
+      "policy.buildIn",
+      "内置策略",
+      effect = PolicyNodeEffect.DENY,
+      rules = listOf(
+        PolicyRoot(
+          groupType = PolicyNodeGroupType.NOT_ALL,
+          rule = listOf(
+            PolicyRule(
+              type = PolicyRuleType.Subject,
+              operator = PolicyRuleOperator.Contains,
+              key = "roles",
+              value = DEFAULT_SUPER_ROLE_ID
+            ),
+            PolicyRule(
+              type = PolicyRuleType.Resource,
+              operator = PolicyRuleOperator.IsChild,
+              key = "id",
+              value = "buildIn.super.*"
+            )
+          )
+        )
+      )
+    ).build().first()
+    fun randomPolicyId() = uuid("policy")
     internal fun Policy.build(): List<P> {
       val base = rules.map {
         it.build()

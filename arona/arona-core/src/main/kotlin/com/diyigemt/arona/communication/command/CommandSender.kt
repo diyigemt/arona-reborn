@@ -11,11 +11,11 @@ import com.diyigemt.arona.communication.event.TencentGuildPrivateMessageEvent
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuerySuspended
-import com.diyigemt.arona.database.permission.PluginUserDocument
+import com.diyigemt.arona.database.permission.*
+import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
-import com.diyigemt.arona.database.permission.UserSchema
 import com.diyigemt.arona.utils.childScope
 import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
@@ -61,6 +61,7 @@ sealed class AbstractCommandSender : CommandSender {
 
 sealed class AbstractUserCommandSender : UserCommandSender, AbstractCommandSender() {
   private var _userDocument: UserDocument? = null
+  private var _contactDocument: ContactDocument? = null
   override val bot: TencentBot get() = user.bot
   override suspend fun sendMessage(message: Message) = user.sendMessage(message)
   override suspend fun userDocument(): PluginUserDocument {
@@ -68,6 +69,14 @@ sealed class AbstractUserCommandSender : UserCommandSender, AbstractCommandSende
       _userDocument = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
     }
     return _userDocument!!
+  }
+
+  override suspend fun contactDocument(): PluginContactDocument {
+    if (_contactDocument == null) {
+      ContactDocument.createContactAndUser(subject, user, ContactRole.DEFAULT_MEMBER_CONTACT_ROLE_ID)
+      _contactDocument = ContactDocument.findContactDocumentByIdOrNull(subject.id)
+    }
+    return _contactDocument!!
   }
 }
 
@@ -77,6 +86,7 @@ interface UserCommandSender : CommandSender {
   override val user: User
   override val sourceId: String
   suspend fun userDocument(): PluginUserDocument
+  suspend fun contactDocument(): PluginContactDocument
 }
 
 /**

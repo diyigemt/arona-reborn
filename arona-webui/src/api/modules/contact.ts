@@ -73,6 +73,14 @@ export const ContactApi = {
       }),
     );
   },
+  fetchContactPolicies(id: string) {
+    return simplifiedApiService(
+      service.raw<Policy[]>({
+        url: `/contact/${id}/policies`,
+        method: "GET",
+      }),
+    );
+  },
   fetchContactPolicy(id: string, policyId: string) {
     return simplifiedApiService(
       service.raw<Policy>({
@@ -80,6 +88,35 @@ export const ContactApi = {
         method: "GET",
         params: {
           pid: policyId,
+        },
+      }),
+    );
+  },
+  updateContactPolicy(id: string, policy: Policy) {
+    return simplifiedApiService(
+      service.raw<void>({
+        url: `/contact/${id}/policy`,
+        method: "PUT",
+        data: policy,
+      }),
+    );
+  },
+  createContactPolicy(id: string, policy: Policy) {
+    return simplifiedApiService(
+      service.raw<void>({
+        url: `/contact/${id}/policy`,
+        method: "POST",
+        data: policy,
+      }),
+    );
+  },
+  deleteContactPolicy(id: string, pid: string) {
+    return simplifiedApiService(
+      service.raw<void>({
+        url: `/contact/${id}/policy`,
+        method: "DELETE",
+        data: {
+          id: pid,
         },
       }),
     );

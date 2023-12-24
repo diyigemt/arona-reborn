@@ -12,6 +12,7 @@ const emit = defineEmits<{
   (e: "update"): void;
 }>();
 const contact = inject<ComputedRef<EditableContact>>("contact") as ComputedRef<EditableContact>;
+const userId = inject("userId", "");
 const roles = computed(() => contact.value.roles);
 function roleNameMapper(mem: EditableContactMember) {
   return mem.roles.map((it) => contact.value.roles.filter((r) => r.id === it)[0].name);
@@ -40,7 +41,7 @@ function onMemberConfirmEdit(): Promise<unknown> {
     </ElTableColumn>
     <ElTableColumn prop="roles" label="角色" width="300" sortable>
       <template #default="{ row }">
-        <div v-if="row.edit">
+        <div v-if="row.edit && !userId">
           <ElSelect v-model="member.roles" multiple collapse-tags>
             <ElOption v-for="(e, index) in roles" :key="index" :value="e.id" :label="e.name"></ElOption>
           </ElSelect>
@@ -52,12 +53,14 @@ function onMemberConfirmEdit(): Promise<unknown> {
     </ElTableColumn>
     <ElTableColumn label="操作" width="160">
       <template #default="{ row }">
-        <div v-if="row.edit">
-          <ElButton type="primary" @click="onConfirm(row)">确认</ElButton>
-          <ElButton @click="onCancel(row)">取消</ElButton>
-        </div>
-        <div v-else>
-          <ElButton @click="onEdit(row)">编辑</ElButton>
+        <div v-if="!userId || row.id === userId">
+          <div v-if="row.edit">
+            <ElButton type="primary" @click="onConfirm(row)">确认</ElButton>
+            <ElButton @click="onCancel(row)">取消</ElButton>
+          </div>
+          <div v-else>
+            <ElButton @click="onEdit(row)">编辑</ElButton>
+          </div>
         </div>
       </template>
     </ElTableColumn>

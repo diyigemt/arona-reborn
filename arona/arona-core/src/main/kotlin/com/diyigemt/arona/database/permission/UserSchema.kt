@@ -58,10 +58,7 @@ internal class UserSchema(id: EntityID<String>) : Entity<String>(id) {
   val registerTime by UserTable.registerTime
 }
 
-abstract class PluginUserDocument {
-  abstract val id: String
-  abstract val unionOpenId: String
-  abstract val qq: Long
+abstract class PluginVisibleData {
   internal abstract val config: Map<String, Map<String, String>>
   fun String.toMongodbKey() = this.replace(".", "·")
   fun String.fromMongodbKey() = this.replace("·", ".")
@@ -94,7 +91,12 @@ abstract class PluginUserDocument {
       JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
     }
   }
+}
 
+abstract class PluginUserDocument : PluginVisibleData() {
+  abstract val id: String
+  abstract val unionOpenId: String
+  abstract val qq: Long
 }
 
 @Serializable

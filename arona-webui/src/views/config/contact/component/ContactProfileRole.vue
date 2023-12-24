@@ -12,6 +12,7 @@ const emit = defineEmits<{
   (e: "update"): void;
 }>();
 const contact = inject<ComputedRef<EditableContact>>("contact") as ComputedRef<EditableContact>;
+const userId = inject("userId", "");
 const { onConfirm, onEdit, onCancel, cache: role } = useTableInlineEditor(contact.value.roles, onRoleConfirmEdit);
 function onRoleConfirmEdit(): Promise<unknown> {
   return ContactApi.updateContactRole(contact.value.id, role.value).then(() => {
@@ -34,7 +35,7 @@ function onRoleConfirmEdit(): Promise<unknown> {
         </div>
       </template>
     </ElTableColumn>
-    <ElTableColumn label="操作" width="160">
+    <ElTableColumn v-if="!userId" label="操作" width="160">
       <template #default="{ row }">
         <div v-if="row.edit">
           <ElButton type="primary" @click="onConfirm(row)">确认</ElButton>

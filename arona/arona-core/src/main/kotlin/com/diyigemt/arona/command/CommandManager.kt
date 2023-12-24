@@ -13,6 +13,9 @@ import com.diyigemt.arona.communication.message.TencentAt.Companion.toReadableTe
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import com.diyigemt.arona.communication.message.toMessageChain
 import com.diyigemt.arona.permission.Permission.Companion.testPermission
+import com.diyigemt.arona.utils.currentDate
+import com.diyigemt.arona.utils.currentDateTime
+import com.diyigemt.arona.utils.currentTime
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.output.Localization
@@ -158,18 +161,40 @@ internal suspend fun executeCommandImpl(
   val command =
     CommandManager.matchCommand(commandStr.replaceFirst("/", "")) as? AbstractCommand ?: return CommandExecuteResult
       .UnresolvedCommand()
+  val arg = call.toString()
+  val parseArg = arg
+    .split(" ")
+    .filter { it.isNotEmpty() }
+    .map { it.trim() }
+    .toMutableList()
+    .apply {
+      // 如果第一个是at机器人, 继续移除掉
+      removeFirstOrNull()
+        ?.let { it.toReadableTencentAt() ?: it.toSourceTencentAt() }
+        .also {
+          if (it != null) {
+            removeFirstOrNull()
+          }
+        }
+    }
   if (checkPermission) {
     val document = caller.subject?.toContactDocumentOrNull()
     val user = caller.user?.toUserDocumentOrNull()
     if (document != null && user != null) {
       document.findContactMemberOrNull(user.id)?.also {
-        if (!command.permission.testPermission(it, document.policies)) {
+        val environment = mapOf(
+          "time" to currentTime().substringAfter(":"),
+          "date" to currentDate(),
+          "datetime" to currentDateTime(),
+          "param1" to (parseArg.getOrNull(0) ?: ""),
+          "param2" to (parseArg.getOrNull(1) ?: "")
+        )
+        if (!command.permission.testPermission(it, document.policies, environment)) {
           return CommandExecuteResult.PermissionDenied(command)
         }
       }
     }
   }
-  val arg = call.toString()
   return runCatching {
     command.context2 {
       obj = caller
@@ -177,21 +202,7 @@ internal suspend fun executeCommandImpl(
       localization = crsiveLocalization
     }
     command.parse(
-      arg
-        .split(" ")
-        .filter { it.isNotEmpty() }
-        .map { it.trim() }
-        .toMutableList()
-        .apply {
-          // 如果第一个是at机器人, 继续移除掉
-          removeFirstOrNull()
-            ?.let { it.toReadableTencentAt() ?: it.toSourceTencentAt() }
-            .also {
-              if (it != null) {
-                removeFirstOrNull()
-              }
-            }
-        }
+      parseArg
     )
     CommandExecuteResult.Success(command)
   }.getOrElse {

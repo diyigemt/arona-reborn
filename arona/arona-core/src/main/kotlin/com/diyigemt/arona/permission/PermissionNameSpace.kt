@@ -6,6 +6,7 @@ import codes.laurence.warden.enforce.EnforcementPointDefault
 import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactMember.Companion.toPermissionSubject
 import com.diyigemt.arona.database.permission.Policy
+import com.diyigemt.arona.database.permission.Policy.Companion.BuildInPolicy
 import com.diyigemt.arona.database.permission.Policy.Companion.build
 import com.diyigemt.arona.database.permission.PolicyNodeEffect
 import com.diyigemt.arona.utils.currentTime
@@ -48,16 +49,23 @@ interface Permission {
     }
 
     @PublishedApi
-    internal suspend fun Permission.testPermission(subject: ContactMember, policies: List<Policy>): Boolean {
+    internal suspend fun Permission.testPermission(
+      subject: ContactMember,
+      policies: List<Policy>,
+      environment: Map<String, Any?> = mapOf()
+    ): Boolean {
       val allow = policies.filter { it.effect == PolicyNodeEffect.ALLOW }.map { it.build() }.flatten()
-      val deny = policies.filter { it.effect == PolicyNodeEffect.DENY }.map { it.build() }.flatten()
+      // 添加常驻禁止策略
+      val deny = policies.filter { it.effect == PolicyNodeEffect.DENY }.map { it.build() }.flatten().toMutableList().apply {
+        add(BuildInPolicy)
+      }
       return runCatching {
         EnforcementPointDefault(allow, deny).enforceAuthorization(
           AccessRequest(
             subject = subject.toPermissionSubject().atts(),
             action = mapOf("type" to "effect"),
             resource = Resource(fullPermissionId()).atts(),
-            environment = mapOf("time" to currentTime().substringAfter(":"))
+            environment = environment
           )
         )
         true

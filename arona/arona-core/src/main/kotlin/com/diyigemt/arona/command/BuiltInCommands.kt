@@ -8,6 +8,7 @@ import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
+import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactAndUser
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
@@ -118,23 +119,6 @@ object BuiltInCommands {
 //    GlobalEventChannel.subscribeAlways<TencentMessageEvent> {
 //      createContactAndUser(it.subject, it.sender, DEFAULT_MEMBER_CONTACT_ROLE_ID)
 //    }
-  }
-
-  private suspend fun createContactAndUser(contact: Contact, user: User, role: String): UserDocument {
-    val contactDocument = findContactDocumentByIdOrNull(contact.id) ?: createContactDocument(
-      contact.id,
-      when (contact) {
-        is FriendUser -> ContactType.Private
-        is Group -> ContactType.Group
-        is Guild, is Channel -> ContactType.Guild
-        else -> ContactType.PrivateGuild
-      }
-    )
-
-    val userDocument = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, contact.id)
-    val member = contactDocument.addMember(userDocument.id)
-    contactDocument.updateMemberRole(member.id, role)
-    return userDocument
   }
 
 }

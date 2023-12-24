@@ -1,15 +1,25 @@
 <script setup lang="ts">
 import { ComputedRef } from "vue";
 import { Contact, Policy } from "@/interface";
+import { ContactApi } from "@/api";
+import { IConfirm, IWarningConfirm, successMessage } from "@/utils/message";
 
 defineOptions({
   name: "ContactProfilePolicy",
 });
 const contact = inject<ComputedRef<Contact>>("contact") as ComputedRef<Contact>;
+const userId = inject("userId", "");
 const router = useRouter();
 
 function onEdit(policy: Policy) {
   router.push({ path: "/config/policy/config", query: { id: contact.value.id, pid: policy.id } });
+}
+function onDelete(policy: Policy) {
+  IWarningConfirm("警告", `确认删除策略 ${policy.name} 吗? 操作不可逆!`).then(() => {
+    ContactApi.deleteContactPolicy(contact.value.id, policy.id).then(() => {
+      successMessage("成功");
+    });
+  });
 }
 </script>
 
@@ -21,9 +31,10 @@ function onEdit(policy: Policy) {
     <ElTableColumn prop="rules" label="规则">
       <template #default="{ row }"> 共{{ row.rules.length }}条规则</template>
     </ElTableColumn>
-    <ElTableColumn label="操作" width="85">
+    <ElTableColumn v-if="!userId" label="操作" width="180">
       <template #default="{ row }">
         <ElButton @click="onEdit(row)">编辑</ElButton>
+        <ElButton type="danger" @click="onDelete(row)">删除</ElButton>
       </template>
     </ElTableColumn>
   </ElTable>

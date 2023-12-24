@@ -1,8 +1,8 @@
 <template>
   <div class="text-xl">编辑群 {{ contact.contactName }} 的策略</div>
   <ElForm inline class="mt-4">
-    <ElFormItem label="策略选择:">
-      <ElSelect v-model="selectPolicyId" @change="onPolicyChange">
+    <ElFormItem label="策略选择:" class="w-300px">
+      <ElSelect v-model="selectPolicyId" class="w-full" @change="onPolicyChange">
         <ElOption v-for="(e, index) in policies" :key="index" :label="e.name" :value="e.id" />
       </ElSelect>
     </ElFormItem>
@@ -11,6 +11,7 @@
       <ElButton type="danger" @click="onReset">重置</ElButton>
       <ElButton type="primary" @click="onSave">保存</ElButton>
       <ElButton type="success" @click="onTest">测试</ElButton>
+      <ElButton type="primary" plain @click="onImportFromOtherContact">从其他群导入</ElButton>
     </ElFormItem>
   </ElForm>
   <div ref="container" class="w-100% h-500px rounded-5px container"></div>
@@ -95,13 +96,31 @@
       :resources="resources"
     />
   </CancelConfirmDialog>
+  <CancelConfirmDialog
+    v-model:show="showImportFromOtherForm"
+    title="从群导入"
+    width="600"
+    :on-before-confirm="onConfirmImport"
+  >
+    <ElForm :model="importForm" label-width="100" label-position="left">
+      <ElFormItem label="群">
+        <ElSelect v-model="importForm.id" class="w-full" @change="onOtherContactChange">
+          <ElOption v-for="(e, index) in otherContacts" :key="index" :label="e.contactName" :value="e.id" />
+        </ElSelect>
+      </ElFormItem>
+      <ElFormItem label="策略">
+        <ElSelect v-model="importForm.policy" class="w-full">
+          <ElOption v-for="(e, index) in otherPolicies" :key="index" :label="e.name" :value="e.id" />
+        </ElSelect>
+      </ElFormItem>
+    </ElForm>
+  </CancelConfirmDialog>
 </template>
 
 <script setup lang="ts">
 import { IG6GraphEvent, TreeGraph } from "@antv/g6";
 import { Ref } from "vue";
 import { FormValidateCallback } from "element-plus";
-import dayjs from "dayjs";
 import { ContactApi, PolicyApi } from "@/api";
 import {
   Policy,
@@ -113,13 +132,14 @@ import {
   PolicyResource,
 } from "@/interface";
 import { initGraph } from "@/views/config/policy/graph";
-import { IAlert, IConfirm } from "@/utils/message";
+import { IAlert, IWarningConfirm } from "@/utils/message";
 import { randomInt, useForceUpdate } from "@/utils";
 import {
   GraphPolicyRoot,
-  mapPolicyToGraph, PolicyNodeTestResult,
+  mapPolicyToGraph,
+  PolicyNodeTestResult,
   PolicyRuleFormRule,
-  PolicyTestInput, PolicyTestResultStatus,
+  PolicyTestInput,
   testPolicy,
 } from "@/views/config/policy/util";
 import PolicyTestDataBuilder from "@/views/config/policy/component/PolicyTestDataBuilder.vue";
@@ -174,6 +194,10 @@ const policyNodeForm = ref<PolicyNodeForm>({ type: "modify", groupType: "ALL" })
 const showPolicyRuleForm = ref(false);
 const RuleForm = ref() as Ref<{ validate: (callback?: FormValidateCallback) => Promise<void> }>;
 const showTestDataForm = ref(false);
+const showImportFromOtherForm = ref(false); // 从其他地方导入
+const importForm = ref({ id: "", policy: "" });
+const otherContacts = ref<Contact[]>([]);
+const otherPolicies = ref<Policy[]>([]);
 const policyRuleForm = ref<PolicyRuleForm>({
   formType: "modify",
   type: "Resource",
@@ -193,7 +217,7 @@ const PolicyRulePropertySelect = computed(() => {
       return ["id", "roles"];
     }
     case "Environment": {
-      return ["time", "date", "datetime"];
+      return ["time", "date", "datetime", "param1", "param2"];
     }
     default: {
       return [];
@@ -336,7 +360,7 @@ let destroyGraphHandler: () => void;
 let graph: TreeGraph;
 let graphData: GraphPolicyRoot;
 function onPolicyChange(id: string) {
-  IConfirm("警告", "确认要切换编辑的策略吗，所有修改将会丢失").then(() => {
+  IWarningConfirm("警告", "确认要切换编辑的策略吗，所有修改将会丢失").then(() => {
     policy.value = policies.value.find((it) => it.id === id) as Policy;
     graphData = mapPolicyToGraph(policy.value);
     graph.changeData(graphData);
@@ -416,7 +440,7 @@ function onPolicyRuleChange() {
 }
 
 function onCreate() {
-  IConfirm("警告", "确认要创建吗，所有修改将会丢失").then(() => {
+  IWarningConfirm("警告", "确认要创建吗，所有修改将会丢失").then(() => {
     policy.value = {
       id: `policy.${randomInt(0, 100)}`,
       name: "新建策略",
@@ -438,7 +462,7 @@ function onReset() {
 }
 
 function onSave() {
-  if (policyId) {
+  if (contact.value.policies.some((it) => it.id === graphData.id)) {
     // 修改
   } else {
     // 创建
@@ -577,6 +601,27 @@ function initPolicyEdit() {
   });
   graph = g;
   destroyGraphHandler = destroy;
+}
+function onConfirmImport() {
+  return IWarningConfirm("警告", "确认要切导入策略吗，所有修改将会丢失").then(() => {
+    policy.value = otherPolicies.value.find((it) => it.id === importForm.value.policy) as Policy;
+    graphData = mapPolicyToGraph(policy.value);
+    graph.changeData(graphData);
+    selectPolicyId.value = policy.value.id;
+  });
+}
+function onOtherContactChange(id: string) {
+  ContactApi.fetchContactPolicies(id).then((data) => {
+    otherPolicies.value = data;
+  });
+}
+function onImportFromOtherContact() {
+  showImportFromOtherForm.value = true;
+  ContactApi.fetchContacts().then((res) => {
+    otherContacts.value = res.filter((it) => {
+      return it.members.some((m) => m.roles.some((r) => r === "role.admin"));
+    });
+  });
 }
 onUnmounted(() => {
   destroyGraphHandler && destroyGraphHandler();

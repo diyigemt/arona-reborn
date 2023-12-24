@@ -28,6 +28,7 @@ const emit = defineEmits<{
   (e: "update", id: string): void;
 }>();
 provide("contact", contact);
+const userId = inject("userId", "");
 const router = useRouter();
 const activeTab = ref("member");
 const updateBasicInfo = ref(false);
@@ -83,12 +84,14 @@ function fetchContactProfile(id: string) {
 <template>
   <div>
     <ActionHeader title="基本信息">
-      <div v-if="updateBasicInfo">
-        <ElButton type="primary" @click="onUpdateBasicInfo">确认</ElButton>
-        <ElButton @click="onCancelUpdateBasicInfo">取消</ElButton>
-      </div>
-      <div v-else>
-        <ElButton @click="updateBasicInfo = true">更新</ElButton>
+      <div v-if="!userId">
+        <div v-if="updateBasicInfo">
+          <ElButton type="primary" @click="onUpdateBasicInfo">确认</ElButton>
+          <ElButton @click="onCancelUpdateBasicInfo">取消</ElButton>
+        </div>
+        <div v-else>
+          <ElButton @click="updateBasicInfo = true">更新</ElButton>
+        </div>
       </div>
     </ActionHeader>
     <ElDescriptions :column="2" border class="custom-description">
@@ -105,7 +108,7 @@ function fetchContactProfile(id: string) {
       <ElDescriptionsItem label="权限数">{{ contact.policies?.length }}</ElDescriptionsItem>
     </ElDescriptions>
     <ActionHeader title="不基本信息" class="mt-4 mb-2! h-32px">
-      <ElButton v-if="activeTab != 'member'" @click="showAddDialog">新增</ElButton>
+      <ElButton v-if="activeTab != 'member' && !userId" @click="showAddDialog">新增</ElButton>
     </ActionHeader>
     <ElTabs v-model="activeTab">
       <ElTabPane label="成员" name="member">

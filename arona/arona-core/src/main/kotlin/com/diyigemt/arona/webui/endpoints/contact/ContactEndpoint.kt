@@ -3,15 +3,15 @@
 package com.diyigemt.arona.webui.endpoints.contact
 
 import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.permission.*
 import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactRole
-import com.diyigemt.arona.database.permission.ContactType
+import com.diyigemt.arona.database.permission.Policy.Companion.PROTECTED_POLICY_ID
 import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
-import com.diyigemt.arona.webui.plugins.receiveJson
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
@@ -36,6 +36,7 @@ internal data class UserContactDocument(
   val contactType: ContactType = ContactType.Group,
   val members: List<ContactMember> = listOf(),
   val roles: List<ContactRole> = listOf(),
+  val config: Map<String, Map<String, String>> = mapOf()
 )
 
 @Serializable
@@ -126,6 +127,7 @@ internal object ContactEndpoint {
         Document(ContactDocument::contactName.name, 1),
         Document(ContactDocument::contactType.name, 1),
         Document(ContactDocument::roles.name, 1),
+        Document(ContactDocument::config.name, 1),
         Document(
           ContactDocument::members.name,
           Document(
@@ -207,7 +209,7 @@ internal object ContactEndpoint {
   /**
    * 获取某个群/频道策略列表
    */
-  @AronaBackendEndpointGet("/policies")
+  @AronaBackendEndpointGet("/{id}/policies")
   suspend fun PipelineContext<Unit, ApplicationCall>.contactPolicies() {
     return success(contact.policies)
   }
@@ -310,7 +312,22 @@ internal object ContactEndpoint {
    */
   @AronaBackendEndpointPut("/{id}/policy")
   suspend fun PipelineContext<Unit, ApplicationCall>.updatePolicy() {
-
+    val policy = context.receiveJsonOrNull<Policy>() ?: return badRequest()
+    if (policy.id in PROTECTED_POLICY_ID || ContactRole.checkHasProtectedRoleId(policy)) {
+      return badRequest()
+    }
+    return if (
+      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+        updateOne(
+          filter = Filters.and(
+            idFilter(contact.id),
+            Filters.eq("${ContactDocument::policies.name}._id", policy.id)
+          ),
+          update = Updates.set("${ContactDocument::policies.name}.$", policy)
+        )
+      }.modifiedCount == 1L
+    ) success()
+    else internalServerError()
   }
 
   /**
@@ -318,7 +335,28 @@ internal object ContactEndpoint {
    */
   @AronaBackendEndpointPost("/{id}/policy")
   suspend fun PipelineContext<Unit, ApplicationCall>.createPolicy() {
-
+    val data = context.receiveJsonOrNull<Policy>() ?: return badRequest()
+    if (contact.policies.any { it.id == data.id }) {
+      return badRequest()
+    }
+    if (data.id in PROTECTED_POLICY_ID || ContactRole.checkHasProtectedRoleId(data)) {
+      return badRequest()
+    }
+    val policy = Policy(
+      Policy.randomPolicyId(),
+      data.name,
+      data.effect,
+      data.rules
+    )
+    return if (
+      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+        updateOne(
+          filter = idFilter(contact.id),
+          update = Updates.push(ContactDocument::policies.name, policy)
+        )
+      }.modifiedCount == 1L
+    ) success()
+    else internalServerError()
   }
 
   /**
@@ -326,6 +364,24 @@ internal object ContactEndpoint {
    */
   @AronaBackendEndpointDelete("/{id}/policy")
   suspend fun PipelineContext<Unit, ApplicationCall>.deletePolicy() {
-
+    val id = context.receiveJsonOrNull<IdBody>()?.id ?: return badRequest()
+    if (id in PROTECTED_POLICY_ID) {
+      return badRequest()
+    }
+    return if (
+      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+        updateOne(
+          filter = idFilter(contact.id),
+          update = Document(
+            "\$pull",
+            Document(
+              ContactDocument::policies.name,
+              Document("_id", id)
+            )
+          )
+        )
+      }.modifiedCount == 1L
+    ) success()
+    else internalServerError()
   }
 }

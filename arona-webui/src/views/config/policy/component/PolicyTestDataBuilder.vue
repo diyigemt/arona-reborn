@@ -26,6 +26,8 @@ const formData = ref<PolicyTestInput>({
     time: dayjs().format("HH:mm:ss"),
     date: dayjs().format("YYYY-MM-DD"),
     datetime: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+    param1: "",
+    param2: "",
   },
 });
 const resourcesSelect = computed(() => {
@@ -97,6 +99,12 @@ defineExpose({
         </ElFormItem>
         <ElFormItem label="time">
           <ElTimePicker v-model="formData.Environment.time" value-format="HH:mm:ss" class="w-full"></ElTimePicker>
+        </ElFormItem>
+        <ElFormItem label="param1">
+          <ElInput v-model="formData.Environment.param1"></ElInput>
+        </ElFormItem>
+        <ElFormItem label="param2">
+          <ElInput v-model="formData.Environment.param2"></ElInput>
         </ElFormItem>
       </ElForm>
     </ElTabPane>

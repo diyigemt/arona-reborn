@@ -128,8 +128,11 @@ function startCheckLoginState() {
         }
         case 2: {
           baseStore.setToken(data.token);
-          successMessage("登录成功");
-          router.push("/home");
+          UserApi.fetchUserProfile().then((user) => {
+            baseStore.setUser(user);
+            successMessage("登录成功");
+            router.push("/home");
+          });
           break;
         }
         default: {

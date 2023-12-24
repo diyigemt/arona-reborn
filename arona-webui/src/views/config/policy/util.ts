@@ -141,6 +141,8 @@ export interface Environment {
   time: string;
   date: string;
   datetime: string;
+  param1: string;
+  param2: string;
 }
 
 export type PolicyTestResultStatus = "allow" | "deny";
@@ -204,7 +206,7 @@ function transferStatus(b: boolean): PolicyTestResultStatus {
   return b ? "allow" : "deny";
 }
 
-function timeCompare(value: string | string[], operator: PolicyRuleOperator, input: string): PolicyTestResultStatus {
+function simpleCompare(value: string | string[], operator: PolicyRuleOperator, input: string): PolicyTestResultStatus {
   switch (operator) {
     case "Equal": {
       return transferStatus(input === (value as string));
@@ -298,13 +300,19 @@ const PolicyRuleTester: IPolicyRuleTester = {
   },
   Environment: {
     time(value: string | string[], operator: PolicyRuleOperator, input: PolicyTestInput) {
-      return timeCompare(value, operator, input.Environment.time);
+      return simpleCompare(value, operator, input.Environment.time);
     },
     date(value: string | string[], operator: PolicyRuleOperator, input: PolicyTestInput) {
-      return timeCompare(value, operator, input.Environment.date);
+      return simpleCompare(value, operator, input.Environment.date);
     },
     datetime(value: string | string[], operator: PolicyRuleOperator, input: PolicyTestInput) {
-      return timeCompare(value, operator, input.Environment.datetime);
+      return simpleCompare(value, operator, input.Environment.datetime);
+    },
+    param1(value: string | string[], operator: PolicyRuleOperator, input: PolicyTestInput) {
+      return simpleCompare(value, operator, input.Environment.param1);
+    },
+    param2(value: string | string[], operator: PolicyRuleOperator, input: PolicyTestInput) {
+      return simpleCompare(value, operator, input.Environment.param2);
     },
   },
 };

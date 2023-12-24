@@ -1,6 +1,7 @@
 package com.diyigemt.arona.database.permission
 
 import codes.laurence.warden.atts.HasAtts
+import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
@@ -27,8 +28,16 @@ enum class ContactType {
   Guild,
 }
 
+abstract class PluginContactDocument : PluginVisibleData() {
+  abstract val id: String
+  abstract val contactName: String
+  abstract val contactType: ContactType
+  abstract var roles: List<ContactRole>
+  abstract var members: List<ContactMember>
+}
+
 @Serializable
-internal data class ContactRole(
+data class ContactRole(
   @BsonId
   val id: String,
   val name: String,
@@ -36,6 +45,23 @@ internal data class ContactRole(
   companion object {
     internal const val DEFAULT_MEMBER_CONTACT_ROLE_ID = "role.default"
     internal const val DEFAULT_ADMIN_CONTACT_ROLE_ID = "role.admin"
+    internal const val DEFAULT_SUPER_ROLE_ID = "role.super" // 只有机器人部署者才有的权限
+    internal val PROTECTED_ROLE_ID = listOf(DEFAULT_SUPER_ROLE_ID)
+    internal fun checkHasProtectedRoleId(p: Policy): Boolean {
+      return p.rules.map { checkHasProtectedRoleIdNode(it) }.any { it }
+    }
+
+    private fun checkHasProtectedRoleIdNode(node: PolicyNode): Boolean {
+      return (node.rule?.map { checkHasProtectedRoleIdRule(it) }?.any { it } ?: false) ||
+          (node.children?.map { checkHasProtectedRoleIdNode(it) }?.any { it } ?: false)
+    }
+
+    private fun checkHasProtectedRoleIdRule(rule: PolicyRule): Boolean {
+      val a = rule.type == PolicyRuleType.Subject && rule.key == "roles"
+      val b = rule.value.split(",").any { it in PROTECTED_ROLE_ID }
+      return a && b
+    }
+
     fun createBaseAdminRole() = ContactRole(DEFAULT_ADMIN_CONTACT_ROLE_ID, "管理员")
     fun createBaseMemberRole() = ContactRole(DEFAULT_MEMBER_CONTACT_ROLE_ID, "普通成员")
     fun createRole(name: String) = ContactRole(
@@ -46,7 +72,7 @@ internal data class ContactRole(
 }
 
 @Serializable
-internal data class ContactMember(
+data class ContactMember(
   @BsonId
   val id: String, // 指向UserDocument.id
   val name: String,
@@ -68,14 +94,15 @@ internal data class ContactMember(
 @Serializable
 internal data class ContactDocument(
   @BsonId
-  val id: String,
-  val contactName: String = "",
-  val contactType: ContactType = ContactType.Group,
+  override val id: String,
+  override val contactName: String = "",
+  override val contactType: ContactType = ContactType.Group,
   var policies: List<Policy> = listOf(),
-  var roles: List<ContactRole> = listOf(),
-  var members: List<ContactMember> = listOf(),
+  override var roles: List<ContactRole> = listOf(),
+  override var members: List<ContactMember> = listOf(),
   val registerTime: String = currentDateTime(),
-) {
+  override val config: Map<String, Map<String, String>> = mapOf(), // 环境自定义的,插件专有的配置项
+): PluginContactDocument() {
 
   fun findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
 
@@ -143,6 +170,26 @@ internal data class ContactDocument(
       )
       withCollection { insertOne(cd) }
       return cd
+    }
+
+    internal suspend fun createContactAndUser(contact: Contact, user: User, role: String): UserDocument {
+      val contactDocument = findContactDocumentByIdOrNull(contact.id) ?: createContactDocument(
+        contact.id,
+        when (contact) {
+          is FriendUser -> ContactType.Private
+          is Group -> ContactType.Group
+          is Guild, is Channel -> ContactType.Guild
+          else -> ContactType.PrivateGuild
+        }
+      )
+
+      val userDocument = UserDocument.findUserDocumentByUidOrNull(user.id) ?: UserDocument.createUserDocument(
+        user.id,
+        contact.id
+      )
+      val member = contactDocument.addMember(userDocument.id)
+      contactDocument.updateMemberRole(member.id, role)
+      return userDocument
     }
   }
 }

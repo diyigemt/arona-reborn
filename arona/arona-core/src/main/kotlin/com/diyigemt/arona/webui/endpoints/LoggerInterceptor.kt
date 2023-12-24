@@ -60,11 +60,12 @@ object LoggerInterceptor {
       return
     }
     this.authorization?.let {
-      DatabaseProvider.redisDbQuery {
-        get(RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, it))
-      } ?: return@let null
+      RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, it)
     }?.also {
-      this._aronaUser = findUserDocumentByIdOrNull(it)
+      val id = DatabaseProvider.redisDbQuery {
+        get(it)
+      } ?: return@also
+      this._aronaUser = findUserDocumentByIdOrNull(id)
       DatabaseProvider.redisDbQuery {
         expire(it, 3600u)
       }

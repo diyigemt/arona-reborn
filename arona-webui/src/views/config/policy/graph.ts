@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { Ref, watch } from "vue";
 import G6, { IG6GraphEvent, IGroup, TreeGraph } from "@antv/g6";
+import { IElement } from "@antv/g-base/src/interfaces";
+import { PolicyTestResultStatus } from "@/views/config/policy/util";
 
 // eslint-disable-next-line import/prefer-default-export
 export function initGraph(container: HTMLDivElement, data: unknown) {
@@ -140,6 +142,31 @@ const textConfig = {
   textBaseline: "bottom",
   fill: colors.Normal,
 };
+const StatusColor = {
+  allow: {
+    bg: "#f0f9eb",
+    border: "#b3e19d",
+    text: "#67c23a",
+  },
+  deny: {
+    bg: "#fef0f0",
+    border: "#fab6b6",
+    text: "#f56c6c",
+  },
+};
+function updateColor(root: IElement, text: IElement[], status: PolicyTestResultStatus) {
+  root?.attr({
+    stroke: StatusColor[status].border,
+    fill: StatusColor[status].bg,
+  });
+  text
+    .filter((it) => it)
+    .forEach((it) => {
+      it.attr({
+        fill: StatusColor[status].text,
+      });
+    });
+}
 function addCollapse(group: IGroup, id: string, collapsed: boolean) {
   group.addShape("rect", {
     attrs: {
@@ -255,7 +282,6 @@ function registerNodes(graph: TreeGraph) {
             opacity: 0.85,
             cursor: "pointer",
           },
-
           name: "name-shape",
         });
         group.addShape("text", {
@@ -281,7 +307,7 @@ function registerNodes(graph: TreeGraph) {
       },
       // eslint-disable-next-line consistent-return
       update(config, item) {
-        const { level, form, effect, name } = config;
+        const { level, form, effect, status, name } = config;
         const group = item.getContainer();
         const maskLabel = group.find((ele) => ele.get("name") === "mask-label-shape");
         // if (level === 0) {
@@ -332,6 +358,12 @@ function registerNodes(graph: TreeGraph) {
           effectEl?.attr("text", effect);
           nameShapeEl?.attr("text", name);
           maskLabel?.attr("text", effect);
+        }
+        if (status) {
+          const rootReact = group.find((ele) => ele.get("name") === "root-shape");
+          const text1 = group.find((ele) => ele.get("name") === "name-shape");
+          const text2 = group.find((ele) => ele.get("name") === "effect");
+          updateColor(rootReact, [text1, text2], status);
         }
         this.updateLinkPoints(config, group);
       },
@@ -405,12 +437,17 @@ function registerNodes(graph: TreeGraph) {
         return rect;
       },
       update(config, item) {
-        const { form, groupType } = config;
+        const { form, groupType, status } = config;
         const group = item.getContainer();
         if (form) {
           // 更新表单信息
           const nameEl = group.findAllByName("name-item")[0];
           nameEl?.attr("text", groupType);
+        }
+        if (status) {
+          const rootReact = group.find((ele) => ele.get("name") === "root-shape");
+          const text1 = group.find((ele) => ele.get("name") === "name-item");
+          updateColor(rootReact, [text1], status);
         }
         this.updateLinkPoints(config, group);
         this.updateLinkPoints(config, group);
@@ -485,7 +522,7 @@ function registerNodes(graph: TreeGraph) {
         return rect;
       },
       update(config, item) {
-        const { form, oType, operator, key, value } = config;
+        const { form, oType, operator, key, value, status } = config;
         const group = item.getContainer();
         const valueMap = Array.isArray(value) ? value.join(",") : value;
         if (form) {
@@ -494,6 +531,11 @@ function registerNodes(graph: TreeGraph) {
           const text = `${oType}.${key} ${operator}\n${valueMap}`;
           config.name = `[${oType}.${key}] ${operator}\n[${valueMap}]`;
           nameEl?.attr("text", text);
+        }
+        if (status) {
+          const rootReact = group.find((ele) => ele.get("name") === "root-shape");
+          const text1 = group.find((ele) => ele.get("name") === "rule-name-item");
+          updateColor(rootReact, [text1], status);
         }
         this.updateLinkPoints(config, group);
       },

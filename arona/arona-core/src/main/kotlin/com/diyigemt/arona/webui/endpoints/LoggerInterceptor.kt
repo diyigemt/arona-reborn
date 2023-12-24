@@ -4,10 +4,8 @@ import com.diyigemt.arona.database.DatabaseProvider
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
+import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.utils.aronaConfig
-import com.diyigemt.arona.utils.badRequest
-import com.diyigemt.arona.utils.forbidden
-import com.diyigemt.arona.utils.isJsonPost
 import com.diyigemt.arona.webui.plugins.AronaAdminToken
 import com.diyigemt.arona.webui.plugins.AronaInstanceVersion
 import com.diyigemt.arona.webui.plugins.XRealIp
@@ -72,7 +70,7 @@ object LoggerInterceptor {
       }
     }
     if (this.authorization == null || _aronaUser == null) {
-      badRequest()
+      unauthorized()
       return finish()
     }
     val query = when (context.request.httpMethod) {

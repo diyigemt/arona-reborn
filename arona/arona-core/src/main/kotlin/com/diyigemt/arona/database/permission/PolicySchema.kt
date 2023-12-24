@@ -135,7 +135,7 @@ data class Policy(
               PolicyRule(
                 type = PolicyRuleType.Subject,
                 operator = PolicyRuleOperator.Contains,
-                key = "role",
+                key = "roles",
                 value = DEFAULT_ADMIN_CONTACT_ROLE_ID
               ),
               PolicyRule(

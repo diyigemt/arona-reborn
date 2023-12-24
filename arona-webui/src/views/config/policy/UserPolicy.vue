@@ -1,5 +1,5 @@
 <template>
-  <div class="text-xl">{{ contactId ? `编辑群${contact.contactName}的策略` : "创建策略" }}</div>
+  <div class="text-xl">编辑群 {{ contact.contactName }} 的策略</div>
   <ElForm inline class="mt-4">
     <ElFormItem label="策略选择:">
       <ElSelect v-model="selectPolicyId" @change="onPolicyChange">
@@ -47,7 +47,7 @@
     <ElForm ref="RuleForm" :model="policyRuleForm" :rules="PolicyRuleFormRule" label-width="120" label-position="left">
       <ElFormItem prop="name" label="对象">
         <ElSelect v-model="policyRuleForm.type" class="w-full" @change="onPropertySelectChange('object')">
-          <ElOption v-for="e in PolicyRuleObjectSelect" :key="e" :label="e" :value="e" />
+          <ElOption v-for="e in PolicyRuleObjectSelect" :key="e" :label="e" :value="e" :disabled="e === 'Action'" />
         </ElSelect>
       </ElFormItem>
       <ElFormItem prop="name" label="属性">
@@ -87,12 +87,21 @@
       </ElFormItem>
     </ElForm>
   </CancelConfirmDialog>
+  <CancelConfirmDialog v-model:show="showTestDataForm" title="测试数据" width="600" @confirm="doTest">
+    <PolicyTestDataBuilder
+      ref="testDataBuilder"
+      :roles="contact.roles"
+      :members="contact.members"
+      :resources="resources"
+    />
+  </CancelConfirmDialog>
 </template>
 
 <script setup lang="ts">
 import { IG6GraphEvent, TreeGraph } from "@antv/g6";
 import { Ref } from "vue";
 import { FormValidateCallback } from "element-plus";
+import dayjs from "dayjs";
 import { ContactApi, PolicyApi } from "@/api";
 import {
   Policy,
@@ -106,7 +115,14 @@ import {
 import { initGraph } from "@/views/config/policy/graph";
 import { IAlert, IConfirm } from "@/utils/message";
 import { randomInt, useForceUpdate } from "@/utils";
-import { GraphPolicyRoot, mapPolicyToGraph, PolicyRuleFormRule } from "@/views/config/policy/util";
+import {
+  GraphPolicyRoot,
+  mapPolicyToGraph, PolicyNodeTestResult,
+  PolicyRuleFormRule,
+  PolicyTestInput, PolicyTestResultStatus,
+  testPolicy,
+} from "@/views/config/policy/util";
+import PolicyTestDataBuilder from "@/views/config/policy/component/PolicyTestDataBuilder.vue";
 
 defineOptions({
   name: "UserPolicy",
@@ -135,8 +151,9 @@ const router = useRouter();
 const contactId = route.query.id as string;
 const policyId = route.query.pid as string;
 // @ts-ignore
-const contact = ref<Contact>({ contactName: "" }) as Ref<Contact>;
+const contact = ref<Contact>({ contactName: "", roles: [], members: [] }) as Ref<Contact>;
 const container = ref<HTMLDivElement>();
+const testDataBuilder = ref<{ build(): PolicyTestInput }>();
 const policy = ref<Policy>({
   id: `policy.${randomInt(0, 100)}`,
   name: "新建策略",
@@ -156,6 +173,7 @@ const showPolicyNodeForm = ref(false);
 const policyNodeForm = ref<PolicyNodeForm>({ type: "modify", groupType: "ALL" });
 const showPolicyRuleForm = ref(false);
 const RuleForm = ref() as Ref<{ validate: (callback?: FormValidateCallback) => Promise<void> }>;
+const showTestDataForm = ref(false);
 const policyRuleForm = ref<PolicyRuleForm>({
   formType: "modify",
   type: "Resource",
@@ -172,7 +190,7 @@ const PolicyRulePropertySelect = computed(() => {
       return ["id"];
     }
     case "Subject": {
-      return ["id", "role"];
+      return ["id", "roles"];
     }
     case "Environment": {
       return ["time", "date", "datetime"];
@@ -184,7 +202,7 @@ const PolicyRulePropertySelect = computed(() => {
 });
 const isValueSelect = computed(() => {
   const { type, key } = policyRuleForm.value;
-  return (type === "Resource" && key === "id") || (type === "Subject" && ["id", "role"].includes(key));
+  return (type === "Resource" && key === "id") || (type === "Subject" && ["id", "roles"].includes(key));
 });
 const isEnvironmentTimeSelect = computed(() => {
   const { type, key } = policyRuleForm.value;
@@ -218,7 +236,7 @@ const PolicyRuleOperatorSelect = computed(() => {
         case "id": {
           return ["Equal", "IsIn"];
         }
-        case "role": {
+        case "roles": {
           return ["Contains", "ContainsAll", "ContainsAny", "IsIn"];
         }
         default: {
@@ -265,7 +283,7 @@ const PolicyRuleValueSelect = computed(() => {
             };
           });
         }
-        case "role": {
+        case "roles": {
           return roles.value.map((it) => {
             return {
               label: it.name,
@@ -300,9 +318,12 @@ function onPropertySelectChange(type: "object" | "key") {
 }
 function onOperatorSelectChange() {
   if (isPolicyRuleValueArrayInput.value) {
+    // eslint-disable-next-line no-nested-ternary
     policyRuleForm.value.value = Array.isArray(policyRuleForm.value.value)
       ? policyRuleForm.value.value
-      : [policyRuleForm.value.value];
+      : policyRuleForm.value.value
+        ? [policyRuleForm.value.value]
+        : [];
   } else {
     policyRuleForm.value.value = Array.isArray(policyRuleForm.value.value)
       ? policyRuleForm.value.value[0]
@@ -424,7 +445,26 @@ function onSave() {
   }
 }
 
-function onTest() {}
+function onTest() {
+  showTestDataForm.value = true;
+}
+
+function doTest() {
+  const testData = testDataBuilder.value?.build();
+  if (testData) {
+    const testResult = testPolicy(graphData, testData);
+    updateItemByResult(testResult);
+  }
+}
+
+function updateItemByResult(result: PolicyNodeTestResult) {
+  graph.updateItem(result.id, {
+    status: result.stats,
+  });
+  if (result.children) {
+    result.children.forEach((it) => updateItemByResult(it as PolicyNodeTestResult));
+  }
+}
 
 onMounted(() => {
   if (!contactId) {

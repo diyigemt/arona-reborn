@@ -10,7 +10,6 @@ import com.diyigemt.arona.utils.internalServerError
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints._aronaUser
-import com.diyigemt.arona.webui.endpoints.contact.ContactMemberUpdateReq
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
@@ -23,15 +22,18 @@ internal data class AuthResp(
   val status: Int, // 0 1 2 无效 等待 成功
   val token: String = "",
 )
+
 @Serializable
 internal data class UserProfileResp(
   val id: String,
   val username: String,
 )
+
 @Serializable
 internal data class UserProfileUpdateReq(
   val username: String,
 )
+
 @Suppress("unused")
 @AronaBackendEndpoint("/user")
 internal object UserEndpoint {
@@ -74,7 +76,12 @@ internal object UserEndpoint {
       // 请求参数无token, 证明为获取登录凭证
       else -> {
         val password = generateNumber()
-        val passwordKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, password)
+        var passwordKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, password)
+        redisDbQuery {
+          while (get(passwordKey) != null) {
+            passwordKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, generateNumber())
+          }
+        }
         redisDbQuery {
           set(passwordKey, "1")
           expire(passwordKey, 600u)
@@ -97,6 +104,7 @@ internal object UserEndpoint {
       )
     )
   }
+
   /**
    * 更新个人信息
    */
@@ -116,6 +124,7 @@ internal object UserEndpoint {
       internalServerError()
     }
   }
+
   /**
    * 获取绑定凭证/绑定结果
    */
@@ -136,9 +145,11 @@ internal object UserEndpoint {
             }
             success(AuthResp(2))
           }
+
           else -> success(AuthResp(1))
         }
       }
+
       else -> {
         val password = generateNumber()
         val key = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, password)

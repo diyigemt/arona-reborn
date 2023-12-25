@@ -12,6 +12,9 @@ import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toReadableTencentAt
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import com.diyigemt.arona.communication.message.toMessageChain
+import com.diyigemt.arona.database.permission.ContactMember
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
+import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.permission.Permission.Companion.testPermission
 import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
@@ -180,18 +183,21 @@ internal suspend fun executeCommandImpl(
   if (checkPermission) {
     val document = caller.subject?.toContactDocumentOrNull()
     val user = caller.user?.toUserDocumentOrNull()
-    if (document != null && user != null) {
-      document.findContactMemberOrNull(user.id)?.also {
-        val environment = mapOf(
-          "time" to currentTime().substringAfter(":"),
-          "date" to currentDate(),
-          "datetime" to currentDateTime(),
-          "param1" to (parseArg.getOrNull(0) ?: ""),
-          "param2" to (parseArg.getOrNull(1) ?: "")
-        )
-        if (!command.permission.testPermission(it, document.policies, environment)) {
-          return CommandExecuteResult.PermissionDenied(command)
-        }
+    if (document != null) {
+      val u = document.findContactMemberOrNull(user?.id ?: "") ?: ContactMember(
+        "",
+        "",
+        listOf(DEFAULT_MEMBER_CONTACT_ROLE_ID)
+      )
+      val environment = mapOf(
+        "time" to currentTime().substringAfter(":"),
+        "date" to currentDate(),
+        "datetime" to currentDateTime(),
+        "param1" to (parseArg.getOrNull(0) ?: ""),
+        "param2" to (parseArg.getOrNull(1) ?: "")
+      )
+      if (!command.permission.testPermission(u, document.policies, environment)) {
+        return CommandExecuteResult.PermissionDenied(command)
       }
     }
   }

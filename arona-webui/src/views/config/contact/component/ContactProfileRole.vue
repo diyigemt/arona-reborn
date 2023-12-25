@@ -12,8 +12,10 @@ const emit = defineEmits<{
   (e: "update"): void;
 }>();
 const contact = inject<ComputedRef<EditableContact>>("contact") as ComputedRef<EditableContact>;
+const roles = computed(() => contact.value.roles);
+
 const userId = inject("userId", "");
-const { onConfirm, onEdit, onCancel, cache: role } = useTableInlineEditor(contact.value.roles, onRoleConfirmEdit);
+const { onConfirm, onEdit, onCancel, cache: role } = useTableInlineEditor(roles, onRoleConfirmEdit);
 function onRoleConfirmEdit(): Promise<unknown> {
   return ContactApi.updateContactRole(contact.value.id, role.value).then(() => {
     successMessage("更新成功");

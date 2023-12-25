@@ -11,7 +11,7 @@
     @ended="onEnded"
   >
     <transition name="el-fade-in">
-      <div v-if="!showLogin && touch" class="absolute-wrapper login-wrapper">
+      <div v-if="!showLogin && isCode" class="absolute-wrapper login-wrapper">
         <div class="login-wrapper-body" style="transform: translateY(-25%)">
           <div class="login-header">Arona</div>
           <div class="tips">请选择要进行游戏的登入方法</div>
@@ -66,7 +66,7 @@
         </div>
       </div>
     </transition>
-    <div v-if="showLogin" class="absolute-wrapper arona-login-wrapper bg-white">
+    <div v-if="showLogin && isCode" class="absolute-wrapper arona-login-wrapper bg-white">
       <div>
         <div class="text-2xl">您的登录认证码为:</div>
         <div class="text-4xl arona-color m-8">{{ code }}</div>
@@ -84,7 +84,8 @@
         >
       </div>
     </div>
-    <div v-if="!touch" class="start">touch to start</div>
+    <div v-if="!isCode" class="start">touch to start</div>
+    <div v-if="isSuccess" class="absolute text-xl right-16px bottom-16px color-white">UID: {{ userId }}</div>
   </VideoBackground>
 </template>
 
@@ -94,20 +95,24 @@ import { User } from "@element-plus/icons-vue";
 import VideoBackground from "vue-responsive-video-background-player";
 import { infoMessage, successMessage } from "@/utils/message";
 import { UserApi } from "@/api";
-import { HTTP_OK } from "@/constant";
 import useBaseStore from "@/store/base";
+import { playLoginVoice } from "@/views/home/loginVoice";
 
 defineOptions({
   name: "LoginIndex",
 });
 const showLogin = ref(false);
-const touchCount = ref(0);
-const touch = computed(() => touchCount.value > 1);
 const code = ref("XXXXXX");
 const respErrorMessage = ref("");
+const loginState = ref<"wait" | "play" | "code" | "success">("wait");
 const countDown = ref(0);
+const isWait = computed(() => loginState.value === "wait");
+const isPlay = computed(() => loginState.value === "play");
+const isCode = computed(() => loginState.value === "code");
+const isSuccess = computed(() => loginState.value === "success");
 const router = useRouter();
 const baseStore = useBaseStore();
+const userId = computed(() => baseStore.userId);
 let loginStateCheckHandler = 0;
 let codeCountDownHandler = 0;
 function onClickThirdPartLogin() {
@@ -115,6 +120,9 @@ function onClickThirdPartLogin() {
 }
 function startCheckLoginState() {
   loginStateCheckHandler = window.setInterval(() => {
+    if (isSuccess.value) {
+      return;
+    }
     UserApi.fetchLoginState(code.value).then((data) => {
       switch (data.status) {
         case 0: {
@@ -131,7 +139,8 @@ function startCheckLoginState() {
           UserApi.fetchUserProfile().then((user) => {
             baseStore.setUser(user);
             successMessage("登录成功");
-            router.push("/home");
+            playLoginVoice();
+            moveToNextState();
           });
           break;
         }
@@ -163,11 +172,36 @@ function onClickAronaLogin() {
 }
 const video = ref<{ player: { play(): void } }>();
 function onClick() {
-  touchCount.value++;
+  if (isSuccess.value) {
+    router.push("/home");
+  }
+  if (!isCode.value) {
+    moveToNextState();
+  }
   video.value?.player.play();
 }
-function onCloseLogin() {
-  touchCount.value = 1;
+function moveToNextState() {
+  switch (loginState.value) {
+    case "wait": {
+      loginState.value = "play";
+      break;
+    }
+    case "play": {
+      loginState.value = "code";
+      break;
+    }
+    case "code": {
+      loginState.value = "success";
+      break;
+    }
+    case "success": {
+      loginState.value = "success";
+      break;
+    }
+    default: {
+      /**/
+    }
+  }
 }
 function onEnded() {
   // @ts-ignore
@@ -187,7 +221,7 @@ onUnmounted(() => {
 .start {
   position: absolute;
   pointer-events: none;
-  opacity: 0.6;
+  opacity: 0.8;
   bottom: 8%;
   left: 50%;
   transform: translateX(-50%);
@@ -211,7 +245,7 @@ onUnmounted(() => {
   //  opacity: 0;
   //}
   100% {
-    opacity: 1;
+    opacity: 0.8;
   }
 }
 .absolute-wrapper {

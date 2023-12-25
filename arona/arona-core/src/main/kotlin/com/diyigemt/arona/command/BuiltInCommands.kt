@@ -18,11 +18,34 @@ import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
+import com.diyigemt.arona.permission.PermissionService
 import com.github.ajalt.clikt.parameters.arguments.argument
 
 object BuiltInCommands {
 
   internal fun registerAll() {
+    // 注册指令权限
+    PermissionService.register(
+      PermissionService.allocatePermissionIdForBuildInCommandOwner(
+        BuildInCommandOwner,
+        "command.*"
+      ),
+      "内置指令父级权限"
+    )
+    PermissionService.register(
+      PermissionService.allocatePermissionIdForBuildInCommandOwner(
+        BuildInOwnerCommandOwner,
+        "command.*"
+      ),
+      "内置指令父级权限"
+    )
+    PermissionService.register(
+      PermissionService.allocatePermissionIdForBuildInCommandOwner(
+        BuildInSuperAdminCommandOwner,
+        "command.*"
+      ),
+      "内置指令父级权限"
+    )
     BuiltInCommands::class.nestedClasses.forEach {
       (it.objectInstance as? Command)?.register()
     }

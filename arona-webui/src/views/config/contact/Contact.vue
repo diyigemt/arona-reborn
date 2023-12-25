@@ -18,7 +18,7 @@ import ContactProfile from "@/views/config/contact/component/ContactProfile.vue"
 import useBaseStore from "@/store/base";
 
 defineOptions({
-  name: "UserContat",
+  name: "UserContact",
 });
 const contacts = ref<Contact[]>([]);
 const contactId = ref<string>() as Ref<string>;
@@ -37,9 +37,7 @@ function onContactUpdate(id: string) {
 }
 function fetchContacts() {
   return ContactApi.fetchContacts().then((res) => {
-    contacts.value = res.filter((it) => {
-      return it.members.some((m) => m.roles.some((r) => r === "role.admin"));
-    });
+    contacts.value = res;
   });
 }
 onMounted(() => {

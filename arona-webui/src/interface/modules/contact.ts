@@ -18,6 +18,7 @@ export interface Contact {
   roles: ContactRole[];
   members: ContactMember[];
   registerTime: string;
+  config: Record<string, Record<string, string>>;
 }
 export interface EditableContactRole extends ContactRole {
   edit: boolean;

@@ -3,23 +3,27 @@ import service, { simplifiedApiService } from "@/api/http";
 // eslint-disable-next-line import/prefer-default-export
 export const PluginPreferenceApi = {
   fetchPluginPreference(pluginId: string, preferenceKey: string) {
-    return service.raw<string>({
-      url: "/plugin/preference",
-      method: "GET",
-      params: {
-        id: pluginId,
-        key: preferenceKey,
-      },
-    });
+    return simplifiedApiService(
+      service.raw<string>({
+        url: "/plugin/preference",
+        method: "GET",
+        params: {
+          id: pluginId,
+          key: preferenceKey,
+        },
+      }),
+    );
   },
   fetchPluginPreferences(pluginId: string) {
-    return service.raw<string[]>({
-      url: "/plugin/preference",
-      method: "GET",
-      params: {
-        id: pluginId,
-      },
-    });
+    return simplifiedApiService(
+      service.raw<string[]>({
+        url: "/plugin/preference",
+        method: "GET",
+        params: {
+          id: pluginId,
+        },
+      }),
+    );
   },
   updatePluginPreference(pluginId: string, preferenceKey: string, preference: string | object) {
     return simplifiedApiService(

@@ -4,14 +4,14 @@ package com.diyigemt.arona.webui.endpoints.contact
 
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.permission.*
-import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
-import com.diyigemt.arona.database.permission.ContactMember
-import com.diyigemt.arona.database.permission.ContactRole
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
+import com.diyigemt.arona.database.permission.ContactRole.Companion.PROTECTED_ROLE_ID
 import com.diyigemt.arona.database.permission.Policy.Companion.PROTECTED_POLICY_ID
 import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
+import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
@@ -29,14 +29,22 @@ import org.bson.Document
 import org.bson.codecs.pojo.annotations.BsonId
 
 @Serializable
+internal data class UserContactMemberDocument(
+  @BsonId
+  val id: String, // 指向UserDocument.id
+  val name: String,
+  val roles: List<String>, // 指向ContactDocument.roles.id
+)
+
+@Serializable
 internal data class UserContactDocument(
   @BsonId
   val id: String,
   val contactName: String,
   val contactType: ContactType = ContactType.Group,
-  val members: List<ContactMember> = listOf(),
+  val members: List<UserContactMemberDocument> = listOf(),
   val roles: List<ContactRole> = listOf(),
-  val config: Map<String, Map<String, String>> = mapOf()
+  val config: Map<String, Map<String, String>> = mapOf(),
 )
 
 @Serializable
@@ -65,10 +73,10 @@ internal data class ContactRoleCreateReq(
 
 @AronaBackendEndpoint("/contact")
 internal object ContactEndpoint {
-  private val NoRequestContactIdPath = listOf("/contacts")
+  private val NoRequestContactIdPath = listOf("/contacts", "/manage-contacts")
   private val RequestContactAdminPath = listOf(
     "/contact", "/contact-basic", "/roles", "/members", "/policies",
-    "/role", "/policy"
+    "/role", "/policy", "/preference"
   )
   private val PipelineContext<Unit, ApplicationCall>.contactId
     get() = request.queryParameters["id"] ?: context.parameters["id"]!!
@@ -115,13 +123,26 @@ internal object ContactEndpoint {
     }
   }
 
+  @AronaBackendEndpointGet("/manage-contacts")
+  suspend fun PipelineContext<Unit, ApplicationCall>.manageContacts() {
+    return success(
+      getContacts().filter { c ->
+        c.members.first { m -> m.id == aronaUser.id }.roles.any { it == DEFAULT_ADMIN_CONTACT_ROLE_ID }
+      }
+    )
+  }
+
   /**
    * 获取用户所有群/频道列表
    */
   @AronaBackendEndpointGet("/contacts")
   suspend fun PipelineContext<Unit, ApplicationCall>.contacts() {
+    return success(getContacts())
+  }
+
+  suspend fun PipelineContext<Unit, ApplicationCall>.getContacts(): List<UserContactDocument> {
     val filter = Aggregates.match(Filters.eq("${ContactDocument::members.name}._id", aronaUser.id))
-    val projection = Aggregates.project(
+    val firstProjection = Aggregates.project(
       Projections.fields(
         Document("_id", 1),
         Document(ContactDocument::contactName.name, 1),
@@ -145,10 +166,21 @@ internal object ContactEndpoint {
         ),
       )
     )
-    val manageContacts = ContactDocument.withCollection<ContactDocument, List<UserContactDocument>> {
-      aggregate<UserContactDocument>(listOf(filter, projection)).toList()
+    val secondProjection = Aggregates.project(
+      Projections.fields(
+        Document("_id", 1),
+        Document(ContactDocument::contactName.name, 1),
+        Document(ContactDocument::contactType.name, 1),
+        Document(ContactDocument::roles.name, 1),
+        Document(ContactDocument::config.name, 1),
+        Document("${ContactDocument::members.name}._id", 1),
+        Document("${ContactDocument::members.name}.${ContactMember::name.name}", 1),
+        Document("${ContactDocument::members.name}.${ContactMember::roles.name}", 1),
+      )
+    )
+    return ContactDocument.withCollection<ContactDocument, List<UserContactDocument>> {
+      aggregate<UserContactDocument>(listOf(filter, firstProjection, secondProjection)).toList()
     }
-    success(manageContacts)
   }
 
   /**
@@ -158,6 +190,8 @@ internal object ContactEndpoint {
   suspend fun PipelineContext<Unit, ApplicationCall>.contact() {
     success(contact)
   }
+
+  private fun ContactMember.toSimply() = UserContactMemberDocument(id, name, roles)
 
   /**
    * 根据id获取一个contact的基本信息 用户自定义名称、群名、成员列表
@@ -169,7 +203,7 @@ internal object ContactEndpoint {
         contactId,
         contact.contactName,
         contact.contactType,
-        contact.members,
+        contact.members.map { it.toSimply() },
         contact.roles
       )
     )
@@ -203,7 +237,7 @@ internal object ContactEndpoint {
    */
   @AronaBackendEndpointGet("/members")
   suspend fun PipelineContext<Unit, ApplicationCall>.contactMembers() {
-    return success(contact.members)
+    return success(contact.members.map { it.toSimply() })
   }
 
   /**
@@ -269,6 +303,9 @@ internal object ContactEndpoint {
   @AronaBackendEndpointDelete("/{id}/role")
   suspend fun PipelineContext<Unit, ApplicationCall>.deleteRole() {
     val data = context.receiveJsonOrNull<IdBody>() ?: return badRequest()
+    if (data.id in PROTECTED_ROLE_ID) {
+      return badRequest()
+    }
     // TODO
     // 删除 contact document 的 roles
     // 删除所有 member 的 role
@@ -282,6 +319,9 @@ internal object ContactEndpoint {
   @AronaBackendEndpointPut("/{id}/role")
   suspend fun PipelineContext<Unit, ApplicationCall>.updateRole() {
     val data = context.receiveJsonOrNull<ContactRoleCreateReq>() ?: return badRequest()
+    if (data.id in PROTECTED_ROLE_ID) {
+      return badRequest()
+    }
     return if (
       ContactDocument.withCollection<ContactDocument, UpdateResult> {
         updateOne(
@@ -326,7 +366,7 @@ internal object ContactEndpoint {
           update = Updates.set("${ContactDocument::policies.name}.$", policy)
         )
       }.modifiedCount == 1L
-    ) success()
+    ) success(policy.id)
     else internalServerError()
   }
 
@@ -355,7 +395,7 @@ internal object ContactEndpoint {
           update = Updates.push(ContactDocument::policies.name, policy)
         )
       }.modifiedCount == 1L
-    ) success()
+    ) success(policy.id)
     else internalServerError()
   }
 
@@ -383,5 +423,50 @@ internal object ContactEndpoint {
       }.modifiedCount == 1L
     ) success()
     else internalServerError()
+  }
+
+  /**
+   * 保存群插件配置
+   */
+  @AronaBackendEndpointPost("/{id}/plugin/preference")
+  suspend fun PipelineContext<Unit, ApplicationCall>.savePreference() {
+    val obj = kotlin.runCatching { context.receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
+    contact.updatePluginConfig(
+      obj.id,
+      obj.key,
+      obj.value
+    )
+    return success()
+  }
+
+  /**
+   * 获取用户自定义的群插件配置
+   */
+  @AronaBackendEndpointGet("/{id}/member/plugin/member-preference")
+  suspend fun PipelineContext<Unit, ApplicationCall>.getMemberPreference() {
+    val pid = request.queryParameters["pid"] ?: return badRequest()
+    val key = request.queryParameters["key"] ?: return badRequest()
+    contact.findContactMemberOrNull(aronaUser.id)?.readPluginConfigStringOrNull(pid, key)?.also {
+      return success(it)
+    }
+    return internalServerError()
+  }
+
+  /**
+   * 保存用户自定义的群插件配置
+   */
+  @AronaBackendEndpointPost("/{id}/member/plugin/member-preference")
+  suspend fun PipelineContext<Unit, ApplicationCall>.saveMemberPreference() {
+    val obj = kotlin.runCatching { context.receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
+    contact.findContactMemberOrNull(aronaUser.id)?.also {
+      it.updatePluginConfig(
+        contact.id,
+        obj.id,
+        obj.key,
+        obj.value
+      )
+      return success()
+    }
+    return internalServerError()
   }
 }

@@ -6,6 +6,7 @@ import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.internal.MultiFilePluginDataStorageImpl
 import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.console.CommandMain
+import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.utils.commandLineLogger
 import com.github.ajalt.clikt.core.CliktCommand
 import io.ktor.util.logging.*
@@ -101,6 +102,11 @@ object PluginManager {
         }
       pluginInstance.internalOnEnable()
       plugins.add(pluginInstance)
+      // 给插件注册command指令
+      PermissionService.register(
+        pluginInstance.permissionId("command.*"),
+        "插件指令父级权限"
+      )
     }
   }
 }

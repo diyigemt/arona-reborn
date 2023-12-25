@@ -91,6 +91,14 @@ abstract class PluginVisibleData {
       JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
     }
   }
+
+  fun readPluginConfigString(pluginId: String, key: String): String {
+    return config[pluginId.toMongodbKey()]!![key]!!
+  }
+
+  fun readPluginConfigStringOrNull(pluginId: String, key: String): String? {
+    return config[pluginId.toMongodbKey()]?.get(key)
+  }
 }
 
 abstract class PluginUserDocument : PluginVisibleData() {

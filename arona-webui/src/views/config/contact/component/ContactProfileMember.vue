@@ -12,12 +12,13 @@ const emit = defineEmits<{
   (e: "update"): void;
 }>();
 const contact = inject<ComputedRef<EditableContact>>("contact") as ComputedRef<EditableContact>;
+const members = computed(() => contact.value.members);
 const userId = inject("userId", "");
 const roles = computed(() => contact.value.roles);
 function roleNameMapper(mem: EditableContactMember) {
   return mem.roles.map((it) => contact.value.roles.filter((r) => r.id === it)[0].name);
 }
-const { onConfirm, onEdit, onCancel, cache: member } = useTableInlineEditor(contact.value.members, onMemberConfirmEdit);
+const { onConfirm, onEdit, onCancel, cache: member } = useTableInlineEditor(members, onMemberConfirmEdit);
 function onMemberConfirmEdit(): Promise<unknown> {
   return ContactApi.updateContactMember(contact.value.id, member.value).then(() => {
     successMessage("更新成功");

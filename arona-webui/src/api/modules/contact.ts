@@ -11,6 +11,14 @@ export const ContactApi = {
       }),
     );
   },
+  fetchManageContacts() {
+    return simplifiedApiService(
+      service.raw<Contact[]>({
+        url: "/contact/manage-contacts",
+        method: "GET",
+      }),
+    );
+  },
   fetchContact(id: string) {
     return simplifiedApiService(
       service.raw<EditableContact>({
@@ -94,7 +102,7 @@ export const ContactApi = {
   },
   updateContactPolicy(id: string, policy: Policy) {
     return simplifiedApiService(
-      service.raw<void>({
+      service.raw<string>({
         url: `/contact/${id}/policy`,
         method: "PUT",
         data: policy,
@@ -103,7 +111,7 @@ export const ContactApi = {
   },
   createContactPolicy(id: string, policy: Policy) {
     return simplifiedApiService(
-      service.raw<void>({
+      service.raw<string>({
         url: `/contact/${id}/policy`,
         method: "POST",
         data: policy,
@@ -117,6 +125,44 @@ export const ContactApi = {
         method: "DELETE",
         data: {
           id: pid,
+        },
+      }),
+    );
+  },
+  updatePluginPreference(cid: string, pid: string, pKey: string, preference: string | object) {
+    return simplifiedApiService(
+      service.raw<void>({
+        url: `/contact/${cid}/plugin/preference`,
+        method: "POST",
+        data: {
+          id: pid,
+          key: pKey,
+          value: typeof preference === "string" ? preference : JSON.stringify(preference),
+        },
+      }),
+    );
+  },
+  fetchMemberPluginPreference(cid: string, pid: string, pKey: string) {
+    return simplifiedApiService(
+      service.raw<string>({
+        url: `/contact/${cid}/member/plugin/member-preference`,
+        method: "GET",
+        params: {
+          pid,
+          key: pKey,
+        },
+      }),
+    );
+  },
+  updateMemberPluginPreference(cid: string, pid: string, pKey: string, preference: string | object) {
+    return simplifiedApiService(
+      service.raw<void>({
+        url: `/contact/${cid}/member/plugin/member-preference`,
+        method: "POST",
+        data: {
+          id: pid,
+          key: pKey,
+          value: typeof preference === "string" ? preference : JSON.stringify(preference),
         },
       }),
     );

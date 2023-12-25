@@ -118,7 +118,7 @@ function fetchContactProfile(id: string) {
         <ContactProfileRole @update="fetchContactProfile(contactId)" />
       </ElTabPane>
       <ElTabPane label="策略" name="policy">
-        <ContactProfilePolicy />
+        <ContactProfilePolicy @update="fetchContactProfile(contactId)" />
       </ElTabPane>
     </ElTabs>
     <CancelConfirmDialog v-model:show="showRoleAddDialog" title="新增角色" @confirm="onConfirmRoleCreate">

@@ -69,7 +69,7 @@ function mapGraphRuleToPolicyRule(node: GraphPolicyRule): PolicyRule {
     type: node.oType,
     operator: node.operator,
     key: node.key,
-    value: node.value,
+    value: Array.isArray(node.value) ? node.value.join(",") : node.value,
   };
 }
 

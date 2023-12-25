@@ -71,7 +71,7 @@ export function pickRandomArrayItemAndPutBack<T>(arr: T[]) {
 }
 
 export function useTableInlineEditor<T extends { id: string; edit: boolean }>(
-  datasource: T[],
+  datasource: Ref<T[]>,
   onConfirm: (data: T) => Promise<unknown>,
   onEdit: (data: T) => Promise<unknown> = () => Promise.resolve(),
   onCancel: (data: T) => Promise<unknown> = () => Promise.resolve(),
@@ -82,7 +82,7 @@ export function useTableInlineEditor<T extends { id: string; edit: boolean }>(
     onEdit(data: T) {
       onEdit(data).then(() => {
         if (cache.value) {
-          this.onCancel(datasource.filter((it) => it.id === cache.value.id)[0]).then(() => {
+          this.onCancel(datasource.value.filter((it) => it.id === cache.value.id)[0]).then(() => {
             cache.value = data;
             cache.value.edit = true;
           });

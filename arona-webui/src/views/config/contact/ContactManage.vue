@@ -33,10 +33,8 @@ function onContactUpdate(id: string) {
   });
 }
 function fetchContacts() {
-  return ContactApi.fetchContacts().then((res) => {
-    contacts.value = res.filter((it) => {
-      return it.members.some((m) => m.roles.some((r) => r === "role.admin"));
-    });
+  return ContactApi.fetchManageContacts().then((data) => {
+    contacts.value = data;
   });
 }
 onMounted(() => {

@@ -1,20 +1,25 @@
 <template>
   <div class="text-xl">编辑群 {{ contact.contactName }} 的策略</div>
-  <ElForm inline class="mt-4">
-    <ElFormItem label="策略选择:" class="w-300px">
-      <ElSelect v-model="selectPolicyId" class="w-full" @change="onPolicyChange">
-        <ElOption v-for="(e, index) in policies" :key="index" :label="e.name" :value="e.id" />
-      </ElSelect>
-    </ElFormItem>
-    <ElFormItem>
-      <ElButton @click="onCreate">创建</ElButton>
-      <ElButton type="danger" @click="onReset">重置</ElButton>
-      <ElButton type="primary" @click="onSave">保存</ElButton>
-      <ElButton type="success" @click="onTest">测试</ElButton>
-      <ElButton type="primary" plain @click="onImportFromOtherContact">从其他群导入</ElButton>
-    </ElFormItem>
+  <ElForm inline class="mt-4 flex justify-between">
+    <div class="inline-block">
+      <ElFormItem label="策略选择:" class="w-300px">
+        <ElSelect v-model="selectPolicyId" class="w-full" @change="onPolicyChange">
+          <ElOption v-for="(e, index) in policies" :key="index" :label="e.name" :value="e.id" />
+        </ElSelect>
+      </ElFormItem>
+      <ElFormItem>
+        <ElButton @click="onCreate">创建</ElButton>
+        <ElButton type="danger" @click="onReset">重置</ElButton>
+        <ElButton type="primary" @click="onSave">保存</ElButton>
+        <ElButton type="success" @click="onTest">测试</ElButton>
+        <ElButton type="primary" plain @click="onImportFromOtherContact">从其他群导入</ElButton>
+      </ElFormItem>
+    </div>
+    <div class="inline-block">
+      <ElButton type="danger" plain @click="onDelete">删除</ElButton>
+    </div>
   </ElForm>
-  <div ref="container" class="w-100% h-500px rounded-5px container"></div>
+  <div ref="container" class="w-100% h-480px rounded-5px container"></div>
   <CancelConfirmDialog v-model:show="showPolicyBaseForm" title="策略信息" width="700" @confirm="onPolicyBaseChange">
     <ElForm :model="policyBaseForm">
       <ElFormItem prop="name" label="策略名称">
@@ -46,22 +51,22 @@
     width="700"
   >
     <ElForm ref="RuleForm" :model="policyRuleForm" :rules="PolicyRuleFormRule" label-width="120" label-position="left">
-      <ElFormItem prop="name" label="对象">
+      <ElFormItem prop="type" label="对象">
         <ElSelect v-model="policyRuleForm.type" class="w-full" @change="onPropertySelectChange('object')">
           <ElOption v-for="e in PolicyRuleObjectSelect" :key="e" :label="e" :value="e" :disabled="e === 'Action'" />
         </ElSelect>
       </ElFormItem>
-      <ElFormItem prop="name" label="属性">
+      <ElFormItem prop="key" label="属性">
         <ElSelect v-model="policyRuleForm.key" class="w-full" @change="onPropertySelectChange('key')">
           <ElOption v-for="e in PolicyRulePropertySelect" :key="e" :label="e" :value="e" />
         </ElSelect>
       </ElFormItem>
-      <ElFormItem prop="name" label="操作符">
+      <ElFormItem prop="operator" label="操作符">
         <ElSelect v-model="policyRuleForm.operator" class="w-full" @change="onOperatorSelectChange">
           <ElOption v-for="e in PolicyRuleOperatorSelect" :key="e" :label="e" :value="e" />
         </ElSelect>
       </ElFormItem>
-      <ElFormItem prop="name" label="值">
+      <ElFormItem prop="value" label="值">
         <ElSelect
           v-if="isValueSelect && visible"
           v-model="policyRuleForm.value"
@@ -132,10 +137,11 @@ import {
   PolicyResource,
 } from "@/interface";
 import { initGraph } from "@/views/config/policy/graph";
-import { IAlert, IWarningConfirm } from "@/utils/message";
+import { errorMessage, IAlert, IWarningConfirm, successMessage } from "@/utils/message";
 import { randomInt, useForceUpdate } from "@/utils";
 import {
   GraphPolicyRoot,
+  mapGraphToPolicy,
   mapPolicyToGraph,
   PolicyNodeTestResult,
   PolicyRuleFormRule,
@@ -169,7 +175,7 @@ const PolicyRuleObjectSelect: PolicyRuleType[] = ["Resource", "Action", "Subject
 const route = useRoute();
 const router = useRouter();
 const contactId = route.query.id as string;
-const policyId = route.query.pid as string;
+let policyId = route.query.pid as string;
 // @ts-ignore
 const contact = ref<Contact>({ contactName: "", roles: [], members: [] }) as Ref<Contact>;
 const container = ref<HTMLDivElement>();
@@ -358,13 +364,16 @@ function onOperatorSelectChange() {
 const parentNodeId = ref("");
 let destroyGraphHandler: () => void;
 let graph: TreeGraph;
-let graphData: GraphPolicyRoot;
+// @ts-ignore
+let graphData: GraphPolicyRoot = { id: policyId };
 function onPolicyChange(id: string) {
-  IWarningConfirm("警告", "确认要切换编辑的策略吗，所有修改将会丢失").then(() => {
-    policy.value = policies.value.find((it) => it.id === id) as Policy;
-    graphData = mapPolicyToGraph(policy.value);
-    graph.changeData(graphData);
-  });
+  IWarningConfirm("警告", "确认要切换编辑的策略吗，所有修改将会丢失")
+    .then(() => {
+      policy.value = policies.value.find((it) => it.id === id) as Policy;
+      graphData = mapPolicyToGraph(policy.value);
+      graph.changeData(graphData);
+    })
+    .catch();
 }
 function onPolicyBaseChange() {
   graphData.name = policyBaseForm.value.name;
@@ -461,16 +470,39 @@ function onReset() {
   }
 }
 
+function isEdit() {
+  return contact.value.policies.some((it) => it.id === policyId);
+}
+
 function onSave() {
-  if (contact.value.policies.some((it) => it.id === graphData.id)) {
-    // 修改
-  } else {
-    // 创建
-  }
+  const data = mapGraphToPolicy(graphData);
+  const fn = isEdit() ? ContactApi.updateContactPolicy : ContactApi.createContactPolicy;
+  fn(contact.value.id, data).then((pid) => {
+    policyId = pid;
+    successMessage("保存成功");
+    setTimeout(() => {
+      fetchData();
+    }, 1000);
+  });
 }
 
 function onTest() {
   showTestDataForm.value = true;
+}
+
+function onDelete() {
+  if (isEdit()) {
+    IWarningConfirm("警告", `确认删除策略 ${graphData.name} 吗? 操作不可逆!`).then(() => {
+      ContactApi.deleteContactPolicy(contact.value.id, graphData.id).then(() => {
+        successMessage("成功");
+        policyId = (policies.value.find((it) => it.id !== graphData.id) || {}).id || "";
+        selectPolicyId.value = policyId;
+        fetchData();
+      });
+    });
+  } else {
+    errorMessage("都没创建呢删除什么");
+  }
 }
 
 function doTest() {
@@ -490,6 +522,28 @@ function updateItemByResult(result: PolicyNodeTestResult) {
   }
 }
 
+function fetchData() {
+  destroyGraphHandler && destroyGraphHandler();
+  ContactApi.fetchContact(contactId).then((data) => {
+    contact.value = data;
+    if (isEdit()) {
+      selectPolicyId.value = policyId;
+      policy.value = policies.value.find((it) => it.id === policyId) as Policy;
+      policyBaseForm.value.effect = policy.value.effect;
+      policyBaseForm.value.name = policy.value.name;
+    } else {
+      policy.value = {
+        id: `policy.${randomInt(0, 100)}`,
+        name: "新建策略",
+        effect: "ALLOW",
+        rules: [],
+      };
+    }
+    graphData = mapPolicyToGraph(policy.value);
+    initPolicyEdit();
+  });
+}
+
 onMounted(() => {
   if (!contactId) {
     IAlert("错误", "请从我管理的群->策略->新增进入本页面", { type: "warning" }).then(() => {
@@ -497,20 +551,8 @@ onMounted(() => {
     });
     return;
   }
-  ContactApi.fetchContact(contactId).then((data) => {
-    contact.value = data;
-    if (policyId) {
-      selectPolicyId.value = policyId;
-      policy.value = policies.value.find((it) => it.id === policyId) as Policy;
-      policyBaseForm.value.effect = policy.value.effect;
-      policyBaseForm.value.name = policy.value.name;
-    }
-    graphData = mapPolicyToGraph(policy.value);
-    initPolicyEdit();
-  });
+  fetchData();
   PolicyApi.fetchResources().then((data) => {
-    data.push("*");
-    data.sort((a, b) => a.length - b.length);
     resources.value = data;
   });
 });

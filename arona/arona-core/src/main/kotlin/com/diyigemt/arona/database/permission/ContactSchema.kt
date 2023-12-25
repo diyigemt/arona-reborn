@@ -77,7 +77,24 @@ data class ContactMember(
   val id: String, // 指向UserDocument.id
   val name: String,
   val roles: List<String>, // 指向ContactDocument.roles.id
-) {
+  override val config: Map<String, Map<String, String>> = mapOf(),
+) : PluginVisibleData() {
+  suspend fun updatePluginConfig(
+    cid: String,
+    pluginId: String,
+    key: String,
+    value: String,
+  ) {
+    ContactDocument.withCollection<ContactDocument, UpdateResult> {
+      updateOne(
+        filter = Filters.and(
+          idFilter(cid),
+          Filters.eq("${ContactDocument::members.name}._id", id)
+        ),
+        update = Updates.set("${ContactDocument::members.name}.$.${ContactMember::config.name}.${pluginId.toMongodbKey()}.$key", value)
+      )
+    }
+  }
   companion object {
     data class ContactMemberPermissionSubject(
       val id: String,
@@ -152,6 +169,19 @@ internal data class ContactDocument(
       )
     }
     return ContactDocumentUpdateException.Success()
+  }
+
+  suspend fun updatePluginConfig(
+    pluginId: String,
+    key: String,
+    value: String,
+  ) {
+    withCollection<ContactDocument, UpdateResult> {
+      updateOne(
+        filter = idFilter(id),
+        update = Updates.set("${ContactDocument::config.name}.${pluginId.toMongodbKey()}.$key", value)
+      )
+    }
   }
 
   companion object : DocumentCompanionObject {

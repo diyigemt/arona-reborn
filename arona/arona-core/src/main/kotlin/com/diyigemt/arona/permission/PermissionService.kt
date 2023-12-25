@@ -1,5 +1,6 @@
 package com.diyigemt.arona.permission
 
+import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.plugins.AbstractPlugin
 import com.diyigemt.arona.plugins.AronaPlugin
 import java.util.concurrent.ConcurrentHashMap
@@ -25,6 +26,13 @@ internal object PermissionService {
     permissionName: String,
   ): PermissionId = PermissionId(
     plugin.description.id.lowercase(),
+    permissionName.lowercase()
+  )
+  fun allocatePermissionIdForBuildInCommandOwner(
+    owner: CommandOwner,
+    permissionName: String,
+  ): PermissionId = PermissionId(
+    owner.permissionId("command").nameSpace,
     permissionName.lowercase()
   )
   operator fun get(id: PermissionId): PermissionImpl? = permissions[id]

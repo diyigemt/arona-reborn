@@ -4,7 +4,7 @@
       <ContactList :contact="contacts" @select="onSelectContact" />
     </ElCol>
     <ElCol :span="20">
-      <ContactProfile v-if="contactId" :contact-id="contactId" @update="onContactUpdate" />
+      <ContactProfile v-if="contactId" :contact-id="contactId" @update="onContactUpdate" base />
     </ElCol>
   </ElRow>
 </template>

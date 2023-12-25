@@ -4,20 +4,15 @@ package com.diyigemt.arona.command
 
 import com.diyigemt.arona.command.CommandManager.register
 import com.diyigemt.arona.communication.command.UserCommandSender
-import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactAndUser
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
-import com.diyigemt.arona.database.permission.ContactType
 import com.diyigemt.arona.database.permission.UserDocument
-import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
-import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
 import com.diyigemt.arona.permission.PermissionService
 import com.github.ajalt.clikt.parameters.arguments.argument
 

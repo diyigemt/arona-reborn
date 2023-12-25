@@ -49,6 +49,9 @@ interface Contact : CoroutineScope {
         is Group, is Guild -> {
           findContactDocumentByIdOrNull(id)
         }
+        is Channel -> {
+          findContactDocumentByIdOrNull(guild.id)
+        }
         else -> null
       }
     }

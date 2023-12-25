@@ -1,5 +1,3 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 val kotlinVersion: String by project
 val exposedVersion: String by project
 plugins {

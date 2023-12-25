@@ -10,9 +10,16 @@ import { IWarningConfirm, successMessage } from "@/utils/message";
 defineOptions({
   name: "ContactProfile",
 });
-const props = defineProps<{
-  contactId: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    base?: boolean;
+    contactId: string;
+  }>(),
+  {
+    base: false,
+    contactId: "",
+  },
+);
 // @ts-ignore
 const contact = ref<Contact>({}) as Ref<Contact>;
 watch(
@@ -74,7 +81,8 @@ function onConfirmRoleCreate() {
 }
 function fetchContactProfile(id: string) {
   if (id) {
-    ContactApi.fetchContact(id).then((data) => {
+    const fn = props.base ? ContactApi.fetchContactBase : ContactApi.fetchContact;
+    fn(id).then((data) => {
       contact.value = data;
     });
   }

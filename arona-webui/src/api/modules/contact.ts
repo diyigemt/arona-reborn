@@ -36,6 +36,23 @@ export const ContactApi = {
       return data;
     });
   },
+  fetchContactBase(id: string) {
+    return simplifiedApiService(
+      service.raw<EditableContact>({
+        url: "/contact/contact-base",
+        method: "GET",
+        params: {
+          id,
+        },
+      }),
+    ).then((data) => {
+      // eslint-disable-next-line no-return-assign
+      data.roles.forEach((it) => (it.edit = false));
+      // eslint-disable-next-line no-return-assign
+      data.members.forEach((it) => (it.edit = false));
+      return data;
+    });
+  },
   updateContact(data: ContactUpdateReq) {
     return simplifiedApiService(
       service.raw<null>({

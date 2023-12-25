@@ -79,8 +79,10 @@ watch(
         emits("update:form", JSON.parse(cacheMemberProfileData[cur]));
       } else {
         ContactApi.fetchMemberPluginPreference(cur, props.pId, props.pKey).then((data) => {
-          cacheMemberProfileData[cur] = data;
-          emits("update:form", data ? JSON.parse(data) : props.defaultForm);
+          if (data) {
+            cacheMemberProfileData[cur] = data;
+            emits("update:form", data ? JSON.parse(data) : props.defaultForm);
+          }
         });
       }
     }
@@ -157,8 +159,10 @@ onMounted(() => {
     contacts.value = data;
   });
   PluginPreferenceApi.fetchPluginPreference(props.pId, props.pKey).then((data) => {
-    cacheProfileData = data;
-    emits("update:form", JSON.parse(data));
+    if (data) {
+      cacheProfileData = data;
+      emits("update:form", JSON.parse(data));
+    }
   });
 });
 </script>

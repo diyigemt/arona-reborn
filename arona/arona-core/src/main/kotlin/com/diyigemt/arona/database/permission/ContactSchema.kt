@@ -203,8 +203,9 @@ internal data class ContactDocument(
     }
 
     internal suspend fun createContactAndUser(contact: Contact, user: User, role: String): UserDocument {
-      val contactDocument = findContactDocumentByIdOrNull(contact.id) ?: createContactDocument(
-        contact.id,
+      val id = if (contact is Channel) contact.guild.id else contact.id
+      val contactDocument = findContactDocumentByIdOrNull(id) ?: createContactDocument(
+        id,
         when (contact) {
           is FriendUser -> ContactType.Private
           is Group -> ContactType.Group
@@ -215,7 +216,7 @@ internal data class ContactDocument(
 
       val userDocument = UserDocument.findUserDocumentByUidOrNull(user.id) ?: UserDocument.createUserDocument(
         user.id,
-        contact.id
+        id
       )
       val member = contactDocument.addMember(userDocument.id)
       contactDocument.updateMemberRole(member.id, role)

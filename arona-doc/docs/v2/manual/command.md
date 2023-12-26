@@ -31,6 +31,40 @@
 | 杂图              | 指向所有不好记的名称的图片汇总 |
 | 11-3/H11-3等主线代码 | 指向主线攻略图片        |
 
+大概长这样
+
+::: details H22-1图文攻略
+
+<img src="/image/guide/chapter-map.webp" alt="chapter-map" />
+
+:::
+
+::: details 学生攻略
+
+<img src="/image/guide/student.webp" alt="student" />
+
+:::
+
+其中`string`内容为1-1至H24-3之间或者学生的名字/黑话(可能收集不全)，如查看主线普通地图5-3的攻略，指令为`/攻略 5-3`；
+
+查看主线困难地图H19-3的攻略，指令为`/攻略 H19-3`；
+
+查看佑香的攻略，指令为`/攻略 佑香`或者`/攻略 没包人`?。
+
+::: details 国际服活动
+
+<img src="/image/guide/active-info.webp" alt="active-info" />
+
+:::
+
+由于杂图太多而且不好记名字，因此提供指令`/攻略 杂图`显示所有可用的名字列表
+
+::: details 杂图
+
+<img src="/image/command/image-help.webp" alt="image-help" />
+
+:::
+
 ## 2 昵称系列
 
 `/叫我` 查询自己的昵称

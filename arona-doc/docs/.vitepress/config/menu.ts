@@ -114,7 +114,7 @@ export const NavItem: DefaultTheme.NavItem[] = [{
   text: '用户手册',
   items: [{
     text: '官方版',
-    link: '/v2/manual/',
+    link: '/v2/manual/command',
   }, {
     text: '自行部署版',
     link: '/v1/manual/',

@@ -48,14 +48,14 @@ object PluginMain : AronaPlugin(
           is CommandExecuteResult.UnmatchedSignature -> {
             // 发送错误处理
             val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@launch
-            commandSender.sendMessage(helpMessage)
+            commandSender.sendMessage("$helpMessage\n用户手册:\nhttps://doc.arona.diyigemt.com/v2/manual/command")
           }
 
           is CommandExecuteResult.ExecutionFailed -> {
             when (result.exception) {
               is UsageError -> {
                 val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@launch
-                commandSender.sendMessage(helpMessage)
+                commandSender.sendMessage("$helpMessage\n用户手册:\nhttps://doc.arona.diyigemt.com/v2/manual/command")
               }
 
               else -> result.exception.let { it1 -> logger.error(it1) }

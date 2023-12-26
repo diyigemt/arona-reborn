@@ -38,7 +38,7 @@ class ImageCacheSchema(id: EntityID<Int>) : IntEntity(id) {
     fun findImage(hash: String, from: ImageCacheContactType = ImageCacheContactType.Group) =
       ImageCacheSchema.find {
         (ImageCacheTable.hash eq hash) and
-            (ImageCacheTable.expired less currentDateTime()) and
+            (ImageCacheTable.expired greater currentDateTime()) and
             (ImageCacheTable.from eq from)
       }.firstOrNull()?.toTencentImage()
   }

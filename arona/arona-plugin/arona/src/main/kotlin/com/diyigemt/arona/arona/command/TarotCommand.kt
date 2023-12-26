@@ -76,8 +76,8 @@ object TarotCommand : AbstractCommand(
       }
       MessageChainBuilder()
         .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
+        .append(im)
         .build().also { ch -> commandSender.sendMessage(ch) }
-      commandSender.sendMessage(im)
     } else {
       MessageChainBuilder()
         .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")

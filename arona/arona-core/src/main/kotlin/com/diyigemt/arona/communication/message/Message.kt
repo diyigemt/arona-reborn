@@ -887,7 +887,11 @@ class MessageChainBuilder private constructor(
 data class MessageReceipt(
   val id: String = "",
   val timestamp: String = "",
-)
+) {
+  companion object {
+    val ErrorMessageReceipt = MessageReceipt("", "")
+  }
+}
 
 fun Message.toMessageChain(): MessageChain = when (this) {
   is MessageChain -> this

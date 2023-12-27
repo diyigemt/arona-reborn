@@ -16,6 +16,7 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.MessageChainBuilder
+import com.diyigemt.arona.communication.message.MessageReceipt
 import com.diyigemt.arona.communication.message.TencentGuildImage
 import com.diyigemt.arona.utils.currentLocalDateTime
 
@@ -74,10 +75,21 @@ object TarotCommand : AbstractCommand(
       } ?: commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also {
         dbQuery { it.update(name, from) }
       }
-      MessageChainBuilder()
+      val mayFail = MessageChainBuilder()
         .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
         .append(im)
-        .build().also { ch -> commandSender.sendMessage(ch) }
+        .build().let { ch -> commandSender.sendMessage(ch) }
+      if (mayFail == MessageReceipt.ErrorMessageReceipt) {
+        commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also { image ->
+          commandSender.sendMessage(
+            MessageChainBuilder()
+              .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
+              .append(im)
+              .build()
+          )
+          dbQuery { image.update(name, from) }
+        }
+      }
     } else {
       MessageChainBuilder()
         .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")

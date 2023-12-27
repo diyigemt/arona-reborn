@@ -54,13 +54,19 @@ object TrainerCommand : AbstractCommand(
         }
         when (im) {
           is TencentImage -> {
-            sendMessage(im)
+            sendMessage(im).also {
+              if (it == MessageReceipt.ErrorMessageReceipt) {
+                subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also { image ->
+                  sendMessage(image)
+                  dbQuery { image.update(hash, from) }
+                }
+              }
+            }
           }
 
           else -> {
             subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also {
               sendMessage(it)
-            }.also {
               dbQuery { it.update(hash, from) }
             }
           }

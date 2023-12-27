@@ -86,6 +86,11 @@
     </div>
     <div v-if="!isCode" class="start">touch to start</div>
     <div v-if="isSuccess" class="absolute text-xl right-16px bottom-16px color-white">UID: {{ userId }}</div>
+    <div class="absolute bottom-16px w-full text-center">
+      <ElLink href="https://beian.miit.gov.cn/" target="_blank" class="text-xl! color-black!"
+        >桂ICP备2022008499 号-2</ElLink
+      >
+    </div>
   </VideoBackground>
 </template>
 

@@ -4,6 +4,7 @@ import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.communication.message.MessageReceipt.Companion.ErrorMessageReceipt
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
 import com.diyigemt.arona.database.guild.GuildMemberSchema
 import com.diyigemt.arona.database.guild.GuildMemberTable
@@ -82,7 +83,7 @@ internal abstract class AbstractContact(
           TencentMessageBuilder(messageSequence = messageSequence).append(body).build()
         )
       )
-    }.getOrDefault(MessageReceipt("", "")) // TODO 异常处理
+    }.getOrDefault(ErrorMessageReceipt) // TODO 异常处理
   }
   override suspend fun uploadImage(
     url: String

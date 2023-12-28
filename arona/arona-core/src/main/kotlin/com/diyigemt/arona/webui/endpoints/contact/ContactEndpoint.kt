@@ -347,15 +347,20 @@ internal object ContactEndpoint {
     } ?: success()
   }
 
+  private fun checkPolicy(policy: Policy): Boolean {
+    if (policy.id in PROTECTED_POLICY_ID || ContactRole.checkHasProtectedRoleId(policy)) {
+      return true
+    }
+    return policy.rules.isEmpty() || policy.rules.any { it.rule.isNullOrEmpty() && it.children.isNullOrEmpty() }
+  }
+
   /**
    * 更新策略
    */
   @AronaBackendEndpointPut("/{id}/policy")
   suspend fun PipelineContext<Unit, ApplicationCall>.updatePolicy() {
     val policy = context.receiveJsonOrNull<Policy>() ?: return badRequest()
-    if (policy.id in PROTECTED_POLICY_ID || ContactRole.checkHasProtectedRoleId(policy)) {
-      return badRequest()
-    }
+    if (checkPolicy(policy)) return badRequest()
     return if (
       ContactDocument.withCollection<ContactDocument, UpdateResult> {
         updateOne(
@@ -379,9 +384,7 @@ internal object ContactEndpoint {
     if (contact.policies.any { it.id == data.id }) {
       return badRequest()
     }
-    if (data.id in PROTECTED_POLICY_ID || ContactRole.checkHasProtectedRoleId(data)) {
-      return badRequest()
-    }
+    if (checkPolicy(data)) return badRequest()
     val policy = Policy(
       Policy.randomPolicyId(),
       data.name,

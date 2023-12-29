@@ -72,7 +72,7 @@ export function pickRandomArrayItemAndPutBack<T>(arr: T[]) {
 
 export function useTableInlineEditor<T extends { id: string; edit: boolean }>(
   datasource: Ref<T[]>,
-  onConfirm: (data: T) => Promise<unknown>,
+  onConfirm: (data: T) => Promise<unknown> = () => Promise.resolve(),
   onEdit: (data: T) => Promise<unknown> = () => Promise.resolve(),
   onCancel: (data: T) => Promise<unknown> = () => Promise.resolve(),
 ) {

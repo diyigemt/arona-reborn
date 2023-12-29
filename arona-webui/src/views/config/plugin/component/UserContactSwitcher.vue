@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Contact } from "@/interface";
 import useBaseStore from "@/store/base";
+import ToDocument from "@/components/common/ToDocument.vue";
 
 defineOptions({
   name: "UserContactSwitcher",
@@ -55,6 +56,7 @@ function onImport() {
     </ElFormItem>
     <ElFormItem>
       <ElButton type="primary" plain @click="onImport">{{ importButtonText }}</ElButton>
+      <ToDocument path=""/>
     </ElFormItem>
   </ElForm>
 </template>

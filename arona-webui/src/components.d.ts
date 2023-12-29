@@ -46,6 +46,7 @@ declare module 'vue' {
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElText: typeof import('element-plus/es')['ElText']
     ElTimePicker: typeof import('element-plus/es')['ElTimePicker']
+    ElTooltip: typeof import('element-plus/es')['ElTooltip']
     EnProcess: typeof import('./components/EnProcess.md')['default']
     MainAsideMenu: typeof import('./components/MainAsideMenu.vue')['default']
     MainBanner: typeof import('./components/MainBanner.vue')['default']
@@ -56,6 +57,7 @@ declare module 'vue' {
     ShadowCard: typeof import('./components/ShadowCard.vue')['default']
     SubPageIndex: typeof import('./components/SubPageIndex.vue')['default']
     TheFooter: typeof import('./components/TheFooter.vue')['default']
+    ToDocument: typeof import('./components/common/ToDocument.vue')['default']
     ZhProcess: typeof import('./components/ZhProcess.md')['default']
   }
 }

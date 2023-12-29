@@ -190,7 +190,7 @@ internal suspend fun executeCommandImpl(
         listOf(DEFAULT_MEMBER_CONTACT_ROLE_ID)
       )
       val environment = mapOf(
-        "time" to currentTime().substringAfter(":"),
+        "time" to currentTime().substringBeforeLast(":"),
         "date" to currentDate(),
         "datetime" to currentDateTime(),
         "param1" to (parseArg.getOrNull(0) ?: ""),

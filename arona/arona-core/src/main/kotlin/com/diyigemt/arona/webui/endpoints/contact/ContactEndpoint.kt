@@ -449,10 +449,11 @@ internal object ContactEndpoint {
   suspend fun PipelineContext<Unit, ApplicationCall>.getMemberPreference() {
     val pid = request.queryParameters["pid"] ?: return badRequest()
     val key = request.queryParameters["key"] ?: return badRequest()
-    contact.findContactMemberOrNull(aronaUser.id)?.readPluginConfigStringOrNull(pid, key)?.also {
+    val member = contact.findContactMemberOrNull(aronaUser.id) ?: return internalServerError()
+    member.readPluginConfigStringOrNull(pid, key)?.also {
       return success(it)
     }
-    return internalServerError()
+    return success("")
   }
 
   /**

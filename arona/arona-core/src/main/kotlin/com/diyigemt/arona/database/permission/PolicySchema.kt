@@ -127,24 +127,32 @@ data class Policy(
       effect = PolicyNodeEffect.DENY,
       rules = listOf(
         PolicyRoot(
-          groupType = PolicyNodeGroupType.NOT_ALL,
+          groupType = PolicyNodeGroupType.ALL,
           rule = listOf(
-            PolicyRule(
-              type = PolicyRuleType.Subject,
-              operator = PolicyRuleOperator.Contains,
-              key = "roles",
-              value = DEFAULT_SUPER_ROLE_ID
-            ),
             PolicyRule(
               type = PolicyRuleType.Resource,
               operator = PolicyRuleOperator.IsChild,
               key = "id",
               value = "buildIn.super.*"
             )
+          ),
+          children = listOf(
+            PolicyNode(
+              groupType = PolicyNodeGroupType.NOT_ALL,
+              rule = listOf(
+                PolicyRule(
+                  type = PolicyRuleType.Subject,
+                  operator = PolicyRuleOperator.Contains,
+                  key = "roles",
+                  value = DEFAULT_SUPER_ROLE_ID
+                )
+              )
+            )
           )
         )
       )
     ).build().first()
+
     fun randomPolicyId() = uuid("policy")
     internal fun Policy.build(): List<P> {
       val base = rules.map {

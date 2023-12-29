@@ -1,6 +1,7 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
+import com.diyigemt.arona.arona.config.BaseConfig
 import com.diyigemt.arona.arona.config.MarkdownCompatiblyConfig
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
@@ -87,7 +88,7 @@ object TrainerCommand : AbstractCommand(
     getImage(arg).run {
       data?.run r1@{
         if (code != 200) {
-          val mdConfig = userDocument().readPluginConfigOrDefault(Arona, default = MarkdownCompatiblyConfig())
+          val mdConfig = userDocument().readPluginConfigOrDefault(Arona, default = BaseConfig()).markdown
           if (mdConfig.enable) {
             val md = TencentMarkdown("102057194_1702305572") {
               append("search_target", arg)

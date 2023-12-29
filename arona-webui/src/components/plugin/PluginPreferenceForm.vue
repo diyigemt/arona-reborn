@@ -12,12 +12,24 @@ interface ProfileType {
   id: string;
   type: "user" | "contact" | "manage-contact";
 }
-const props = defineProps<{
-  pId: string;
-  pKey: string;
-  form: Record<string, never> | object;
-  defaultForm: Record<string, never> | object;
-}>();
+const props = withDefaults(
+  defineProps<{
+    pId: string;
+    pKey: string;
+    form: Record<string, never> | object;
+    defaultForm: Record<string, never> | object;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    dataProcessor?: (data: any) => any;
+  }>(),
+  {
+    pId: "",
+    pKey: "",
+    form: () => ({}),
+    defaultForm: () => ({}),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    dataProcessor: (data: any) => data,
+  },
+);
 const emits = defineEmits<{
   (e: "confirm"): void;
   (e: "update:form", form: Record<string, never>): void;
@@ -46,6 +58,10 @@ const importForm = ref<ImportForm>({ source: "contact", id: "" });
 const formEl = ref<{ resetFields(): void }>();
 let cacheProfileData: string;
 const cacheMemberProfileData: { [key: string]: string } = {};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function jsonParse(text: string): any {
+  return props.dataProcessor(JSON.parse(text));
+}
 watch(
   () => editType.value.type,
   (cur) => {
@@ -57,12 +73,12 @@ watch(
       case "manage-contact": {
         const tmp = contact.value?.config[props.pId];
         if (tmp) {
-          emits("update:form", tmp[props.pKey] ? JSON.parse(tmp[props.pKey]) : props.defaultForm);
+          emits("update:form", tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
         }
         break;
       }
       case "user": {
-        emits("update:form", JSON.parse(cacheProfileData));
+        emits("update:form", jsonParse(cacheProfileData));
         break;
       }
       default: {
@@ -76,12 +92,12 @@ watch(
   (cur) => {
     if (editType.value.type === "contact") {
       if (cacheMemberProfileData[cur]) {
-        emits("update:form", JSON.parse(cacheMemberProfileData[cur]));
+        emits("update:form", jsonParse(cacheMemberProfileData[cur]));
       } else {
         ContactApi.fetchMemberPluginPreference(cur, props.pId, props.pKey).then((data) => {
           if (data) {
             cacheMemberProfileData[cur] = data;
-            emits("update:form", data ? JSON.parse(data) : props.defaultForm);
+            emits("update:form", data ? jsonParse(data) : props.defaultForm);
           }
         });
       }
@@ -136,20 +152,20 @@ function onConfirmImport() {
   IWarningConfirm("警告", "已有内容将会被覆盖, 是否继续?").then(() => {
     const { id, source } = importForm.value;
     if (source === "user") {
-      emits("update:form", JSON.parse(cacheProfileData));
+      emits("update:form", jsonParse(cacheProfileData));
     } else if (source === "contact") {
       if (cacheMemberProfileData[id]) {
-        emits("update:form", JSON.parse(cacheMemberProfileData[id]));
+        emits("update:form", jsonParse(cacheMemberProfileData[id]));
       } else {
         ContactApi.fetchMemberPluginPreference(id, props.pId, props.pKey).then((data) => {
           cacheMemberProfileData[id] = data;
-          emits("update:form", data ? JSON.parse(data) : props.defaultForm);
+          emits("update:form", data ? jsonParse(data) : props.defaultForm);
         });
       }
     } else {
       const tmp = contact.value?.config[props.pId];
       if (tmp) {
-        emits("update:form", tmp[props.pKey] ? JSON.parse(tmp[props.pKey]) : props.defaultForm);
+        emits("update:form", tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
       }
     }
   });
@@ -161,7 +177,7 @@ onMounted(() => {
   PluginPreferenceApi.fetchPluginPreference(props.pId, props.pKey).then((data) => {
     if (data) {
       cacheProfileData = data;
-      emits("update:form", JSON.parse(data));
+      emits("update:form", jsonParse(data));
     }
   });
 });

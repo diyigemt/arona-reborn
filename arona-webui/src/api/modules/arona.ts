@@ -4,14 +4,13 @@ import { AronaImage } from "@/interface";
 // eslint-disable-next-line import/prefer-default-export
 export const AronaApi = {
   trainerImage(name: string) {
-    return simplifiedApiService(
-      service.raw<AronaImage[]>({
-        baseURL: "https://arona.diyigemt.com/api/v2",
-        url: "/image",
-        params: {
-          name,
-        },
-      }),
-    );
+    return service.raw<AronaImage[]>({
+      baseURL: "https://arona.diyigemt.com/api/v2",
+      url: "/image",
+      params: {
+        name,
+      },
+      showServerResponseError: false,
+    });
   },
 };

@@ -20,6 +20,8 @@ const props = withDefaults(
     defaultForm: Record<string, never> | object;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dataProcessor?: (data: any) => any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    postDataProcessor?: (data: any) => any;
   }>(),
   {
     pId: "",
@@ -28,6 +30,8 @@ const props = withDefaults(
     defaultForm: () => ({}),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dataProcessor: (data: any) => data,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    postDataProcessor: (data: any) => data,
   },
 );
 const emits = defineEmits<{
@@ -72,9 +76,7 @@ watch(
       }
       case "manage-contact": {
         const tmp = contact.value?.config[props.pId];
-        if (tmp) {
-          emits("update:form", tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
-        }
+        emits("update:form", tmp && tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
         break;
       }
       case "user": {
@@ -109,10 +111,12 @@ function onCancel() {
 }
 function onConfirm() {
   emits("confirm");
+  const data = props.postDataProcessor(props.form);
   switch (editType.value.type) {
     case "contact": {
-      ContactApi.updateMemberPluginPreference(editType.value.id, props.pId, props.pKey, props.form)
+      ContactApi.updateMemberPluginPreference(editType.value.id, props.pId, props.pKey, data)
         .then(() => {
+          cacheMemberProfileData[editType.value.id] = JSON.stringify(props.form);
           successMessage("保存成功");
         })
         .catch(() => {
@@ -121,8 +125,9 @@ function onConfirm() {
       break;
     }
     case "user": {
-      PluginPreferenceApi.updatePluginPreference(props.pId, props.pKey, props.form)
+      PluginPreferenceApi.updatePluginPreference(props.pId, props.pKey, data)
         .then(() => {
+          cacheProfileData = JSON.stringify(props.form);
           successMessage("保存成功");
         })
         .catch(() => {
@@ -131,8 +136,12 @@ function onConfirm() {
       break;
     }
     case "manage-contact": {
-      ContactApi.updatePluginPreference(editType.value.id, props.pId, props.pKey, props.form)
+      ContactApi.updatePluginPreference(editType.value.id, props.pId, props.pKey, data)
         .then(() => {
+          const tmp = contact.value?.config[props.pId];
+          if (tmp) {
+            tmp[props.pKey] = JSON.stringify(props.form);
+          }
           successMessage("保存成功");
         })
         .catch(() => {
@@ -178,6 +187,8 @@ onMounted(() => {
     if (data) {
       cacheProfileData = data;
       emits("update:form", jsonParse(data));
+    } else {
+      cacheProfileData = JSON.stringify(props.defaultForm);
     }
   });
 });

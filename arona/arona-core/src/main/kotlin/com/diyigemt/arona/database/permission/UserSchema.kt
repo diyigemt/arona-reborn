@@ -59,7 +59,7 @@ internal class UserSchema(id: EntityID<String>) : Entity<String>(id) {
 }
 
 abstract class PluginVisibleData {
-  internal abstract val config: Map<String, Map<String, String>>
+  abstract val config: Map<String, Map<String, String>>
   fun String.toMongodbKey() = this.replace(".", "·")
   fun String.fromMongodbKey() = this.replace("·", ".")
   @OptIn(InternalSerializationApi::class)

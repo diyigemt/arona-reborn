@@ -2,10 +2,10 @@
   <ElTabs v-model="tab">
     <ElTabPane name="base" label="基础设置">
       <PluginPreferenceForm
-        v-model:form="markdownConfig"
-        :default-form="defaultBaseConfig.markdown"
+        v-model:form="baseConfig"
+        :default-form="defaultBaseConfig"
         p-id="com.diyigemt.arona"
-        p-key="MarkdownCompatiblyConfig"
+        p-key="BaseConfig"
       >
         <ElFormItem label="启用markdown" prop="enable">
           <ElSwitch
@@ -21,12 +21,14 @@
     <ElTabPane name="trainer" label="攻略设置">
       <PluginPreferenceForm
         v-model:form="trainerConfig"
-        :default-form="defaultBaseConfig.trainer"
+        :default-form="defaultTrainerConfig"
         :data-processor="onParseTrainerOption"
+        :post-data-processor="onSaveParseTrainerOption"
         p-id="com.diyigemt.arona"
         p-key="TrainerConfig"
       >
-        <ElFormItem label="启用markdown" prop="override">
+        <ElFormItem label="别名覆盖：" prop="override">
+          <ElButton type="primary" @click="onAddOverride">新增</ElButton>
           <ElTable :data="trainerOverrideConfig">
             <ElTableColumn prop="type" label="类型">
               <template #default="{ row }">
@@ -43,7 +45,7 @@
             <ElTableColumn prop="name" label="原始值" width="300">
               <template #default="{ row }">
                 <div v-if="row.edit">
-                  <ElSelect v-model="row.name" allow-create collapse-tags />
+                  <ElSelect v-model="row.name" filterable multiple allow-create collapse-tags default-first-option />
                 </div>
                 <div v-else>
                   {{ row.name }}
@@ -53,7 +55,13 @@
             <ElTableColumn prop="name" label="覆盖值" width="300">
               <template #default="{ row }">
                 <div v-if="row.edit">
-                  <ElSelect v-model="row.value" remote :remote-method="onSearchTrainer" :loading="trainerSearchLoading">
+                  <ElSelect
+                    v-model="row.value"
+                    filterable
+                    remote
+                    :remote-method="onSearchTrainer"
+                    :loading="trainerSearchLoading"
+                  >
                     <ElOption
                       v-for="(e, index) in aronaTrainerOptions"
                       :key="index"
@@ -86,7 +94,7 @@
     <ElTabPane name="tarot" label="塔罗牌设置">
       <PluginPreferenceForm
         v-model:form="tarotConfig"
-        :default-form="defaultBaseConfig.tarot"
+        :default-form="defaultTarotConfig"
         p-id="com.diyigemt.arona"
         p-key="TarotConfig"
       >
@@ -108,7 +116,8 @@
 import PluginPreferenceForm from "@/components/plugin/PluginPreferenceForm.vue";
 import { AronaApi } from "@/api/modules/arona";
 import { SelectOptions } from "@/interface";
-import { useTableInlineEditor } from "@/utils";
+import { randomInt, useTableInlineEditor } from "@/utils";
+import { warningMessage } from "@/utils/message";
 
 defineOptions({
   name: "AronaPreferences",
@@ -134,8 +143,6 @@ interface TrainerConfig {
 
 interface BaseConfig {
   markdown: MarkdownCompatiblyConfig;
-  trainer: TrainerConfig;
-  tarot: TarotConfig;
 }
 
 const tab = ref<"base" | "trainer" | "tarot">("base");
@@ -143,18 +150,25 @@ const defaultBaseConfig: BaseConfig = {
   markdown: {
     enable: true,
   },
-  trainer: {
-    override: [],
-  },
-  tarot: {
-    fxxkDestiny: false,
-  },
 };
-const preference = ref<BaseConfig>(defaultBaseConfig);
-const markdownConfig = computed(() => preference.value.markdown);
-const trainerConfig = computed(() => preference.value.trainer);
+const defaultTrainerConfig: TrainerConfig = {
+  override: [],
+};
+const defaultTarotConfig: TarotConfig = {
+  fxxkDestiny: false,
+};
+const baseConfig = ref<BaseConfig>(defaultBaseConfig);
+const trainerConfig = ref<TrainerConfig>(defaultTrainerConfig);
+const tarotConfig = ref<TarotConfig>(defaultTarotConfig);
+const markdownConfig = computed({
+  get() {
+    return baseConfig.value.markdown;
+  },
+  set(val) {
+    baseConfig.value.markdown = val;
+  },
+});
 const trainerOverrideConfig = computed(() => trainerConfig.value.override);
-const tarotConfig = computed(() => preference.value.tarot);
 const { onEdit, onCancel, onConfirm, cache: overrideItem } = useTableInlineEditor(trainerOverrideConfig);
 
 const trainerSearchLoading = ref(false);
@@ -164,6 +178,25 @@ function onParseTrainerOption(data: TrainerConfig) {
   data.override.forEach((it) => {
     it.id = `${it.name.join("-")}-${it.value}`;
     it.edit = false;
+  });
+  return data;
+}
+function onSaveParseTrainerOption(data: TrainerConfig) {
+  return {
+    override: data.override.map((it) => ({
+      type: it.type,
+      name: it.name,
+      value: it.value,
+    })),
+  };
+}
+function onAddOverride() {
+  trainerOverrideConfig.value.splice(0, 0, {
+    id: `${randomInt(0, 1024)}`,
+    type: "RAW",
+    name: [],
+    value: "",
+    edit: false,
   });
 }
 function onDeleteOverride(override: TrainerConfig["override"][0]) {
@@ -177,8 +210,10 @@ function onSearchTrainer(name: string) {
     trainerSearchLoading.value = true;
     AronaApi.trainerImage(name).then((data) => {
       trainerSearchLoading.value = false;
-      if (data) {
-        aronaTrainerOptions.value = data.map((it) => ({ id: it.hash, value: it.name, label: it.name }));
+      if (data && data.data) {
+        aronaTrainerOptions.value = data.data.map((it) => ({ id: it.hash, value: it.name, label: it.name }));
+      } else {
+        warningMessage("别名搜索失败");
       }
     });
   }

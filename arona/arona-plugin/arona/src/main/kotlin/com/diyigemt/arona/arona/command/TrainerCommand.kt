@@ -3,6 +3,7 @@ package com.diyigemt.arona.arona.command
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.config.BaseConfig
 import com.diyigemt.arona.arona.config.MarkdownCompatiblyConfig
+import com.diyigemt.arona.arona.config.TrainerConfig
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
@@ -85,21 +86,23 @@ object TrainerCommand : AbstractCommand(
   }
 
   suspend fun UserCommandSender.trainer() {
-    getImage(arg).run {
+    val override = userDocument().readPluginConfigOrDefault(Arona, default = TrainerConfig()).overrideConfig
+    val match = override.firstOrNull { it.name.contains(arg) }?.value ?: arg
+    getImage(match).run {
       data?.run r1@{
         if (code != 200) {
           val mdConfig = userDocument().readPluginConfigOrDefault(Arona, default = BaseConfig()).markdown
           if (mdConfig.enable) {
             val md = TencentMarkdown("102057194_1702305572") {
-              append("search_target", arg)
+              append("search_target", match)
               filterIndexed { index, _ -> index < 4 }.forEachIndexed { index, it ->
                 append("option_${index + 1}", it.name)
               }
             }
-            val btn = TencentKeyboard("102057194_1702305246")
+            val btn = TencentKeyboard("102057194_1702611887")
             sendMessage(MessageChainBuilder().append(md).append(btn).build())
           } else {
-            sendMessage("没有与${arg}对应的信息, 是否想要输入:\n${
+            sendMessage("没有与${match}对应的信息, 是否想要输入:\n${
               filterIndexed { index, _ -> index < 4 }
                 .mapIndexed { index, it -> "${index + 1}. /攻略 ${it.name}" }
                 .joinToString("\n")

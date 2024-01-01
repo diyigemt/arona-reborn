@@ -15,7 +15,7 @@ data class BaseConfig(
 
 @Serializable
 data class MarkdownCompatiblyConfig(
-  val enable: Boolean = true // 是否启用md
+  val enable: Boolean = false // 是否启用md
 )
 
 @Serializable

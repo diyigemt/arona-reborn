@@ -160,7 +160,7 @@ interface BaseConfig {
 const tab = ref<"base" | "trainer" | "tarot">("base");
 const defaultBaseConfig: BaseConfig = {
   markdown: {
-    enable: true,
+    enable: false,
   },
 };
 const defaultTrainerConfig: TrainerConfig = {

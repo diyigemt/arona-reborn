@@ -1,5 +1,9 @@
 package com.diyigemt.arona.arona
 
+import com.diyigemt.arona.communication.event.TencentBotUserChangeEvent
+import com.diyigemt.arona.communication.event.TencentFriendAddEvent
+import com.diyigemt.arona.communication.event.TencentGroupAddEvent
+import com.diyigemt.arona.communication.event.TencentGuildAddEvent
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import io.ktor.client.*
@@ -12,7 +16,7 @@ object Arona : AronaPlugin(
     id = "com.diyigemt.arona",
     name = "arona",
     author = "diyigemt",
-    version = "0.1.17",
+    version = "1.0.0",
     description = "hello world"
   )
 ) {
@@ -26,6 +30,16 @@ object Arona : AronaPlugin(
   }
 
   override fun onLoad() {
+    pluginEventChannel().subscribeAlways<TencentBotUserChangeEvent> {
+      when (it) {
+        is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> {
+          it.subject.sendMessage("欢迎连接「シッテムの箱」，老师。\n使用手册：https://doc.arona.diyigemt.com/v2/manual/command")
+        }
 
+        else -> {
+          //TODO 删除聊天事件
+        }
+      }
+    }
   }
 }

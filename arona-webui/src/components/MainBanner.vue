@@ -1,6 +1,16 @@
 <template>
   <div class="banner-container cursor-pointer dot-bg" @click="goHome">
-    <div class="font-bold text-left antialiased font-sans banner-text">Arona</div>
+    <div
+      class="font-bold text-left antialiased font-sans banner-text"
+      style="
+        background: linear-gradient(135deg, rgb(72, 84, 235), rgba(203, 158, 234, 0.8) 90%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      "
+    >
+      Arona
+    </div>
   </div>
 </template>
 

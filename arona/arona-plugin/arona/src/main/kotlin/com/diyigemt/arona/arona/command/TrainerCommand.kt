@@ -15,6 +15,7 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextMessage
 import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.*
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -86,12 +87,12 @@ object TrainerCommand : AbstractCommand(
   }
 
   suspend fun UserCommandSender.trainer() {
-    val override = userDocument().readPluginConfigOrDefault(Arona, default = TrainerConfig()).overrideConfig
+    val override = readPluginConfigOrDefault(Arona, default = TrainerConfig()).overrideConfig
     val match = override.firstOrNull { it.name.contains(arg) }?.value ?: arg
     getImage(match).run {
       data?.run r1@{
         if (code != 200) {
-          val mdConfig = userDocument().readPluginConfigOrDefault(Arona, default = BaseConfig()).markdown
+          val mdConfig = readPluginConfigOrDefault(Arona, default = BaseConfig()).markdown
           if (mdConfig.enable) {
             val md = TencentMarkdown("102057194_1702305572") {
               append("search_target", match)

@@ -28,6 +28,8 @@ interface Contact : CoroutineScope {
   val unionOpenid: String? // 统一id
   val unionOpenidOrId
     get() = unionOpenid ?: id
+  val fatherSubjectIdOrSelf
+    get() = if (this is Channel) this.guild.id else id
 
   suspend fun sendMessage(message: String, messageSequence: Int = 1) = sendMessage(PlainText(message), messageSequence)
 

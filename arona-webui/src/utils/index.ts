@@ -76,31 +76,39 @@ export function useTableInlineEditor<T extends { id: string; edit: boolean }>(
   onEdit: (data: T) => Promise<unknown> = () => Promise.resolve(),
   onCancel: (data: T) => Promise<unknown> = () => Promise.resolve(),
 ) {
-  const cache = ref<T>() as Ref<T>;
+  const editCache = ref<T>() as Ref<T>;
+  const currentEdit = ref<T>() as Ref<T>;
   return {
-    cache,
+    cache: currentEdit,
     onEdit(data: T) {
+      editCache.value = JSON.parse(JSON.stringify(data));
       onEdit(data).then(() => {
-        if (cache.value) {
-          this.onCancel(datasource.value.filter((it) => it.id === cache.value.id)[0]).then(() => {
-            cache.value = data;
-            cache.value.edit = true;
+        if (currentEdit.value) {
+          this.onCancel(datasource.value.filter((it) => it.id === currentEdit.value.id)[0]).then(() => {
+            currentEdit.value = data;
+            currentEdit.value.edit = true;
           });
         } else {
-          cache.value = data;
-          cache.value.edit = true;
+          currentEdit.value = data;
+          currentEdit.value.edit = true;
         }
       });
     },
     onConfirm(data: T) {
       onConfirm(data).then((next) => {
-        cache.value.edit = false;
+        currentEdit.value.edit = false;
       });
     },
     onCancel(data: T) {
+      if (editCache.value) {
+        currentEdit.value = editCache.value;
+        const index = datasource.value.findIndex((it) => it.id === currentEdit.value.id);
+        if (index !== -1) {
+          datasource.value.splice(index, 1, editCache.value);
+        }
+      }
       return onCancel(data).then((next) => {
-        cache.value = data;
-        data.edit = false;
+        currentEdit.value.edit = false;
       });
     },
   };

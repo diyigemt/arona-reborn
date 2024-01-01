@@ -54,5 +54,7 @@ declare global {
     export * from "blockly/core/blockly";
     const Blocks: Blocks
   }
+  interface String {
+    toMongodbKey(): string;
+  }
 }
-

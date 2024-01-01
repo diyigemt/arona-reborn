@@ -1,8 +1,8 @@
 <template>
   <VideoBackground
     ref="video"
-    src="/video/pv.webm"
-    poster="/image/BG_View_Kivotos.webp"
+    :src="`https://yuuka.cdn.diyigemt.com/image/home_page/video/${pvs[pvSelector]}.webm`"
+    :poster="`https://yuuka.cdn.diyigemt.com/image/home_page/image/${posters[pvSelector]}.webp`"
     :muted="false"
     :autoplay="false"
     :loop="false"
@@ -87,7 +87,11 @@
     <div v-if="!isCode" class="start">touch to start</div>
     <div v-if="isSuccess" class="absolute text-xl right-16px bottom-16px color-white">UID: {{ userId }}</div>
     <div class="absolute bottom-16px w-full text-center">
-      <ElLink href="https://beian.miit.gov.cn/" target="_blank" class="text-xl! color-black!"
+      <ElLink
+        href="https://beian.miit.gov.cn/"
+        target="_blank"
+        class="text-xl!"
+        :class="{ 'color-black!': pvSelector === 0, 'color-white!': pvSelector !== 0 }"
         >桂ICP备2022008499 号-2</ElLink
       >
     </div>
@@ -102,10 +106,14 @@ import { infoMessage, successMessage } from "@/utils/message";
 import { UserApi } from "@/api";
 import useBaseStore from "@/store/base";
 import { playLoginVoice } from "@/views/home/loginVoice";
+import { randomInt } from "@/utils";
 
 defineOptions({
   name: "LoginIndex",
 });
+const pvs = ["pv-1", "pv-2"];
+const posters = ["BG_View_Kivotos", "BG_CS_PV4_157"];
+const pvSelector = randomInt(0, 2);
 const showLogin = ref(false);
 const code = ref("XXXXXX");
 const respErrorMessage = ref("");

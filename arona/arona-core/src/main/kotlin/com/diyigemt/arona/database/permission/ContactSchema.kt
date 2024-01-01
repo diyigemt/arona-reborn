@@ -34,7 +34,17 @@ abstract class PluginContactDocument : PluginVisibleData() {
   abstract val contactType: ContactType
   abstract var roles: List<ContactRole>
   abstract var members: List<ContactMember>
+  fun findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
+  fun findContactMember(memberId: String) = members.first { it.id == memberId }
+
 }
+
+abstract class PluginContactMember : PluginVisibleData() {
+  abstract val id: String // 指向UserDocument.id
+  abstract val name: String
+  abstract val roles: List<String>
+}
+
 
 @Serializable
 data class ContactRole(
@@ -74,11 +84,11 @@ data class ContactRole(
 @Serializable
 data class ContactMember(
   @BsonId
-  val id: String, // 指向UserDocument.id
-  val name: String,
-  val roles: List<String>, // 指向ContactDocument.roles.id
+  override val id: String, // 指向UserDocument.id
+  override val name: String,
+  override val roles: List<String>, // 指向ContactDocument.roles.id
   override val config: Map<String, Map<String, String>> = mapOf(),
-) : PluginVisibleData() {
+) : PluginContactMember() {
   suspend fun updatePluginConfig(
     cid: String,
     pluginId: String,
@@ -120,8 +130,6 @@ internal data class ContactDocument(
   val registerTime: String = currentDateTime(),
   override val config: Map<String, Map<String, String>> = mapOf(), // 环境自定义的,插件专有的配置项
 ): PluginContactDocument() {
-
-  fun findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
 
   /**
    * 检查member是否拥有这个群的role.admin权限
@@ -203,7 +211,7 @@ internal data class ContactDocument(
     }
 
     internal suspend fun createContactAndUser(contact: Contact, user: User, role: String): UserDocument {
-      val id = if (contact is Channel) contact.guild.id else contact.id
+      val id = contact.fatherSubjectIdOrSelf
       val contactDocument = findContactDocumentByIdOrNull(id) ?: createContactDocument(
         id,
         when (contact) {

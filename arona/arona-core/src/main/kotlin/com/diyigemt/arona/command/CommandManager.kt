@@ -203,7 +203,7 @@ internal suspend fun executeCommandImpl(
     }
   }
   return runCatching {
-    command.context2 {
+    command.context {
       obj = caller
       terminal = commandTerminal
       localization = crsiveLocalization

@@ -88,6 +88,25 @@ const MainSideBar: DefaultTheme.Sidebar = [{
     text: "webui",
     link: "/manual/webui"
   }]
+}, {
+  text: 'webui',
+  collapsed: false,
+  items: [{
+    text: "登录",
+    link: "/webui/login"
+  }, {
+    text: "群管理",
+    link: "/webui/contact"
+  }, {
+    text: "策略管理",
+    link: "/webui/policy"
+  }, {
+    text: "插件偏好",
+    link: "/webui/plugins"
+  }, {
+    text: "个人中心",
+    link: "/webui/user"
+  }]
 }].map((it: DefaultTheme.SidebarItem) => {
   it.base = "/v2/";
   return it;

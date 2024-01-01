@@ -133,7 +133,7 @@ data class Policy(
               type = PolicyRuleType.Resource,
               operator = PolicyRuleOperator.IsChild,
               key = "id",
-              value = "buildIn.super.*"
+              value = "buildIn.super:*"
             )
           ),
           children = listOf(
@@ -223,16 +223,23 @@ data class Policy(
               groupType = PolicyNodeGroupType.ALL,
               rule = listOf(
                 PolicyRule(
-                  type = PolicyRuleType.Subject,
-                  operator = PolicyRuleOperator.Contains,
-                  key = "roles",
-                  value = DEFAULT_MEMBER_CONTACT_ROLE_ID
-                ),
-                PolicyRule(
                   type = PolicyRuleType.Resource,
                   operator = PolicyRuleOperator.IsChild,
                   key = "id",
-                  value = "buildIn.owner.*"
+                  value = "buildIn.owner:*"
+                )
+              ),
+              children = listOf(
+                PolicyNode(
+                  groupType = PolicyNodeGroupType.NOT_ALL,
+                  rule = listOf(
+                    PolicyRule(
+                      type = PolicyRuleType.Subject,
+                      operator = PolicyRuleOperator.Contains,
+                      key = "roles",
+                      value = DEFAULT_ADMIN_CONTACT_ROLE_ID
+                    )
+                  )
                 )
               )
             )

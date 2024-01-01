@@ -15,7 +15,8 @@
     // 非相对模块导入的路径映射配置
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    "skipLibCheck": true,
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "mock/index.d.ts"],
   // 编译器默认排除的编译文件

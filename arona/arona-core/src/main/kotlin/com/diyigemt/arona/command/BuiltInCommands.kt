@@ -68,13 +68,13 @@ object BuiltInCommands {
   }
 
   object BindContactNameCommand : AbstractCommand(
-    BuildInCommandOwner,
+    BuildInOwnerCommandOwner,
     "绑定",
     help = "绑定群/频道名称"
   ) {
     private val name by argument("要设置的群名/频道名称")
     suspend fun UserCommandSender.bindContactName() {
-      val contact = findContactDocumentByIdOrNull(subject.id)
+      val contact = findContactDocumentByIdOrNull(subject.fatherSubjectIdOrSelf)
       if (contact == null) {
         sendMessage("当前环境信息查找失败, 去翻文档看看怎么解决吧")
         return
@@ -85,41 +85,41 @@ object BuiltInCommands {
   }
 
   // TODO 总之没做完
-  object BindCommand : AbstractCommand(
-    BuildInCommandOwner,
-    "绑定账号",
-    help = "绑定已经注册的用户信息"
-  ) {
-    private val token by argument("在个人信息界面生成的唯一token")
-    suspend fun UserCommandSender.bind() {
-      val bindKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, token)
-      when (val userId = redisDbQuery {
-        get(bindKey)
-      }) {
-        is String -> {
-          // 拿到绑定的用户本体
-          when (val user = findUserDocumentByIdOrNull(userId)) {
-            is UserDocument -> {
-              // TODO 询问是否合并信息?
-              redisDbQuery {
-                set(bindKey, "success")
-                expire(bindKey, 600u)
-              }
-              sendMessage("绑定成功")
-            }
-
-            else -> {
-              sendMessage("用户未找到, 请再试一次")
-            }
-          }
-        }
-
-        else -> {
-          sendMessage("token无效")
-        }
-      }
-    }
-  }
+//  object BindCommand : AbstractCommand(
+//    BuildInCommandOwner,
+//    "绑定账号",
+//    help = "绑定已经注册的用户信息"
+//  ) {
+//    private val token by argument("在个人信息界面生成的唯一token")
+//    suspend fun UserCommandSender.bind() {
+//      val bindKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_BINDING, token)
+//      when (val userId = redisDbQuery {
+//        get(bindKey)
+//      }) {
+//        is String -> {
+//          // 拿到绑定的用户本体
+//          when (val user = findUserDocumentByIdOrNull(userId)) {
+//            is UserDocument -> {
+//              // TODO 询问是否合并信息?
+//              redisDbQuery {
+//                set(bindKey, "success")
+//                expire(bindKey, 600u)
+//              }
+//              sendMessage("绑定成功")
+//            }
+//
+//            else -> {
+//              sendMessage("用户未找到, 请再试一次")
+//            }
+//          }
+//        }
+//
+//        else -> {
+//          sendMessage("token无效")
+//        }
+//      }
+//    }
+//  }
 
   internal fun registerListeners() {
     GlobalEventChannel.subscribeAlways<TencentBotUserChangeEvent> {

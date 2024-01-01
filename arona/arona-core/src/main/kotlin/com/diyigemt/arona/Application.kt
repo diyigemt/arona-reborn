@@ -26,7 +26,7 @@ object AronaApplication : CoroutineScope {
     TencentBotClient.invoke(aronaConfig.bot).auth()
     val environment = applicationEngineEnvironment {
       connector {
-        port = 8080
+        port = 12355
         host = "127.0.0.1"
       }
       rootPath = "/api/v1"

@@ -3,6 +3,7 @@
 package com.diyigemt.arona.communication.command
 
 import com.diyigemt.arona.AronaApplication
+import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.TencentGroupMessageEvent
@@ -16,11 +17,11 @@ import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
-import com.diyigemt.arona.utils.childScope
-import com.diyigemt.arona.utils.childScopeContext
+import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.qualifiedNameOrTip
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.serializer
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -74,9 +75,13 @@ sealed class AbstractUserCommandSender : UserCommandSender, AbstractCommandSende
   override suspend fun contactDocument(): PluginContactDocument {
     if (_contactDocument == null) {
       ContactDocument.createContactAndUser(subject, user, ContactRole.DEFAULT_MEMBER_CONTACT_ROLE_ID)
-      _contactDocument = ContactDocument.findContactDocumentByIdOrNull(subject.id)
+      _contactDocument = ContactDocument.findContactDocumentByIdOrNull(subject.fatherSubjectIdOrSelf)
     }
     return _contactDocument!!
+  }
+
+  override suspend fun contactMember(): PluginContactMember {
+    return contactDocument().findContactMember(userDocument().id)
   }
 }
 
@@ -87,7 +92,26 @@ interface UserCommandSender : CommandSender {
   override val sourceId: String
   suspend fun userDocument(): PluginUserDocument
   suspend fun contactDocument(): PluginContactDocument
+  suspend fun contactMember(): PluginContactMember
+
+  companion object {
+    /**
+     * 优先级 环境默认 > 用户分环境 > 用户默认
+     */
+    suspend inline fun <reified T : Any> UserCommandSender.readPluginConfigOrNull(plugin: CommandOwner) =
+      contactDocument().readPluginConfigOrNull<T>(plugin) ?: contactMember().readPluginConfigOrNull<T>(plugin)
+      ?: userDocument().readPluginConfigOrNull<T>(plugin)
+
+    suspend inline fun <reified T : Any> UserCommandSender.readPluginConfigOrDefault(plugin: CommandOwner, default: T) =
+      contactDocument().readPluginConfigOrNull<T>(plugin) ?: contactMember().readPluginConfigOrNull<T>(plugin)
+      ?: userDocument().readPluginConfigOrDefault<T>(plugin, default)
+
+    suspend inline fun <reified T : Any> UserCommandSender.readPluginConfig(plugin: CommandOwner) =
+      contactDocument().readPluginConfigOrNull<T>(plugin) ?: contactMember().readPluginConfigOrNull<T>(plugin)
+      ?: userDocument().readPluginConfig<T>(plugin)
+  }
 }
+
 
 /**
  * 单聊
@@ -98,7 +122,8 @@ class FriendUserCommandSender internal constructor(
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("FriendUserCommandSender") {
   override val subject get() = user
   override var messageSequence: Int = 1
-  override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
+  override suspend fun sendMessage(message: Message) =
+    user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -111,7 +136,8 @@ class GroupCommandSender internal constructor(
   override val subject get() = user.group
   val group get() = user.group
   override var messageSequence: Int = 1
-  override suspend fun sendMessage(message: Message) = subject.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
+  override suspend fun sendMessage(message: Message) =
+    subject.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -125,7 +151,8 @@ class GuildChannelCommandSender internal constructor(
   val channel get() = user.channel
   val guild get() = user.guild
   override var messageSequence: Int = 1
-  override suspend fun sendMessage(message: Message) = subject.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
+  override suspend fun sendMessage(message: Message) =
+    subject.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -138,7 +165,8 @@ class GuildUserCommandSender internal constructor(
   override val subject get() = user.guild
   val guild get() = user.guild
   override var messageSequence: Int = 1
-  override suspend fun sendMessage(message: Message) = user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
+  override suspend fun sendMessage(message: Message) =
+    user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
 }
 
 object ConsoleCommandSender : AbstractCommandSender(), CommandSender {

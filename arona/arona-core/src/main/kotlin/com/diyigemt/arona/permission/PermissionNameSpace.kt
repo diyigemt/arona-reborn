@@ -44,7 +44,7 @@ interface Permission {
           tmpParent = tmpParent.parent
         }
         fathers.reverse()
-        fathers.joinToString(":") { it.id.nameSpace } + ":$id"
+        fathers.joinToString(":") { it.id.nameSpace } + ":${id.name}"
       }
     }
 

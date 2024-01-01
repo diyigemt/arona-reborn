@@ -68,10 +68,22 @@ function jsonParse(text: string): any {
 }
 watch(
   () => editType.value.type,
-  (cur) => {
+  (cur, prv) => {
     switch (cur) {
       case "contact": {
-        // 查询
+        if (prv === "manage-contact") {
+          const { id } = editType.value;
+          if (cacheMemberProfileData[id]) {
+            emits("update:form", jsonParse(cacheMemberProfileData[id]));
+          } else {
+            ContactApi.fetchMemberPluginPreference(id, props.pId, props.pKey).then((data) => {
+              if (data) {
+                cacheMemberProfileData[id] = data;
+              }
+              emits("update:form", data ? jsonParse(data) : props.defaultForm);
+            });
+          }
+        }
         break;
       }
       case "manage-contact": {
@@ -99,10 +111,13 @@ watch(
         ContactApi.fetchMemberPluginPreference(cur, props.pId, props.pKey).then((data) => {
           if (data) {
             cacheMemberProfileData[cur] = data;
-            emits("update:form", data ? jsonParse(data) : props.defaultForm);
           }
+          emits("update:form", data ? jsonParse(data) : props.defaultForm);
         });
       }
+    } else if (editType.value.type === "manage-contact") {
+      const tmp = contact.value?.config[props.pId];
+      emits("update:form", tmp && tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
     }
   },
 );
@@ -213,7 +228,7 @@ onMounted(() => {
         </ElRadioGroup>
       </ElFormItem>
       <ElFormItem v-if="importForm.source !== 'user'" label="群">
-        <ElSelect v-model="importForm.id">
+        <ElSelect v-model="importForm.id" default-first-option>
           <ElOption v-for="(e, index) in contacts" :key="index" :label="e.contactName" :value="e.id" />
         </ElSelect>
       </ElFormItem>

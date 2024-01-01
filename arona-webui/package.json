@@ -6,7 +6,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit --skipLibCheck && vite build",
+    "build": "vite build",
+    "build-restrict": "vue-tsc --noEmit --skipLibCheck && vite build",
     "lint": "eslint src",
     "preview": "vite preview",
     "mock": "nodemon --exec ts-node mock/index.ts --watch src/ --watch mock/ -e ts"

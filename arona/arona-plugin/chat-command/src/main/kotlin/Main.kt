@@ -11,6 +11,7 @@ import com.diyigemt.arona.utils.error
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.UsageError
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 object PluginMain : AronaPlugin(
@@ -42,21 +43,25 @@ object PluginMain : AronaPlugin(
       PluginMain.launch {
         when (val result = CommandManager.executeCommand(commandSender, it.message)) {
           is CommandExecuteResult.Success -> {
-
+            delay(2000L)
+            commandSender.sendMessage("Arona将在北京时间2024年01月01日 20:00至21:00进行半停机升级，更新日志见:\nhttps://doc.arona.diyigemt" +
+                ".com/v2/other/changelog")
           }
 
           is CommandExecuteResult.UnmatchedSignature -> {
             // 发送错误处理
             val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@launch
             commandSender.sendMessage("$helpMessage\n用户手册:\nhttps://doc.arona.diyigemt.com/v2/manual/command")
-          }
+            commandSender.sendMessage("Arona将在北京时间2024年01月01日 20:00至21:00进行半停机升级，更新日志见:\nhttps://doc.arona.diyigemt" +
+                ".com/v2/other/changelog")}
 
           is CommandExecuteResult.ExecutionFailed -> {
             when (result.exception) {
               is UsageError -> {
                 val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@launch
                 commandSender.sendMessage("$helpMessage\n用户手册:\nhttps://doc.arona.diyigemt.com/v2/manual/command")
-              }
+                commandSender.sendMessage("Arona将在北京时间2024年01月01日 20:00至21:00进行半停机升级，更新日志见:\nhttps://doc.arona.diyigemt" +
+                    ".com/v2/other/changelog")}
 
               else -> result.exception.let { it1 -> logger.error(it1) }
             }

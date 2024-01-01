@@ -81,12 +81,12 @@ defineExpose({
     <ElTabPane label="Subject" name="Subject">
       <ElForm :model="formData.Subject" label-width="80" label-position="left">
         <ElFormItem label="id">
-          <ElSelect v-model="formData.Subject.id" filterable class="w-full">
+          <ElSelect v-model="formData.Subject.id" filterable default-first-option class="w-full">
             <ElOption v-for="(e, index) in membersSelect" :key="index" :label="e.label" :value="e.value" />
           </ElSelect>
         </ElFormItem>
         <ElFormItem label="roles">
-          <ElSelect v-model="formData.Subject.roles" multiple filterable class="w-full">
+          <ElSelect v-model="formData.Subject.roles" multiple filterable default-first-option class="w-full">
             <ElOption v-for="(e, index) in rolesSelect" :key="index" :label="e.label" :value="e.value" />
           </ElSelect>
         </ElFormItem>

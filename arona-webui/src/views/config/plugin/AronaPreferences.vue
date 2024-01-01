@@ -4,7 +4,7 @@
       <PluginPreferenceForm
         v-model:form="baseConfig"
         :default-form="defaultBaseConfig"
-        p-id="com.diyigemt.arona"
+        p-id="com·diyigemt·arona"
         p-key="BaseConfig"
       >
         <ElFormItem label="启用markdown" prop="enable">
@@ -24,25 +24,14 @@
         :default-form="defaultTrainerConfig"
         :data-processor="onParseTrainerOption"
         :post-data-processor="onSaveParseTrainerOption"
-        p-id="com.diyigemt.arona"
+        p-id="com·diyigemt·arona"
         p-key="TrainerConfig"
       >
         <ElFormItem label="别名覆盖：" prop="override">
           <ElButton type="primary" @click="onAddOverride">新增</ElButton>
           <ElTable :data="trainerOverrideConfig">
-            <ElTableColumn prop="type" label="类型">
-              <template #default="{ row }">
-                <div v-if="row.edit">
-                  <ElSelect v-model="row.type">
-                    <ElOption value="RAW" label="RAW" />
-                  </ElSelect>
-                </div>
-                <div v-else>
-                  {{ row.type }}
-                </div>
-              </template>
-            </ElTableColumn>
-            <ElTableColumn prop="name" label="原始值" width="300">
+            <ElTableColumn type="index" label="序号" width="100" />
+            <ElTableColumn prop="name" label="原始值">
               <template #default="{ row }">
                 <div v-if="row.edit">
                   <ElSelect v-model="row.name" filterable multiple allow-create collapse-tags default-first-option />
@@ -59,6 +48,7 @@
                     v-model="row.value"
                     filterable
                     remote
+                    default-first-option
                     :remote-method="onSearchTrainer"
                     :loading="trainerSearchLoading"
                   >
@@ -72,6 +62,18 @@
                 </div>
                 <div v-else>
                   {{ row.value }}
+                </div>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn prop="type" label="类型" width="80">
+              <template #default="{ row }">
+                <div v-if="row.edit">
+                  <ElSelect v-model="row.type">
+                    <ElOption value="RAW" label="RAW" />
+                  </ElSelect>
+                </div>
+                <div v-else>
+                  {{ row.type }}
                 </div>
               </template>
             </ElTableColumn>
@@ -95,10 +97,19 @@
       <PluginPreferenceForm
         v-model:form="tarotConfig"
         :default-form="defaultTarotConfig"
-        p-id="com.diyigemt.arona"
+        p-id="com·diyigemt·arona"
         p-key="TarotConfig"
       >
-        <ElFormItem label="启用逆天改命" prop="fxxkDestiny">
+        <ElFormItem label="每天仅能抽取一次" prop="dayOne">
+          <ElSwitch
+            v-model="tarotConfig.dayOne"
+            :active-value="true"
+            :inactive-value="false"
+            active-text="启用"
+            inactive-text="停用"
+          />
+        </ElFormItem>
+        <ElFormItem label="启用保底" prop="fxxkDestiny">
           <ElSwitch
             v-model="tarotConfig.fxxkDestiny"
             :active-value="true"
@@ -128,6 +139,7 @@ interface MarkdownCompatiblyConfig {
 }
 
 interface TarotConfig {
+  dayOne: boolean;
   fxxkDestiny: boolean;
 }
 
@@ -155,6 +167,7 @@ const defaultTrainerConfig: TrainerConfig = {
   override: [],
 };
 const defaultTarotConfig: TarotConfig = {
+  dayOne: true,
   fxxkDestiny: false,
 };
 const baseConfig = ref<BaseConfig>(defaultBaseConfig);
@@ -183,11 +196,13 @@ function onParseTrainerOption(data: TrainerConfig) {
 }
 function onSaveParseTrainerOption(data: TrainerConfig) {
   return {
-    override: data.override.map((it) => ({
-      type: it.type,
-      name: it.name,
-      value: it.value,
-    })),
+    override: data.override
+      .filter((it) => it.name.length > 0 && it.value)
+      .map((it) => ({
+        type: it.type,
+        name: it.name,
+        value: it.value,
+      })),
   };
 }
 function onAddOverride() {

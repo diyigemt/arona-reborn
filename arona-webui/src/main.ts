@@ -18,6 +18,11 @@ const i18n = createI18n({
   messages,
 });
 
+// eslint-disable-next-line no-extend-native
+String.prototype.toMongodbKey = function toMongodbKey() {
+  return this.replace(/[.]/g, "·");
+};
+
 const app = createApp(App);
 
 app.use(router).use(store);

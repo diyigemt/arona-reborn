@@ -3,7 +3,7 @@ import { ComputedRef, Ref } from "vue";
 import { EditableContact, EditableContactMember } from "@/interface";
 import { useTableInlineEditor } from "@/utils";
 import { ContactApi } from "@/api";
-import { successMessage } from "@/utils/message";
+import { successMessage, warningMessage } from "@/utils/message";
 
 defineOptions({
   name: "ContactProfileMember",
@@ -19,7 +19,10 @@ function roleNameMapper(mem: EditableContactMember) {
   return mem.roles.map((it) => contact.value.roles.filter((r) => r.id === it)[0].name);
 }
 const { onConfirm, onEdit, onCancel, cache: member } = useTableInlineEditor(members, onMemberConfirmEdit);
-function onMemberConfirmEdit(): Promise<unknown> {
+function onMemberConfirmEdit(data: EditableContactMember): Promise<unknown> {
+  if (!data.roles.find((it) => it === "role.default")) {
+    warningMessage("不能将群员角色删除");
+  }
   return ContactApi.updateContactMember(contact.value.id, member.value).then(() => {
     successMessage("更新成功");
     emit("update");
@@ -44,7 +47,13 @@ function onMemberConfirmEdit(): Promise<unknown> {
       <template #default="{ row }">
         <div v-if="row.edit && !userId">
           <ElSelect v-model="member.roles" multiple collapse-tags>
-            <ElOption v-for="(e, index) in roles" :key="index" :value="e.id" :label="e.name"></ElOption>
+            <ElOption
+              v-for="(e, index) in roles"
+              :key="index"
+              :value="e.id"
+              :label="e.name"
+              :disabled="e.id === 'role.default'"
+            ></ElOption>
           </ElSelect>
         </div>
         <div v-else>

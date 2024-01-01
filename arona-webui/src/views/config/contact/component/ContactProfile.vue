@@ -113,7 +113,7 @@ function fetchContactProfile(id: string) {
       </ElDescriptionsItem>
       <ElDescriptionsItem label="成员数">{{ contact.members?.length }}</ElDescriptionsItem>
       <ElDescriptionsItem label="角色数">{{ contact.roles?.length }}</ElDescriptionsItem>
-      <ElDescriptionsItem label="权限数">{{ contact.policies?.length }}</ElDescriptionsItem>
+      <ElDescriptionsItem label="策略数">{{ contact.policies?.length }}</ElDescriptionsItem>
     </ElDescriptions>
     <ActionHeader title="不基本信息" class="mt-4 mb-2! h-32px">
       <ElButton v-if="activeTab != 'member' && !userId" @click="showAddDialog">新增</ElButton>

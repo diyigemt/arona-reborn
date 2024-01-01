@@ -33,7 +33,7 @@ function onDelete(policy: Policy) {
     <ElTableColumn prop="name" label="名称"></ElTableColumn>
     <ElTableColumn prop="effect" label="效果" width="100"></ElTableColumn>
     <ElTableColumn prop="rules" label="规则" width="120">
-      <template #default="{ row }"> 共{{ row.rules.length }}条规则</template>
+      <template #default="{ row }"> 共{{ (row.rules?.length ?? 0) + (row.children?.length ?? 0) }}条规则</template>
     </ElTableColumn>
     <ElTableColumn v-if="!userId" label="操作" width="180">
       <template #default="{ row }">

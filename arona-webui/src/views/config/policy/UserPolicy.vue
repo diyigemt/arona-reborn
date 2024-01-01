@@ -191,7 +191,7 @@ const resources = ref<PolicyResource[]>([]);
 const policies = computed(() => contact.value.policies);
 const members = computed(() => contact.value.members);
 const roles = computed(() => contact.value.roles);
-const showRuleAddBtn = computed(() => parentNodeId.value !== policy.value.id);
+const showRuleAddBtn = computed(() => parentNodeId.value !== policy.value.id && policyNodeForm.value.type === "append");
 const { visible, update } = useForceUpdate();
 const showPolicyBaseForm = ref(false);
 const policyBaseForm = ref<PolicyBaseForm>({ name: "", effect: "ALLOW" });

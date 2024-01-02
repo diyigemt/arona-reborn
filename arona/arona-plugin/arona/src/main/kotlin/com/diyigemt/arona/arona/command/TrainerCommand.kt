@@ -87,7 +87,7 @@ object TrainerCommand : AbstractCommand(
   }
 
   suspend fun UserCommandSender.trainer() {
-    val override = readPluginConfigOrDefault(Arona, default = TrainerConfig()).overrideConfig
+    val override = readPluginConfigOrDefault(Arona, default = TrainerConfig()).override
     val match = override.firstOrNull { it.name.contains(arg) }?.value ?: arg
     getImage(match).run {
       data?.run r1@{

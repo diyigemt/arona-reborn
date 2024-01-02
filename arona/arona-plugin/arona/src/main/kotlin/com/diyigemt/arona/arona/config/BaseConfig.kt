@@ -26,11 +26,14 @@ data class TarotConfig(
 
 @Serializable
 data class TrainerConfig(
-  val overrideConfig: List<TrainerOverrideConfig> = listOf()
+  val override: List<TrainerOverrideConfig> = listOf()
 )
 object TrainerOverrideTypeSerializer : KSerializer<TrainerOverrideType> {
   // TODO
-  override fun deserialize(decoder: Decoder) = TrainerOverrideType.RAW
+  override fun deserialize(decoder: Decoder): TrainerOverrideType {
+    decoder.decodeString()
+    return TrainerOverrideType.RAW
+  }
   override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrainerOverrideType", PrimitiveKind.STRING)
   override fun serialize(encoder: Encoder, value: TrainerOverrideType) = encoder.encodeString(value.name)
 }

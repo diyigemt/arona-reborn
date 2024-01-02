@@ -11,6 +11,8 @@ import zhCn from "element-plus/dist/locale/zh-cn.mjs";
 import { AdvancedBloomFilter } from "@pixi/filter-advanced-bloom";
 import { Sprite } from "pixi.js";
 import SpineManager, { SpineInstanceReactConfig } from "@/utils/spine";
+import { IAlert } from "@/utils/message";
+import useBaseStore from "@/store/base";
 
 const locale = zhCn;
 const aronaContainer = ref<HTMLElement>();
@@ -22,7 +24,12 @@ const aronaConfig: SpineInstanceReactConfig[] = [
     animation: "",
   },
 ];
+const store = useBaseStore();
 onMounted(() => {
+  if (!store.clarity) {
+    IAlert("提示", "为了改善用户体验，网站使用Microsoft Clarity的严格隐私模式收集用户交互信息");
+    store.clarity = true;
+  }
   // SpineManager.createSpine({
   //   el: aronaContainer.value!,
   //   name: "arona",

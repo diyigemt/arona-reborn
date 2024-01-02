@@ -8,6 +8,7 @@ const useBaseStore = defineStore({
     token: "",
     // @ts-ignore
     user: {},
+    clarity: false,
   }),
   getters: {
     userId(state) {
@@ -15,6 +16,9 @@ const useBaseStore = defineStore({
     },
   },
   actions: {
+    setClarity(clarity: boolean) {
+      this.clarity = clarity;
+    },
     setToken(token: string) {
       this.token = token;
     },

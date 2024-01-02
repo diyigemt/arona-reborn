@@ -23,7 +23,7 @@ class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String? 
 )
 
 enum class BackendEndpoint(val path: String) {
-  QueryImage("/api/v2/image"),
+  QueryImage("/api/v2/image")
 }
 
 object NetworkTool {

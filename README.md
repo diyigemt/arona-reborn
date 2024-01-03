@@ -2,6 +2,10 @@
 
 一个基于大量复制 [Mirai](https://github.com/mamoe/mirai) 的代码实现而仓促搭建起来的用于开发qq官方机器人的框架，附带一个正在复刻旧版 [arona](https://github.com/diyigemt/arona) 功能的插件
 
+文档：https://doc.arona.diyigemt.com
+
+webui：https://www.kivotos.com.cn
+
 ### 如何使用
 
 群主/管理员/频道主扫描二维码即可

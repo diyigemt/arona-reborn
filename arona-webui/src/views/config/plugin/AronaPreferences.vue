@@ -217,7 +217,7 @@ function onAddOverride() {
 function onDeleteOverride(override: TrainerConfig["override"][0]) {
   const index = trainerOverrideConfig.value.findIndex((it) => it.id === override.id);
   if (index !== -1) {
-    trainerOverrideConfig.value.splice(index);
+    trainerOverrideConfig.value.splice(index, 1);
   }
 }
 function onSearchTrainer(name: string) {

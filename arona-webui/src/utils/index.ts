@@ -84,14 +84,10 @@ export function useTableInlineEditor<T extends { id: string; edit: boolean }>(
       editCache.value = JSON.parse(JSON.stringify(data));
       onEdit(data).then(() => {
         if (currentEdit.value) {
-          this.onCancel(datasource.value.filter((it) => it.id === currentEdit.value.id)[0]).then(() => {
-            currentEdit.value = data;
-            currentEdit.value.edit = true;
-          });
-        } else {
-          currentEdit.value = data;
-          currentEdit.value.edit = true;
+          currentEdit.value.edit = false;
         }
+        currentEdit.value = data;
+        currentEdit.value.edit = true;
       });
     },
     onConfirm(data: T) {

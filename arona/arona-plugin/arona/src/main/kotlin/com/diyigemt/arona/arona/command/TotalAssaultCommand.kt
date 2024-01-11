@@ -39,7 +39,7 @@ object TotalAssaultCommand : AbstractCommand(
 
   suspend fun UserCommandSender.totalAssault() {
     val config = readPluginConfigOrDefault(Arona, TotalAssaultConfig())
-    val name = when (config.defaultTotalAssault) {
+    val name = when (server ?: config.defaultTotalAssault) {
       Server.B -> "国服B服总力战档线"
       Server.CN -> "国服官服总力战档线"
       Server.JP -> "日服总力战档线"
@@ -63,7 +63,7 @@ object TotalAssaultExCommand : AbstractCommand(
 
   suspend fun UserCommandSender.totalAssault() {
     val config = readPluginConfigOrDefault(Arona, TotalAssaultConfig())
-    when (config.defaultTotalAssaultEx) {
+    when (server ?: config.defaultTotalAssaultEx) {
       Server.B,
       Server.CN -> sendMessage("还没开呢, 别急")
       Server.ASIA, Server.HK, Server.KR, Server.GLOBAL, Server.US -> sendMessage("没数据源")

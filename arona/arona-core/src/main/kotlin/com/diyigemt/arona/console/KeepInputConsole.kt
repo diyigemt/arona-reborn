@@ -4,6 +4,8 @@ import ch.qos.logback.classic.PatternLayout
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder
+import com.github.ajalt.mordant.terminal.ConversionResult
+import com.github.ajalt.mordant.terminal.Terminal
 import kotlinx.coroutines.delay
 import org.fusesource.jansi.AnsiConsole
 import org.jline.reader.*
@@ -21,11 +23,31 @@ internal val lineReader: LineReader by lazy {
   LineReaderBuilder.builder().terminal(terminal).completer { _, _, candidates ->
     candidates.addAll(
       CommandMain.registeredCommands().map {
-        Candidate(AttributedString.stripAnsi(it), it, null, null, null, null, true)
+        val name = it.commandName
+        Candidate(AttributedString.stripAnsi(name), name, null, null, null, null, true)
       }
     )
   }.build()
 }
+
+fun Terminal.confirm(
+  prompt: String,
+  default: String = "Y",
+  showDefault: Boolean = true,
+  showChoices: Boolean = true,
+  hideInput: Boolean = false,
+  promptSuffix: String = ": ",
+  invalidChoiceMessage: String = "Invalid value, choose from ",
+) = prompt(
+  prompt, default == "Y", showDefault, showChoices, hideInput, listOf(true, false), promptSuffix,
+  invalidChoiceMessage
+) {
+  return@prompt if (it in listOf("Y", "N")) {
+    ConversionResult.Valid(it == "Y")
+  } else {
+    ConversionResult.Invalid("Y or N")
+  }
+} as Boolean
 
 suspend fun launchConsole() {
   while (true) {

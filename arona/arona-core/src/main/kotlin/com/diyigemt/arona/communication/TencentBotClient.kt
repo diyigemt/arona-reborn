@@ -12,6 +12,7 @@ import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.logging.*
 import io.ktor.utils.io.core.*
 import io.ktor.websocket.*
@@ -60,16 +61,15 @@ interface TencentBot : Contact, CoroutineScope {
 internal class TencentBotClient
 private constructor(private val config: TencentBotConfig) : Closeable, TencentBot, CoroutineScope {
   override val id = config.id
-  override val client = HttpClient(CIO) {
-    install(WebSockets)
-    install(ContentNegotiation) {
-      json
-    }
-  }
   override val json = Json {
     ignoreUnknownKeys = true
   }
-
+  override val client = HttpClient(CIO) {
+    install(WebSockets)
+    install(ContentNegotiation) {
+      json(json)
+    }
+  }
   override val logger = KtorSimpleLogger("Bot.$id")
   override val eventChannel =
     GlobalEventChannel.filterIsInstance<TencentBotEvent>().filter { it.bot === this@TencentBotClient }

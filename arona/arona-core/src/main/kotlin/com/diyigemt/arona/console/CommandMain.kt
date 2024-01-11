@@ -36,7 +36,7 @@ class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invo
       }
       instance.subcommands(command)
     }
-    internal fun registeredCommands() = instance.registeredSubcommands().map { it.commandName }
+    internal fun registeredCommands() = instance.registeredSubcommands()
     internal fun run(argv: List<String>) {
       runCatching {
         instance.parse(argv)

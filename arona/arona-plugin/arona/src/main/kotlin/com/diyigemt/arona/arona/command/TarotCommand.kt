@@ -1,10 +1,7 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
-import com.diyigemt.arona.arona.config.TarotConfig
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
-import com.diyigemt.arona.arona.database.image.ImageCacheSchema
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
 import com.diyigemt.arona.arona.database.image.update
@@ -21,8 +18,14 @@ import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.MessageReceipt
 import com.diyigemt.arona.communication.message.TencentGuildImage
 import com.diyigemt.arona.utils.currentLocalDateTime
+import kotlinx.serialization.Serializable
 import kotlin.math.max
 
+@Serializable
+data class TarotConfig(
+  val fxxkDestiny: Boolean = false, // 是否启用逆天改命
+  val dayOne: Boolean = true // 每天最多抽一次?
+)
 @Suppress("unused")
 object TarotCommand : AbstractCommand(
   Arona,

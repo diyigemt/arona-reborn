@@ -149,6 +149,8 @@ internal val crsiveLocalization = object : Localization {
   override fun missingArgument(paramName: String) = "缺少参数: $paramName"
   override fun extraArgumentOne(name: String) = "多余的参数: $name"
   override fun extraArgumentMany(name: String, count: Int) = "多余的参数: $name"
+  override fun invalidChoice(choice: String, choices: List<String>) = "参数无效:$choice, 可选值为: ${choices.joinToString(",")}"
+  override fun badParameterWithMessageAndParam(paramName: String, message: String) = "$paramName 的值无效. $message"
 }
 
 internal suspend fun executeCommandImpl(

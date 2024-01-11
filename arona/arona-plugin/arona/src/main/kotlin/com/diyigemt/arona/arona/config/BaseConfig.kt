@@ -17,34 +17,3 @@ data class BaseConfig(
 data class MarkdownCompatiblyConfig(
   val enable: Boolean = false // 是否启用md
 )
-
-@Serializable
-data class TarotConfig(
-  val fxxkDestiny: Boolean = false, // 是否启用逆天改命
-  val dayOne: Boolean = true // 每天最多抽一次?
-)
-
-@Serializable
-data class TrainerConfig(
-  val override: List<TrainerOverrideConfig> = listOf()
-)
-object TrainerOverrideTypeSerializer : KSerializer<TrainerOverrideType> {
-  // TODO
-  override fun deserialize(decoder: Decoder): TrainerOverrideType {
-    decoder.decodeString()
-    return TrainerOverrideType.RAW
-  }
-  override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrainerOverrideType", PrimitiveKind.STRING)
-  override fun serialize(encoder: Encoder, value: TrainerOverrideType) = encoder.encodeString(value.name)
-}
-
-@Serializable
-data class TrainerOverrideConfig(
-  val type: TrainerOverrideType,
-  val name: List<String>,
-  val value: String,
-)
-@Serializable(with = TrainerOverrideTypeSerializer::class)
-enum class TrainerOverrideType {
-  RAW
-}

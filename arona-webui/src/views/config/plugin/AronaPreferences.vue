@@ -120,6 +120,29 @@
         </ElFormItem>
       </PluginPreferenceForm>
     </ElTabPane>
+    <ElTabPane name="totalAssault" label="总力设置">
+      <PluginPreferenceForm
+        v-model:form="totalAssaultConfig"
+        :default-form="defaultTotalAssaultConfig"
+        p-id="com·diyigemt·arona"
+        p-key="TotalAssaultConfig"
+      >
+        <ElFormItem label="总力档线默认服务器" prop="defaultTotalAssault">
+          <ElSelect v-model="totalAssaultConfig.defaultTotalAssault" default-first-option>
+            <ElOption value="JP" label="日服" />
+            <ElOption value="CN" label="官服" />
+            <ElOption value="B" label="B服" />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem label="大决战档线默认服务器" prop="defaultTotalAssaultEx">
+          <ElSelect v-model="totalAssaultConfig.defaultTotalAssaultEx" default-first-option>
+            <ElOption value="JP" label="日服" />
+            <ElOption value="CN" label="官服" />
+            <ElOption value="B" label="B服" />
+          </ElSelect>
+        </ElFormItem>
+      </PluginPreferenceForm>
+    </ElTabPane>
   </ElTabs>
 </template>
 
@@ -152,12 +175,15 @@ interface TrainerConfig {
     edit: boolean;
   }[];
 }
-
+interface TotalAssaultConfig {
+  defaultTotalAssault: "B" | "CN" | "JP";
+  defaultTotalAssaultEx: "B" | "CN" | "JP";
+}
 interface BaseConfig {
   markdown: MarkdownCompatiblyConfig;
 }
 
-const tab = ref<"base" | "trainer" | "tarot">("base");
+const tab = ref<"base" | "trainer" | "tarot" | "totalAssault">("base");
 const defaultBaseConfig: BaseConfig = {
   markdown: {
     enable: false,
@@ -170,9 +196,14 @@ const defaultTarotConfig: TarotConfig = {
   dayOne: true,
   fxxkDestiny: false,
 };
+const defaultTotalAssaultConfig: TotalAssaultConfig = {
+  defaultTotalAssault: "JP",
+  defaultTotalAssaultEx: "JP",
+};
 const baseConfig = ref<BaseConfig>(defaultBaseConfig);
 const trainerConfig = ref<TrainerConfig>(defaultTrainerConfig);
 const tarotConfig = ref<TarotConfig>(defaultTarotConfig);
+const totalAssaultConfig = ref<TotalAssaultConfig>(defaultTotalAssaultConfig);
 const markdownConfig = computed({
   get() {
     return baseConfig.value.markdown;

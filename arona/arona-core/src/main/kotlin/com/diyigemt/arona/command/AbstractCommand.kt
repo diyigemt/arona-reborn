@@ -95,9 +95,8 @@ internal class CommandReflector(
 
   @Suppress("UNCHECKED_CAST")
   fun findSubCommand(): List<AbstractCommand> {
-    val s = command::class.java.declaredClasses
+    val s = command::class.nestedClasses
       .asSequence()
-      .map { it.kotlin }
       .filter { it.isSubCommand() } as Sequence<KClass<out AbstractCommand>>
     return s
       .onEach { it::class.checkModifiers() }

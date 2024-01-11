@@ -2,8 +2,6 @@ package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.config.BaseConfig
-import com.diyigemt.arona.arona.config.MarkdownCompatiblyConfig
-import com.diyigemt.arona.arona.config.TrainerConfig
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
@@ -21,8 +19,14 @@ import com.diyigemt.arona.communication.message.*
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 
 @Serializable
@@ -32,6 +36,31 @@ data class ImageQueryData(
   val content: String,
   val type: String,
 )
+
+@Serializable
+data class TrainerConfig(
+  val override: List<TrainerOverrideConfig> = listOf()
+)
+object TrainerOverrideTypeSerializer : KSerializer<TrainerOverrideType> {
+  // TODO
+  override fun deserialize(decoder: Decoder): TrainerOverrideType {
+    decoder.decodeString()
+    return TrainerOverrideType.RAW
+  }
+  override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrainerOverrideType", PrimitiveKind.STRING)
+  override fun serialize(encoder: Encoder, value: TrainerOverrideType) = encoder.encodeString(value.name)
+}
+
+@Serializable
+data class TrainerOverrideConfig(
+  val type: TrainerOverrideType,
+  val name: List<String>,
+  val value: String,
+)
+@Serializable(with = TrainerOverrideTypeSerializer::class)
+enum class TrainerOverrideType {
+  RAW
+}
 
 @Suppress("unused")
 object TrainerCommand : AbstractCommand(

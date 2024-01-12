@@ -9,6 +9,7 @@ import com.diyigemt.arona.plugins.AronaPluginDescription
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 
 object Arona : AronaPlugin(
@@ -33,6 +34,7 @@ object Arona : AronaPlugin(
     pluginEventChannel().subscribeAlways<TencentBotUserChangeEvent> {
       when (it) {
         is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> {
+          delay(2000L)
           it.subject.sendMessage("欢迎连接「シッテムの箱」，老师。\n使用手册：https://doc.arona.diyigemt.com/v2/manual/command")
         }
 

@@ -109,6 +109,15 @@ interface UserCommandSender : CommandSender {
     suspend inline fun <reified T : Any> UserCommandSender.readPluginConfig(plugin: CommandOwner) =
       contactDocument().readPluginConfigOrNull<T>(plugin) ?: contactMember().readPluginConfigOrNull<T>(plugin)
       ?: userDocument().readPluginConfig<T>(plugin)
+
+    suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfigOrNull(plugin: CommandOwner) =
+      contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfigOrNull<T>(plugin)
+
+    suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfigOrDefault(plugin: CommandOwner, default: T) =
+      contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfigOrDefault<T>(plugin, default)
+
+    suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfig(plugin: CommandOwner) =
+      contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfig<T>(plugin)
   }
 }
 

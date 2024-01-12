@@ -13,6 +13,7 @@ import com.diyigemt.arona.arona.tools.randomInt
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
+import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.MessageReceipt
@@ -22,9 +23,16 @@ import kotlinx.serialization.Serializable
 import kotlin.math.max
 
 @Serializable
+enum class TarotCardType(val index: Int) {
+  A(1),
+  B(2);
+}
+
+@Serializable
 data class TarotConfig(
   val fxxkDestiny: Boolean = false, // 是否启用逆天改命
   val dayOne: Boolean = true, // 每天最多抽一次?
+  val cardType: TarotCardType = TarotCardType.A, // 卡面类型
 )
 
 @Suppress("unused")
@@ -59,6 +67,7 @@ object TarotCommand : AbstractCommand(
 
   suspend fun UserCommandSender.tarot() {
     val tarotConfig = readPluginConfigOrDefault(Arona, default = TarotConfig())
+    val userTarotConfig = readUserPluginConfigOrDefault(Arona, default = TarotConfig())
     val id = userDocument().id
     val today = currentLocalDateTime().date.dayOfMonth
     val record = dbQuery {
@@ -68,7 +77,7 @@ object TarotCommand : AbstractCommand(
       val tarot = dbQuery {
         TarotSchema.findById(record.tarot)
       }!!
-      send(this, tarot, record.positive)
+      send(this, tarot, record.positive, userTarotConfig.cardType)
       return
     }
     var tarotIndex = randomInt(TarotCount) + 1
@@ -93,7 +102,7 @@ object TarotCommand : AbstractCommand(
     val tarot = dbQuery {
       TarotSchema.findById(tarotIndex)
     }!!
-    send(this, tarot, positive)
+    send(this, tarot, positive, userTarotConfig.cardType)
     dbQuery {
       if (record != null) {
         record.day = today
@@ -109,14 +118,30 @@ object TarotCommand : AbstractCommand(
     }
   }
 
-  private suspend fun send(commandSender: UserCommandSender, tarot: TarotSchema, positive: Boolean) {
-    val from = commandSender.contactType()
-    val res = if (positive) tarot.positive else tarot.negative
-    val resName = if (positive) "正位" else "逆位"
+  private suspend fun send(
+    commandSender: UserCommandSender,
+    tarot: TarotSchema,
+    positive: Boolean,
+    type: TarotCardType,
+  ) {
+    var res = if (positive) tarot.positive else tarot.negative
+    var resName = if (positive) "正位" else "逆位"
     val fileSuffix = if (positive) "up" else "down"
-    val name = "${tarot.id.value}-${fileSuffix}"
+    var name = "${tarot.id.value}-${fileSuffix}" + if (type == TarotCardType.B) "-2" else ""
+    // 随机数
+    val roll = randomInt(100)
+    if (roll == 1) {
+      resName = "正位"
+      name = "23"
+      res = "꒰ঌ(\uD83C\uDF80 ᗜ`˰´ᗜ \uD83C\uDF38)໒꒱\n"
+    } else if (roll == 2) {
+      resName = "正位"
+      name = "0"
+      res = "草莓牛奶！"
+    }
     val path = "/tarot/$name.png"
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
+    val from = commandSender.contactType()
     if (commandSender.isGroupOrPrivate()) {
       val im = dbQuery {
         findImage(name, from)

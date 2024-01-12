@@ -5,6 +5,7 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
+import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrNull
 import com.diyigemt.arona.communication.message.PlainText
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
@@ -38,8 +39,8 @@ object TotalAssaultCommand : AbstractCommand(
     .optional()
 
   suspend fun UserCommandSender.totalAssault() {
-    val config = readPluginConfigOrDefault(Arona, TotalAssaultConfig())
-    val name = when (server ?: config.defaultTotalAssault) {
+    val config = readPluginConfigOrNull<TotalAssaultConfig>(Arona)
+    val name = when (server ?: config?.defaultTotalAssault ?: Server.JP) {
       Server.B -> "国服B服总力战档线"
       Server.CN -> "国服官服总力战档线"
       Server.JP -> "日服总力战档线"
@@ -47,6 +48,9 @@ object TotalAssaultCommand : AbstractCommand(
         sendMessage("没数据源")
         return
       }
+    }
+    if (config == null) {
+      sendMessage("未配置默认服务器,发送日服数据,配置可随时在webui更改")
     }
     CommandManager.executeCommand(this, PlainText("/攻略 $name"))
   }

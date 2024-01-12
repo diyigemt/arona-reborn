@@ -118,6 +118,12 @@
             inactive-text="停用"
           />
         </ElFormItem>
+        <ElFormItem label="卡面类型" prop="cardType">
+          <ElSelect v-model="tarotConfig.cardType" default-first-option>
+            <ElOption value="A" label="Shi0n老师" />
+            <ElOption value="B" label="GoAnchor老师" />
+          </ElSelect>
+        </ElFormItem>
       </PluginPreferenceForm>
     </ElTabPane>
     <ElTabPane name="totalAssault" label="总力设置">
@@ -164,6 +170,7 @@ interface MarkdownCompatiblyConfig {
 interface TarotConfig {
   dayOne: boolean;
   fxxkDestiny: boolean;
+  cardType: "A" | "B";
 }
 
 interface TrainerConfig {
@@ -195,6 +202,7 @@ const defaultTrainerConfig: TrainerConfig = {
 const defaultTarotConfig: TarotConfig = {
   dayOne: true,
   fxxkDestiny: false,
+  cardType: "A",
 };
 const defaultTotalAssaultConfig: TotalAssaultConfig = {
   defaultTotalAssault: "JP",

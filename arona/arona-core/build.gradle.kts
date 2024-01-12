@@ -26,6 +26,24 @@ tasks.withType<Zip>{
 //  dependsOn("distTar", "distZip")
 //  archiveFileName.set("${project.name}-${project.version}.jar")
 //}
+task("copyToPlugins") {
+  dependsOn("distTar", "distZip")
+  val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox"
+  val buildJar = file(project.buildDir.path + "/libs")
+    .listFiles { it -> it.isFile && it.name.contains("-all.jar") }
+    ?.firstOrNull()
+  if (buildJar == null) {
+    logger.error("build file not found: ${project.name}")
+  } else {
+    // 删除旧版本插件
+    file(pluginDir)
+      .listFiles { it -> it.isFile && it.name.startsWith(project.name) }
+      ?.forEach { it.delete() }
+    buildJar.copyTo(file(pluginDir + "./" + "${project.name}-${project.version}.jar"), true)
+    logger.error("copy ${buildJar.name} to plugin folder")
+  }
+}
+
 dependencies {
   implementation("io.ktor:ktor-server-cors")
   implementation("io.ktor:ktor-server-core-jvm")

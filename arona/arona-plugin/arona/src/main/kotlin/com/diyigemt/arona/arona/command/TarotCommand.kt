@@ -24,8 +24,9 @@ import kotlin.math.max
 @Serializable
 data class TarotConfig(
   val fxxkDestiny: Boolean = false, // 是否启用逆天改命
-  val dayOne: Boolean = true // 每天最多抽一次?
+  val dayOne: Boolean = true, // 每天最多抽一次?
 )
+
 @Suppress("unused")
 object TarotCommand : AbstractCommand(
   Arona,
@@ -34,7 +35,6 @@ object TarotCommand : AbstractCommand(
 ) {
   private const val TarotCount = 22
   private val PositiveMap = mapOf(
-    0 to true,
     1 to true,
     2 to true,
     3 to true,
@@ -46,15 +46,17 @@ object TarotCommand : AbstractCommand(
     9 to true,
     10 to true,
     11 to true,
-    13 to false,
-    14 to true,
-    15 to false,
-    17 to true,
-    18 to false,
-    19 to true,
+    12 to true,
+    14 to false,
+    15 to true,
+    16 to false,
+    18 to true,
+    19 to false,
     20 to true,
     21 to true,
+    22 to true,
   )
+
   suspend fun UserCommandSender.tarot() {
     val tarotConfig = readPluginConfigOrDefault(Arona, default = TarotConfig())
     val id = userDocument().id

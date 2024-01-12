@@ -8,10 +8,20 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.sqlite.SQLiteConfig
 
 internal object DatabaseProvider {
   private val database: DB by lazy {
-    val database = DB.connect("jdbc:sqlite:${Arona.dataFolder}/arona.db", "org.sqlite.JDBC")
+    val database = DB.connect(
+      "jdbc:sqlite:${Arona.dataFolder}/arona.db",
+      "org.sqlite.JDBC",
+      setupConnection = {
+        SQLiteConfig().apply {
+          busyTimeout = 1000
+          apply(it)
+        }
+      }
+    )
     transaction(database) {
       ReflectionTool.scanTypeAnnotatedObjectInstance(Database::class).forEach {
         SchemaUtils.create(it as Table)

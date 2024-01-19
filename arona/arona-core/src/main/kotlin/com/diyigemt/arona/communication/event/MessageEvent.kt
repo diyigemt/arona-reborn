@@ -27,6 +27,7 @@ interface TencentFriendEvent : TencentBotEvent {
 // 频道消息事件
 class TencentGuildMessageEvent internal constructor(
   message: MessageChain,
+  override val eventId: String,
   override val sender: GuildChannelMember,
 ) : TencentGuildEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.channel
@@ -39,6 +40,7 @@ class TencentGuildMessageEvent internal constructor(
 // 频道私聊消息事件
 class TencentGuildPrivateMessageEvent internal constructor(
   message: MessageChain,
+  override val eventId: String,
   override val sender: GuildMember,
 ) : TencentGuildEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.channel
@@ -50,6 +52,7 @@ class TencentGuildPrivateMessageEvent internal constructor(
 
 class TencentFriendMessageEvent internal constructor(
   message: MessageChain,
+  override val eventId: String,
   override val sender: FriendUser,
 ) : TencentFriendEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender
@@ -58,6 +61,7 @@ class TencentFriendMessageEvent internal constructor(
 
 class TencentGroupMessageEvent internal constructor(
   message: MessageChain,
+  override val eventId: String,
   override val sender: GroupMember,
 ) : TencentGroupEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.group
@@ -70,10 +74,12 @@ class TencentGroupMessageEvent internal constructor(
 interface TencentBotUserChangeEvent : TencentBotEvent {
   val subject: Contact
   val user: User
+  val eventId: String
 }
 
 class TencentFriendAddEvent internal constructor(
-  override val friend: FriendUser
+  override val friend: FriendUser,
+  override val eventId: String,
 ) : TencentFriendEvent, TencentBotUserChangeEvent, TencentEvent() {
   override val user get() = friend
   override val subject get() = friend
@@ -81,7 +87,8 @@ class TencentFriendAddEvent internal constructor(
 }
 
 class TencentFriendDeleteEvent internal constructor(
-  override val friend: FriendUser
+  override val friend: FriendUser,
+  override val eventId: String,
 ) : TencentFriendEvent, TencentBotUserChangeEvent, TencentEvent() {
   override val user get() = friend
   override val subject get() = friend
@@ -89,7 +96,8 @@ class TencentFriendDeleteEvent internal constructor(
 }
 
 class TencentGroupAddEvent internal constructor(
-  override val user: GroupMember
+  override val user: GroupMember,
+  override val eventId: String,
 ) : TencentGroupEvent, TencentBotUserChangeEvent, TencentEvent() {
   override val group get() = user.group
   override val subject get() = group
@@ -100,7 +108,8 @@ class TencentGroupAddEvent internal constructor(
 }
 
 class TencentGroupDeleteEvent internal constructor(
-  override val user: GroupMember
+  override val user: GroupMember,
+  override val eventId: String,
 ) : TencentGroupEvent, TencentBotUserChangeEvent, TencentEvent() {
   override val group get() = user.group
   override val subject get() = group
@@ -108,7 +117,8 @@ class TencentGroupDeleteEvent internal constructor(
 }
 
 class TencentGuildAddEvent internal constructor(
-  override val user: GuildMember
+  override val user: GuildMember,
+  override val eventId: String,
 ) : TencentGuildEvent, TencentBotUserChangeEvent, TencentEvent() {
   override val guild get() = user.guild
   override val subject get() = guild
@@ -117,6 +127,7 @@ class TencentGuildAddEvent internal constructor(
 
 class TencentGuildDeleteEvent internal constructor(
   override val user: GuildMember,
+  override val eventId: String,
 ) : TencentGuildEvent, TencentBotUserChangeEvent, TencentEvent() {
   override val guild get() = user.guild
   override val subject get() = guild

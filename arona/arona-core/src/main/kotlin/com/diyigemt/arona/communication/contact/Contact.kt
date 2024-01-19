@@ -40,7 +40,7 @@ interface Contact : CoroutineScope {
     sendMessage(message.toMessageChain(), messageSequence)
 
   /**
-   * 回复消息, 如果包含messageId就是被动消息, 不是就是主动消息
+   * 回复消息, 如果包含messageId或eventId就是被动消息, 不是就是主动消息
    */
   suspend fun sendMessage(message: MessageChain, messageSequence: Int = 1): MessageReceipt
 

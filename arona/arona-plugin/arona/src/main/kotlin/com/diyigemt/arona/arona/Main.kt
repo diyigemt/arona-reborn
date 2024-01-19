@@ -11,6 +11,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
+import java.nio.file.Path
 
 object Arona : AronaPlugin(
   AronaPluginDescription(
@@ -43,5 +44,13 @@ object Arona : AronaPlugin(
         }
       }
     }
+  }
+
+  fun dataFolder(vararg paths: String): Path {
+    var path = dataFolderPath
+    paths.forEach {
+      path = path.resolve(it)
+    }
+    return path
   }
 }

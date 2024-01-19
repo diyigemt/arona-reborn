@@ -68,7 +68,7 @@ fun appendConsole(message: String? = null) {
 class CustomAppender : AppenderBase<ILoggingEvent>() {
   private val encoder: LayoutWrappingEncoder<ILoggingEvent> = LayoutWrappingEncoder()
   private val layout: PatternLayout = PatternLayout()
-  private var pattern: String = "%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %logger{36} - %msg%n"
+  private var pattern: String = "%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %logger{72} - %msg%n"
 
   override fun start() {
     super.start()

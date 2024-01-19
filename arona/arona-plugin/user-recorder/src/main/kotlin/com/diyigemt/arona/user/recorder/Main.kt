@@ -132,6 +132,7 @@ object PluginMain : AronaPlugin(
   }
 }
 
+@Suppress("unused")
 class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显示当日dau") {
   override fun run() {
     dbQuery {

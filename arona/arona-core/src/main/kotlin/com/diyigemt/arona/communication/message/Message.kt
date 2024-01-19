@@ -238,7 +238,7 @@ internal data class TencentBotGroupEventRaw(
   val groupOpenId: String,
   @SerialName("op_member_openid")
   val opMemberId: String,
-  val timestamp: Long
+  val timestamp: Long,
 ) : ContactRaw {
   override val id get() = groupOpenId
 }
@@ -246,7 +246,7 @@ internal data class TencentBotGroupEventRaw(
 @Serializable
 internal data class TencentBotFriendEventRaw(
   val openid: String,
-  val timestamp: String
+  val timestamp: String,
 ) : ContactRaw {
   override val id get() = openid
 }
@@ -432,6 +432,7 @@ internal const val EmptyMessageId = ""
 
 sealed interface MessageChain : Message, Collection<Message> {
   val sourceId: String
+  val eventId: String?
 
   companion object {
     fun MessageChain.hasExternalMessage() = this.filterIsInstance<PlainText>().size != this.size
@@ -440,9 +441,10 @@ sealed interface MessageChain : Message, Collection<Message> {
 
 internal class MessageChainImpl(
   override val sourceId: String,
+  override val eventId: String? = null,
   internal val delegate: MutableCollection<Message>,
 ) : MessageChain, Collection<Message> by delegate {
-  constructor(sourceId: String) : this(sourceId, ConcurrentLinkedQueue())
+  constructor(sourceId: String, eventId: String? = null) : this(sourceId, eventId, ConcurrentLinkedQueue())
 
   // TODO
   override fun toString() = delegate.joinToString(" ") { it.toString() }
@@ -556,6 +558,7 @@ data class TencentGuildImage(
   override val width: Int = 0
   override val size: Long = 0L
 }
+
 @Serializable
 data class TencentMarkdown(
   @SerialName("custom_template_id")
@@ -574,7 +577,7 @@ data class TencentMarkdown(
 @Serializable
 data class TencentMarkdownParam(
   val key: String,
-  val values: List<String>
+  val values: List<String>,
 ) {
   companion object {
     class TencentMarkdownParamBuilder {
@@ -584,9 +587,10 @@ data class TencentMarkdownParam(
     }
   }
 }
+
 @Serializable
 data class TencentKeyboard(
-  val id: String
+  val id: String,
 ) : Message { // TODO custom keyboard
   override fun serialization(): String {
     TODO("Not yet implemented")
@@ -707,6 +711,9 @@ data class TencentMessage constructor(
   @SerialName("msg_id")
   @EncodeDefault
   var messageId: String? = null,
+  @SerialName("event_id")
+  @EncodeDefault
+  val eventId: String? = null,
   @SerialName("msg_seq")
   @EncodeDefault
   var messageSequence: Int = 1,
@@ -742,11 +749,12 @@ class TencentMessageBuilder private constructor(
   messageSource: TencentMessageEvent? = null,
 ) : MutableList<Message> by container {
   private var sourceMessageId: String? = messageSource?.message?.sourceId
+  private var eventId: String? = messageSource?.message?.eventId
 
   constructor(messageSource: TencentMessageEvent? = null, messageSequence: Int = 1) : this(
     mutableListOf(),
     messageSequence,
-    messageSource
+    messageSource,
   )
 
   constructor(sourceId: String, messageSequence: Int = 1) : this(mutableListOf(), messageSequence) {
@@ -766,6 +774,7 @@ class TencentMessageBuilder private constructor(
 
   fun append(element: MessageChain) = this.apply {
     sourceMessageId = element.sourceId
+    eventId = element.eventId
     container.addAll(element)
   }
 
@@ -798,6 +807,7 @@ class TencentMessageBuilder private constructor(
       .takeIf { it.isNotEmpty() } ?: " ",
     messageType = TencentMessageType.PLAIN_TEXT,
     messageId = sourceMessageId,
+    eventId = eventId,
     messageSequence = messageSequence
   ).apply {
     when (val im = container.filterIsInstance<TencentImage>().lastOrNull()) {
@@ -807,10 +817,12 @@ class TencentMessageBuilder private constructor(
           fileInfo = im.resourceId
         )
       }
+
       is TencentGuildImage -> {
         messageType = TencentMessageType.IMAGE
         image = im.url.encodeURLPath()
       }
+
       else -> {}
     }
   }.apply {
@@ -819,6 +831,7 @@ class TencentMessageBuilder private constructor(
         messageType = TencentMessageType.MARKDOWN
         markdown = md
       }
+
       else -> {}
     }
     when (val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()) {
@@ -826,6 +839,7 @@ class TencentMessageBuilder private constructor(
         messageType = TencentMessageType.MARKDOWN
         keyboard = kb
       }
+
       else -> {}
     }
   }
@@ -834,8 +848,14 @@ class TencentMessageBuilder private constructor(
 class MessageChainBuilder private constructor(
   private val container: MutableList<Message>,
   private var sourceMessageId: String? = null,
+  private var eventId: String? = null,
 ) : MutableList<Message> by container {
-  constructor(sourceMessageId: String? = null) : this(mutableListOf(), sourceMessageId)
+  constructor(sourceMessageId: String? = null, eventId: String? = null) : this(
+    mutableListOf(),
+    sourceMessageId,
+    eventId
+  )
+
   constructor(messageChain: MessageChain) : this(mutableListOf(), "") {
     append(messageChain)
   }
@@ -853,6 +873,7 @@ class MessageChainBuilder private constructor(
 
   fun append(element: MessageChain) = this.apply {
     sourceMessageId = element.sourceId.takeIf { it.isNotBlank() } ?: sourceMessageId
+    eventId = element.eventId.takeIf { !it.isNullOrBlank() } ?: eventId
     container.addAll(element)
   }
 
@@ -879,7 +900,7 @@ class MessageChainBuilder private constructor(
 
   // TODO build其他类型消息
   fun build(): MessageChain {
-    return MessageChainImpl(sourceMessageId ?: EmptyMessageId, this)
+    return MessageChainImpl(sourceMessageId ?: EmptyMessageId, eventId, this)
   }
 }
 
@@ -895,7 +916,8 @@ data class MessageReceipt(
 
 fun Message.toMessageChain(): MessageChain = when (this) {
   is MessageChain -> this
-  else -> MessageChainImpl("", mutableListOf(this))
+  else -> MessageChainImpl("", null, mutableListOf(this))
 }
 
-fun Message.toMessageChain(sourceId0: String): MessageChain = MessageChainBuilder(sourceId0).append(this).build()
+fun Message.toMessageChain(sourceId0: String, eventId: String?): MessageChain =
+  MessageChainBuilder(sourceId0, eventId).append(this).build()

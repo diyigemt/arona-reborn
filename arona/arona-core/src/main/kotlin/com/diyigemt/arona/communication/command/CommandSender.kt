@@ -33,6 +33,7 @@ interface CommandSender : CoroutineScope {
   val subject: Contact?
   val user: User?
   val sourceId: String?
+  val eventId: String?
   var messageSequence: Int // 消息序列, 回复同一条sourceId时自增, 从1开始
 
   suspend fun sendMessage(message: String): MessageReceipt = sendMessage(PlainText(message))
@@ -128,11 +129,12 @@ interface UserCommandSender : CommandSender {
 class FriendUserCommandSender internal constructor(
   override val user: FriendUser,
   override val sourceId: String,
+  override val eventId: String? = null
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("FriendUserCommandSender") {
   override val subject get() = user
   override var messageSequence: Int = 1
   override suspend fun sendMessage(message: Message) =
-    user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
+    user.sendMessage(message.toMessageChain(sourceId, eventId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -141,12 +143,13 @@ class FriendUserCommandSender internal constructor(
 class GroupCommandSender internal constructor(
   override val user: GroupMember,
   override val sourceId: String,
+  override val eventId: String? = null
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GroupCommandSender") {
   override val subject get() = user.group
   val group get() = user.group
   override var messageSequence: Int = 1
   override suspend fun sendMessage(message: Message) =
-    subject.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
+    subject.sendMessage(message.toMessageChain(sourceId, eventId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -155,13 +158,14 @@ class GroupCommandSender internal constructor(
 class GuildChannelCommandSender internal constructor(
   override val user: GuildChannelMember,
   override val sourceId: String,
+  override val eventId: String? = null
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildChannelCommandSender") {
   override val subject get() = user.channel
   val channel get() = user.channel
   val guild get() = user.guild
   override var messageSequence: Int = 1
   override suspend fun sendMessage(message: Message) =
-    subject.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
+    subject.sendMessage(message.toMessageChain(sourceId, eventId), messageSequence).also { messageSequence++ }
 }
 
 /**
@@ -170,12 +174,13 @@ class GuildChannelCommandSender internal constructor(
 class GuildUserCommandSender internal constructor(
   override val user: GuildMember,
   override val sourceId: String,
+  override val eventId: String? = null
 ) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildUserCommandSender") {
   override val subject get() = user.guild
   val guild get() = user.guild
   override var messageSequence: Int = 1
   override suspend fun sendMessage(message: Message) =
-    user.sendMessage(message.toMessageChain(sourceId), messageSequence).also { messageSequence++ }
+    user.sendMessage(message.toMessageChain(sourceId, eventId), messageSequence).also { messageSequence++ }
 }
 
 object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
@@ -184,6 +189,7 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val subject: Contact? = null
   override val user: User? = null
   override val sourceId: String = EmptyMessageId
+  override val eventId: String? = null
 
   override var messageSequence: Int = 1
   override suspend fun sendMessage(message: Message): MessageReceipt {

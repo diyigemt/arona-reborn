@@ -7,7 +7,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.arona.Arona"
-version = "1.0.8"
+version = "1.0.9"
 dependencies {
   compileOnly(project(":arona-core"))
 
@@ -15,7 +15,8 @@ dependencies {
   implementation("io.ktor:ktor-client-core")
   implementation("io.ktor:ktor-client-content-negotiation")
   implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
-
+  implementation("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.7.9")
+  implementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.7.9")
   testImplementation(kotlin("test"))
 }
 

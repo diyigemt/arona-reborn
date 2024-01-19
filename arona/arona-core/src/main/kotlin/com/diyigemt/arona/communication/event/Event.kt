@@ -19,7 +19,7 @@ internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHand
   override val type = TencentWebsocketEventType.READY
   override val decoder = TencentWebsocketIdentifyResp.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketIdentifyResp) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketIdentifyResp, eventId: String) {
     logger.info("websocket receive hello from server")
     sessionId = payload.sessionId
     TencentBotWebsocketAuthSuccessEvent(bot, payload).broadcast()
@@ -31,13 +31,13 @@ internal object TencentWebsocketMessageCreateHandler :
   override val type = TencentWebsocketEventType.MESSAGE_CREATE
   override val decoder = TencentChannelMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw, eventId: String) {
     val guild = bot.guilds.getOrCreate(payload.guildId)
     val tmp = GuildChannelMemberImpl(
       guild.channels.getOrCreate(payload.channelId),
       guild.members.getOrCreate(payload.author.id)
     )
-    TencentGuildMessageEvent(payload.toMessageChain(), tmp).broadcast()
+    TencentGuildMessageEvent(payload.toMessageChain(), eventId, tmp).broadcast()
   }
 }
 
@@ -49,7 +49,7 @@ internal object TencentWebsocketAtMessageCreateHandler :
   override val type = TencentWebsocketEventType.AT_MESSAGE_CREATE
   override val decoder = TencentChannelMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw, eventId: String) {
     val guild = bot.guilds.getOrCreate(payload.guildId)
     val tmp = GuildChannelMemberImpl(
       guild.channels.getOrCreate(payload.channelId),
@@ -57,6 +57,7 @@ internal object TencentWebsocketAtMessageCreateHandler :
     )
     TencentGuildMessageEvent(
       payload.toMessageChain(),
+      eventId,
       tmp
     ).broadcast()
   }
@@ -68,7 +69,7 @@ internal object TencentWebsocketDirectMessageCreateHandler :
   override val type = TencentWebsocketEventType.DIRECT_MESSAGE_CREATE
   override val decoder = TencentChannelMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw, eventId: String) {
     val memberId = payload.author.id
     val guildId = payload.guildId
     val guild = bot.guilds.getOrCreate(guildId)
@@ -82,6 +83,7 @@ internal object TencentWebsocketDirectMessageCreateHandler :
     )
     TencentGuildPrivateMessageEvent(
       payload.toMessageChain(),
+      eventId,
       tmp
     ).broadcast()
   }
@@ -92,9 +94,9 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
   override val type = TencentWebsocketEventType.GROUP_AT_MESSAGE_CREATE
   override val decoder = TencentGroupMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGroupMessageRaw) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGroupMessageRaw, eventId: String) {
     val member = bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
-    TencentGroupMessageEvent(payload.toMessageChain(), member).broadcast()
+    TencentGroupMessageEvent(payload.toMessageChain(), eventId, member).broadcast()
   }
 }
 
@@ -103,10 +105,10 @@ internal object TencentWebsocketGuildCreateHandler :
   override val type = TencentWebsocketEventType.GUILD_CREATE
   override val decoder = TencentGuildRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildRaw) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildRaw, eventId: String) {
     val guild = bot.guilds.getOrCreate(payload.id)
     val member = guild.members.getOrCreate(payload.opUserId)
-    TencentGuildAddEvent(member).broadcast()
+    TencentGuildAddEvent(member, eventId).broadcast()
   }
 }
 
@@ -115,10 +117,10 @@ internal object TencentWebsocketGroupAddBotHandler :
   override val type = TencentWebsocketEventType.GROUP_ADD_ROBOT
   override val decoder = TencentBotGroupEventRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotGroupEventRaw) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotGroupEventRaw, eventId: String) {
     val group = bot.groups.getOrCreate(payload.id)
     val member = group.members.getOrCreate(payload.opMemberId)
-    TencentGroupAddEvent(member).broadcast()
+    TencentGroupAddEvent(member, eventId).broadcast()
   }
 }
 
@@ -127,16 +129,16 @@ internal object TencentWebsocketFriendAddBotHandler :
   override val type = TencentWebsocketEventType.FRIEND_ADD
   override val decoder = TencentBotFriendEventRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotFriendEventRaw) {
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotFriendEventRaw, eventId: String) {
     val friend = bot.friends.getOrCreate(payload.id)
-    TencentFriendAddEvent(friend).broadcast()
+    TencentFriendAddEvent(friend, eventId).broadcast()
   }
 }
 
 internal abstract class TencentWebsocketDispatchEventHandler<T> {
   abstract val type: TencentWebsocketEventType
   abstract val decoder: KSerializer<T>
-  abstract suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: T)
+  abstract suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: T, eventId: String = "")
 }
 
 internal object TencentWebsocketDispatchEventManager {
@@ -153,7 +155,7 @@ internal object TencentWebsocketDispatchEventManager {
     runCatching {
       json.decodeFromString(TencentWebsocketPayload.serializer(handler.decoder), source)
     }.onSuccess {
-      handler::class.declaredFunctions.firstOrNull()?.callSuspend(handler, this, it.data)
+      handler::class.declaredFunctions.firstOrNull()?.callSuspend(handler, this, it.data, it.id ?: "")
     }.onFailure {
       logger.error(it)
       logger.error("decode dispatch event failed event: {}, data: {}", event, source)
@@ -172,6 +174,7 @@ suspend fun <E : Event> E.broadcast(): E {
 
 abstract class TencentEvent : AbstractEvent() {
   abstract val bot: TencentBot
+  abstract val eventId: String
   val logger get() = bot.logger
 }
 
@@ -182,25 +185,37 @@ interface TencentBotEvent : Event {
 internal data class TencentBotAuthSuccessEvent(
   override val bot: TencentBot,
   val payload: TencentBotAuthEndpointResp,
-) : TencentBotEvent, TencentEvent()
+) : TencentBotEvent, TencentEvent() {
+  override val eventId: String = ""
+}
 
 internal data class TencentBotWebsocketHandshakeSuccessEvent(
   override val bot: TencentBot,
-) : TencentBotEvent, TencentEvent()
+) : TencentBotEvent, TencentEvent() {
+  override val eventId: String = ""
+}
 
 internal data class TencentBotWebsocketConnectionLostEvent(
   override val bot: TencentBot,
-) : TencentBotEvent, TencentEvent()
+) : TencentBotEvent, TencentEvent() {
+  override val eventId: String = ""
+}
 
 internal data class TencentBotWebsocketConnectionResumeEvent(
   override val bot: TencentBot,
-) : TencentBotEvent, TencentEvent()
+) : TencentBotEvent, TencentEvent() {
+  override val eventId: String = ""
+}
 
 internal data class TencentBotWebsocketAuthSuccessEvent(
   override val bot: TencentBot,
   val payload: TencentWebsocketIdentifyResp,
-) : TencentBotEvent, TencentEvent()
+) : TencentBotEvent, TencentEvent() {
+  override val eventId: String = ""
+}
 
 data class TencentBotOnlineEvent(
   override val bot: TencentBot,
-) : TencentBotEvent, TencentEvent()
+) : TencentBotEvent, TencentEvent() {
+  override val eventId: String = ""
+}

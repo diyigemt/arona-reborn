@@ -4,7 +4,7 @@
     <appender name="STDOUT" class="com.diyigemt.arona.console.CustomAppender">
         <withJansi>true</withJansi>
         <encoder>
-            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %logger{36} - %msg%n</pattern>
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %logger{72} - %msg%n</pattern>
         </encoder>
     </appender>
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -17,7 +17,7 @@
             <totalSizeCap>10GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{72} - %msg%n</pattern>
         </encoder>
     </appender>
     <root level="info">

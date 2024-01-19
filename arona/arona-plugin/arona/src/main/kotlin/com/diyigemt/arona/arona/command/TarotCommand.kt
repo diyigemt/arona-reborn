@@ -14,6 +14,7 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
+import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrNull
 import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.MessageReceipt
@@ -67,7 +68,7 @@ object TarotCommand : AbstractCommand(
 
   suspend fun UserCommandSender.tarot() {
     val tarotConfig = readPluginConfigOrDefault(Arona, default = TarotConfig())
-    val userTarotConfig = readUserPluginConfigOrDefault(Arona, default = TarotConfig())
+    val userTarotConfig = readUserPluginConfigOrNull(Arona) ?: contactDocument().readPluginConfigOrDefault(Arona, default = TarotConfig())
     val id = userDocument().id
     val today = currentLocalDateTime().date.dayOfMonth
     val record = dbQuery {
@@ -128,16 +129,19 @@ object TarotCommand : AbstractCommand(
     var resName = if (positive) "正位" else "逆位"
     val fileSuffix = if (positive) "up" else "down"
     var name = "${tarot.id.value}-${fileSuffix}" + if (type == TarotCardType.B) "-2" else ""
+    var cardName = tarot.name
     // 随机数
     val roll = randomInt(100)
     if (roll == 1) {
       resName = "正位"
       name = "23"
       res = "꒰ঌ(\uD83C\uDF80 ᗜ`˰´ᗜ \uD83C\uDF38)໒꒱\n"
+      cardName = "Azusa"
     } else if (roll == 2) {
       resName = "正位"
       name = "0"
       res = "草莓牛奶！"
+      cardName = "Arona"
     }
     val path = "/tarot/$name.png"
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
@@ -149,14 +153,14 @@ object TarotCommand : AbstractCommand(
         dbQuery { it.update(name, from) }
       }
       val mayFail = MessageChainBuilder()
-        .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
+        .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
         .append(im)
         .build().let { ch -> commandSender.sendMessage(ch) }
       if (mayFail == MessageReceipt.ErrorMessageReceipt) {
         commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also { image ->
           commandSender.sendMessage(
             MessageChainBuilder()
-              .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
+              .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
               .append(im)
               .build()
           )
@@ -165,7 +169,7 @@ object TarotCommand : AbstractCommand(
       }
     } else {
       MessageChainBuilder()
-        .append("看看${teacherName}抽到了什么:\n${tarot.name}(${resName})\n${res}")
+        .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
         .append(
           TencentGuildImage(
             url = "https://arona.cdn.diyigemt.com/image$path"

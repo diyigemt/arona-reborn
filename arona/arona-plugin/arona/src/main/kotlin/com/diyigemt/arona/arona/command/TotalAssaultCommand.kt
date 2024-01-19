@@ -49,7 +49,7 @@ object TotalAssaultCommand : AbstractCommand(
         return
       }
     }
-    if (config == null) {
+    if (config == null && server == null) {
       sendMessage("未配置默认服务器,发送日服数据,配置可随时在webui更改")
     }
     CommandManager.executeCommand(this, PlainText("/攻略 $name"))

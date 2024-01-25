@@ -20,18 +20,9 @@ object GachaCommand : AbstractCommand(
     GachaTool.generateGachaImage(
       GachaResult(
         "",
-        10,
+        11,
         listOf(
-          GachaResultItem("Student_Portrait_Serina.png", true),
-          GachaResultItem("Student_Portrait_Serina.png"),
-          GachaResultItem("Student_Portrait_Serina.png"),
-          GachaResultItem("Student_Portrait_Serina.png"),
-          GachaResultItem("Student_Portrait_Serina.png"),
-          GachaResultItem("Student_Portrait_Serina.png"),
-          GachaResultItem("Student_Portrait_Serina.png"),
-          GachaResultItem("Student_Portrait_Serina.png"),
-          GachaResultItem("Student_Portrait_Momoi.png", true, rarity = StudentRarity.SR),
-          GachaResultItem("Student_Portrait_Seia.png", isNew = true, isPickup = true, StudentRarity.SSR),
+          GachaResultItem("Student_Portrait_CH0230.png", isNew = true, isPickup = true, rarity = StudentRarity.SSR),
         )
       )
     ).also {

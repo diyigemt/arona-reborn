@@ -113,7 +113,7 @@ object GachaTool {
         alpha = 120
       })
       it.canvas.resetMatrix()
-      it.canvas.drawString("確認", (360 - boldFont.measureTextWidthEx("確認")) / 2 + 18, 80f, boldFont, Paint().apply {
+      it.canvas.drawString("OK", (360 - boldFont.measureTextWidthEx("OK")) / 2 + 18, 80f, boldFont, Paint().apply {
         color = Color.makeARGB(255, 43, 70, 120)
       })
     }
@@ -151,8 +151,8 @@ object GachaTool {
       })
       it.canvas.resetMatrix()
       // 点数
-      it.canvas.drawString("招募點數",
-        55f + (338 - normalFont.measureTextWidthEx("招募點數")) / 2,
+      it.canvas.drawString("呼び出しポインと",
+        55f + (338 - normalFont.measureTextWidthEx("呼び出しポインと")) / 2,
         (110 / 2f - 24f) / 2 + 22,
         normalFont,
         Paint().apply {
@@ -457,8 +457,6 @@ object GachaTool {
     })
     // new pickup
     canvas.resetMatrix()
-    canvas.drawImageRect(newIm, Rect(60f, 55f, 137f, 88.6f))
-    canvas.drawImageRect(pickUpIm, Rect(50f, 85f, 190.7f, 139.6f))
   }
 
   private fun Image.Companion.fromGachaPath(path: String) = makeFromEncoded(

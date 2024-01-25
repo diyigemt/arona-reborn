@@ -1,6 +1,10 @@
 package com.diyigemt.arona.arona.tools
 
 import com.diyigemt.arona.arona.Arona
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.arona.database.gacha.GachaPoolSchema
+import com.diyigemt.arona.arona.database.gacha.GachaPoolTable
+import com.diyigemt.arona.arona.database.student.StudentRarity
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -16,7 +20,7 @@ import kotlin.math.min
 
 data class GachaResultItem(
   val image: String, // 头像路径
-  val isNew: Boolean = false, // 是否new
+  var isNew: Boolean = false, // 是否new
   val isPickup: Boolean = false, // 是否pickup
   val rarity: StudentRarity = StudentRarity.R, // 学生稀有度
 )
@@ -25,32 +29,6 @@ data class GachaResult(
   val name: String, // 卡池名称
   val point: Int, // 累计点数
   val result: List<GachaResultItem>,
-)
-
-@Serializable(with = StudentRaritySerializer::class)
-enum class StudentRarity {
-  R,
-  SR,
-  SSR;
-
-  fun toInt() = list.indexOfFirst { it == this }
-
-  companion object {
-    private val list = entries.toList()
-    fun fromInt(i: Int) = list.getOrNull(i) ?: SSR
-  }
-}
-
-object StudentRaritySerializer : KSerializer<StudentRarity> {
-  override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("StudentRaritySerializer", PrimitiveKind.INT)
-  override fun deserialize(decoder: Decoder) = StudentRarity.fromInt(decoder.decodeInt())
-  override fun serialize(encoder: Encoder, value: StudentRarity) = encoder.encodeInt(value.toInt())
-}
-
-data class StudentSchema(
-  val id: Int,
-  val image: String,
-  val rarity: StudentRarity,
 )
 
 object GachaTool {
@@ -79,6 +57,11 @@ object GachaTool {
   private val ssrColor = Color4f.new(242, 194, 218)
   private val boldFont = Font(Typeface.makeFromFile(Arona.dataFolder("gacha", "font-bold.otf").toFile().path), 54f)
   private val normalFont = Font(Typeface.makeFromFile(Arona.dataFolder("gacha", "font-bold.otf").toFile().path), 32f)
+  val NormalPool by lazy { // 常驻池
+    dbQuery {
+      GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().toGachaPool()
+    }
+  }
   fun generateGachaImage(result: GachaResult): Surface {
     val surface = Surface.makeRasterN32Premul(2340, 1080)
     val canvas = surface.canvas

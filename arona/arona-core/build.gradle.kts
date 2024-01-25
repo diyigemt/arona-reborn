@@ -67,6 +67,7 @@ dependencies {
   api("org.jetbrains.exposed:exposed-dao:$exposedVersion")
   api("org.jetbrains.exposed:exposed-core:$exposedVersion")
   api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+  api("org.jetbrains.exposed:exposed-json:$exposedVersion")
 
   implementation("org.jline:jline:3.24.1")
   implementation("com.github.Towdium:PinIn:1.6.0")

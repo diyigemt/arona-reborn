@@ -11,6 +11,7 @@ import com.diyigemt.arona.database.permission.ContactRole.Companion.createBaseMe
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseContactAdminPolicy
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseMemberPolicy
 import com.diyigemt.arona.database.withCollection
+import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
 import com.mongodb.client.model.Filters
@@ -89,12 +90,16 @@ data class ContactMember(
   override val roles: List<String>, // 指向ContactDocument.roles.id
   override val config: Map<String, Map<String, String>> = mapOf(),
 ) : PluginContactMember() {
-  suspend fun updatePluginConfig(
-    cid: String,
+  override suspend fun updatePluginConfig(
     pluginId: String,
     key: String,
     value: String,
+    cid: String?,
   ) {
+    if (cid == null) {
+      commandLineLogger.warn("trigger contact member update config without cid, ignoring.")
+      return
+    }
     ContactDocument.withCollection<ContactDocument, UpdateResult> {
       updateOne(
         filter = Filters.and(
@@ -179,10 +184,11 @@ internal data class ContactDocument(
     return ContactDocumentUpdateException.Success()
   }
 
-  suspend fun updatePluginConfig(
+  override suspend fun updatePluginConfig(
     pluginId: String,
     key: String,
     value: String,
+    cid: String?
   ) {
     withCollection<ContactDocument, UpdateResult> {
       updateOne(

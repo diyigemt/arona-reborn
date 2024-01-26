@@ -1,4 +1,4 @@
-package com.diyigemt.arona.example
+package com.diyigemt.arona.maintain.notifier
 
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription

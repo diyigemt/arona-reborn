@@ -18,7 +18,7 @@ abstract class AbstractPluginData : PluginData, PluginDataImpl() {
    */
   abstract override val saveName: String
 
-  val valueNodes: MutableList<ValueNode<*>> = mutableListOf()
+  internal val valueNodes: MutableList<ValueNode<*>> = mutableListOf()
 
   open fun <T : SerializerAwareValue<*>> track(
     value: T,

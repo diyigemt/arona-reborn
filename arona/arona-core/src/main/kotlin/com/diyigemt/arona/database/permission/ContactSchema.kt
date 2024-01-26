@@ -94,12 +94,15 @@ data class ContactMember(
     pluginId: String,
     key: String,
     value: String,
-    cid: String?,
   ) {
-    if (cid == null) {
-      commandLineLogger.warn("trigger contact member update config without cid, ignoring.")
-      return
-    }
+    commandLineLogger.warn("trigger contact member update config without cid, ignoring.")
+  }
+  override suspend fun updatePluginConfig(
+    pluginId: String,
+    key: String,
+    value: String,
+    cid: String,
+  ) {
     ContactDocument.withCollection<ContactDocument, UpdateResult> {
       updateOne(
         filter = Filters.and(
@@ -188,7 +191,6 @@ internal data class ContactDocument(
     pluginId: String,
     key: String,
     value: String,
-    cid: String?
   ) {
     withCollection<ContactDocument, UpdateResult> {
       updateOne(
@@ -196,6 +198,15 @@ internal data class ContactDocument(
         update = Updates.set("${ContactDocument::config.name}.${pluginId.toMongodbKey()}.$key", value)
       )
     }
+  }
+
+  override suspend fun updatePluginConfig(
+    pluginId: String,
+    key: String,
+    value: String,
+    cid: String
+  ) {
+    updatePluginConfig(pluginId, key, value)
   }
 
   companion object : DocumentCompanionObject {

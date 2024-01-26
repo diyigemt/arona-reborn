@@ -103,7 +103,8 @@ abstract class PluginVisibleData {
     return config[pluginId.toMongodbKey()]?.get(key)
   }
 
-  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String, cid: String? = null)
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String, cid: String)
 }
 
 abstract class PluginUserDocument : PluginVisibleData() {
@@ -155,7 +156,6 @@ internal data class UserDocument(
     pluginId: String,
     key: String,
     value: String,
-    cid: String?
   ) {
     withCollection<UserDocument, UpdateResult> {
       updateOne(
@@ -163,6 +163,15 @@ internal data class UserDocument(
         update = Updates.set("${UserDocument::config.name}.${pluginId.toMongodbKey()}.$key", value)
       )
     }
+  }
+
+  override suspend fun updatePluginConfig(
+    pluginId: String,
+    key: String,
+    value: String,
+    cid: String
+  ) {
+    updatePluginConfig(pluginId, key, value)
   }
 
   companion object : DocumentCompanionObject {

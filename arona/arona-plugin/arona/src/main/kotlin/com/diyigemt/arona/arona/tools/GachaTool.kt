@@ -32,6 +32,9 @@ data class GachaResult(
 )
 
 object GachaTool {
+  val GachaResourcePath by lazy {
+    Arona.dataFolder("gacha")
+  }
   private val bg = Image.fromGachaPath("Gacha_BG_R.png")
   private val star = Image.fromGachaPath("Common_Icon_Formation_Star.png")
   private val bgTriangle = Image.fromGachaPath("UITex_BGPoliLight_3.png")
@@ -61,6 +64,15 @@ object GachaTool {
     dbQuery {
       GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().toGachaPool()
     }
+  }
+  val NormalSSRStudent by lazy {
+    NormalPool.students.filter { it.rarity == StudentRarity.SSR }
+  }
+  val NormalSRStudent by lazy {
+    NormalPool.students.filter { it.rarity == StudentRarity.SR }
+  }
+  val NormalRStudent by lazy {
+    NormalPool.students.filter { it.rarity == StudentRarity.R }
   }
   fun generateGachaImage(result: GachaResult): Surface {
     val surface = Surface.makeRasterN32Premul(2340, 1080)
@@ -443,7 +455,7 @@ object GachaTool {
   }
 
   private fun Image.Companion.fromGachaPath(path: String) = makeFromEncoded(
-    Files.readAllBytes(Arona.dataFolderPath.resolve("gacha").resolve(path))
+    Files.readAllBytes(GachaResourcePath.resolve(path))
   )
 
   private fun Color4f.Companion.new(r: Int, g: Int, b: Int, a: Int = 255): Color4f = Color4f(
@@ -524,4 +536,5 @@ object GachaTool {
     val react = measureText(text, paint)
     return react.width
   }
+
 }

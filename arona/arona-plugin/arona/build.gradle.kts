@@ -17,6 +17,7 @@ dependencies {
   implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
   implementation("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.7.9")
   implementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.7.9")
+  implementation("net.coobird:thumbnailator:0.4.20")
   testImplementation(kotlin("test"))
 }
 

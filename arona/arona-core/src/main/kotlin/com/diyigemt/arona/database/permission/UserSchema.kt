@@ -74,6 +74,9 @@ abstract class PluginVisibleData {
   inline fun <reified T : Any> readPluginConfig(plugin: CommandOwner, key: String = T::class.name) =
     readPluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
 
+  suspend inline fun <reified T : Any> updatePluginConfig(plugin: CommandOwner, value: T, key: String = T::class.name) =
+    updatePluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, JsonIgnoreUnknownKeys.encodeToString(value))
+
   fun <T> readPluginConfigOrNull(pluginId: String, key: String, serializer: KSerializer<T>): T? {
     return config[pluginId.toMongodbKey()]?.get(key)?.let {
       JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
@@ -99,6 +102,9 @@ abstract class PluginVisibleData {
   fun readPluginConfigStringOrNull(pluginId: String, key: String): String? {
     return config[pluginId.toMongodbKey()]?.get(key)
   }
+
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String, cid: String)
 }
 
 abstract class PluginUserDocument : PluginVisibleData() {
@@ -146,7 +152,7 @@ internal data class UserDocument(
     }
   }
 
-  suspend fun updatePluginConfig(
+  override suspend fun updatePluginConfig(
     pluginId: String,
     key: String,
     value: String,
@@ -157,6 +163,15 @@ internal data class UserDocument(
         update = Updates.set("${UserDocument::config.name}.${pluginId.toMongodbKey()}.$key", value)
       )
     }
+  }
+
+  override suspend fun updatePluginConfig(
+    pluginId: String,
+    key: String,
+    value: String,
+    cid: String
+  ) {
+    updatePluginConfig(pluginId, key, value)
   }
 
   companion object : DocumentCompanionObject {

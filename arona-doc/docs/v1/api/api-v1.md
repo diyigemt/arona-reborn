@@ -2,8 +2,7 @@
 
 该api最初是作为[arona bot](https://github.com/diyigemt/arona)的服务而开发出来的，现在由于tx疯狂打压mirai系bot的生存空间，看不到活着的希望，于是决定公开，希望能帮助到其他类型的bot
 
-具体效果可以看站里的[功能介绍](/v1/command/manual#%E5%AD%A6%E7%94%9F%E4%B8%8E%E4%B8%BB%E7%BA%BF%E5%9C%B0%E5%9B%BE%E6%94%BB%E7%95%A5
-%E7%B3%BB%E5%88%97)
+具体效果可以看站里的[功能介绍](https://doc.arona.diyigemt.com/v1/command/manual#%E5%AD%A6%E7%94%9F%E4%B8%8E%E4%B8%BB%E7%BA%BF%E5%9C%B0%E5%9B%BE%E6%94%BB%E7%95%A5%E7%B3%BB%E5%88%97)
 
 ## 前言
 

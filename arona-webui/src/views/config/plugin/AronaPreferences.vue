@@ -65,7 +65,7 @@
                 </div>
               </template>
             </ElTableColumn>
-            <ElTableColumn prop="type" label="类型" width="80">
+            <ElTableColumn prop="type" label="类型" width="100">
               <template #default="{ row }">
                 <div v-if="row.edit">
                   <ElSelect v-model="row.type">
@@ -149,6 +149,18 @@
         </ElFormItem>
       </PluginPreferenceForm>
     </ElTabPane>
+    <ElTabPane name="gacha" label="抽卡">
+      <PluginPreferenceForm
+        v-model:form="contactGachaConfig"
+        :default-form="defaultGachaConfig"
+        p-id="com·diyigemt·arona"
+        p-key="ContactGachaConfig"
+      >
+        <ElFormItem label="群每人日抽卡点数上限" prop="defaultTotalAssault">
+          <ElInputNumber v-model="contactGachaConfig.limit" :step="10" :min="0"></ElInputNumber>
+        </ElFormItem>
+      </PluginPreferenceForm>
+    </ElTabPane>
   </ElTabs>
 </template>
 
@@ -172,7 +184,9 @@ interface TarotConfig {
   fxxkDestiny: boolean;
   cardType: "A" | "B";
 }
-
+interface ContactGachaConfig {
+  limit: number;
+}
 interface TrainerConfig {
   override: {
     id: string;
@@ -190,7 +204,7 @@ interface BaseConfig {
   markdown: MarkdownCompatiblyConfig;
 }
 
-const tab = ref<"base" | "trainer" | "tarot" | "totalAssault">("base");
+const tab = ref<"base" | "trainer" | "tarot" | "totalAssault" | "gacha">("base");
 const defaultBaseConfig: BaseConfig = {
   markdown: {
     enable: false,
@@ -198,6 +212,9 @@ const defaultBaseConfig: BaseConfig = {
 };
 const defaultTrainerConfig: TrainerConfig = {
   override: [],
+};
+const defaultGachaConfig: ContactGachaConfig = {
+  limit: 0,
 };
 const defaultTarotConfig: TarotConfig = {
   dayOne: true,
@@ -212,6 +229,7 @@ const baseConfig = ref<BaseConfig>(defaultBaseConfig);
 const trainerConfig = ref<TrainerConfig>(defaultTrainerConfig);
 const tarotConfig = ref<TarotConfig>(defaultTarotConfig);
 const totalAssaultConfig = ref<TotalAssaultConfig>(defaultTotalAssaultConfig);
+const contactGachaConfig = ref<ContactGachaConfig>(defaultGachaConfig);
 const markdownConfig = computed({
   get() {
     return baseConfig.value.markdown;

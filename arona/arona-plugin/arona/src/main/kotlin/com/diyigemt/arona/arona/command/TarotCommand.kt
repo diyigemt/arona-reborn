@@ -87,7 +87,7 @@ object TarotCommand : AbstractCommand(
     if (tarotConfig.fxxkDestiny && (tarotIndex - 1 !in PositiveMap || PositiveMap[tarotIndex - 1] != positive)) {
       val rate = (record?.negativeCount ?: 0) + 1
       // 改命
-      if (randomInt(101) >= 50 + 5 * rate) {
+      if (randomInt(101) >= 55 - 5 * rate) {
         val t = PositiveMap.keys.toList()[randomInt(PositiveMap.size)]
         tarotIndex = t
         positive = PositiveMap[t] ?: true

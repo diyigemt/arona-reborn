@@ -85,12 +85,12 @@ object GachaCommand : AbstractCommand(
     val userRecord = userRecordMap.getOrDefault(pickupPoolId, ContactGachaLimitItem())
     val today = currentLocalDateTime().date.dayOfMonth
 
-    if (pickupPoolId != 1 && contactConfig.limit > 0 && today == userRecord.day && contactConfig.limit < userRecord.count) {
+    if (pickupPoolId != 1 && contactConfig.limit > 0 && today == userRecord.day && contactConfig.limit <= userRecord.count) {
       sendMessage("今日已在本群抽卡${userRecord.count}次, 超过本群设置的${contactConfig.limit}上限")
       return
     }
+    userRecord.count += if (today == userRecord.day) 10 else 10 - userRecord.count
     userRecord.day = today
-    userRecord.count += 10
     userRecordMap[pickupPoolId] = userRecord
     contactRecord.map[user.id] = userRecordMap
     updateContactPluginConfig(Arona, contactRecord)
@@ -186,7 +186,7 @@ object GachaCommand : AbstractCommand(
           )
         ).build().also { im -> sendMessage(im) }
     }
-    delay(5000)
+    delay(30000)
     randomFile.delete()
   }
 

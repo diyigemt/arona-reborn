@@ -65,6 +65,9 @@ object GachaTool {
       GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().toGachaPool()
     }
   }
+  var CurrentPickupPool = dbQuery {
+    GachaPoolSchema.find { GachaPoolTable.active eq true }.toList().firstOrNull()
+  }
   val NormalSSRStudent by lazy {
     NormalPool.students.filter { it.rarity == StudentRarity.SSR }
   }

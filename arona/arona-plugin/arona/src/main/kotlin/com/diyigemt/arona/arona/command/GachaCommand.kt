@@ -27,10 +27,14 @@ import com.diyigemt.arona.communication.message.TencentGuildImage
 import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.console.confirm
 import com.diyigemt.arona.utils.currentLocalDateTime
+import com.diyigemt.arona.utils.runSuspend
 import com.diyigemt.arona.utils.uuid
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.convert
+import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.mordant.terminal.ConversionResult
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
@@ -75,12 +79,36 @@ object GachaCommand : AbstractCommand(
   "十连",
   description = "抽一发十连"
 ) {
+  private val isHistory by argument(name = "历史", help = "查看历史记录").convert { input ->
+    input == "历史"
+  }.optional()
+
   suspend fun UserCommandSender.gacha() {
+    if (isHistory == true) {
+      val recordMap = readUserPluginConfigOrDefault(Arona, UserGachaRecord(mutableMapOf()))
+      val poolId = GachaTool.CurrentPickupPool?.id?.value ?: 1
+      val record = recordMap.map[poolId] ?: UserGachaRecordItem()
+      val poolName = GachaTool.CurrentPickupPool?.name ?: "常驻池"
+      if (record.point == 0) {
+        sendMessage("当前池子: $poolName\n无抽卡记录")
+      } else {
+        MessageChainBuilder()
+          .append("当前池子: $poolName")
+          .append("招募点数: ${record.point}")
+          .append("pickup: ${record.pickup}")
+          .append("出彩数: ${record.ssr}")
+          .append("出彩率: " + String.format("%.2f", record.ssr.toDouble() / record.point * 100) + "%")
+          .build().also {
+            sendMessage(it)
+          }
+      }
+      return
+    }
 
     val contactConfig = readPluginConfigOrDefault(Arona, ContactGachaConfig())
     val contactRecord = readPluginConfigOrDefault(Arona, ContactGachaLimitRecord())
     val userRecordMap = contactRecord.map.getOrDefault(user.id, mutableMapOf())
-    val pickupPool = GachaPoolSchema.currentActivePool()
+    val pickupPool = GachaTool.CurrentPickupPool
     val pickupPoolId = pickupPool?.id?.value ?: 1
     val userRecord = userRecordMap.getOrDefault(pickupPoolId, ContactGachaLimitItem())
     val today = currentLocalDateTime().date.dayOfMonth
@@ -137,7 +165,12 @@ object GachaCommand : AbstractCommand(
     // 保底
     if (result.all { it.rarity == StudentRarity.R }) {
       (NormalSRStudent + pickupSRStudentList).random().also {
-        result[9] = GachaResultItem(it.headFileName, isNew = false, isPickup = pickupList.contains(it.id.value), rarity = it.rarity)
+        result[9] = GachaResultItem(
+          it.headFileName,
+          isNew = false,
+          isPickup = pickupList.contains(it.id.value),
+          rarity = it.rarity
+        )
       }
     }
 
@@ -168,7 +201,7 @@ object GachaCommand : AbstractCommand(
           Thumbnails
             .of(input)
             .scale(1.0)
-            .outputQuality(0.8)
+            .outputQuality(0.5)
             .outputFormat("jpg")
             .toFile(randomFile)
         }
@@ -186,8 +219,10 @@ object GachaCommand : AbstractCommand(
           )
         ).build().also { im -> sendMessage(im) }
     }
-    delay(30000)
-    randomFile.delete()
+    runSuspend {
+      delay(30000)
+      randomFile.delete()
+    }
   }
 
 }

@@ -4,6 +4,7 @@ import com.diyigemt.arona.arona.database.Database
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.arona.database.student.StudentTable
+import com.diyigemt.arona.arona.tools.GachaTool
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -38,6 +39,7 @@ class GachaPoolSchema(id: EntityID<Int>) : IntEntity(id) {
           it[active] = false
         }
         p.active = true
+        GachaTool.CurrentPickupPool = p
         true
       }
     }

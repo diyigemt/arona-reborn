@@ -14,8 +14,6 @@ import com.github.ajalt.clikt.core.terminal
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 
-var active = false
-
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
     id = "com.diyigemt.arona.maintain.notifier",
@@ -27,18 +25,16 @@ object PluginMain : AronaPlugin(
 ) {
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
-      if (active) {
-        MessageChainBuilder(it.message.sourceId)
-          .append("Arona正在维护中.")
-          .append("原因: ${NotifyConfig.reason}")
-          .append("起始时间: ${NotifyConfig.start}")
-          .append("结束时间: ${NotifyConfig.end}")
-          .append("更新日志: ${NotifyConfig.doc}")
-          .build()
-          .also { m ->
-            subject.sendMessage(m)
-          }
-      }
+      MessageChainBuilder(it.message.sourceId)
+        .append("Arona正在维护中.")
+        .append("原因: ${NotifyConfig.reason}")
+        .append("起始时间: ${NotifyConfig.start}")
+        .append("结束时间: ${NotifyConfig.end}")
+        .append("更新日志: ${NotifyConfig.doc}")
+        .build()
+        .also { m ->
+          subject.sendMessage(m)
+        }
     }
   }
 }
@@ -64,6 +60,5 @@ class UpdateUpdateConsoleCommand : CommandLineSubCommand, CliktCommand(name = "m
     NotifyConfig.end = end.takeIf { it.split(":").size == 3 } ?: "$end:00"
     NotifyConfig.reason = reason
     NotifyConfig.doc = doc
-    active = true
   }
 }

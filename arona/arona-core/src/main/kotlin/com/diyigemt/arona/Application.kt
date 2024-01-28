@@ -16,6 +16,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object AronaApplication : CoroutineScope {
   fun run() {
+    System.getProperty("java.awt.headless", "true")
     BuiltInCommands.registerAll()
     BuiltInCommands.registerListeners()
     runSuspend {

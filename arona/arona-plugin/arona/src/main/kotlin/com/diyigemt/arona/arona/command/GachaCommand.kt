@@ -142,7 +142,7 @@ object GachaCommand : AbstractCommand(
 
         in sRate until sRate + srRate -> {
           if (it > (sRate + srRate) - 30 * pickupSRStudentList.size) {
-            NormalSRStudent.takeIf { pickupSRStudentList.isNotEmpty() } ?: pickupSRStudentList
+            NormalSRStudent.takeIf { pickupSRStudentList.isEmpty() } ?: pickupSRStudentList
           } else {
             NormalSRStudent
           }
@@ -150,7 +150,7 @@ object GachaCommand : AbstractCommand(
 
         else -> {
           if (it > 1000 - 7 * pickupSSRStudentList.size) {
-            NormalSSRStudent.takeIf { pickupSSRStudentList.isNotEmpty() } ?: pickupSSRStudentList
+            NormalSSRStudent.takeIf { pickupSSRStudentList.isEmpty() } ?: pickupSSRStudentList
           } else {
             NormalSSRStudent
           }

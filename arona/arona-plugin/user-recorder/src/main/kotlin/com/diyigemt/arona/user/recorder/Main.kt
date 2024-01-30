@@ -13,9 +13,8 @@ import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
 import com.github.ajalt.clikt.core.CliktCommand
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
-import java.util.Timer
+import java.util.*
 import kotlin.concurrent.scheduleAtFixedRate
-import kotlin.system.exitProcess
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
@@ -29,11 +28,28 @@ object PluginMain : AronaPlugin(
   private val timer = Timer("user-recorder", true)
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
+      // 统计消息数
+      dbQuery {
+        val today = currentDate()
+        when (val record = DailyActiveUser.findById(today)) {
+          is DailyActiveUser -> {
+            record.message += 1
+          }
+
+          else -> {
+            DailyActiveUser.new(today) {
+              message = 1
+            }
+          }
+        }
+      }
+      // 统计contact
       dbQuery {
         when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
           is Contact -> {
             contact.lastActive = currentDateTime()
           }
+
           else -> {
             Contact.new(it.subject.id) {
               type = when (it) {
@@ -46,12 +62,14 @@ object PluginMain : AronaPlugin(
           }
         }
       }
+      // 统计user
       dbQuery {
         when (val user = User.find { UserTable.id eq sender.id }.firstOrNull()) {
           is User -> {
             user.actionCount
             user.lastActive = currentDateTime()
           }
+
           else -> {
             User.new(
               id = sender.id
@@ -65,6 +83,7 @@ object PluginMain : AronaPlugin(
         messageString.split(" ").toMutableList().removeFirstOrNull() ?: return@subscribeAlways
       val command =
         CommandManager.matchCommand(commandStr.replace("/", "")) as? AbstractCommand ?: return@subscribeAlways
+      // 统计command
       dbQuery {
         when (val fCommand = Command.find { CommandTable.name eq command.primaryName }.firstOrNull()) {
           is Command -> fCommand.count++
@@ -82,7 +101,7 @@ object PluginMain : AronaPlugin(
         is com.diyigemt.arona.communication.contact.User -> {
           dbQuery {
             when (User.find { UserTable.id eq subject.id }.firstOrNull()) {
-              is User -> { }
+              is User -> {}
               else -> {
                 User.new(
                   id = subject.id
@@ -95,11 +114,12 @@ object PluginMain : AronaPlugin(
       dbQuery {
         when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
           is Contact -> {
-            contact.active = when(it) {
+            contact.active = when (it) {
               is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> true
               else -> false
             }
           }
+
           else -> {
             Contact.new(it.subject.id) {
               type = when (it) {
@@ -114,13 +134,15 @@ object PluginMain : AronaPlugin(
       }
     }
     timer.scheduleAtFixedRate(0L, 10 * 60 * 1000L) {
+      // 统计dau
       dbQuery {
         val today = currentDate()
-        val c = User.find( UserTable.lastActive greater today ).count().toInt()
+        val c = User.find(UserTable.lastActive greater today).count().toInt()
         when (val record = DailyActiveUser.findById(today)) {
           is DailyActiveUser -> {
             record.count = c
           }
+
           else -> {
             DailyActiveUser.new(today) {
               count = c
@@ -135,11 +157,20 @@ object PluginMain : AronaPlugin(
 @Suppress("unused")
 class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显示当日dau") {
   override fun run() {
+    // dau
     dbQuery {
       val contactCount = Contact.count()
       val userCount = User.count()
-      val dau = DailyActiveUser.findById(currentDate())?.count
-      echo("contact: $contactCount, user: $userCount, dau: $dau")
+      val dau = DailyActiveUser.findById(currentDate())
+      echo("contact: $contactCount, user: $userCount, $dau")
+    }
+    // 指令执行次数
+    dbQuery {
+      Command.all()
+        .sortedBy { it.count }
+        .forEach {
+          echo("${it.name}: ${it.count}")
+        }
     }
   }
 }

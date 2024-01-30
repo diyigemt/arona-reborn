@@ -21,9 +21,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender.Companion.read
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.updateContactPluginConfig
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.updateUserPluginConfig
-import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.MessageChainBuilder
-import com.diyigemt.arona.communication.message.TencentGuildImage
 import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.console.confirm
 import com.diyigemt.arona.utils.currentLocalDateTime
@@ -207,17 +205,8 @@ object GachaCommand : AbstractCommand(
         }
       }
     }
-    if (isGroupOrPrivate()) {
-      subject.uploadImage("https://arona.diyigemt.com/image/gacha_result/$randomFileName").also {
-        sendMessage(it)
-      }
-    } else {
-      MessageChainBuilder()
-        .append(
-          TencentGuildImage(
-            url = "https://arona.diyigemt.com/image/gacha_result/$randomFileName"
-          )
-        ).build().also { im -> sendMessage(im) }
+    subject.uploadImage("https://arona.diyigemt.com/image/gacha_result/$randomFileName").also {
+      sendMessage(it)
     }
     runSuspend {
       delay(30000)

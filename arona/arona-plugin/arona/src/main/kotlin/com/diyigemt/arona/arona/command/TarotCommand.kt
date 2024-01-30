@@ -13,12 +13,9 @@ import com.diyigemt.arona.arona.tools.randomInt
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
-import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrNull
-import com.diyigemt.arona.communication.command.isGroupOrPrivate
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.MessageReceipt
-import com.diyigemt.arona.communication.message.TencentGuildImage
 import com.diyigemt.arona.utils.currentLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlin.math.max
@@ -68,7 +65,8 @@ object TarotCommand : AbstractCommand(
 
   suspend fun UserCommandSender.tarot() {
     val tarotConfig = readPluginConfigOrDefault(Arona, default = TarotConfig())
-    val userTarotConfig = readUserPluginConfigOrNull(Arona) ?: contactDocument().readPluginConfigOrDefault(Arona, default = TarotConfig())
+    val userTarotConfig =
+      readUserPluginConfigOrNull(Arona) ?: contactDocument().readPluginConfigOrDefault(Arona, default = TarotConfig())
     val id = userDocument().id
     val today = currentLocalDateTime().date.dayOfMonth
     val record = dbQuery {
@@ -146,35 +144,26 @@ object TarotCommand : AbstractCommand(
     val path = "/tarot/$name.png"
     val teacherName = queryTeacherNameFromDB(commandSender.user.id)
     val from = commandSender.contactType()
-    if (commandSender.isGroupOrPrivate()) {
-      val im = dbQuery {
-        findImage(name, from)
-      } ?: commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also {
-        dbQuery { it.update(name, from) }
+    val url = "https://arona.cdn.diyigemt.com/image$path"
+    val im = dbQuery {
+      findImage(name, from)
+    } ?: commandSender.subject.uploadImage(url).also {
+      dbQuery { it.update(name, from) }
+    }
+    val mayFail = MessageChainBuilder()
+      .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
+      .append(im)
+      .build().let { ch -> commandSender.sendMessage(ch) }
+    if (mayFail == MessageReceipt.ErrorMessageReceipt) {
+      commandSender.subject.uploadImage(url).also { image ->
+        commandSender.sendMessage(
+          MessageChainBuilder()
+            .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
+            .append(im)
+            .build()
+        )
+        dbQuery { image.update(name, from) }
       }
-      val mayFail = MessageChainBuilder()
-        .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
-        .append(im)
-        .build().let { ch -> commandSender.sendMessage(ch) }
-      if (mayFail == MessageReceipt.ErrorMessageReceipt) {
-        commandSender.subject.uploadImage("https://arona.cdn.diyigemt.com/image$path").also { image ->
-          commandSender.sendMessage(
-            MessageChainBuilder()
-              .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
-              .append(im)
-              .build()
-          )
-          dbQuery { image.update(name, from) }
-        }
-      }
-    } else {
-      MessageChainBuilder()
-        .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
-        .append(
-          TencentGuildImage(
-            url = "https://arona.cdn.diyigemt.com/image$path"
-          )
-        ).build().also { ch -> commandSender.sendMessage(ch) }
     }
   }
 }

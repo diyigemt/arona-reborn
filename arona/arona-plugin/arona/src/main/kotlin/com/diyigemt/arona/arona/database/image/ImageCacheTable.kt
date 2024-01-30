@@ -3,6 +3,7 @@ package com.diyigemt.arona.arona.database.image
 import com.diyigemt.arona.arona.database.Database
 import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.communication.command.isGroup
+import com.diyigemt.arona.communication.command.isPrivate
 import com.diyigemt.arona.communication.message.TencentImage
 import com.diyigemt.arona.communication.message.TencentOfflineImage
 import com.diyigemt.arona.utils.currentDateTime
@@ -20,10 +21,16 @@ import org.jetbrains.exposed.sql.and
 
 enum class ImageCacheContactType {
   Private,
-  Group
+  Group,
+  Guild
 }
 
-fun CommandSender.contactType() = if (isGroup()) ImageCacheContactType.Group else ImageCacheContactType.Private
+fun CommandSender.contactType() =
+  when {
+    isGroup() -> ImageCacheContactType.Group
+    isPrivate() -> ImageCacheContactType.Private
+    else -> ImageCacheContactType.Guild
+  }
 
 @Database
 object ImageCacheTable : IntIdTable(name = "ImageCache") {
@@ -36,11 +43,14 @@ object ImageCacheTable : IntIdTable(name = "ImageCache") {
 class ImageCacheSchema(id: EntityID<Int>) : IntEntity(id) {
   companion object : IntEntityClass<ImageCacheSchema>(ImageCacheTable) {
     fun findImage(hash: String, from: ImageCacheContactType = ImageCacheContactType.Group) =
-      ImageCacheSchema.find {
-        (ImageCacheTable.hash eq hash) and
-            (ImageCacheTable.expired greater currentDateTime()) and
-            (ImageCacheTable.from eq from)
-      }.firstOrNull()?.toTencentImage()
+      when (from) {
+        ImageCacheContactType.Guild -> null
+        else -> ImageCacheSchema.find {
+          (ImageCacheTable.hash eq hash) and
+              (ImageCacheTable.expired greater currentDateTime()) and
+              (ImageCacheTable.from eq from)
+        }.firstOrNull()?.toTencentImage()
+      }
   }
 
   var hash by ImageCacheTable.hash
@@ -56,6 +66,7 @@ class ImageCacheSchema(id: EntityID<Int>) : IntEntity(id) {
 }
 
 fun TencentImage.update(hash: String, from: ImageCacheContactType = ImageCacheContactType.Group) {
+  if (from == ImageCacheContactType.Guild) return
   val expired = now().let {
     if (this@update.ttl == 0L) {
       it.plus(DateTimePeriod(years = 1), TimeZone.currentSystemDefault())

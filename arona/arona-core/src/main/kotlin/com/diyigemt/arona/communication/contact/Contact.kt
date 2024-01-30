@@ -48,13 +48,15 @@ interface Contact : CoroutineScope {
 
   companion object {
     internal suspend fun Contact.toContactDocumentOrNull(): ContactDocument? {
-      return when(this) {
+      return when (this) {
         is Group, is Guild -> {
           findContactDocumentByIdOrNull(id)
         }
+
         is Channel -> {
           findContactDocumentByIdOrNull(guild.id)
         }
+
         else -> null
       }
     }
@@ -87,10 +89,11 @@ internal abstract class AbstractContact(
       )
     }.getOrDefault(ErrorMessageReceipt) // TODO 异常处理
   }
+
   override suspend fun uploadImage(
-    url: String
+    url: String,
   ): TencentImage {
-    return when(this) {
+    return when (this) {
       is FriendUser -> {
         bot.callOpenapi(
           TencentEndpoint.PostSingleUserRichMessage,
@@ -108,6 +111,7 @@ internal abstract class AbstractContact(
           )
         }.getOrThrow().let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) }
       }
+
       is Group -> {
         bot.callOpenapi(
           TencentEndpoint.PostGroupRichMessage,
@@ -125,7 +129,8 @@ internal abstract class AbstractContact(
           )
         }.getOrThrow().let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) }
       }
-      else -> TencentOfflineImage("", "", 0L, url)
+
+      else -> TencentGuildImage(url)
     }
   }
 }
@@ -183,11 +188,6 @@ internal class GuildImpl(
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
     // 无法实现
     TODO()
-  }
-
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
-    TODO("Not yet implemented")
   }
 
   init {
@@ -255,11 +255,6 @@ internal class ChannelImpl(
   override val unionOpenid: String? = null
   override val members: ContactList<GuildChannelMember> =
     GuildChannelMemberContactList { EmptyGuildChannelMemberImpl(this, it) }
-
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
-    TODO("Not yet implemented")
-  }
 
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
     return callMessageOpenApi(
@@ -361,10 +356,6 @@ internal class GuildChannelMemberImpl(
   override val unionOpenid: String? = null
   override fun asGuildMember(): GuildMember = channel.guild.members[id]!!
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int) = asGuildMember().sendMessage(message)
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
-    TODO("Not yet implemented")
-  }
 }
 
 // 通过频道直接获取的频道成员
@@ -375,10 +366,6 @@ internal class GuildMemberImpl(
   override val unionOpenid: String? = null,
 ) : GuildMember, AbstractContact(guild.bot, guild.coroutineContext) {
   override val id get() = unionOpenid ?: internalGuildUser.user?.id ?: EmptyMessageId
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
-    TODO("Not yet implemented")
-  }
 
   // 私聊使用另一个接口, 而不是频道接口
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
@@ -404,11 +391,6 @@ internal class EmptyGuildMemberImpl(
   override val channel: Channel
     get() = guild.findOrCreateMemberPrivateChannel(id)
 
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
-    TODO("Not yet implemented")
-  }
-
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt = channel.sendMessage(
     message
   )
@@ -420,11 +402,6 @@ internal class EmptyGuildChannelMemberImpl(
 ) : GuildChannelMember, EmptyContact, AbstractContact(channel.bot, channel.coroutineContext) {
   override val guild: Guild = channel.guild
   override fun asGuildMember(): GuildMember = guild.members.getOrCreate(id)
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
-    TODO("Not yet implemented")
-  }
-
   override val unionOpenid = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt = channel.sendMessage(
     message
@@ -438,11 +415,6 @@ internal class EmptyChannelImpl(
   override val unionOpenid = EmptyMessageId
   override val members: ContactList<GuildChannelMember> =
     GuildChannelMemberContactList { EmptyGuildChannelMemberImpl(this, it) }
-
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
-    TODO("Not yet implemented")
-  }
 
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
     return callMessageOpenApi(
@@ -462,11 +434,6 @@ internal class EmptyGuildImpl(
   override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
   override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
   override val isPublic: Boolean = bot.isPublic
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
-    TODO("Not yet implemented")
-  }
-
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
     TODO("Not yet implemented")
   }
@@ -478,11 +445,6 @@ internal class EmptyGroupMemberImpl(
 ) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
-    TODO("Not yet implemented")
-  }
-
-  override suspend fun uploadImage(url: String): TencentImage {
-    // 无需
     TODO("Not yet implemented")
   }
 

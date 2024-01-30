@@ -11,15 +11,13 @@ import com.diyigemt.arona.arona.tools.NetworkTool
 import com.diyigemt.arona.arona.tools.ServerResponse
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextMessage
-import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
-import com.diyigemt.arona.communication.command.isGroupOrPrivate
+import com.diyigemt.arona.communication.command.isGuild
 import com.diyigemt.arona.communication.message.*
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -40,14 +38,16 @@ data class ImageQueryData(
 
 @Serializable
 data class TrainerConfig(
-  val override: List<TrainerOverrideConfig> = listOf()
+  val override: List<TrainerOverrideConfig> = listOf(),
 )
+
 object TrainerOverrideTypeSerializer : KSerializer<TrainerOverrideType> {
   // TODO
   override fun deserialize(decoder: Decoder): TrainerOverrideType {
     decoder.decodeString()
     return TrainerOverrideType.RAW
   }
+
   override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("TrainerOverrideType", PrimitiveKind.STRING)
   override fun serialize(encoder: Encoder, value: TrainerOverrideType) = encoder.encodeString(value.name)
 }
@@ -58,6 +58,7 @@ data class TrainerOverrideConfig(
   val name: List<String>,
   val value: String,
 )
+
 @Serializable(with = TrainerOverrideTypeSerializer::class)
 enum class TrainerOverrideType {
   RAW
@@ -78,41 +79,35 @@ object TrainerCommand : AbstractCommand(
     }.getOrThrow()
   }
 
-  private suspend fun CommandSender.sendImage(query: ImageQueryData) {
+  private suspend fun UserCommandSender.sendImage(query: ImageQueryData) {
     val from = contactType()
-    if (isGroupOrPrivate()) {
-      with(query) {
-        val im = dbQuery {
-          findImage(hash, from)
-        }
-        when (im) {
-          is TencentImage -> {
-            sendMessage(im).also {
-              if (it == MessageReceipt.ErrorMessageReceipt) {
-                subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also { image ->
-                  sendMessage(image)
-                  dbQuery { image.update(hash, from) }
-                }
+    with(query) {
+      val url = "https://arona.cdn.diyigemt.com/image" +
+          (if (isGuild()) "/s" else "") +
+          content
+      val im = dbQuery {
+        findImage(hash, from)
+      }
+      when (im) {
+        is TencentImage -> {
+          sendMessage(im).also {
+            if (it == MessageReceipt.ErrorMessageReceipt) {
+              subject.uploadImage(url).also { image ->
+                sendMessage(image)
+                dbQuery { image.update(hash, from) }
               }
             }
           }
-
-          else -> {
-            subject.uploadImage("https://arona.cdn.diyigemt.com/image${content}").also {
-              sendMessage(it)
-              dbQuery { it.update(hash, from) }
-            }
-          }
         }
 
+        else -> {
+          subject.uploadImage(url).also {
+            sendMessage(it)
+            dbQuery { it.update(hash, from) }
+          }
+        }
       }
-    } else {
-      MessageChainBuilder()
-        .append(
-          TencentGuildImage(
-            url = "https://arona.cdn.diyigemt.com/image/s${query.content}"
-          )
-        ).build().also { im -> sendMessage(im) }
+
     }
   }
 
@@ -139,22 +134,19 @@ object TrainerCommand : AbstractCommand(
                 .joinToString("\n")
             }")
           }
-          withTimeout(50000) {
-            nextMessage(filter = filter@{ event ->
-              val fb = event.message.filterIsInstance<PlainText>().firstOrNull() ?: return@filter false
-              runCatching {
-                fb.toString().toInt().let { this@r1.size >= it && it > 0 }
-              }.getOrDefault(false)
-            }) {
-              val feedback = it.message.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: "1"
-              runCatching {
-                feedback.toInt()
-              }.onSuccess { i ->
-                getImage(this@r1[i - 1].name).run {
-                  data?.run {
-                    sendImage(get(0))
-                  }
-                }
+          val message = nextMessage(50000) { event ->
+            val fb = event.message.filterIsInstance<PlainText>().firstOrNull() ?: return@nextMessage false
+            runCatching {
+              fb.toString().toInt().let { this@r1.size >= it && it > 0 }
+            }.getOrDefault(false)
+          }
+          val feedback = message.message.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: "1"
+          runCatching {
+            feedback.toInt()
+          }.onSuccess { i ->
+            getImage(this@r1[i - 1].name).run {
+              data?.run {
+                sendImage(get(0))
               }
             }
           }

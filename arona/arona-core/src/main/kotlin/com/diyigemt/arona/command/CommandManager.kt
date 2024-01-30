@@ -3,7 +3,6 @@
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.communication.command.*
-import com.diyigemt.arona.communication.command.CommandSender.Companion.toCommandSender
 import com.diyigemt.arona.communication.contact.Contact.Companion.toContactDocumentOrNull
 import com.diyigemt.arona.communication.contact.User.Companion.toUserDocumentOrNull
 import com.diyigemt.arona.communication.event.*
@@ -14,14 +13,12 @@ import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTenc
 import com.diyigemt.arona.communication.message.toMessageChain
 import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
-import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.permission.Permission.Companion.testPermission
 import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.currentTime
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.context
-import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.Terminal
@@ -149,7 +146,9 @@ internal val crsiveLocalization = object : Localization {
   override fun missingArgument(paramName: String) = "缺少参数: $paramName"
   override fun extraArgumentOne(name: String) = "多余的参数: $name"
   override fun extraArgumentMany(name: String, count: Int) = "多余的参数: $name"
-  override fun invalidChoice(choice: String, choices: List<String>) = "参数无效:$choice, 可选值为: ${choices.joinToString(",")}"
+  override fun invalidChoice(choice: String, choices: List<String>) =
+    "参数无效:$choice, 可选值为: ${choices.joinToString(",")}"
+
   override fun badParameterWithMessageAndParam(paramName: String, message: String) = "$paramName 的值无效. $message"
 }
 
@@ -224,86 +223,88 @@ internal suspend fun executeCommandImpl(
 }
 
 
-suspend inline fun GuildUserCommandSender.nextMessage(
+suspend fun GuildUserCommandSender.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
-  noinline filter: suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Boolean = { true },
-  noinline action: suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Unit,
-) {
+  filter: suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Boolean = { true },
+): TencentGuildPrivateMessageEvent {
   val mapper = createMapper<GuildUserCommandSender, TencentGuildPrivateMessageEvent>(filter)
-  val event = (if (timeoutMillis == -1L) {
+  return (if (timeoutMillis == -1L) {
     GlobalEventChannel.syncFromEvent<TencentGuildPrivateMessageEvent, TencentGuildPrivateMessageEvent>(mapper)
   } else {
     withTimeout(timeoutMillis) {
       GlobalEventChannel.syncFromEvent<TencentGuildPrivateMessageEvent, TencentGuildPrivateMessageEvent>(mapper)
     }
-  })
-  action.invoke(event.toCommandSender(), event)
+  }).also {
+    setSourceId(it.message.sourceId)
+  }
 }
 
-suspend inline fun GuildChannelCommandSender.nextMessage(
+suspend fun GuildChannelCommandSender.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
-  noinline filter: suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Boolean = { true },
-  noinline action: suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Unit,
-) {
+  filter: suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Boolean = { true },
+): TencentGuildMessageEvent {
   val mapper = createMapper<GuildChannelCommandSender, TencentGuildMessageEvent>(filter)
-  val event = (if (timeoutMillis == -1L) {
+  return (if (timeoutMillis == -1L) {
     GlobalEventChannel.syncFromEvent<TencentGuildMessageEvent, TencentGuildMessageEvent>(mapper)
   } else {
     withTimeout(timeoutMillis) {
       GlobalEventChannel.syncFromEvent<TencentGuildMessageEvent, TencentGuildMessageEvent>(mapper)
     }
-  })
-  action.invoke(event.toCommandSender(), event)
+  }).also {
+    setSourceId(it.message.sourceId)
+  }
+}
+
+suspend fun GroupCommandSender.nextMessage(
+  timeoutMillis: Long = -1,
+  intercept: Boolean = false,
+  filter: suspend GroupCommandSender.(TencentGroupMessageEvent) -> Boolean = { true },
+): TencentGroupMessageEvent {
+  val mapper = createMapper<GroupCommandSender, TencentGroupMessageEvent>(filter)
+  return (if (timeoutMillis == -1L) {
+    GlobalEventChannel.syncFromEvent<TencentGroupMessageEvent, TencentGroupMessageEvent>(mapper)
+  } else {
+    withTimeout(timeoutMillis) {
+      GlobalEventChannel.syncFromEvent<TencentGroupMessageEvent, TencentGroupMessageEvent>(mapper)
+    }
+  }).also {
+    setSourceId(it.message.sourceId)
+  }
 }
 
 
+@Suppress("UNCHECKED_CAST")
 suspend inline fun <reified C : UserCommandSender> C.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
   noinline filter: suspend C.(TencentMessageEvent) -> Boolean = { true },
-  noinline action: suspend C.(TencentMessageEvent) -> Unit,
-) {
-  when (this) {
+): TencentMessageEvent {
+  return when (this) {
     is FriendUserCommandSender -> TODO()
     is GroupCommandSender -> {
-      val mapper = createMapper<C, TencentGroupMessageEvent>(filter)
-      val event = (if (timeoutMillis == -1L) {
-        GlobalEventChannel.syncFromEvent(mapper)
-      } else {
-        withTimeout(timeoutMillis) {
-          GlobalEventChannel.syncFromEvent(mapper)
-        }
-      })
-
-      action.invoke(event.toCommandSender() as C, event)
+      nextMessage(
+        timeoutMillis,
+        intercept,
+        filter as (suspend GroupCommandSender.(TencentGroupMessageEvent) -> Boolean)
+      )
     }
 
     is GuildUserCommandSender -> {
-      val mapper = createMapper<C, TencentGuildPrivateMessageEvent>(filter)
-      val event = (if (timeoutMillis == -1L) {
-        GlobalEventChannel.syncFromEvent(mapper)
-      } else {
-        withTimeout(timeoutMillis) {
-          GlobalEventChannel.syncFromEvent(mapper)
-        }
-      })
-
-      action.invoke(event.toCommandSender() as C, event)
+      nextMessage(
+        timeoutMillis,
+        intercept,
+        filter as (suspend GuildUserCommandSender.(TencentGuildPrivateMessageEvent) -> Boolean)
+      )
     }
 
     is GuildChannelCommandSender -> {
-      val mapper = createMapper<C, TencentGuildMessageEvent>(filter)
-      val event = (if (timeoutMillis == -1L) {
-        GlobalEventChannel.syncFromEvent(mapper)
-      } else {
-        withTimeout(timeoutMillis) {
-          GlobalEventChannel.syncFromEvent(mapper)
-        }
-      })
-
-      action.invoke(event.toCommandSender() as C, event)
+      nextMessage(
+        timeoutMillis,
+        intercept,
+        filter as (suspend GuildChannelCommandSender.(TencentGuildMessageEvent) -> Boolean)
+      )
     }
 
     else -> TODO()

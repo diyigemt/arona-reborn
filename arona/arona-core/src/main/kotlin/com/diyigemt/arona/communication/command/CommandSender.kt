@@ -11,17 +11,14 @@ import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
 import com.diyigemt.arona.communication.event.TencentGuildPrivateMessageEvent
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuerySuspended
 import com.diyigemt.arona.database.permission.*
-import com.diyigemt.arona.database.permission.ContactDocument
-import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
-import com.diyigemt.arona.utils.*
+import com.diyigemt.arona.utils.childScope
+import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.qualifiedNameOrTip
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.serialization.serializer
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -32,7 +29,7 @@ interface CommandSender : CoroutineScope {
   val bot: TencentBot?
   val subject: Contact?
   val user: User?
-  val sourceId: String?
+  val sourceId: String
   val eventId: String?
   var messageSequence: Int // 消息序列, 回复同一条sourceId时自增, 从1开始
 
@@ -54,14 +51,21 @@ interface CommandSender : CoroutineScope {
   }
 }
 
-sealed class AbstractCommandSender : CommandSender {
+sealed class AbstractCommandSender() : CommandSender {
   abstract override val bot: TencentBot?
   abstract override val subject: Contact?
   abstract override val user: User?
+  private var _sourceId = EmptyMessageId
+  override val sourceId: String
+    get() = _sourceId
   internal val kType = this::class.starProjectedType
+  internal fun setSourceId(n: String) { _sourceId = n }
+  constructor(sourceId: String) : this() {
+    setSourceId(sourceId)
+  }
 }
 
-sealed class AbstractUserCommandSender : UserCommandSender, AbstractCommandSender() {
+sealed class AbstractUserCommandSender(sourceId: String) : UserCommandSender, AbstractCommandSender(sourceId) {
   private var _userDocument: UserDocument? = null
   private var _contactDocument: ContactDocument? = null
   override val bot: TencentBot get() = user.bot
@@ -90,7 +94,7 @@ interface UserCommandSender : CommandSender {
   override val bot: TencentBot
   override val subject: Contact
   override val user: User
-  override val sourceId: String
+  override var sourceId: String
   suspend fun userDocument(): PluginUserDocument
   suspend fun contactDocument(): PluginContactDocument
   suspend fun contactMember(): PluginContactMember
@@ -114,13 +118,18 @@ interface UserCommandSender : CommandSender {
     suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfigOrNull(plugin: CommandOwner) =
       contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfigOrNull<T>(plugin)
 
-    suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfigOrDefault(plugin: CommandOwner, default: T) =
+    suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfigOrDefault(
+      plugin: CommandOwner,
+      default: T,
+    ) =
       contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfigOrDefault<T>(plugin, default)
 
     suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfig(plugin: CommandOwner) =
       contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfig<T>(plugin)
+
     suspend inline fun <reified T : Any> UserCommandSender.updateUserPluginConfig(plugin: CommandOwner, value: T) =
       userDocument().updatePluginConfig<T>(plugin, value)
+
     suspend inline fun <reified T : Any> UserCommandSender.updateContactPluginConfig(plugin: CommandOwner, value: T) =
       contactDocument().updatePluginConfig<T>(plugin, value)
 
@@ -133,9 +142,9 @@ interface UserCommandSender : CommandSender {
  */
 class FriendUserCommandSender internal constructor(
   override val user: FriendUser,
-  override val sourceId: String,
-  override val eventId: String? = null
-) : AbstractUserCommandSender(), CoroutineScope by user.childScope("FriendUserCommandSender") {
+  sourceId: String,
+  override val eventId: String? = null,
+) : AbstractUserCommandSender(sourceId), CoroutineScope by user.childScope("FriendUserCommandSender") {
   override val subject get() = user
   override var messageSequence: Int = 1
   override suspend fun sendMessage(message: Message) =
@@ -147,9 +156,9 @@ class FriendUserCommandSender internal constructor(
  */
 class GroupCommandSender internal constructor(
   override val user: GroupMember,
-  override val sourceId: String,
-  override val eventId: String? = null
-) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GroupCommandSender") {
+  sourceId: String,
+  override val eventId: String? = null,
+) : AbstractUserCommandSender(sourceId), CoroutineScope by user.childScope("GroupCommandSender") {
   override val subject get() = user.group
   val group get() = user.group
   override var messageSequence: Int = 1
@@ -162,9 +171,9 @@ class GroupCommandSender internal constructor(
  */
 class GuildChannelCommandSender internal constructor(
   override val user: GuildChannelMember,
-  override val sourceId: String,
-  override val eventId: String? = null
-) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildChannelCommandSender") {
+  sourceId: String,
+  override val eventId: String? = null,
+) : AbstractUserCommandSender(sourceId), CoroutineScope by user.childScope("GuildChannelCommandSender") {
   override val subject get() = user.channel
   val channel get() = user.channel
   val guild get() = user.guild
@@ -178,9 +187,9 @@ class GuildChannelCommandSender internal constructor(
  */
 class GuildUserCommandSender internal constructor(
   override val user: GuildMember,
-  override val sourceId: String,
-  override val eventId: String? = null
-) : AbstractUserCommandSender(), CoroutineScope by user.childScope("GuildUserCommandSender") {
+  sourceId: String,
+  override val eventId: String? = null,
+) : AbstractUserCommandSender(sourceId), CoroutineScope by user.childScope("GuildUserCommandSender") {
   override val subject get() = user.guild
   val guild get() = user.guild
   override var messageSequence: Int = 1
@@ -193,7 +202,6 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val bot: TencentBot? = null
   override val subject: Contact? = null
   override val user: User? = null
-  override val sourceId: String = EmptyMessageId
   override val eventId: String? = null
 
   override var messageSequence: Int = 1
@@ -221,6 +229,8 @@ fun CommandSender.isGroupOrPrivate(): Boolean {
   }
   return this is GroupCommandSender
 }
+
+fun CommandSender.isGuild() = !isGroupOrPrivate()
 
 @OptIn(ExperimentalContracts::class)
 fun CommandSender.isGroup(): Boolean {

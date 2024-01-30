@@ -53,7 +53,9 @@ suspend fun launchConsole() {
   while (true) {
     runCatching {
       val input = lineReader.readLine("> ")
-      CommandMain.run(input.split(" "))
+      CommandMain.run(
+        input.split(" ").filterNot { it.isBlank() }
+      )
       delay(1000)
     }.onFailure {
       return

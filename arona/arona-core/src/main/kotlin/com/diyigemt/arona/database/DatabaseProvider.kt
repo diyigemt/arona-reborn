@@ -18,6 +18,7 @@ import io.github.crackthecodeabhi.kreds.connection.KredsClient
 import io.github.crackthecodeabhi.kreds.connection.newClient
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -34,6 +35,11 @@ internal object DatabaseProvider {
           busyTimeout = 1000
           apply(it)
         }
+      },
+      databaseConfig = DatabaseConfig {
+        defaultRepetitionAttempts = 3
+        defaultMinRepetitionDelay = 0
+        defaultMaxRepetitionDelay = 1500
       }
     )
     transaction(database) {

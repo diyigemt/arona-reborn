@@ -3,6 +3,7 @@ package com.diyigemt.arona.arona.database
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.tools.ReflectionTool
 import kotlinx.coroutines.Dispatchers
+import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.Database as DB
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.Table
@@ -20,6 +21,11 @@ internal object DatabaseProvider {
           busyTimeout = 1000
           apply(it)
         }
+      },
+      databaseConfig = DatabaseConfig {
+        defaultRepetitionAttempts = 3
+        defaultMinRepetitionDelay = 0
+        defaultMaxRepetitionDelay = 1500
       }
     )
     transaction(database) {

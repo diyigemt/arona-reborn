@@ -11,7 +11,15 @@ import com.diyigemt.arona.user.recorder.database.*
 import com.diyigemt.arona.user.recorder.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
+import com.diyigemt.arona.utils.now
+import com.diyigemt.arona.utils.toDate
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.default
+import com.github.ajalt.clikt.parameters.types.int
+import kotlinx.datetime.DateTimePeriod
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import java.util.*
 import kotlin.concurrent.scheduleAtFixedRate
@@ -156,12 +164,15 @@ object PluginMain : AronaPlugin(
 
 @Suppress("unused")
 class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显示当日dau") {
+  private val offset by argument().int().default(0)
   override fun run() {
     // dau
     dbQuery {
       val contactCount = Contact.count()
       val userCount = User.count()
-      val dau = DailyActiveUser.findById(currentDate())
+      val date = now().minus(DateTimePeriod(days = offset), TimeZone.currentSystemDefault()).toDate()
+      val dau = DailyActiveUser.findById(date)
+      echo("date: $date")
       echo("contact: $contactCount, user: $userCount, $dau")
     }
     // 指令执行次数

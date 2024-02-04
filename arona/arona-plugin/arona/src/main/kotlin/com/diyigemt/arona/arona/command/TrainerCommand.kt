@@ -119,13 +119,13 @@ object TrainerCommand : AbstractCommand(
         if (code != 200) {
           val mdConfig = readUserPluginConfigOrDefault(Arona, default = BaseConfig()).markdown
           if (mdConfig.enable) {
-            val md = TencentMarkdown("102057194_1702305572") {
+            val md = TencentTemplateMarkdown("102057194_1702305572") {
               append("search_target", match)
               filterIndexed { index, _ -> index < 4 }.forEachIndexed { index, it ->
                 append("option_${index + 1}", it.name)
               }
             }
-            val btn = TencentKeyboard("102057194_1702611887")
+            val btn = TencentTempleKeyboard("102057194_1702611887")
             sendMessage(MessageChainBuilder().append(md).append(btn).build())
           } else {
             sendMessage("没有与${match}对应的信息, 是否想要输入:\n${

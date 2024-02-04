@@ -559,13 +559,15 @@ data class TencentGuildImage(
   override val size: Long = 0L
 }
 
+interface TencentMarkdown
+
 @Serializable
-data class TencentMarkdown(
+data class TencentTemplateMarkdown(
   @SerialName("custom_template_id")
   val id: String,
   val params: List<TencentMarkdownParam>,
   val content: String? = null,
-) : Message {
+) : Message, TencentMarkdown {
   constructor(id: String, block: TencentMarkdownParam.Companion.TencentMarkdownParamBuilder.() -> Unit) :
       this(id, TencentMarkdownParam.Companion.TencentMarkdownParamBuilder().apply(block).build())
 
@@ -585,15 +587,6 @@ data class TencentMarkdownParam(
       fun append(key: String, value: String) = apply { store.add(TencentMarkdownParam(key, listOf(value))) }
       fun build() = store.toList()
     }
-  }
-}
-
-@Serializable
-data class TencentKeyboard(
-  val id: String,
-) : Message { // TODO custom keyboard
-  override fun serialization(): String {
-    TODO("Not yet implemented")
   }
 }
 
@@ -703,9 +696,9 @@ data class TencentMessage constructor(
   var image: String? = null,
   var media: TencentMessageMediaInfo? = null,
   @EncodeDefault
-  var markdown: TencentMarkdown? = null,
+  var markdown: TencentTemplateMarkdown? = null,
   @EncodeDefault
-  var keyboard: TencentKeyboard? = null,
+  var keyboard: TencentTempleKeyboard? = null,
   @EncodeDefault
   val ark: String? = null,
   @SerialName("msg_id")
@@ -826,16 +819,16 @@ class TencentMessageBuilder private constructor(
       else -> {}
     }
   }.apply {
-    when (val md = container.filterIsInstance<TencentMarkdown>().lastOrNull()) {
-      is TencentMarkdown -> {
+    when (val md = container.filterIsInstance<TencentTemplateMarkdown>().lastOrNull()) {
+      is TencentTemplateMarkdown -> {
         messageType = TencentMessageType.MARKDOWN
         markdown = md
       }
 
       else -> {}
     }
-    when (val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()) {
-      is TencentKeyboard -> {
+    when (val kb = container.filterIsInstance<TencentTempleKeyboard>().lastOrNull()) {
+      is TencentTempleKeyboard -> {
         messageType = TencentMessageType.MARKDOWN
         keyboard = kb
       }

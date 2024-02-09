@@ -1,14 +1,20 @@
 package com.diyigemt.arona.console
 
+import com.diyigemt.arona.communication.BotManager
+import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.utils.ReflectionUtil
 import com.diyigemt.arona.utils.commandLineLogger
+import com.diyigemt.arona.utils.runSuspend
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.*
 import io.ktor.util.logging.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.toList
 import kotlin.system.exitProcess
 
 interface CommandLineSubCommand
@@ -69,9 +75,22 @@ class PermissionManagerCommand : CommandLineSubCommand, CliktCommand(name = "per
 
 @Suppress("unused")
 class GlobalAnnouncementCommand : CommandLineSubCommand, CliktCommand(name = "anno", help = "主动消息通知") {
+  private val message by argument(name = "contain")
   override fun run() {
-    // todo
-    echo("还没做")
+    runSuspend {
+      val contacts = ContactDocument.contacts()
+      val guilds = ContactDocument.guilds()
+      contacts.forEachIndexed { index, c ->
+        delay(260L)
+        BotManager.getBot().groups.getOrCreate(c.id).sendMessage(message)
+        echo("send group($index/${contacts.size}): ${c.contactName}")
+      }
+      guilds.forEachIndexed { index, g ->
+        delay(260L)
+        BotManager.getBot().guilds.getOrCreate(g.id).sendMessage(message)
+        echo("send guild($index/${guilds.size}): ${g.contactName}")
+      }
+    }
   }
 }
 

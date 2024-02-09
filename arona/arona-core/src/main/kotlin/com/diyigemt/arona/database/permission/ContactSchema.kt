@@ -14,12 +14,22 @@ import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
+import com.diyigemt.arona.webui.endpoints.aronaUser
+import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
+import com.mongodb.client.model.Projections
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
+import com.mongodb.kotlin.client.coroutine.AggregateFlow
+import com.mongodb.kotlin.client.coroutine.FindFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
+import org.bson.Document
 import org.bson.codecs.pojo.annotations.BsonId
+import org.bson.codecs.pojo.annotations.BsonProperty
+import org.bson.types.ObjectId
 
 @Serializable
 enum class ContactType {
@@ -125,7 +135,14 @@ data class ContactMember(
     )
   }
 }
-
+@Serializable
+internal data class SimplifiedContactDocument(
+  @BsonProperty("_id")
+  @BsonId
+  val id: String,
+  val contactName: String,
+  val contactType: ContactType = ContactType.Group,
+)
 @Serializable
 internal data class ContactDocument(
   @BsonId
@@ -246,6 +263,42 @@ internal data class ContactDocument(
       val member = contactDocument.addMember(userDocument.id)
       contactDocument.updateMemberRole(member.id, role)
       return userDocument
+    }
+
+    internal suspend fun contacts(): List<SimplifiedContactDocument> {
+      val filter = Aggregates.match(Filters.eq(ContactDocument::contactType.name, ContactType.Group.name))
+      return withCollection<ContactDocument, List<SimplifiedContactDocument>> {
+        aggregate<SimplifiedContactDocument>(
+          listOf(
+            filter,
+            Aggregates.project(
+              Projections.fields(
+                Document("_id", 1),
+                Document(ContactDocument::contactName.name, 1),
+                Document(ContactDocument::contactType.name, 1)
+              )
+            )
+          )
+        ).toList()
+      }
+    }
+
+    internal suspend fun guilds(): List<SimplifiedContactDocument> {
+      val filter = Aggregates.match(Filters.eq(ContactDocument::contactType.name, ContactType.Guild.name))
+      return withCollection<ContactDocument, List<SimplifiedContactDocument>> {
+        aggregate<SimplifiedContactDocument>(
+          listOf(
+            filter,
+            Aggregates.project(
+              Projections.fields(
+                Document("_id", 1),
+                Document(ContactDocument::contactName.name, 1),
+                Document(ContactDocument::contactType.name, 1)
+              )
+            )
+          )
+        ).toList()
+      }
     }
   }
 }

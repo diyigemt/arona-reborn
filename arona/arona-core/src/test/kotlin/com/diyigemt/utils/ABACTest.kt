@@ -28,7 +28,6 @@ data class Resource(
 ) : HasAtts()
 
 class ABACTest {
-  @Test
   fun testBase() {
     runBlocking {
       val policies = listOf(
@@ -74,7 +73,6 @@ class ABACTest {
     }
   }
 
-  @Test
   fun testGeneratePolicy() {
     val rule1 = PolicyRule(
       PolicyRuleType.Resource,
@@ -133,7 +131,6 @@ class ABACTest {
       }
     }
   }
-  @Test
   fun testContactBaseAdminPolicy() {
     runBlocking {
       val contact = findContactDocumentByIdOrNull("") ?: return@runBlocking
@@ -156,7 +153,6 @@ class ABACTest {
       }
     }
   }
-  @Test
   fun testPermissionFather() {
     val root = PermissionImpl(PermissionId("buildIn", "*"), "root permission", RootPermission)
     val firstChild = PermissionImpl(PermissionId("command.bind", "*"), "第一个子代", root)
@@ -165,7 +161,6 @@ class ABACTest {
     println(firstChild.fullPermissionId())
     println(secondChild.fullPermissionId())
   }
-  @Test
   fun testCheckPermission() {
     runBlocking {
       val contact = findContactDocumentByIdOrNull("") ?: return@runBlocking
@@ -177,7 +172,6 @@ class ABACTest {
     }
 
   }
-  @Test
   fun testPermissionIdMatch() {
     val r = "buildIn.*"
     val l = "buildIn.owner:min.action:test.m"

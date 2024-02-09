@@ -112,6 +112,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
       fetchGuildList().onSuccess {
         // 通知插件端登录成功
         TencentBotOnlineEvent(this@TencentBotClient).broadcast()
+        BotManager.registerBot(this@TencentBotClient)
       }
     }
     // 处理断联事件

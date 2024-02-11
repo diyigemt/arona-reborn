@@ -1,9 +1,8 @@
 package com.diyigemt.arona.arona
 
-import com.diyigemt.arona.communication.event.TencentBotUserChangeEvent
-import com.diyigemt.arona.communication.event.TencentFriendAddEvent
-import com.diyigemt.arona.communication.event.TencentGroupAddEvent
-import com.diyigemt.arona.communication.event.TencentGuildAddEvent
+import com.diyigemt.arona.communication.TencentApiErrorException
+import com.diyigemt.arona.communication.event.*
+import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import io.ktor.client.*
@@ -42,6 +41,18 @@ object Arona : AronaPlugin(
         else -> {
           //TODO 删除聊天事件
         }
+      }
+    }
+    // 全局异常处理
+    pluginEventChannel().subscribeAlways<MessagePostSendEvent<*>> {
+      if (it.isFailure && it.isTencentError) {
+        MessageChainBuilder(it.message.sourceId)
+          .append("错误发生")
+          .append("message: ${(it.exception as TencentApiErrorException).source.message}")
+          .build()
+          .also { ch ->
+            it.target.sendMessage(ch)
+          }
       }
     }
   }

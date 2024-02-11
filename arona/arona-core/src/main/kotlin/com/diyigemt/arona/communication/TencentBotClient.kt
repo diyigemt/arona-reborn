@@ -4,6 +4,7 @@ import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.communication.message.TencentWebsocketOperationManager.handleTencentOperation
+import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.runSuspend
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -19,12 +20,9 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.MissingFieldException
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import java.util.*
@@ -281,12 +279,12 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
       } else {
         bodyTmp = resp.bodyAsText()
         if (bodyTmp.contains("\"code\":22009")) {
-          throw ImageFailedException(bodyTmp)
+          throw ImageFailedException(resp.status, bodyTmp)
         }
         throw HttpNotOkException(
           resp.status,
-          resp.bodyAsText(),
-          resp.headers["X-Tps-Trace-Id"],
+          bodyTmp,
+          resp.headers["X-Tps-Trace-Id"] ?: "",
           resp.request.content.toString()
         )
       }
@@ -326,7 +324,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
 
   override val bot: TencentBot = this
   override val unionOpenid: String = config.appId
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
     TODO("Not yet implemented")
   }
 
@@ -366,9 +364,31 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     client.close()
   }
 }
+@Serializable
+data class TencentApiErrorResp(
+  val message: String,
+  val code: Int,
+  @SerialName("trace_id")
+  val traceId: String = "",
+) {
+  override fun toString(): String {
+    return "traceId: ${traceId}, message: ${message}, code: ${code}"
+  }
+}
+sealed class TencentApiErrorException(
+  val status: HttpStatusCode,
+  val source: TencentApiErrorResp,
+  val req: String? = ""
+) : Exception(source.toString())
 
-class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String? = "", req: String? = "") : Exception(
-  "status: $status, traceId: $traceId, message: $body, req-body: $req"
-)
+class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String = "", req: String? = "") : TencentApiErrorException(
+  status, JsonIgnoreUnknownKeys.decodeFromString(body), req
+) {
+  override val message: String = "status: $status, $source, req-body: $req"
+}
 
-class ImageFailedException(msg: String) : Exception(msg)
+class ImageFailedException(status: HttpStatusCode, body: String) : TencentApiErrorException(
+  status, JsonIgnoreUnknownKeys.decodeFromString(body)
+) {
+  override val message: String = "image upload failed, $source"
+}

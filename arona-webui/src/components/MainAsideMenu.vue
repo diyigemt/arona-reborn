@@ -17,6 +17,7 @@
       <template #title>
         <span>插件偏好</span>
       </template>
+      <el-menu-item index="/config/plugin/base-preferences">通用</el-menu-item>
       <el-menu-item index="/config/plugin/arona-preferences">Arona</el-menu-item>
     </el-sub-menu>
     <el-menu-item index="/config/user/profile">个人中心</el-menu-item>

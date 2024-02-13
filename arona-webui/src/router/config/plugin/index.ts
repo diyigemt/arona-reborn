@@ -10,7 +10,15 @@ const PluginRouter: Array<RouteRecordRaw> = [
     children: [
       {
         path: "",
-        redirect: "arona-preferences",
+        redirect: "base-preferences",
+      },
+      {
+        path: "base-preferences",
+        name: "base-preferences",
+        meta: {
+          title: "通用设置",
+        },
+        component: () => import("@/views/config/plugin/BasePreferences.vue"),
       },
       {
         path: "arona-preferences",

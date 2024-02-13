@@ -2,10 +2,11 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
   kotlin("jvm") version "1.9.10"
+  id("org.jetbrains.kotlin.plugin.serialization") version "1.9.10"
 }
 
-val projectMainClass = "com.diyigemt.arona.debugger.PluginMain"
-version = "0.2.0"
+val projectMainClass = "com.diyigemt.arona.custom.menu.PluginMain"
+version = "0.1.0"
 dependencies {
   compileOnly(project(":arona-core"))
   testImplementation(kotlin("test"))
@@ -41,3 +42,4 @@ task("copyToPlugins") {
     logger.error("copy ${buildJar.name} to plugin folder")
   }
 }
+

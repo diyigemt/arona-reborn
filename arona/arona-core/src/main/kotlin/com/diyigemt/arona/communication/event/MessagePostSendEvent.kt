@@ -30,25 +30,41 @@ data class GroupMessagePostSendEvent(
   override val message: MessageChain,
   override val exception: Throwable?,
   override val receipt: MessageReceipt?
-) : MessagePostSendEvent<Group>()
+) : MessagePostSendEvent<Group>() {
+  override fun toString(): String {
+    return "Group(${target.id}) <- $message"
+  }
+}
 
 data class FriendMessagePostSendEvent(
   override val target: FriendUser,
   override val message: MessageChain,
   override val exception: Throwable?,
   override val receipt: MessageReceipt?
-) : MessagePostSendEvent<FriendUser>()
+) : MessagePostSendEvent<FriendUser>() {
+  override fun toString(): String {
+    return "Friend(${target.id}) <- $message"
+  }
+}
 
 data class GuildMessagePostSendEvent(
   override val target: Guild,
   override val message: MessageChain,
   override val exception: Throwable?,
   override val receipt: MessageReceipt?
-) : MessagePostSendEvent<Guild>()
+) : MessagePostSendEvent<Guild>() {
+  override fun toString(): String {
+    return "Guild(${target.id}) <- $message"
+  }
+}
 
 data class ChannelMessagePostSendEvent(
   override val target: Channel,
   override val message: MessageChain,
   override val exception: Throwable?,
   override val receipt: MessageReceipt?
-) : MessagePostSendEvent<Channel>()
+) : MessagePostSendEvent<Channel>() {
+  override fun toString(): String {
+    return "Channel(${target.id}) <- $message"
+  }
+}

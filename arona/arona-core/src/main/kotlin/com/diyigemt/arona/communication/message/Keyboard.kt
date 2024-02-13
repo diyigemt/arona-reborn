@@ -1,19 +1,20 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.communication.message
 
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-interface TencentKeyboard
+@Serializable
+sealed class TencentKeyboard
 
 @Serializable
 data class TencentTempleKeyboard(
   val id: String,
-) : Message, TencentKeyboard { // TODO custom keyboard
+) : Message, TencentKeyboard() { // TODO custom keyboard
   override fun serialization(): String {
     TODO("Not yet implemented")
   }
@@ -22,15 +23,18 @@ data class TencentTempleKeyboard(
 @Serializable
 data class TencentCustomKeyboard(
   val content: TencentCustomKeyboard0,
-) : Message, TencentKeyboard {
+) : Message, TencentKeyboard() {
   override fun serialization(): String {
     TODO("Not yet implemented")
   }
 }
 
 @Serializable
-data class TencentCustomKeyboard0(
+data class TencentCustomKeyboard0 constructor(
   val rows: List<TencentCustomKeyboard1>,
+  @SerialName("bot_appid")
+  @EncodeDefault
+  var botAppid: String? = null
 )
 
 @Serializable
@@ -40,39 +44,54 @@ data class TencentCustomKeyboard1(
 
 @Serializable
 data class TencentKeyboardButton(
+  @EncodeDefault
   var id: String, // 按钮ID：在一个keyboard消息内设置唯一
   @SerialName("render_data")
+  @EncodeDefault
   var renderData: TencentKeyboardButtonRenderData,
+  @EncodeDefault
   var action: TencentKeyboardButtonActionData,
 )
 
 @Serializable
 data class TencentKeyboardButtonActionData(
+  @EncodeDefault
   var type: TencentKeyboardButtonActionType = TencentKeyboardButtonActionType.COMMAND,
+  @EncodeDefault
   var data: String = "", // 操作相关的数据
+  @EncodeDefault
   var reply: Boolean? = null, // 指令按钮可用，指令是否带引用回复本消息，默认 false。支持版本 8983
+  @EncodeDefault
   var enter: Boolean? = null, // 指令按钮可用，点击按钮后直接自动发送 data，默认 false。支持版本 8983
   /**
    * 本字段仅在指令按钮下有效，设置后后会忽略 action.enter 配置。
    * 设置为 1 时 ，点击按钮自动唤起启手Q选图器，其他值暂无效果。
    * （仅支持手机端版本 8983+ 的单聊场景，桌面端不支持）
    */
+  @EncodeDefault
   var anchor: Int? = null,
   @SerialName("click_limit")
+  @EncodeDefault
   var clickLimit: Int? = null, // 【已弃用】可操作点击的次数，默认不限
   @SerialName("at_bot_show_channel_list")
+  @EncodeDefault
   var atBotShowChannelList: Boolean? = null, // 【已弃用】指令按钮可用，弹出子频道选择器，默认 false
   @SerialName("unsupport_tips")
+  @EncodeDefault
   var unsupportTips: String? = null, // 客户端不支持本action的时候，弹出的toast文案
+  @EncodeDefault
   var permission: TencentKeyboardButtonActionPermissionData = TencentKeyboardButtonActionPermissionData(),
 )
 
 @Serializable
 data class TencentKeyboardButtonActionPermissionData(
+  @EncodeDefault
   val type: TencentKeyboardButtonActionDataType = TencentKeyboardButtonActionDataType.ANY_ONE,
   @SerialName("specify_user_ids") // 有权限的用户 id 的列表
+  @EncodeDefault
   val specifyUserIds: List<String>? = null,
   @SerialName("specify_role_ids") // 有权限的身份组 id 的列表（仅频道可用）
+  @EncodeDefault
   val specifyRoleIds: List<String>? = null,
 )
 
@@ -107,9 +126,12 @@ enum class TencentKeyboardButtonActionDataType(val id: Int) {
 
 @Serializable
 data class TencentKeyboardButtonRenderData(
+  @EncodeDefault
   var label: String = "", // 按钮上的文字
   @SerialName("visited_label")
-  var visitedLabel: String = "", // 点击后按钮的上文字
+  @EncodeDefault
+  var visitedLabel: String = label, // 点击后按钮的上文字
+  @EncodeDefault
   var style: TencentKeyboardButtonRenderDataStyle = TencentKeyboardButtonRenderDataStyle.Blue, // 按钮样式
 )
 

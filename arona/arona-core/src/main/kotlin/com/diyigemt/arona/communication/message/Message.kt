@@ -698,7 +698,7 @@ data class TencentMessage constructor(
   @EncodeDefault
   var markdown: TencentTemplateMarkdown? = null,
   @EncodeDefault
-  var keyboard: TencentTempleKeyboard? = null,
+  var keyboard: TencentKeyboard? = null,
   @EncodeDefault
   val ark: String? = null,
   @SerialName("msg_id")
@@ -827,8 +827,8 @@ class TencentMessageBuilder private constructor(
 
       else -> {}
     }
-    when (val kb = container.filterIsInstance<TencentTempleKeyboard>().lastOrNull()) {
-      is TencentTempleKeyboard -> {
+    when (val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()) {
+      is TencentKeyboard -> {
         messageType = TencentMessageType.MARKDOWN
         keyboard = kb
       }

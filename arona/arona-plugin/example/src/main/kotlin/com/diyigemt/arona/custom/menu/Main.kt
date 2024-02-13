@@ -1,4 +1,4 @@
-package com.diyigemt.arona.maintain.notifier
+package com.diyigemt.arona.custom.menu
 
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription

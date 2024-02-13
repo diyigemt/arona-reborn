@@ -1,23 +1,5 @@
 <template>
   <ElTabs v-model="tab">
-    <ElTabPane name="base" label="基础设置">
-      <PluginPreferenceForm
-        v-model:form="baseConfig"
-        :default-form="defaultBaseConfig"
-        p-id="com·diyigemt·arona"
-        p-key="BaseConfig"
-      >
-        <ElFormItem label="启用markdown" prop="enable">
-          <ElSwitch
-            v-model="markdownConfig.enable"
-            :active-value="true"
-            :inactive-value="false"
-            active-text="启用"
-            inactive-text="停用"
-          />
-        </ElFormItem>
-      </PluginPreferenceForm>
-    </ElTabPane>
     <ElTabPane name="trainer" label="攻略设置">
       <PluginPreferenceForm
         v-model:form="trainerConfig"
@@ -175,18 +157,16 @@ defineOptions({
   name: "AronaPreferences",
 });
 
-interface MarkdownCompatiblyConfig {
-  enable: boolean;
-}
-
 interface TarotConfig {
   dayOne: boolean;
   fxxkDestiny: boolean;
   cardType: "A" | "B";
 }
+
 interface ContactGachaConfig {
   limit: number;
 }
+
 interface TrainerConfig {
   override: {
     id: string;
@@ -196,20 +176,13 @@ interface TrainerConfig {
     edit: boolean;
   }[];
 }
+
 interface TotalAssaultConfig {
   defaultTotalAssault: "B" | "CN" | "JP";
   defaultTotalAssaultEx: "B" | "CN" | "JP";
 }
-interface BaseConfig {
-  markdown: MarkdownCompatiblyConfig;
-}
 
-const tab = ref<"base" | "trainer" | "tarot" | "totalAssault" | "gacha">("base");
-const defaultBaseConfig: BaseConfig = {
-  markdown: {
-    enable: false,
-  },
-};
+const tab = ref<"trainer" | "tarot" | "totalAssault" | "gacha">("trainer");
 const defaultTrainerConfig: TrainerConfig = {
   override: [],
 };
@@ -225,19 +198,10 @@ const defaultTotalAssaultConfig: TotalAssaultConfig = {
   defaultTotalAssault: "JP",
   defaultTotalAssaultEx: "JP",
 };
-const baseConfig = ref<BaseConfig>(defaultBaseConfig);
 const trainerConfig = ref<TrainerConfig>(defaultTrainerConfig);
 const tarotConfig = ref<TarotConfig>(defaultTarotConfig);
 const totalAssaultConfig = ref<TotalAssaultConfig>(defaultTotalAssaultConfig);
 const contactGachaConfig = ref<ContactGachaConfig>(defaultGachaConfig);
-const markdownConfig = computed({
-  get() {
-    return baseConfig.value.markdown;
-  },
-  set(val) {
-    baseConfig.value.markdown = val;
-  },
-});
 const trainerOverrideConfig = computed(() => trainerConfig.value.override);
 const { onEdit, onCancel, onConfirm, cache: overrideItem } = useTableInlineEditor(trainerOverrideConfig);
 
@@ -251,6 +215,7 @@ function onParseTrainerOption(data: TrainerConfig) {
   });
   return data;
 }
+
 function onSaveParseTrainerOption(data: TrainerConfig) {
   return {
     override: data.override
@@ -262,6 +227,7 @@ function onSaveParseTrainerOption(data: TrainerConfig) {
       })),
   };
 }
+
 function onAddOverride() {
   trainerOverrideConfig.value.splice(0, 0, {
     id: `${randomInt(0, 1024)}`,
@@ -271,12 +237,14 @@ function onAddOverride() {
     edit: false,
   });
 }
+
 function onDeleteOverride(override: TrainerConfig["override"][0]) {
   const index = trainerOverrideConfig.value.findIndex((it) => it.id === override.id);
   if (index !== -1) {
     trainerOverrideConfig.value.splice(index, 1);
   }
 }
+
 function onSearchTrainer(name: string) {
   if (name) {
     trainerSearchLoading.value = true;

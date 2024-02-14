@@ -138,9 +138,11 @@
         p-id="com·diyigemt·arona"
         p-key="ContactGachaConfig"
       >
-        <ElFormItem label="群每人日抽卡点数上限" prop="defaultTotalAssault">
-          <ElInputNumber v-model="contactGachaConfig.limit" :step="10" :min="0"></ElInputNumber>
-        </ElFormItem>
+        <template #default="{ from }">
+          <ElFormItem v-if="from !== 'user'" label="群每人日抽卡点数上限" prop="defaultTotalAssault">
+            <ElInputNumber v-model="contactGachaConfig.limit" :step="10" :min="0"></ElInputNumber>
+          </ElFormItem>
+        </template>
       </PluginPreferenceForm>
     </ElTabPane>
   </ElTabs>

@@ -6,6 +6,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender.Companion.read
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import kotlinx.serialization.Serializable
 
 object PluginMain : AronaPlugin(
@@ -36,7 +37,7 @@ data class CustomMenuRow(
 @Serializable
 data class CustomMenuConfig(
   val rows: List<CustomMenuRow> = listOf()
-) {
+) : PluginWebuiConfig() {
   constructor(vararg rows: CustomMenuRow) : this(listOf(*rows))
   fun toCustomKeyboard(): TencentCustomKeyboard {
     return tencentCustomKeyboard {

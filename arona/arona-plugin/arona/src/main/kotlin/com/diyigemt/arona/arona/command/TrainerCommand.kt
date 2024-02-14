@@ -16,6 +16,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender.Companion.read
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.isGuild
 import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
 import kotlinx.serialization.KSerializer
@@ -39,7 +40,7 @@ data class ImageQueryData(
 @Serializable
 data class TrainerConfig(
   val override: List<TrainerOverrideConfig> = listOf(),
-)
+) : PluginWebuiConfig()
 
 object TrainerOverrideTypeSerializer : KSerializer<TrainerOverrideType> {
   // TODO

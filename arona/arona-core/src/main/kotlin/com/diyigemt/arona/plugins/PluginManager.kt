@@ -8,10 +8,14 @@ import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.console.CommandMain
 import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.utils.commandLineLogger
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.core.CliktCommand
 import io.ktor.util.logging.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.serializerOrNull
 import java.io.File
 import java.net.URLClassLoader
 import java.nio.file.Path
@@ -48,6 +52,7 @@ object PluginManager {
     }
   }
 
+  @OptIn(InternalSerializationApi::class)
   @Suppress("UNCHECKED_CAST")
   private fun loadPluginFromFile(jarFile: File) {
     val jarURL = jarFile.toURI().toURL()
@@ -100,6 +105,17 @@ object PluginManager {
         .also {
           CommandMain.registerCommands(it as List<CliktCommand>)
         }
+      // 注册webui配置序列化类
+      val webuiConfigQuery = org.reflections.scanners.Scanners.SubTypes
+        .of(PluginWebuiConfig::class.java)
+        .asClass<PluginWebuiConfig>(pluginClassLoader)
+      webuiConfigQuery.apply(reflections.store)
+        .filter { PluginWebuiConfig::class.java.isAssignableFrom(it) }
+        .mapNotNull { it.kotlin.serializerOrNull() }
+        .forEach {
+          PluginWebuiConfigRecorder.register(pluginInstance, it)
+        }
+
       pluginInstance.internalOnEnable()
       plugins.add(pluginInstance)
       // 给插件注册command指令

@@ -17,6 +17,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender.Companion.read
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.MessageReceipt
 import com.diyigemt.arona.utils.currentLocalDateTime
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import kotlinx.serialization.Serializable
 import kotlin.math.max
 
@@ -31,7 +32,7 @@ data class TarotConfig(
   val fxxkDestiny: Boolean = false, // 是否启用逆天改命
   val dayOne: Boolean = true, // 每天最多抽一次?
   val cardType: TarotCardType = TarotCardType.A, // 卡面类型
-)
+) : PluginWebuiConfig()
 
 @Suppress("unused")
 object TarotCommand : AbstractCommand(

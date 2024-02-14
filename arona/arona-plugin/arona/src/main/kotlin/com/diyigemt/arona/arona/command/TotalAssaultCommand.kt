@@ -7,6 +7,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrNull
 import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.types.enum
@@ -27,7 +28,7 @@ enum class Server(val tag: String) {
 data class TotalAssaultConfig(
   val defaultTotalAssault: Server = Server.JP, // 总力战档线默认数据
   val defaultTotalAssaultEx: Server = Server.JP, // 大决战档线默认数据
-)
+) : PluginWebuiConfig()
 
 @Suppress("unused")
 object TotalAssaultCommand : AbstractCommand(

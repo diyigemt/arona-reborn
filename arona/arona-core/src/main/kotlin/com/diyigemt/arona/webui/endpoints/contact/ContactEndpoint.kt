@@ -2,6 +2,7 @@
 
 package com.diyigemt.arona.webui.endpoints.contact
 
+import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.permission.*
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
@@ -12,6 +13,9 @@ import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
+import com.diyigemt.arona.webui.event.ContentAuditEvent
+import com.diyigemt.arona.webui.event.isNotPass
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
@@ -433,11 +437,18 @@ internal object ContactEndpoint {
    */
   @AronaBackendEndpointPost("/{id}/plugin/preference")
   suspend fun PipelineContext<Unit, ApplicationCall>.savePreference() {
-    val obj = kotlin.runCatching { context.receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
+    val obj = kotlin.runCatching {
+      context.receive<PluginPreferenceResp>()
+    }.onFailure {
+      return badRequest()
+    }.getOrThrow()
+    val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
+    val ev = ContentAuditEvent(value).broadcast()
+    if (ev.isNotPass) return errorMessage(ev.message)
     contact.updatePluginConfig(
       obj.id,
       obj.key,
-      obj.value
+      value
     )
     return success()
   }
@@ -462,12 +473,15 @@ internal object ContactEndpoint {
   @AronaBackendEndpointPost("/{id}/member/plugin/member-preference")
   suspend fun PipelineContext<Unit, ApplicationCall>.saveMemberPreference() {
     val obj = kotlin.runCatching { context.receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
+    val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
+    val ev = ContentAuditEvent(value).broadcast()
+    if (ev.isNotPass) return errorMessage(ev.message)
     contact.findContactMemberOrNull(aronaUser.id)?.also {
       it.updatePluginConfig(
         contact.id,
         obj.id,
         obj.key,
-        obj.value
+        value
       )
       return success()
     }

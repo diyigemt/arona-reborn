@@ -1,7 +1,8 @@
 import { PropType } from "vue";
 import { ElButton, ElCol, ElForm, ElFormItem, ElInput, ElPopover, ElRow, ElSwitch } from "element-plus";
-import { Delete, Plus } from "@element-plus/icons-vue";
+import { Plus } from "@element-plus/icons-vue";
 import { CustomMenuButton, CustomMenuRow } from "@/interface";
+import { infoMessage } from "@/utils/message";
 
 export const CustomButton = defineComponent({
   props: {
@@ -10,7 +11,7 @@ export const CustomButton = defineComponent({
       required: true,
     },
   },
-  emits: ["update:button"],
+  emits: ["update:button", "delete"],
   setup(prop, { emit }) {
     const data = ref(prop.button);
     watch(
@@ -20,6 +21,9 @@ export const CustomButton = defineComponent({
       },
       { deep: true },
     );
+    function onDeleteButton() {
+      emit("delete");
+    }
     const slots = {
       default: () => (
         <>
@@ -34,7 +38,9 @@ export const CustomButton = defineComponent({
               <ElSwitch v-model={data.value.enter} activeValue={true} inactiveValue={false} />
             </ElFormItem>
             <ElFormItem class={"mb-0!"}>
-              <ElButton type={"danger"}>删除</ElButton>
+              <ElButton type={"danger"} onClick={onDeleteButton}>
+                删除
+              </ElButton>
             </ElFormItem>
           </ElForm>
         </>
@@ -59,17 +65,44 @@ export const CustomRow = defineComponent({
       required: true,
     },
   },
-  setup(props) {
-    function onButtonUpdate(b: CustomMenuButton, idx: number) {
-      console.log(b, idx);
+  emits: ["update:row"],
+  setup(props, { emit }) {
+    const buttons = ref(props.row.buttons);
+    const overflow = computed(() => buttons.value.length >= 5);
+    function onButtonUpdate() {
+      update();
+    }
+    function onButtonAdd() {
+      if (buttons.value.length >= 5) {
+        infoMessage("放不下了");
+        return;
+      }
+      buttons.value.push({
+        label: "",
+        data: "",
+        enter: false,
+      });
+      update();
+    }
+    function onButtonDelete(index: number) {
+      buttons.value.splice(index, 1);
+      update();
+    }
+    function update() {
+      emit("update:row", {
+        buttons: buttons.value,
+      });
     }
     return () => (
       <ElRow gutter={16}>
-        {props.row.buttons.map((it, index) => (
-          <CustomButton button={it} key={index} onUpdate:button={onButtonUpdate}></CustomButton>
+        {buttons.value.map((it, index) => (
+          <CustomButton button={it} key={index} onUpdate:button={onButtonUpdate} onDelete={() => onButtonDelete(index)} />
         ))}
-        <ElCol class={"max-w-60px!"}>
-          <ElButton type={"primary"} icon={Plus} />
+        <ElCol
+          class={"max-w-60px!"}
+          style={{ opacity: overflow.value ? 0 : 1, "pointer-events": overflow.value ? "none" : "initial" }}
+        >
+          <ElButton type={"primary"} icon={Plus} onClick={onButtonAdd} />
         </ElCol>
       </ElRow>
     );

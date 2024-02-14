@@ -7,15 +7,17 @@
         p-id="com·diyigemt·arona"
         p-key="BaseConfig"
       >
-        <ElFormItem label="启用markdown" prop="enable">
-          <ElSwitch
-            v-model="markdownConfig.enable"
-            :active-value="true"
-            :inactive-value="false"
-            active-text="启用"
-            inactive-text="停用"
-          />
-        </ElFormItem>
+        <template #default="{ from }">
+          <ElFormItem v-if="from === 'user'" label="启用markdown" prop="enable">
+            <ElSwitch
+              v-model="markdownConfig.enable"
+              :active-value="true"
+              :inactive-value="false"
+              active-text="启用"
+              inactive-text="停用"
+            />
+          </ElFormItem>
+        </template>
       </PluginPreferenceForm>
     </ElTabPane>
     <ElTabPane name="menu" label="快捷菜单设置">

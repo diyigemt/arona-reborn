@@ -7,6 +7,7 @@ import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuerySuspended
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.name
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
@@ -18,7 +19,6 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.id.IdTable
 import org.jetbrains.exposed.sql.Column
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 
 private const val BASE_ID_KEY = "BASE_ID"
 private val BASE_ID: String
@@ -63,33 +63,33 @@ abstract class PluginVisibleData {
   fun String.toMongodbKey() = this.replace(".", "·")
   fun String.fromMongodbKey() = this.replace("·", ".")
   @OptIn(InternalSerializationApi::class)
-  inline fun <reified T : Any> readPluginConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
+  inline fun <reified T : PluginWebuiConfig> readPluginConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
     readPluginConfigOrNull(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
 
   @OptIn(InternalSerializationApi::class)
-  inline fun <reified T : Any> readPluginConfigOrDefault(plugin: CommandOwner, default: T, key: String = T::class.name) =
+  inline fun <reified T : PluginWebuiConfig> readPluginConfigOrDefault(plugin: CommandOwner, default: T, key: String = T::class.name) =
     readPluginConfigOrDefault(plugin.permission.id.nameSpace.toMongodbKey(), default, key, T::class.serializer())
 
   @OptIn(InternalSerializationApi::class)
-  inline fun <reified T : Any> readPluginConfig(plugin: CommandOwner, key: String = T::class.name) =
+  inline fun <reified T : PluginWebuiConfig> readPluginConfig(plugin: CommandOwner, key: String = T::class.name) =
     readPluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
 
-  suspend inline fun <reified T : Any> updatePluginConfig(plugin: CommandOwner, value: T, key: String = T::class.name) =
+  suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(plugin: CommandOwner, value: T, key: String = T::class.name) =
     updatePluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, JsonIgnoreUnknownKeys.encodeToString(value))
 
-  fun <T> readPluginConfigOrNull(pluginId: String, key: String, serializer: KSerializer<T>): T? {
+  fun <T : PluginWebuiConfig> readPluginConfigOrNull(pluginId: String, key: String, serializer: KSerializer<T>): T? {
     return config[pluginId.toMongodbKey()]?.get(key)?.let {
       JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
     }
   }
 
-  fun <T> readPluginConfigOrDefault(pluginId: String, default: T, key: String, serializer: KSerializer<T>): T {
+  fun <T : PluginWebuiConfig> readPluginConfigOrDefault(pluginId: String, default: T, key: String, serializer: KSerializer<T>): T {
     return config[pluginId.toMongodbKey()]?.get(key)?.let {
       JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
     } ?: default
   }
 
-  fun <T> readPluginConfig(pluginId: String, key: String, serializer: KSerializer<T>): T {
+  fun <T : PluginWebuiConfig> readPluginConfig(pluginId: String, key: String, serializer: KSerializer<T>): T {
     return config[pluginId.toMongodbKey()]!![key]!!.let {
       JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
     }

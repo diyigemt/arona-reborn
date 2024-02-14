@@ -1,11 +1,17 @@
 package com.diyigemt.arona.webui.endpoints.plugin
 
+import com.diyigemt.arona.communication.event.broadcast
+import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.badRequest
+import com.diyigemt.arona.utils.errorMessage
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointPost
 import com.diyigemt.arona.webui.endpoints.aronaUser
+import com.diyigemt.arona.webui.event.ContentAuditEvent
+import com.diyigemt.arona.webui.event.isNotPass
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.util.pipeline.*
@@ -39,11 +45,18 @@ object PluginPreferenceEndpoint {
   }
   @AronaBackendEndpointPost
   suspend fun PipelineContext<Unit, ApplicationCall>.savePreference() {
-    val obj = kotlin.runCatching { context.receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
+    val obj = kotlin.runCatching {
+      context.receive<PluginPreferenceResp>()
+    }.onFailure {
+      return badRequest()
+    }.getOrNull() ?: return badRequest()
+    val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
+    val ev = ContentAuditEvent(value).broadcast()
+    if (ev.isNotPass) return errorMessage(ev.message)
     aronaUser.updatePluginConfig(
       obj.id,
       obj.key,
-      obj.value
+      value
     )
     return success()
   }

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Plus } from "@element-plus/icons-vue";
-import { CustomMenuConfig } from "@/interface";
+import { CustomMenuConfig, CustomMenuRow } from "@/interface";
 import { CustomRow } from "@/views/config/plugin/component/CustomButton";
 
 defineOptions({
   name: "CustomMenu",
 });
 // eslint-disable-next-line no-undef
-const menuData = withDefaults(defineProps<{ data: CustomMenuConfig }>(), {
+const props = withDefaults(defineProps<{ data: CustomMenuConfig }>(), {
   data: () => ({
     rows: [
       {
@@ -43,17 +43,41 @@ const menuData = withDefaults(defineProps<{ data: CustomMenuConfig }>(), {
     ],
   }),
 });
+const menu = ref(props.data);
 const emit = defineEmits<{
   (e: "update:data", data: CustomMenuConfig): void;
 }>();
+function onRowAdd() {
+  menu.value.rows.push({
+    buttons: [],
+  });
+}
+function onRowUpdate(row: CustomMenuRow, index: number) {
+  if (row.buttons.length === 0) {
+    menu.value.rows.splice(index, 1);
+  } else {
+    menu.value.rows.splice(index, 1, row);
+  }
+}
+function update() {
+  emit("update:data", {
+    rows: menu.value.rows,
+  });
+}
 </script>
 
 <template>
   <div>
-    <CustomRow v-for="(e, index) in data.rows" :key="index" :row="e" class="mb-8px" />
-    <ElRow :gutter="16">
+    <CustomRow
+      v-for="(e, index) in menu.rows"
+      :key="e"
+      :row="e"
+      class="mb-8px"
+      @update:row="onRowUpdate($event, index)"
+    />
+    <ElRow v-if="menu.rows.length < 5" :gutter="16">
       <ElCol class="flex-1!">
-        <ElButton :icon="Plus" plain class="w-100% mb-8px" />
+        <ElButton :icon="Plus" plain class="w-100% mb-8px" @click="onRowAdd" />
       </ElCol>
       <ElCol class="max-w-60px! flex-1!" style="opacity: 0">
         <ElButton :icon="Plus" />

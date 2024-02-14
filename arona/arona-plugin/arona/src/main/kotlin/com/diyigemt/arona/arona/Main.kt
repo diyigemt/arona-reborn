@@ -29,6 +29,7 @@ object Arona : AronaPlugin(
       json
     }
   }
+  private val errorList = mutableListOf<String>()
 
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentBotUserChangeEvent> {
@@ -46,6 +47,17 @@ object Arona : AronaPlugin(
     // 全局异常处理
     pluginEventChannel().subscribeAlways<MessagePostSendEvent<*>> {
       if (it.isFailure && it.isTencentError) {
+        val sourceId = it.message.sourceId
+        if (sourceId in errorList) {
+          // 在发送错误消息时出错, 不再发送
+          errorList.remove(sourceId)
+          return@subscribeAlways
+        }
+        if (sourceId.isBlank()) {
+          // 空的sourceId 应该是哪里出错了
+          return@subscribeAlways
+        }
+        errorList.add(sourceId)
         MessageChainBuilder(it.message.sourceId)
           .append("错误发生")
           .append("message: ${(it.exception as TencentApiErrorException).source.message}")

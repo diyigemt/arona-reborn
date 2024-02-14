@@ -212,7 +212,7 @@ onMounted(() => {
 <template>
   <UserContactSwitcher v-model="editType" :contacts="contactSelect" @import="onImport" />
   <ElForm ref="formEl" :model="props.form">
-    <slot />
+    <slot :from="editType.type" />
     <ElFormItem>
       <ElButton @click="onCancel">取消</ElButton>
       <ElButton type="primary" @click="onConfirm">提交</ElButton>

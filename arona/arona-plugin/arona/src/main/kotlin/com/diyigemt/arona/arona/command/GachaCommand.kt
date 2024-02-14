@@ -27,6 +27,7 @@ import com.diyigemt.arona.console.confirm
 import com.diyigemt.arona.utils.currentLocalDateTime
 import com.diyigemt.arona.utils.runSuspend
 import com.diyigemt.arona.utils.uuid
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.core.terminal
@@ -52,7 +53,7 @@ data class UserGachaRecordItem(
 @Serializable
 data class UserGachaRecord(
   val map: MutableMap<Int, UserGachaRecordItem> = mutableMapOf(),
-)
+) : PluginWebuiConfig()
 
 @Serializable
 data class ContactGachaLimitItem(
@@ -64,12 +65,12 @@ data class ContactGachaLimitItem(
 @Serializable
 data class ContactGachaLimitRecord(
   val map: MutableMap<String, MutableMap<Int, ContactGachaLimitItem>> = mutableMapOf(),
-)
+) : PluginWebuiConfig()
 
 @Serializable
 data class ContactGachaConfig(
   val limit: Int = 0,
-)
+) : PluginWebuiConfig()
 
 @Suppress("unused")
 object GachaCommand : AbstractCommand(

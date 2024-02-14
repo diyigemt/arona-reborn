@@ -18,6 +18,7 @@ import com.diyigemt.arona.utils.childScope
 import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.qualifiedNameOrTip
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
@@ -103,34 +104,34 @@ interface UserCommandSender : CommandSender {
     /**
      * 优先级 环境默认 > 用户分环境 > 用户默认
      */
-    suspend inline fun <reified T : Any> UserCommandSender.readPluginConfigOrNull(plugin: CommandOwner) =
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.readPluginConfigOrNull(plugin: CommandOwner) =
       contactDocument().readPluginConfigOrNull<T>(plugin) ?: contactMember().readPluginConfigOrNull<T>(plugin)
       ?: userDocument().readPluginConfigOrNull<T>(plugin)
 
-    suspend inline fun <reified T : Any> UserCommandSender.readPluginConfigOrDefault(plugin: CommandOwner, default: T) =
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.readPluginConfigOrDefault(plugin: CommandOwner, default: T) =
       contactDocument().readPluginConfigOrNull<T>(plugin) ?: contactMember().readPluginConfigOrNull<T>(plugin)
       ?: userDocument().readPluginConfigOrDefault<T>(plugin, default)
 
-    suspend inline fun <reified T : Any> UserCommandSender.readPluginConfig(plugin: CommandOwner) =
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.readPluginConfig(plugin: CommandOwner) =
       contactDocument().readPluginConfigOrNull<T>(plugin) ?: contactMember().readPluginConfigOrNull<T>(plugin)
       ?: userDocument().readPluginConfig<T>(plugin)
 
-    suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfigOrNull(plugin: CommandOwner) =
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.readUserPluginConfigOrNull(plugin: CommandOwner) =
       contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfigOrNull<T>(plugin)
 
-    suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfigOrDefault(
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.readUserPluginConfigOrDefault(
       plugin: CommandOwner,
       default: T,
     ) =
       contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfigOrDefault<T>(plugin, default)
 
-    suspend inline fun <reified T : Any> UserCommandSender.readUserPluginConfig(plugin: CommandOwner) =
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.readUserPluginConfig(plugin: CommandOwner) =
       contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfig<T>(plugin)
 
-    suspend inline fun <reified T : Any> UserCommandSender.updateUserPluginConfig(plugin: CommandOwner, value: T) =
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.updateUserPluginConfig(plugin: CommandOwner, value: T) =
       userDocument().updatePluginConfig<T>(plugin, value)
 
-    suspend inline fun <reified T : Any> UserCommandSender.updateContactPluginConfig(plugin: CommandOwner, value: T) =
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.updateContactPluginConfig(plugin: CommandOwner, value: T) =
       contactDocument().updatePluginConfig<T>(plugin, value)
 
   }

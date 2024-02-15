@@ -1,4 +1,4 @@
-package com.diyigemt.arona.custom.menu
+package com.diyigemt.arona.maintain.notifier
 
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.MessageChainBuilder

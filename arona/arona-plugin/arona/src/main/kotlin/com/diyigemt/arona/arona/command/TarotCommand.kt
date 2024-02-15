@@ -16,6 +16,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender.Companion.read
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrNull
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.MessageReceipt
+import com.diyigemt.arona.communication.message.isFailed
 import com.diyigemt.arona.utils.currentLocalDateTime
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import kotlinx.serialization.Serializable
@@ -151,11 +152,11 @@ object TarotCommand : AbstractCommand(
     } ?: commandSender.subject.uploadImage(url).also {
       dbQuery { it.update(name, from) }
     }
-    val mayFail = MessageChainBuilder()
+    val resp = MessageChainBuilder()
       .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
       .append(im)
       .build().let { ch -> commandSender.sendMessage(ch) }
-    if (mayFail == MessageReceipt.ErrorMessageReceipt) {
+    if (resp.isFailed) {
       commandSender.subject.uploadImage(url).also { image ->
         commandSender.sendMessage(
           MessageChainBuilder()

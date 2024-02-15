@@ -14,7 +14,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.custom.menu",
     name = "custom-menu",
     author = "diyigemt",
-    version = "0.1.0",
+    version = "0.2.0",
     description = "快捷菜单"
   )
 ) {

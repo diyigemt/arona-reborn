@@ -14,7 +14,7 @@ import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
 import com.diyigemt.arona.webui.event.ContentAuditEvent
-import com.diyigemt.arona.webui.event.isNotPass
+import com.diyigemt.arona.webui.event.isBlock
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Aggregates
@@ -444,7 +444,7 @@ internal object ContactEndpoint {
     }.getOrThrow()
     val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
     val ev = ContentAuditEvent(value).broadcast()
-    if (ev.isNotPass) return errorMessage(ev.message)
+    if (ev.isBlock) return errorMessage("内容审核失败: ${ev.message}")
     contact.updatePluginConfig(
       obj.id,
       obj.key,
@@ -475,7 +475,7 @@ internal object ContactEndpoint {
     val obj = kotlin.runCatching { context.receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
     val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
     val ev = ContentAuditEvent(value).broadcast()
-    if (ev.isNotPass) return errorMessage(ev.message)
+    if (ev.isBlock) return errorMessage("内容审核失败: ${ev.message}")
     contact.findContactMemberOrNull(aronaUser.id)?.also {
       it.updatePluginConfig(
         contact.id,

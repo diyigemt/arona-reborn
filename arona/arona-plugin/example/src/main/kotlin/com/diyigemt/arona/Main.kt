@@ -1,4 +1,4 @@
-package com.diyigemt.arona.custom.menu
+package com.diyigemt.arona
 
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription

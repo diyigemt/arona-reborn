@@ -5,7 +5,7 @@ plugins {
   id("io.ktor.plugin") version "2.3.7"
   id("org.jetbrains.kotlin.plugin.serialization") version "1.9.10"
 }
-version = "1.1.7"
+version = "1.1.8"
 application {
   mainClass.set("com.diyigemt.arona.ApplicationKt")
 
@@ -45,16 +45,16 @@ task("copyToPlugins") {
 }
 
 dependencies {
-  implementation("io.ktor:ktor-server-cors")
-  implementation("io.ktor:ktor-server-core-jvm")
+  api("io.ktor:ktor-server-cors")
+  api("io.ktor:ktor-server-core-jvm")
   implementation("io.ktor:ktor-server-netty-jvm")
   implementation("io.ktor:ktor-server-status-pages")
-  implementation("io.ktor:ktor-server-double-receive")
+  api("io.ktor:ktor-server-double-receive")
   implementation("io.ktor:ktor-server-call-logging-jvm")
   implementation("io.ktor:ktor-server-forwarded-header-jvm")
   implementation("io.ktor:ktor-server-host-common-jvm")
   implementation("io.ktor:ktor-server-status-pages-jvm")
-  implementation("io.ktor:ktor-server-double-receive-jvm")
+  api("io.ktor:ktor-server-double-receive-jvm")
   implementation("io.ktor:ktor-server-content-negotiation-jvm")
 
   implementation("io.ktor:ktor-client-cio")

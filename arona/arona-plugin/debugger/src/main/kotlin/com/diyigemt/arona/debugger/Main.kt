@@ -10,7 +10,7 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
   id = "com.diyigemt.arona.debugger",
   name = "debugger",
   author = "diyigemt",
-  version = "2.3.3",
+  version = "0.2.0",
   description = "debugger"
 )) {
   override fun onLoad() {

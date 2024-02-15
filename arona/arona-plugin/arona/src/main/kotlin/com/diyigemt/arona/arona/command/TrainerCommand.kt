@@ -92,7 +92,7 @@ object TrainerCommand : AbstractCommand(
       when (im) {
         is TencentImage -> {
           sendMessage(im).also {
-            if (it == MessageReceipt.ErrorMessageReceipt) {
+            if (it.isFailed) {
               subject.uploadImage(url).also { image ->
                 sendMessage(image)
                 dbQuery { image.update(hash, from) }

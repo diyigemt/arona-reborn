@@ -24,10 +24,12 @@
       <PluginPreferenceForm
         v-model:form="menuConfig"
         :default-form="defaultCustomMenuConfig"
-        p-id="com·diyigemt·arona"
+        p-id="com·diyigemt·arona·custom·menu"
         p-key="CustomMenuConfig"
       >
-        <CustomMenu :data="defaultCustomMenuConfig" class="w-600px" />
+        <template #default="{ from }">
+          <CustomMenu v-if="from !== 'manage-contact'" :data="defaultCustomMenuConfig" class="w-600px" />
+        </template>
       </PluginPreferenceForm>
     </ElTabPane>
   </ElTabs>
@@ -39,7 +41,7 @@ import { CustomMenuConfig } from "@/interface";
 import CustomMenu from "@/views/config/plugin/component/CustomMenu.vue";
 
 defineOptions({
-  name: "AronaPreferences",
+  name: "BasePreferences",
 });
 interface MarkdownCompatiblyConfig {
   enable: boolean;

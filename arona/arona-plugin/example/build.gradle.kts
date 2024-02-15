@@ -2,6 +2,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
   kotlin("jvm") version "1.9.10"
+  id("io.ktor.plugin") version "2.3.3"
 }
 
 val projectMainClass = "com.diyigemt.arona.example.PluginMain"
@@ -14,7 +15,9 @@ dependencies {
 tasks.test {
   useJUnitPlatform()
 }
-
+application {
+  mainClass.set(projectMainClass)
+}
 tasks.withType<Jar> {
   manifest {
     attributes["Main-Class"] = projectMainClass

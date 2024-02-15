@@ -907,6 +907,9 @@ data class MessageReceipt(
   }
 }
 
+val MessageReceipt?.isFailed
+  get() = this == null
+
 fun Message.toMessageChain(): MessageChain = when (this) {
   is MessageChain -> this
   else -> MessageChainImpl("", null, mutableListOf(this))

@@ -2,6 +2,7 @@
 import { Plus } from "@element-plus/icons-vue";
 import { CustomMenuConfig, CustomMenuRow } from "@/interface";
 import { CustomRow } from "@/views/config/plugin/component/CustomButton";
+import { useForceUpdate } from "@/utils";
 
 defineOptions({
   name: "CustomMenu",
@@ -47,6 +48,7 @@ const menu = ref(props.data);
 const emit = defineEmits<{
   (e: "update:data", data: CustomMenuConfig): void;
 }>();
+const { visible, update: forceUpdate } = useForceUpdate();
 function onRowAdd() {
   menu.value.rows.push({
     buttons: [],
@@ -55,6 +57,7 @@ function onRowAdd() {
 function onRowUpdate(row: CustomMenuRow, index: number) {
   if (row.buttons.length === 0) {
     menu.value.rows.splice(index, 1);
+    forceUpdate();
   } else {
     menu.value.rows.splice(index, 1, row);
   }
@@ -68,13 +71,15 @@ function update() {
 
 <template>
   <div>
-    <CustomRow
-      v-for="(e, index) in menu.rows"
-      :key="e"
-      :row="e"
-      class="mb-8px"
-      @update:row="onRowUpdate($event, index)"
-    />
+    <div v-if="visible">
+      <CustomRow
+        v-for="(e, index) in menu.rows"
+        :key="index"
+        :row="e"
+        class="mb-8px"
+        @update:row="onRowUpdate($event, index)"
+      />
+    </div>
     <ElRow v-if="menu.rows.length < 5" :gutter="16">
       <ElCol class="flex-1!">
         <ElButton :icon="Plus" plain class="w-100% mb-8px" @click="onRowAdd" />

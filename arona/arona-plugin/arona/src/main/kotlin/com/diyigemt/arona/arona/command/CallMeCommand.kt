@@ -6,6 +6,9 @@ import com.diyigemt.arona.arona.database.name.TeacherNameSchema
 import com.diyigemt.arona.arona.tools.queryTeacherNameFromDB
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.event.broadcast
+import com.diyigemt.arona.webui.event.ContentAuditEvent
+import com.diyigemt.arona.webui.event.isBlock
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 
@@ -24,6 +27,11 @@ object CallMeCommand : AbstractCommand(
       return
     }
     var name = expect as String
+    val ev = ContentAuditEvent(name).broadcast()
+    if (ev.isBlock) {
+      sendMessage("违禁词: ${ev.message}")
+      return
+    }
     if (name.length > 20) {
       sendMessage("名称不能超过20个字符")
       return

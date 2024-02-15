@@ -57,11 +57,10 @@ internal class UserSchema(id: EntityID<String>) : Entity<String>(id) {
   var uid by UserTable.uid
   val registerTime by UserTable.registerTime
 }
-
+fun String.toMongodbKey() = this.replace(".", "·")
+fun String.fromMongodbKey() = this.replace("·", ".")
 abstract class PluginVisibleData {
   abstract val config: Map<String, Map<String, String>>
-  fun String.toMongodbKey() = this.replace(".", "·")
-  fun String.fromMongodbKey() = this.replace("·", ".")
   @OptIn(InternalSerializationApi::class)
   inline fun <reified T : PluginWebuiConfig> readPluginConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
     readPluginConfigOrNull(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())

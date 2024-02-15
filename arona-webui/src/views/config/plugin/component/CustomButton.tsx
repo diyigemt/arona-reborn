@@ -10,10 +10,16 @@ export const CustomButton = defineComponent({
       type: Object as PropType<CustomMenuButton>,
       required: true,
     },
+    index: {
+      type: Number,
+      required: true,
+    },
   },
   emits: ["update:button", "delete"],
   setup(prop, { emit }) {
     const data = ref(prop.button);
+    const visibleIndex = inject("visibleIndex", ref(-1));
+    const visible = computed(() => prop.index === visibleIndex.value);
     watch(
       () => data.value,
       () => {

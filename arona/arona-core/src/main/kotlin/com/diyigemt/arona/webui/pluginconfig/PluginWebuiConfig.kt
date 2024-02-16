@@ -9,7 +9,10 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
 @Serializable
-abstract class PluginWebuiConfig
+abstract class PluginWebuiConfig {
+  // 更新用户提交的信息, 防止注入
+  abstract fun check()
+}
 
 object PluginWebuiConfigRecorder {
   private val map : MutableMap<String, MutableMap<String, KSerializer<*>>> = mutableMapOf()
@@ -26,8 +29,9 @@ object PluginWebuiConfigRecorder {
   fun checkDataSafety(obj: PluginPreferenceResp): String? {
     val serializer = getSerializer(obj.id, obj.key) ?: return null
     return kotlin.runCatching {
-      val decode = JsonIgnoreUnknownKeys.decodeFromString(serializer, obj.value) as Any
-      JsonIgnoreUnknownKeys.encodeToString(serializer as KSerializer<Any>, decode)
+      val decode = JsonIgnoreUnknownKeys.decodeFromString(serializer, obj.value) as PluginWebuiConfig
+      decode.check()
+      JsonIgnoreUnknownKeys.encodeToString(serializer as KSerializer<PluginWebuiConfig>, decode)
     }.getOrNull()
   }
   private fun getSerializer(id: String, key: String): KSerializer<*>? {

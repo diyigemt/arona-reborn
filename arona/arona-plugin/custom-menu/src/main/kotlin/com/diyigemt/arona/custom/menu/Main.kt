@@ -30,15 +30,26 @@ data class CustomMenuButton(
 )
 @Serializable
 data class CustomMenuRow(
-  val buttons: List<CustomMenuButton>
+  val buttons: MutableList<CustomMenuButton>
 ) {
-  constructor(vararg buttons: CustomMenuButton) : this(listOf(*buttons))
+  constructor(vararg buttons: CustomMenuButton) : this(mutableListOf(*buttons))
 }
 @Serializable
 data class CustomMenuConfig(
-  val rows: List<CustomMenuRow> = listOf()
+  val rows: MutableList<CustomMenuRow> = mutableListOf()
 ) : PluginWebuiConfig() {
-  constructor(vararg rows: CustomMenuRow) : this(listOf(*rows))
+  constructor(vararg rows: CustomMenuRow) : this(mutableListOf(*rows))
+
+  override fun check() {
+    while (rows.size > 5) {
+      rows.removeLast()
+    }
+    rows.forEach {
+      while (it.buttons.size > 5) {
+        it.buttons.removeLast()
+      }
+    }
+  }
   fun toCustomKeyboard(): TencentCustomKeyboard {
     return tencentCustomKeyboard {
       rows.forEachIndexed { i, r ->

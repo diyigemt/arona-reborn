@@ -10,7 +10,7 @@ val projectMainClass = "com.diyigemt.arona.arona.Arona"
 version = "1.0.19"
 dependencies {
   compileOnly(project(":arona-core"))
-
+  compileOnly("io.ktor:ktor-server-core-jvm")
   implementation("io.ktor:ktor-client-cio")
   implementation("io.ktor:ktor-client-core")
   implementation("io.ktor:ktor-client-content-negotiation")

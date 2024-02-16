@@ -53,7 +53,9 @@ data class UserGachaRecordItem(
 @Serializable
 data class UserGachaRecord(
   val map: MutableMap<Int, UserGachaRecordItem> = mutableMapOf(),
-) : PluginWebuiConfig()
+) : PluginWebuiConfig() {
+  override fun check() {}
+}
 
 @Serializable
 data class ContactGachaLimitItem(
@@ -65,12 +67,16 @@ data class ContactGachaLimitItem(
 @Serializable
 data class ContactGachaLimitRecord(
   val map: MutableMap<String, MutableMap<Int, ContactGachaLimitItem>> = mutableMapOf(),
-) : PluginWebuiConfig()
+) : PluginWebuiConfig() {
+  override fun check() {}
+}
 
 @Serializable
 data class ContactGachaConfig(
   val limit: Int = 0,
-) : PluginWebuiConfig()
+) : PluginWebuiConfig() {
+  override fun check() {}
+}
 
 @Suppress("unused")
 object GachaCommand : AbstractCommand(

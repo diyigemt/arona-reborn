@@ -101,3 +101,11 @@ body {
   border-radius: 4px;
   font-size: 16px !important;
 }
+// 隐藏form的required的*号
+.hide-required {
+  .el-form-item__label {
+    &:before {
+      display: none;
+    }
+  }
+}

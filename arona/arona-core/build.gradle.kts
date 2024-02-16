@@ -45,16 +45,16 @@ task("copyToPlugins") {
 }
 
 dependencies {
-  api("io.ktor:ktor-server-cors")
-  api("io.ktor:ktor-server-core-jvm")
+  implementation("io.ktor:ktor-server-cors")
+  implementation("io.ktor:ktor-server-core-jvm")
   implementation("io.ktor:ktor-server-netty-jvm")
   implementation("io.ktor:ktor-server-status-pages")
-  api("io.ktor:ktor-server-double-receive")
+  implementation("io.ktor:ktor-server-double-receive")
   implementation("io.ktor:ktor-server-call-logging-jvm")
   implementation("io.ktor:ktor-server-forwarded-header-jvm")
   implementation("io.ktor:ktor-server-host-common-jvm")
   implementation("io.ktor:ktor-server-status-pages-jvm")
-  api("io.ktor:ktor-server-double-receive-jvm")
+  implementation("io.ktor:ktor-server-double-receive-jvm")
   implementation("io.ktor:ktor-server-content-negotiation-jvm")
 
   implementation("io.ktor:ktor-client-cio")

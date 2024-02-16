@@ -33,7 +33,9 @@ data class TarotConfig(
   val fxxkDestiny: Boolean = false, // 是否启用逆天改命
   val dayOne: Boolean = true, // 每天最多抽一次?
   val cardType: TarotCardType = TarotCardType.A, // 卡面类型
-) : PluginWebuiConfig()
+) : PluginWebuiConfig() {
+  override fun check() {}
+}
 
 @Suppress("unused")
 object TarotCommand : AbstractCommand(

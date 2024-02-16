@@ -28,6 +28,14 @@ const PluginRouter: Array<RouteRecordRaw> = [
         },
         component: () => import("@/views/config/plugin/AronaPreferences.vue"),
       },
+      {
+        path: "arona-gacha",
+        name: "arona-gacha",
+        meta: {
+          title: "抽卡设置",
+        },
+        component: () => import("@/views/config/plugin/GachaPoolPreferences.vue"),
+      },
     ],
   },
 ];

@@ -28,7 +28,9 @@ enum class Server(val tag: String) {
 data class TotalAssaultConfig(
   val defaultTotalAssault: Server = Server.JP, // 总力战档线默认数据
   val defaultTotalAssaultEx: Server = Server.JP, // 大决战档线默认数据
-) : PluginWebuiConfig()
+) : PluginWebuiConfig() {
+  override fun check() {}
+}
 
 @Suppress("unused")
 object TotalAssaultCommand : AbstractCommand(

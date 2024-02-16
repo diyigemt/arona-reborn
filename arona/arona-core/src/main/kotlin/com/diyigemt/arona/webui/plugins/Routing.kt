@@ -13,8 +13,19 @@ import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.hasAnnotation
 
+object RoutingManager {
+  private val endpointObjects: MutableList<Any> = mutableListOf()
+  init {
+    endpointObjects.addAll(ReflectionUtil.scanTypeAnnotatedObjectInstance(AronaBackendEndpoint::class))
+  }
+  fun registerEndpoint(endpoint: Any) = endpointObjects.add(endpoint)
+  fun endpoints(): List<Any> {
+    return endpointObjects
+  }
+}
+
 fun Application.configureRouting() {
-  val endpoints = ReflectionUtil.scanTypeAnnotatedObjectInstance(AronaBackendEndpoint::class)
+  val endpoints = RoutingManager.endpoints()
   val adminCallInterceptors = endpoints.map {
     ReflectionUtil
       .scanMethodWithAnnotated<AronaBackendAdminRouteInterceptor>(it::class).map { method ->

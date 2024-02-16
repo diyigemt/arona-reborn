@@ -40,7 +40,9 @@ data class ImageQueryData(
 @Serializable
 data class TrainerConfig(
   val override: List<TrainerOverrideConfig> = listOf(),
-) : PluginWebuiConfig()
+) : PluginWebuiConfig() {
+  override fun check() {}
+}
 
 object TrainerOverrideTypeSerializer : KSerializer<TrainerOverrideType> {
   // TODO

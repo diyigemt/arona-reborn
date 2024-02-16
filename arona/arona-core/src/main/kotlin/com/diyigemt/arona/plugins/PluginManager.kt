@@ -8,8 +8,10 @@ import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.console.CommandMain
 import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.utils.commandLineLogger
+import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
+import com.diyigemt.arona.webui.plugins.RoutingManager
 import com.github.ajalt.clikt.core.CliktCommand
 import io.ktor.util.logging.*
 import kotlinx.coroutines.CoroutineScope
@@ -114,6 +116,15 @@ object PluginManager {
         .mapNotNull { it.kotlin.serializerOrNull() }
         .forEach {
           PluginWebuiConfigRecorder.register(pluginInstance, it)
+        }
+      // 注册webui节点
+      val webuiEndpointsQuery = org.reflections.scanners.Scanners.TypesAnnotated
+        .of(AronaBackendEndpoint::class.java)
+        .asClass<Class<*>>(pluginClassLoader)
+      webuiEndpointsQuery.apply(reflections.store)
+        .mapNotNull { it.kotlin.objectInstance }
+        .forEach {
+          RoutingManager.registerEndpoint(it)
         }
 
       pluginInstance.internalOnEnable()

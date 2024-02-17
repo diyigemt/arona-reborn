@@ -41,7 +41,14 @@ data class TarotConfig(
 object TarotCommand : AbstractCommand(
   Arona,
   "塔罗牌",
-  description = "抽一张ba风格的塔罗牌, 画师pixiv@Shi0n"
+  description = "抽一张ba风格的塔罗牌",
+  help = """
+    提供两种不同的卡面
+    
+    可配置一天内结果是否相同
+    
+    都在webui里修改
+  """.trimIndent()
 ) {
   private const val TarotCount = 22
   private val PositiveMap = mapOf(

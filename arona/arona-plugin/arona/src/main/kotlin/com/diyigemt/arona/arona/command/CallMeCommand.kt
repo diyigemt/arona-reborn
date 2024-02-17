@@ -16,7 +16,12 @@ import com.github.ajalt.clikt.parameters.arguments.optional
 object CallMeCommand : AbstractCommand(
   Arona,
   "叫我",
-  description = "记录用于称呼的名字"
+  description = "记录用于称呼的名字",
+  help = """
+    /叫我, 回复当前昵称
+    
+    /叫我 <期望的称呼>, 记录昵称
+  """.trimIndent()
 ) {
   private val expect by argument(name = "期望的称呼", help = "期望的称呼").optional()
   suspend fun UserCommandSender.callMe() {

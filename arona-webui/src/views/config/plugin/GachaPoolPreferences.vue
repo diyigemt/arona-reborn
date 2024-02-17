@@ -196,6 +196,9 @@ const rate = computed(() => gachaPool.value.rate);
 const gachaPoolConfig = ref<GachaPoolConfig>(defaultGachaPoolConfig);
 let isPoolCreate = false;
 function onCreate() {
+  if (!gachaPoolConfig.value.pools) {
+    gachaPoolConfig.value.pools = [];
+  }
   if (gachaPoolConfig.value.pools.length >= 5) {
     warningMessage("只支持配置最高5个");
     return;
@@ -250,24 +253,24 @@ function onEditRate() {
     gachaPool.value.pickupRate.ssr = rate.value.ssr;
   }
 }
+const filterMethodMap: { [key: string]: (it: Student) => boolean } = {
+  限: (it) => it.limit === "Unique",
+  限定: (it) => it.limit === "Unique",
+  常: (it) => it.limit === "Permanent",
+  常驻: (it) => it.limit === "Permanent",
+  活: (it) => it.limit === "Event",
+  活动: (it) => it.limit === "Event",
+  3: (it) => it.rarity === "SSR",
+  三: (it) => it.rarity === "SSR",
+  2: (it) => it.rarity === "SR",
+  二: (it) => it.rarity === "SR",
+  1: (it) => it.rarity === "R",
+  一: (it) => it.rarity === "R",
+};
 function doFilter(input: string) {
-  if (input === "限定" || input === "限") {
-    return students.value.filter((it) => it.limit === "Unique");
-  }
-  if (input === "常驻" || input === "常") {
-    return students.value.filter((it) => it.limit === "Permanent");
-  }
-  if (input === "活动" || input === "活") {
-    return students.value.filter((it) => it.limit === "Event");
-  }
-  if (input === "3" || input === "三") {
-    return students.value.filter((it) => it.rarity === "SSR");
-  }
-  if (input === "2" || input === "二") {
-    return students.value.filter((it) => it.rarity === "SR");
-  }
-  if (input === "1" || input === "一") {
-    return students.value.filter((it) => it.rarity === "R");
+  const method = filterMethodMap[input];
+  if (method) {
+    return students.value.filter(method);
   }
   return students.value.filter((it) => it.name.includes(input));
 }
@@ -279,6 +282,20 @@ function pickups(id: number[]) {
   return students_(students.value.filter((it) => id.includes(it.id)));
 }
 function rates(r: GachaRate) {
+  if (!r || !r.sr) {
+    if (r.r) {
+      r = {
+        r: 78.5,
+        sr: 18.5,
+        ssr: 3,
+      };
+    } else {
+      r = {
+        sr: 3,
+        ssr: 0.7,
+      } as GachaRate;
+    }
+  }
   const base = `sr: ${r.sr.toFixed(1)}%,ssr: ${r.ssr.toFixed(1)}%`;
   if (r.r) {
     return `r: ${r.r.toFixed(1)}%,${base}`;

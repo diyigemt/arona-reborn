@@ -9,6 +9,7 @@ import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.diyigemt.arona.webui.event.ContentAuditEvent
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.types.int
 import com.qcloud.cos.COSClient
 import com.qcloud.cos.ClientConfig
 import com.qcloud.cos.auth.BasicCOSCredentials
@@ -26,7 +27,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.content.audit",
     name = "custom-menu",
     author = "diyigemt",
-    version = "0.1.0",
+    version = "0.1.1",
     description = "内容审核"
   )
 ) {
@@ -57,7 +58,7 @@ object PluginMain : AronaPlugin(
             resp.teenagerInfo,
             resp.meaninglessInfo
           ).firstOrNull { info ->
-            (info.score.toIntOrNull() ?: 0) >= 95
+            (info.score.toIntOrNull() ?: 0) >= AuditConfig.threshold
           }?.also { _ ->
             it.pass = false
             it.message = resp.label
@@ -68,8 +69,24 @@ object PluginMain : AronaPlugin(
   }
 }
 
+@Suppress("unused")
+class AuditThresholdChangeCommand : CommandLineSubCommand, CliktCommand(
+  name = "auditThreshold", help = "改变内容审查阈值",
+  invokeWithoutSubcommand = true
+) {
+  private val threshold by argument().int()
+  override fun run() {
+    if (threshold !in (0 .. 100)) {
+      error("必须在0至100之间")
+    }
+    AuditConfig.threshold = threshold
+  }
+
+}
+
 object AuditConfig : AutoSavePluginData("config") {
   val secretId by value("")
   val secretKey by value("")
   val auditTimeout by value(5000L)
+  var threshold by value(93)
 }

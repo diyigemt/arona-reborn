@@ -8,20 +8,15 @@
         p-key="GachaConfig"
       >
         <template #default="{ from }">
-          <div v-if="from !== 'contact'">
+          <div v-if="from !== 'contact'" class="mb-16px">
             <div class="w-100% justify-end">
               <ElButton type="primary" @click="onCreate">新建</ElButton>
             </div>
             <ElTable :data="gachaPoolConfig.pools">
               <ElTableColumn label="卡池名称" prop="name" />
-              <ElTableColumn label="包含常驻池" prop="extendBase" width="100">
-                <template #default="{ row }">
-                  {{ row.extendBase ? "是" : "否" }}
-                </template>
-              </ElTableColumn>
               <ElTableColumn label="pickup" prop="pickup">
                 <template #default="{ row }">
-                  <div class="white-space" style="white-space: pre;">
+                  <div class="white-space" style="white-space: pre">
                     {{ pickups(row.pickup) }}
                   </div>
                 </template>
@@ -31,7 +26,7 @@
                   {{ rates(row.rate) }}
                 </template>
               </ElTableColumn>
-              <ElTableColumn label="pickupRate" prop="pickupRate" width="150">
+              <ElTableColumn label="pickupRate" prop="pickupRate" width="200">
                 <template #default="{ row }">
                   {{ rates(row.pickupRate) }}
                 </template>
@@ -136,15 +131,6 @@
           </div>
         </div>
       </ElFormItem>
-      <ElFormItem label="包含常驻池:" prop="extendBase">
-        <ElSwitch
-          v-model="gachaPool.extendBase"
-          :active-value="true"
-          :inactive-value="false"
-          active-text="是"
-          inactive-text="否"
-        />
-      </ElFormItem>
     </ElForm>
     <template #footer>
       <div class="text-right">
@@ -171,7 +157,6 @@ interface GachaPoolConfig {
 }
 interface CustomPool {
   name: string;
-  extendBase: boolean;
   pickup: number[];
   rate: GachaRate;
   pickupRate: GachaPickupRate;
@@ -196,7 +181,6 @@ const filterStudents = ref<Student[]>([]);
 const showGachaEditDialog = ref(false);
 const gachaPool = ref<CustomPool>({
   name: "",
-  extendBase: true,
   pickup: [],
   rate: {
     r: 78.5,
@@ -210,6 +194,7 @@ const gachaPool = ref<CustomPool>({
 });
 const rate = computed(() => gachaPool.value.rate);
 const gachaPoolConfig = ref<GachaPoolConfig>(defaultGachaPoolConfig);
+let isPoolCreate = false;
 function onCreate() {
   if (gachaPoolConfig.value.pools.length >= 5) {
     warningMessage("只支持配置最高5个");
@@ -217,7 +202,6 @@ function onCreate() {
   }
   gachaPool.value = {
     name: "",
-    extendBase: true,
     pickup: [],
     rate: {
       r: 78.5,
@@ -229,6 +213,7 @@ function onCreate() {
       ssr: 0.7,
     },
   };
+  isPoolCreate = true;
   showGachaEditDialog.value = true;
 }
 function onConfirm() {
@@ -236,11 +221,19 @@ function onConfirm() {
     if (!res) {
       return;
     }
-    gachaPoolConfig.value.pools.push(gachaPool.value);
+    if (isPoolCreate) {
+      gachaPoolConfig.value.pools.push(gachaPool.value);
+    } else {
+      const idx = gachaPoolConfig.value.pools.findIndex((it) => it.name === gachaPool.value.name);
+      gachaPoolConfig.value.pools.splice(idx, 1, gachaPool.value);
+    }
+    showGachaEditDialog.value = false;
   });
 }
 function onEdit(pool: CustomPool) {
   gachaPool.value = pool;
+  isPoolCreate = false;
+  showGachaEditDialog.value = true;
 }
 function onDelete(pool: CustomPool) {
   IConfirm("警告", `确定要删除卡池: ${pool.name}?`).then(() => {

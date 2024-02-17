@@ -7,7 +7,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.content.audit.PluginMain"
-version = "0.1.0"
+version = "0.1.1"
 dependencies {
   compileOnly(project(":arona-core"))
   implementation("com.qcloud:cos_api:5.6.187")

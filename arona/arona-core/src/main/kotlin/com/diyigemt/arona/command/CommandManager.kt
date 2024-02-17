@@ -18,6 +18,7 @@ import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.currentTime
 import com.github.ajalt.clikt.core.MissingArgument
+import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.output.Localization
@@ -218,6 +219,7 @@ internal suspend fun executeCommandImpl(
     when (it) {
       is MissingArgument -> CommandExecuteResult.UnmatchedSignature(it, command)
       is TimeoutCancellationException -> CommandExecuteResult.Success(command)
+      is PrintHelpMessage -> CommandExecuteResult.UnmatchedSignature(it, command)
       else -> CommandExecuteResult.ExecutionFailed(it, command)
     }
   }

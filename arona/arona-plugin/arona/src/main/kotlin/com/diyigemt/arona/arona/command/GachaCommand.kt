@@ -1,7 +1,11 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
+import com.diyigemt.arona.arona.config.GachaConfig
+import com.diyigemt.arona.arona.config.GachaPickupRate
+import com.diyigemt.arona.arona.config.GachaRate
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.arona.database.gacha.GachaPool
 import com.diyigemt.arona.arona.database.gacha.GachaPoolSchema
 import com.diyigemt.arona.arona.database.gacha.GachaPoolTable
 import com.diyigemt.arona.arona.database.student.StudentLimitType
@@ -32,7 +36,6 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.arguments.convert
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.mordant.terminal.ConversionResult
 import kotlinx.coroutines.delay
@@ -63,7 +66,11 @@ data class ContactGachaLimitItem(
   var count: Int = 0,
 )
 
-// 用户 -> 卡池id -> 记录
+/**
+ * 用户 -> 卡池id -> 记录
+ *
+ * 特别的 -1 代表用户自定义或群主自定义的卡池
+ */
 @Serializable
 data class ContactGachaLimitRecord(
   val map: MutableMap<String, MutableMap<Int, ContactGachaLimitItem>> = mutableMapOf(),
@@ -82,71 +89,120 @@ data class ContactGachaConfig(
 object GachaCommand : AbstractCommand(
   Arona,
   "十连",
-  description = "抽一发十连"
+  description = "抽一发十连",
+  help = """
+    不提供参数时, 抽日服当前最新池子
+    
+    /十连 历史 查看当期池子记录
+    
+    /十连 池子名称, 抽自己定义或当前环境管理员定义的池子
+  """.trimIndent()
 ) {
-  private val isHistory by argument(name = "历史", help = "查看历史记录").convert { input ->
-    input == "历史"
-  }.optional()
+  private val targetPoolName by argument(name = "要抽的池子", help = "对指定的池子抽一次十连").optional()
 
   suspend fun UserCommandSender.gacha() {
-    if (isHistory == true) {
-      val recordMap = readUserPluginConfigOrDefault(Arona, UserGachaRecord(mutableMapOf()))
-      val poolId = GachaTool.CurrentPickupPool?.id?.value ?: 1
-      val record = recordMap.map[poolId] ?: UserGachaRecordItem()
-      val poolName = GachaTool.CurrentPickupPool?.name ?: "常驻池"
-      if (record.point == 0) {
-        sendMessage("当前池子: $poolName\n无抽卡记录")
-      } else {
-        MessageChainBuilder()
-          .append("当前池子: $poolName")
-          .append("招募点数: ${record.point}")
-          .append("pickup: ${record.pickup}")
-          .append("出彩数: ${record.ssr}")
-          .append("出彩率: " + String.format("%.2f", record.ssr.toDouble() / record.point * 100) + "%")
-          .build().also {
-            sendMessage(it)
-          }
+    if (!targetPoolName.isNullOrBlank()) {
+      // 查看官方池子历史记录
+      if (targetPoolName == "历史") {
+        gachaHistory(0)
+        return
       }
+      // 抽指定的卡池
+      val poolConfig = contactDocument().readPluginConfigOrDefault(Arona, GachaConfig()).also {
+        it.pools.addAll(userDocument().readPluginConfigOrDefault(Arona, GachaConfig()).pools)
+      }
+      val pool = poolConfig.pools.firstOrNull { it.name == targetPoolName }
+      if (pool == null) {
+        sendMessage("池子不存在!, 可选:\n${poolConfig.pools.joinToString("\n") { it.name }}")
+        return
+      }
+      // 开抽!
+      if (checkGachaLimitOver(-1)) {
+        return
+      }
+      val result = doGacha(pool.toGachaPool(), pool.rate, pool.pickupRate)
+      sendResult(pool.name, 10, result)
       return
     }
 
-    val contactConfig = readPluginConfigOrDefault(Arona, ContactGachaConfig())
-    val contactRecord = readPluginConfigOrDefault(Arona, ContactGachaLimitRecord())
-    val userRecordMap = contactRecord.map.getOrDefault(user.id, mutableMapOf())
     val pickupPool = GachaTool.CurrentPickupPool
     val pickupPoolId = pickupPool?.id?.value ?: 1
-    val userRecord = userRecordMap.getOrDefault(pickupPoolId, ContactGachaLimitItem())
-    val today = currentLocalDateTime().date.dayOfMonth
-
-    if (pickupPoolId != 1 && contactConfig.limit > 0 && today == userRecord.day && contactConfig.limit <= userRecord.count) {
-      sendMessage("今日已在本群抽卡${userRecord.count}次, 超过本群设置的${contactConfig.limit}上限")
+    // 检查是否超过抽卡限制次数
+    if (checkGachaLimitOver(pickupPoolId)) {
       return
     }
-    userRecord.count += if (today == userRecord.day) 10 else 10 - userRecord.count
-    userRecord.day = today
-    userRecordMap[pickupPoolId] = userRecord
-    contactRecord.map[user.id] = userRecordMap
-    updateContactPluginConfig(Arona, contactRecord)
+    // 我的回合 抽卡!
+    val pool = pickupPool?.toGachaPool() ?: GachaTool.NormalPool
+    val result = doGacha(pool)
+    // 保存抽卡记录
+    val recordMap = readUserPluginConfigOrDefault(Arona, UserGachaRecord())
+    val poolId = pickupPool?.id?.value ?: 1
+    val record = recordMap.map[poolId] ?: UserGachaRecordItem()
+    record.point += 10
+    record.ssr += result.filter { it.rarity == StudentRarity.SSR }.size
+    record.pickup += result.filter { it.isPickup }.size
+    recordMap.map[poolId] = record
+    updateUserPluginConfig(Arona, recordMap)
 
-    val pickupList = pickupPool?.students ?: listOf()
-    val pickupStudentList = (pickupPool?.toGachaPool() ?: GachaTool.NormalPool).students
+    // 发送图片
+    sendResult(pool.name, record.point, result)
+  }
+
+  private suspend fun UserCommandSender.sendResult(poolName: String, point: Int, result: List<GachaResultItem>) {
+    val randomFileName = "${uuid()}.jpg"
+    val randomFile = Arona.dataFolder("gacha_result", randomFileName).toFile()
+    GachaTool.generateGachaImage(
+      GachaResult(
+        poolName,
+        point,
+        result
+      )
+    ).also {
+      it.makeImageSnapshot().encodeToData(format = EncodedImageFormat.PNG)?.bytes?.also { arr ->
+        ByteArrayInputStream(arr).use { input ->
+          Thumbnails
+            .of(input)
+            .scale(1.0)
+            .outputQuality(0.5)
+            .outputFormat("jpg")
+            .toFile(randomFile)
+        }
+      }
+    }
+    subject.uploadImage("https://arona.diyigemt.com/image/gacha_result/$randomFileName").also {
+      sendMessage(it)
+    }
+    runSuspend {
+      delay(30000)
+      randomFile.delete()
+    }
+  }
+
+  private fun doGacha(
+    pool: GachaPool,
+    rate: GachaRate = GachaRate(),
+    pickupRate: GachaPickupRate = GachaPickupRate()
+  ): List<GachaResultItem> {
+    val pickupList = pool.students.map { it.id.value }
+    val pickupStudentList = pool.students
     val pickupSRStudentList = pickupStudentList.filter { it.rarity == StudentRarity.SR }
     val pickupSSRStudentList = pickupStudentList.filter { it.rarity == StudentRarity.SSR }
-    var sRate = 785
-    val srRate = 185
-    var ssrRate = 30
-    if (pickupPool?.fes == true) {
-      sRate -= 30
+
+    var rRate = (rate.r * 10).toInt()
+    val srRate = (rate.sr * 10).toInt()
+    var ssrRate = (rate.ssr * 10).toInt()
+    if (pool.isFes) {
+      rRate -= 30
       ssrRate += 30
     }
     val result = List(10) { (0..1000).random() }.map {
       when (it) {
-        in 0 until sRate -> {
+        in 0 until rRate -> {
           NormalRStudent
         }
 
-        in sRate until sRate + srRate -> {
-          if (it > (sRate + srRate) - 30 * pickupSRStudentList.size) {
+        in rRate until rRate + srRate -> {
+          if (it > (rRate + srRate) - (pickupRate.sr * 10).toInt() * pickupSRStudentList.size) {
             NormalSRStudent.takeIf { pickupSRStudentList.isEmpty() } ?: pickupSRStudentList
           } else {
             NormalSRStudent
@@ -154,7 +210,7 @@ object GachaCommand : AbstractCommand(
         }
 
         else -> {
-          if (it > 1000 - 7 * pickupSSRStudentList.size) {
+          if (it > 1000 - (pickupRate.ssr * 10).toInt() * pickupSSRStudentList.size) {
             NormalSSRStudent.takeIf { pickupSSRStudentList.isEmpty() } ?: pickupSSRStudentList
           } else {
             NormalSSRStudent
@@ -183,42 +239,58 @@ object GachaCommand : AbstractCommand(
     result.forEachIndexed { idx, it ->
       it.isNew = it.isPickup && result.indexOfFirst { l -> l.image == it.image } == idx
     }
+    return result
+  }
 
-    val recordMap = readUserPluginConfigOrDefault(Arona, UserGachaRecord(mutableMapOf()))
-    val poolId = pickupPool?.id?.value ?: 1
+  @Suppress("unused_parameter")
+  private suspend fun UserCommandSender.gachaHistory(reserve: Int) {
+    val recordMap = readUserPluginConfigOrDefault(Arona, UserGachaRecord())
+    val poolId = GachaTool.CurrentPickupPool?.id?.value ?: 1
     val record = recordMap.map[poolId] ?: UserGachaRecordItem()
-    record.point += 10
-    record.ssr += result.filter { it.rarity == StudentRarity.SSR }.size
-    record.pickup += result.filter { it.isPickup }.size
-    recordMap.map[poolId] = record
-    updateUserPluginConfig(Arona, recordMap)
-    val randomFileName = "${uuid()}.jpg"
-    val randomFile = Arona.dataFolder("gacha_result", randomFileName).toFile()
-    GachaTool.generateGachaImage(
-      GachaResult(
-        pickupPool?.name ?: GachaTool.NormalPool.name,
-        record.point,
-        result
-      )
-    ).also {
-      it.makeImageSnapshot().encodeToData(format = EncodedImageFormat.PNG)?.bytes?.also { arr ->
-        ByteArrayInputStream(arr).use { input ->
-          Thumbnails
-            .of(input)
-            .scale(1.0)
-            .outputQuality(0.5)
-            .outputFormat("jpg")
-            .toFile(randomFile)
+    val poolName = GachaTool.CurrentPickupPool?.name ?: "常驻池"
+    if (record.point == 0) {
+      sendMessage("当前池子: $poolName\n无抽卡记录")
+    } else {
+      MessageChainBuilder()
+        .append("当前池子: $poolName")
+        .append("招募点数: ${record.point}")
+        .append("pickup: ${record.pickup}")
+        .append("出彩数: ${record.ssr}")
+        .append("出彩率: " + String.format("%.2f", record.ssr.toDouble() / record.point * 100) + "%")
+        .build().also {
+          sendMessage(it)
         }
-      }
     }
-    subject.uploadImage("https://arona.diyigemt.com/image/gacha_result/$randomFileName").also {
-      sendMessage(it)
+  }
+
+  /**
+   * 检查抽卡次数是否达到上限
+   *
+   * @param type 要检查的池子, 为-1表示为用户或群主自定义的池子
+   *
+   * @return true 达到上限 false 未达到上限
+   */
+  private suspend fun UserCommandSender.checkGachaLimitOver(type: Int): Boolean {
+    // 获取管理设定的抽卡次数配置
+    val contactConfig = readPluginConfigOrDefault(Arona, ContactGachaConfig())
+    // 获取群自身保存的抽卡次数记录
+    val contactRecord = contactDocument().readPluginConfigOrDefault(Arona, ContactGachaLimitRecord())
+    // 获取群员自己的抽卡次数记录
+    val userRecordMap = contactRecord.map.getOrDefault(user.id, mutableMapOf())
+    val userRecord = userRecordMap.getOrDefault(type, ContactGachaLimitItem())
+    // 检查次数
+    val today = currentLocalDateTime().date.dayOfMonth
+    if (type != 1 && contactConfig.limit > 0 && today == userRecord.day && contactConfig.limit <= userRecord.count) {
+      sendMessage("今日已在本群抽卡${userRecord.count}次, 超过本群设置的${contactConfig.limit}上限")
+      return true
     }
-    runSuspend {
-      delay(30000)
-      randomFile.delete()
-    }
+    // 未超过次数, 次数自增并保存
+    userRecord.count += if (today == userRecord.day) 10 else 10 - userRecord.count
+    userRecord.day = today
+    userRecordMap[type] = userRecord
+    contactRecord.map[user.id] = userRecordMap
+    updateContactPluginConfig(Arona, contactRecord)
+    return false
   }
 
 }

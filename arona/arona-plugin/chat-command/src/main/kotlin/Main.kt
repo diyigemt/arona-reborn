@@ -19,7 +19,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.chat.command",
     name = "chat-command",
     author = "diyigemt",
-    version = "0.1.0",
+    version = "0.1.1",
     description = "chat-command"
   )
 ) {
@@ -30,9 +30,9 @@ object PluginMain : AronaPlugin(
       },
     ) {
       // TODO 正式环境上线
-      val text = it.message.filterIsInstance<PlainText>().firstOrNull() ?: return@subscribeAlways
+//      val text = it.message.filterIsInstance<PlainText>().firstOrNull() ?: return@subscribeAlways
       // 命令必须以 "/" 开头
-      val commandText = text.toString()
+//      val commandText = text.toString()
 //      if (!commandText.startsWith("/")) {
 //        return@subscribeAlways
 //      }

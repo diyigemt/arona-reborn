@@ -44,6 +44,14 @@ const props = withDefaults(defineProps<{ data: CustomMenuConfig }>(), {
     ],
   }),
 });
+watch(
+  () => props.data,
+  (cur) => {
+    menu.value = cur;
+    forceUpdate();
+  },
+  { deep: true },
+);
 const menu = ref(props.data);
 const emit = defineEmits<{
   (e: "update:data", data: CustomMenuConfig): void;

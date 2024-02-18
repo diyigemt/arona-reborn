@@ -28,7 +28,7 @@
         p-key="CustomMenuConfig"
       >
         <template #default="{ from }">
-          <CustomMenu v-if="from !== 'manage-contact'" :data="defaultCustomMenuConfig" class="w-600px" />
+          <CustomMenu v-if="from !== 'manage-contact'" :data="menuConfig" class="w-600px" />
         </template>
       </PluginPreferenceForm>
     </ElTabPane>

@@ -58,7 +58,7 @@ object PluginMain : AronaPlugin(
             resp.teenagerInfo,
             resp.meaninglessInfo
           ).firstOrNull { info ->
-            (info.score.toIntOrNull() ?: 0) >= AuditConfig.threshold
+            (info.score?.toIntOrNull() ?: 0) >= AuditConfig.threshold
           }?.also { _ ->
             it.pass = false
             it.message = resp.label

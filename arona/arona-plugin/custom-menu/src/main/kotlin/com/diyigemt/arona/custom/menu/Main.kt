@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.custom.menu
 
 import com.diyigemt.arona.command.AbstractCommand
@@ -7,6 +9,8 @@ import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 object PluginMain : AronaPlugin(
@@ -30,12 +34,14 @@ data class CustomMenuButton(
 )
 @Serializable
 data class CustomMenuRow(
-  val buttons: MutableList<CustomMenuButton>
+  @EncodeDefault
+  val buttons: MutableList<CustomMenuButton> = mutableListOf()
 ) {
   constructor(vararg buttons: CustomMenuButton) : this(mutableListOf(*buttons))
 }
 @Serializable
 data class CustomMenuConfig(
+  @EncodeDefault
   val rows: MutableList<CustomMenuRow> = mutableListOf()
 ) : PluginWebuiConfig() {
   constructor(vararg rows: CustomMenuRow) : this(mutableListOf(*rows))

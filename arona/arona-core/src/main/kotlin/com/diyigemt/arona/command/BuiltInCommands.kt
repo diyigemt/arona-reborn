@@ -49,7 +49,14 @@ object BuiltInCommands {
   object LoginCommand : AbstractCommand(
     BuildInCommandOwner,
     "登录",
-    help = "登录webui"
+    help = "登录webui",
+    description = """
+      /登录 <code> 登录webui
+      
+      code 可以在 https://www.kivotos.com.cn/ 处获得
+      
+      具体可看: https://doc.arona.diyigemt.com/v2/manual/webui
+    """.trimIndent()
   ) {
     private val token by argument("登录凭证")
     suspend fun UserCommandSender.login() {

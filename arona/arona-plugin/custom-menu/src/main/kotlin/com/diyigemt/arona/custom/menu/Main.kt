@@ -18,7 +18,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.custom.menu",
     name = "custom-menu",
     author = "diyigemt",
-    version = "0.2.0",
+    version = "0.2.2",
     description = "快捷菜单"
   )
 ) {
@@ -106,10 +106,13 @@ object CustomMenuCommand : AbstractCommand(
 ) {
   suspend fun UserCommandSender.menu() {
     val menu = readUserPluginConfigOrNull<CustomMenuConfig>(PluginMain)
-    val md = TencentTemplateMarkdown("102057194_1702387539") {
-      append("title", if (menu == null) "默认菜单, 可在webui自定义" else "快捷菜单")
+    val md = TencentTemplateMarkdown("102057194_1708227032") {
+      append("title", if (menu == null) "默认菜单" else "快捷菜单")
+      append("content", " ")
+      append("footer", " ")
     }
-    val kb = (menu ?: CustomMenuConfig.DefaultMenu).toCustomKeyboard()
+    val kb = TencentTempleKeyboard("102057194_1708226882")
+//    val kb = (menu ?: CustomMenuConfig.DefaultMenu).toCustomKeyboard()
     sendMessage(MessageChainBuilder().append(md).append(kb).build())
   }
 }

@@ -27,7 +27,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.content.audit",
     name = "custom-menu",
     author = "diyigemt",
-    version = "0.1.1",
+    version = "0.1.2",
     description = "内容审核"
   )
 ) {

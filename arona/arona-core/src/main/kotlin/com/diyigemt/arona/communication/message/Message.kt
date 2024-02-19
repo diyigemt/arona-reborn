@@ -797,7 +797,7 @@ class TencentMessageBuilder private constructor(
     content = container
       .filterIsInstance<PlainText>()
       .joinToString("\n") { it.toString() }
-      .takeIf { it.isNotEmpty() } ?: " ",
+      .takeIf { it.isNotEmpty() } ?: "",
     messageType = TencentMessageType.PLAIN_TEXT,
     messageId = sourceMessageId,
     eventId = eventId,

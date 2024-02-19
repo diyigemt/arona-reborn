@@ -686,31 +686,78 @@ enum class TencentRichMessageType(val code: Int) {
 }
 
 @Serializable
-data class TencentMessage constructor(
-  val content: String,
+sealed class TencentMessage(
+  @EncodeDefault
+  open val content: String = "",
+  @EncodeDefault
+  open var image: String? = null,
+  @EncodeDefault
+  open var markdown: TencentTemplateMarkdown? = null,
+  @EncodeDefault
+  open var keyboard: TencentKeyboard? = null,
+  @EncodeDefault
+  open val ark: String? = null,
+  @SerialName("msg_id")
+  @EncodeDefault
+  open var messageId: String? = null,
+  @SerialName("event_id")
+  @EncodeDefault
+  open val eventId: String? = null,
+  @SerialName("msg_seq")
+  @EncodeDefault
+  open var messageSequence: Int = 1,
+)
+
+@Serializable
+data class TencentGroupMessage(
+  @Transient
+  override val content: String = "",
   @SerialName("msg_type")
   @Serializable(with = TencentMessageTypeAsIntSerializer::class)
   @EncodeDefault
   var messageType: TencentMessageType = TencentMessageType.PLAIN_TEXT,
-  @EncodeDefault
-  var image: String? = null,
+  @Transient
+  override var image: String? = null,
   var media: TencentMessageMediaInfo? = null,
-  @EncodeDefault
-  var markdown: TencentTemplateMarkdown? = null,
-  @EncodeDefault
-  var keyboard: TencentKeyboard? = null,
-  @EncodeDefault
-  val ark: String? = null,
+  @Transient
+  override var markdown: TencentTemplateMarkdown? = null,
+  @Transient
+  override var keyboard: TencentKeyboard? = null,
+  @Transient
+  override val ark: String? = null,
   @SerialName("msg_id")
-  @EncodeDefault
-  var messageId: String? = null,
+  @Transient
+  override var messageId: String? = null,
   @SerialName("event_id")
-  @EncodeDefault
-  val eventId: String? = null,
+  @Transient
+  override val eventId: String? = null,
   @SerialName("msg_seq")
-  @EncodeDefault
-  var messageSequence: Int = 1,
-)
+  @Transient
+  override var messageSequence: Int = 1,
+) : TencentMessage(content, image, markdown, keyboard, ark, messageId, eventId, messageSequence)
+
+@Serializable
+data class TencentGuildMessage(
+  @Transient
+  override val content: String = "",
+  @Transient
+  override var image: String? = null,
+  @Transient
+  override var markdown: TencentTemplateMarkdown? = null,
+  @Transient
+  override var keyboard: TencentKeyboard? = null,
+  @Transient
+  override val ark: String? = null,
+  @SerialName("msg_id")
+  @Transient
+  override var messageId: String? = null,
+  @SerialName("event_id")
+  @Transient
+  override val eventId: String? = null,
+  @SerialName("msg_seq")
+  @Transient
+  override var messageSequence: Int = 1,
+) : TencentMessage(content, image, markdown, keyboard, ark, messageId, eventId, messageSequence)
 
 @Serializable
 data class TencentMessageMediaInfo(
@@ -771,7 +818,7 @@ class TencentMessageBuilder private constructor(
     container.addAll(element)
   }
 
-  fun append(message: TencentMessage) = this.apply {
+  fun append(message: TencentGroupMessage) = this.apply {
     when (message.messageType) {
       TencentMessageType.PLAIN_TEXT -> {
         append(PlainText(message.content))
@@ -787,53 +834,82 @@ class TencentMessageBuilder private constructor(
     }
   }
 
+  fun append(message: TencentGuildMessage) = this.apply {
+    // TODO
+  }
+
+  fun append(message: TencentMessage) = this.apply {
+    when (message) {
+      is TencentGuildMessage -> append(message)
+      is TencentGroupMessage -> append(message)
+    }
+    // TODO
+  }
+
   // TODO
   fun append(other: TencentMessageBuilder) = this.apply {
     other.build().also { append(it) }
   }
 
   // TODO build其他类型消息
-  fun build() = TencentMessage(
-    content = container
+  fun build(isPrivateChannel: Boolean = false): TencentMessage {
+    val content = container
       .filterIsInstance<PlainText>()
       .joinToString("\n") { it.toString() }
-      .takeIf { it.isNotEmpty() } ?: "",
-    messageType = TencentMessageType.PLAIN_TEXT,
-    messageId = sourceMessageId,
-    eventId = eventId,
-    messageSequence = messageSequence
-  ).apply {
-    when (val im = container.filterIsInstance<TencentImage>().lastOrNull()) {
-      is TencentOfflineImage -> {
-        messageType = TencentMessageType.FILE
-        media = TencentMessageMediaInfo(
-          fileInfo = im.resourceId
-        )
-      }
-
-      is TencentGuildImage -> {
-        messageType = TencentMessageType.IMAGE
-        image = im.url.encodeURLPath()
-      }
-
-      else -> {}
+      .takeIf { it.isNotEmpty() } ?: ""
+    val im = container.filterIsInstance<TencentImage>().lastOrNull()
+    val md = container.filterIsInstance<TencentTemplateMarkdown>().lastOrNull()
+    val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()
+    if (isPrivateChannel) {
+      return TencentGuildMessage(
+        content = content,
+        image = im?.url?.encodeURLPath(),
+        markdown = md,
+//        keyboard = kb,
+        messageId = sourceMessageId,
+        eventId = eventId,
+        messageSequence = messageSequence
+      )
     }
-  }.apply {
-    when (val md = container.filterIsInstance<TencentTemplateMarkdown>().lastOrNull()) {
-      is TencentTemplateMarkdown -> {
-        messageType = TencentMessageType.MARKDOWN
-        markdown = md
-      }
+    return TencentGroupMessage(
+      content = content,
+      messageType = TencentMessageType.PLAIN_TEXT,
+      messageId = sourceMessageId,
+      eventId = eventId,
+      messageSequence = messageSequence
+    ).apply {
+      when (im) {
+        is TencentOfflineImage -> {
+          messageType = TencentMessageType.FILE
+          media = TencentMessageMediaInfo(
+            fileInfo = im.resourceId
+          )
+        }
 
-      else -> {}
-    }
-    when (val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()) {
-      is TencentKeyboard -> {
-        messageType = TencentMessageType.MARKDOWN
-        keyboard = kb
-      }
+        is TencentGuildImage -> {
+          messageType = TencentMessageType.IMAGE
+          image = im.url.encodeURLPath()
+        }
 
-      else -> {}
+        else -> {}
+      }
+    }.apply {
+      when (md) {
+        is TencentTemplateMarkdown -> {
+          messageType = TencentMessageType.MARKDOWN
+          markdown = md
+        }
+
+        else -> {}
+      }
+      when (kb) {
+        is TencentKeyboard -> {
+          messageType = TencentMessageType.MARKDOWN
+          keyboard = kb
+        }
+
+        else -> {}
+      }
     }
   }
 }
@@ -871,24 +947,12 @@ class MessageChainBuilder private constructor(
   }
 
   fun append(message: TencentMessage) = this.apply {
-    when (message.messageType) {
-      TencentMessageType.PLAIN_TEXT -> {
-        append(PlainText(message.content))
-      }
-
-      TencentMessageType.IMAGE -> {
-        if (message.image != null) {
-          append(TencentOfflineImage("", "", 0L, message.image!!))
-        }
-      }
-
-      else -> {}
-    }
+    //TODO
   }
 
   // TODO
   fun append(other: TencentMessageBuilder) = this.apply {
-    other.build().also { append(it) }
+//    other.build().also { append(it) }
   }
 
   // TODO build其他类型消息

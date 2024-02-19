@@ -97,7 +97,7 @@ internal abstract class AbstractContact(
       contentType(ContentType.Application.Json)
       setBody(
         bot.json.encodeToString(
-          TencentMessageBuilder(messageSequence = messageSequence).append(chain).build()
+          TencentMessageBuilder(messageSequence = messageSequence).append(chain).build(this@AbstractContact is GuildMember)
         )
       )
     }

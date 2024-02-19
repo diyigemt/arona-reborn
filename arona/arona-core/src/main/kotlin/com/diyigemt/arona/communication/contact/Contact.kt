@@ -12,6 +12,8 @@ import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.utils.childScopeContext
+import com.diyigemt.arona.utils.commandLineLogger
+import com.diyigemt.arona.utils.error
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
@@ -81,6 +83,8 @@ internal abstract class AbstractContact(
 
     val chain = kotlin.runCatching {
       preSendEventConstructor(this as C, body).broadcast()
+    }.onFailure {
+      commandLineLogger.error(it)
     }.getOrNull()?.message?.toMessageChain() ?: return null
 
     val result = bot.callOpenapi(

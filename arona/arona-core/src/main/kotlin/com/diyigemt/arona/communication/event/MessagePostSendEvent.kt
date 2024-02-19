@@ -48,13 +48,13 @@ data class FriendMessagePostSendEvent(
 }
 
 data class GuildMessagePostSendEvent(
-  override val target: Guild,
+  override val target: GuildMember,
   override val message: MessageChain,
   override val exception: Throwable?,
   override val receipt: MessageReceipt?
-) : MessagePostSendEvent<Guild>() {
+) : MessagePostSendEvent<GuildMember>() {
   override fun toString(): String {
-    return "Guild(${target.id}) <- $message"
+    return "Guild(${target.guild.id}) <- $message"
   }
 }
 

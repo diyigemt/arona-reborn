@@ -23,7 +23,7 @@ data class FriendMessagePreSendEvent(
 ) : MessagePreSendEvent()
 
 data class GuildMessagePreSendEvent(
-  override val target: Guild,
+  override val target: GuildMember,
   override var message: Message
 ) : MessagePreSendEvent()
 

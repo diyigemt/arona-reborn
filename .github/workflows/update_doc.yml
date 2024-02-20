@@ -1,0 +1,70 @@
+name: Update Arona Doc
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@main
+
+    - name: Check for changes in arona-doc
+      id: changes
+      run: |
+        if [[ -n "$(git diff --name-only ${{ github.event.before }}...${{ github.sha }} | grep '^arona-doc/')" ]]; then
+          echo "::set-output name=arona_doc_changes::true"
+        else
+          echo "::set-output name=arona_doc_changes::false"
+        fi
+    - name: Update Arona Doc if changes detected
+      if: steps.changes.outputs.arona_doc_changes == 'true'
+      run: |
+        latest_branch=$(git for-each-ref --sort=-committerdate refs/heads/ --format='%(refname:short)' | head -n 1)
+        git checkout -b $latest_branch $latest_branch
+        cd arona-doc
+
+    # Set up Node.js environment
+    - uses: actions/setup-node@main
+      if: steps.changes.outputs.arona_doc_changes == 'true'
+      with:
+        node-version: '18.x'
+    - uses: pnpm/action-setup@master
+      if: steps.changes.outputs.arona_doc_changes == 'true'
+      with:
+        version: latest
+    - name: Build
+      if: steps.changes.outputs.arona_doc_changes == 'true'
+      run: |
+        pnpm i
+        pnpm run build
+    - name: Compress dist directory
+      if: steps.changes.outputs.arona_doc_changes == 'true'
+      uses: DuckSoft/create-7z-action@master
+      with:
+        # file/folder path to compress
+        pathSource: dist/*
+        # 7z archive path to write
+        pathTarget: dist.7z
+    - name: Docs rsync deploy
+      uses: easingthemes/ssh-deploy@main
+      with:
+        SSH_PRIVATE_KEY: ${{ secrets.SERVER_KEY }}
+        SOURCE: "./dist.7z"
+        REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+        REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
+        TARGET: "/srv/arona-doc/dist.7z"
+    - name: Run script on server
+      if: steps.changes.outputs.arona_doc_changes == 'true'
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_KEY }}
+        script: |
+          cd /srv/arona-doc
+          bash run.sh

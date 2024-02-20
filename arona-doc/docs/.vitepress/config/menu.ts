@@ -141,7 +141,7 @@ export const NavItem: DefaultTheme.NavItem[] = [{
 }, {
   text: '更新日志',
   items: [{
-    text: '官方版1.1.0',
+    text: '官方版1.2.0',
     link: '/v2/other/changelog',
   }, {
     text: '自行部署版1.1.14',

@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "arona-doc/**"
+
+concurrency:
+  group: "deploy0doc"
+  cancel-in-progress: true
 
 jobs:
   build:

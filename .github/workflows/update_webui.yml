@@ -5,11 +5,11 @@ on:
     branches:
       - master
     paths:
-      - "arona-doc/**"
+      - "arona-webui/**"
   workflow_dispatch:
 
 concurrency:
-  group: "deploy_doc"
+  group: "deploy_webui"
   cancel-in-progress: true
 
 jobs:
@@ -30,13 +30,13 @@ jobs:
         version: latest
     - name: Build
       run: |
-        cd arona-doc
+        cd arona-webui
         pnpm i
         pnpm run build
     - name: Compress dist directory
       uses: thedoctor0/zip-release@main
       with:
-        directory: 'arona-doc/docs/.vitepress'
+        directory: 'arona-webui'
         type: '7z'
         filename: 'dist.7z'
         path: 'dist'
@@ -45,10 +45,10 @@ jobs:
       uses: easingthemes/ssh-deploy@main
       with:
         SSH_PRIVATE_KEY: ${{ secrets.SERVER_KEY }}
-        SOURCE: "arona-doc/docs/.vitepress/dist.7z"
+        SOURCE: "arona-webui/dist.7z"
         REMOTE_HOST: ${{ secrets.SERVER_HOST }}
         REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
-        TARGET: "/srv/arona-doc/tmp/dist.7z"
+        TARGET: "/srv/kivotos/tmp/dist.7z"
     - name: Run script on server
       uses: appleboy/ssh-action@master
       with:
@@ -56,5 +56,5 @@ jobs:
         username: ${{ secrets.SERVER_USERNAME }}
         key: ${{ secrets.SERVER_KEY }}
         script: |
-          cd /srv/arona-doc
+          cd /srv/kivotos
           bash run2.sh

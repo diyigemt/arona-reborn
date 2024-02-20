@@ -18,10 +18,10 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@main
-    - name: Update Arona Doc if changes detected
+      with:
+        fetch-depth: 0
+    - name: Change Work Dir
       run: |
-        latest_branch=$(git for-each-ref --sort=-committerdate refs/heads/ --format='%(refname:short)' | head -n 1)
-        git checkout -b $latest_branch $latest_branch
         cd arona-doc
 
     # Set up Node.js environment

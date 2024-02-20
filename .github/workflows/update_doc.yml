@@ -36,7 +36,7 @@ jobs:
       uses: thedoctor0/zip-release@main
       with:
         type: '7z'
-        filename: 'dist.zip'
+        filename: 'dist.7z'
         path: 'arona-doc/docs/.vitepress/dist'
         exclusions: '*.git* /*node_modules/* .editorconfig'
     - name: Docs rsync deploy

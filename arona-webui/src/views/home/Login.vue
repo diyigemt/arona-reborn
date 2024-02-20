@@ -78,7 +78,7 @@
         <div v-if="respErrorMessage">{{ respErrorMessage }}</div>
         <el-text class="mt-4"
           >不会使用?
-          <el-link type="primary" href="https://doc.arona.diyigemt.com/" target="_blank"
+          <el-link type="primary" href="https://doc.arona.diyigemt.com/v2/manual/webui" target="_blank"
             >访问arona在线文档</el-link
           ></el-text
         >

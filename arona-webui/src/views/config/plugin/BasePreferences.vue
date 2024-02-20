@@ -4,7 +4,7 @@
       <PluginPreferenceForm
         v-model:form="baseConfig"
         :default-form="defaultBaseConfig"
-        p-id="com·diyigemt·arona"
+        p-id="buildIn·normal"
         p-key="BaseConfig"
       >
         <template #default="{ from }">

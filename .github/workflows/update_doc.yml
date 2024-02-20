@@ -37,7 +37,7 @@ jobs:
       with:
         type: '7z'
         filename: 'dist.zip'
-        path: 'arona-doc/dist'
+        path: 'arona-doc/docs/.vitepress/dist'
         exclusions: '*.git* /*node_modules/* .editorconfig'
     - name: Docs rsync deploy
       uses: easingthemes/ssh-deploy@main

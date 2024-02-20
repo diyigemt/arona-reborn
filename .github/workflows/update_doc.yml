@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - "arona-doc/**"
+  workflow_dispatch:
 
 concurrency:
   group: "deploy0doc"
@@ -35,9 +36,10 @@ jobs:
     - name: Compress dist directory
       uses: thedoctor0/zip-release@main
       with:
+        directory: 'arona-doc/docs/.vitepress'
         type: '7z'
         filename: 'dist.7z'
-        path: 'arona-doc/docs/.vitepress/dist'
+        path: 'dist'
         exclusions: '*.git* /*node_modules/* .editorconfig'
     - name: Docs rsync deploy
       uses: easingthemes/ssh-deploy@main

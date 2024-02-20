@@ -46,7 +46,7 @@ jobs:
         SOURCE: "dist.7z"
         REMOTE_HOST: ${{ secrets.SERVER_HOST }}
         REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
-        TARGET: "/srv/arona-doc/dist.7z"
+        TARGET: "/srv/arona-doc/tmp/dist.7z"
     - name: Run script on server
       uses: appleboy/ssh-action@master
       with:
@@ -55,4 +55,4 @@ jobs:
         key: ${{ secrets.SERVER_KEY }}
         script: |
           cd /srv/arona-doc
-          bash run.sh
+          bash run2.sh

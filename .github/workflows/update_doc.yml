@@ -33,12 +33,12 @@ jobs:
         pnpm i
         pnpm run build
     - name: Compress dist directory
-      uses: DuckSoft/create-7z-action@master
+      uses: thedoctor0/zip-release@main
       with:
-        # file/folder path to compress
-        pathSource: arona-doc/dist/*
-        # 7z archive path to write
-        pathTarget: dist.7z
+        type: '7z'
+        filename: 'dist.zip'
+        path: 'arona-doc/dist'
+        exclusions: '*.git* /*node_modules/* .editorconfig'
     - name: Docs rsync deploy
       uses: easingthemes/ssh-deploy@main
       with:

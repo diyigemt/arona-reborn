@@ -14,6 +14,7 @@ import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMB
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
 import com.diyigemt.arona.permission.PermissionService
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
 
 object BuiltInCommands {
@@ -44,6 +45,7 @@ object BuiltInCommands {
     BuiltInCommands::class.nestedClasses.forEach {
       (it.objectInstance as? Command)?.register()
     }
+    PluginWebuiConfigRecorder.register(BuildInCommandOwner, BaseConfig.serializer())
   }
 
   object LoginCommand : AbstractCommand(

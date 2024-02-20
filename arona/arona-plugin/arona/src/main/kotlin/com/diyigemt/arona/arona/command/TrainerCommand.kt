@@ -1,7 +1,6 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
-import com.diyigemt.arona.arona.config.BaseConfig
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
@@ -10,6 +9,8 @@ import com.diyigemt.arona.arona.tools.BackendEndpoint
 import com.diyigemt.arona.arona.tools.NetworkTool
 import com.diyigemt.arona.arona.tools.ServerResponse
 import com.diyigemt.arona.command.AbstractCommand
+import com.diyigemt.arona.command.BaseConfig
+import com.diyigemt.arona.command.BuildInCommandOwner
 import com.diyigemt.arona.command.nextMessage
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
@@ -129,7 +130,7 @@ object TrainerCommand : AbstractCommand(
     getImage(match).run {
       data?.run r1@{
         if (code != 200) {
-          val mdConfig = readUserPluginConfigOrDefault(Arona, default = BaseConfig()).markdown
+          val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
           if (mdConfig.enable) {
             val md = TencentTemplateMarkdown("102057194_1702305572") {
               append("search_target", match)

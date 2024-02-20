@@ -7,7 +7,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.arona.Arona"
-version = "1.1.0"
+version = "1.1.1"
 dependencies {
   compileOnly(project(":arona-core"))
   compileOnly("io.ktor:ktor-server-core-jvm")

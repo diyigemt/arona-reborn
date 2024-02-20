@@ -3,7 +3,10 @@
 package com.diyigemt.arona.custom.menu
 
 import com.diyigemt.arona.command.AbstractCommand
+import com.diyigemt.arona.command.BaseConfig
+import com.diyigemt.arona.command.BuildInCommandOwner
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrNull
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.plugins.AronaPlugin
@@ -105,14 +108,24 @@ object CustomMenuCommand : AbstractCommand(
   PluginMain, "菜单", description = "提供快捷菜单, 或者默认菜单"
 ) {
   suspend fun UserCommandSender.menu() {
+    val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
+    if (!mdConfig.enable) {
+      sendMessage(MessageChainBuilder()
+        .append("请先在webui开启markdown支持")
+        .append("需要NTQQ或QQ8.9.85以上版本才能显示")
+        .append("文档: https://doc.arona.diyigemt.com/v2/manual/webui")
+        .append("webui仅支持桌面端,未对移动端适配")
+        .build()
+      )
+      return
+    }
     val menu = readUserPluginConfigOrNull<CustomMenuConfig>(PluginMain)
     val md = TencentTemplateMarkdown("102057194_1708227032") {
       append("title", if (menu == null) "默认菜单" else "快捷菜单")
       append("content", " ")
       append("footer", " ")
     }
-    val kb = TencentTempleKeyboard("102057194_1708226882")
-//    val kb = (menu ?: CustomMenuConfig.DefaultMenu).toCustomKeyboard()
+    val kb = (menu ?: CustomMenuConfig.DefaultMenu).toCustomKeyboard()
     sendMessage(MessageChainBuilder().append(md).append(kb).build())
   }
 }

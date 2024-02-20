@@ -1,5 +1,6 @@
 package com.diyigemt.arona.webui.pluginconfig
 
+import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.database.permission.toMongodbKey
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
@@ -22,6 +23,15 @@ object PluginWebuiConfigRecorder {
   fun register(owner: AronaPlugin, serializer: KSerializer<*>) {
     val key = serializer.descriptor.serialName.split(".").last()
     map.getOrPut(owner.description.id.toMongodbKey()) {
+      mutableMapOf(key to serializer)
+    }.also {
+      it[key] = serializer
+    }
+  }
+  @OptIn(ExperimentalSerializationApi::class)
+  fun register(owner: CommandOwner, serializer: KSerializer<*>) {
+    val key = serializer.descriptor.serialName.split(".").last()
+    map.getOrPut(owner.permission.id.nameSpace.toMongodbKey()) {
       mutableMapOf(key to serializer)
     }.also {
       it[key] = serializer

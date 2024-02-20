@@ -1,4 +1,4 @@
-name: Update Arona Doc
+name: Update Arona Webui
 
 on:
   push:

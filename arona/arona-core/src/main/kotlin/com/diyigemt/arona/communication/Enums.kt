@@ -113,3 +113,36 @@ internal object TencentGuildChannelApplicationTypeIntSerializer : KSerializer<Te
   override fun serialize(encoder: Encoder, value: TencentGuildChannelApplicationType) = encoder.encodeInt(value.code)
   override fun deserialize(decoder: Decoder) = TencentGuildChannelApplicationType.fromValue(decoder.decodeInt())
 }
+
+@Serializable(with = TencentWebsocketCallbackButtonChatTypeIntSerializer::class)
+enum class TencentWebsocketCallbackButtonChatType(val code: Int) {
+  Guild(0),
+  Group(1),
+  Friend(2);
+  companion object {
+    private val map = entries.associateBy { it.code }
+    fun fromValue(code: Int) = map[code] ?: Group
+  }
+}
+
+internal object TencentWebsocketCallbackButtonChatTypeIntSerializer : KSerializer<TencentWebsocketCallbackButtonChatType> {
+  override val descriptor = PrimitiveSerialDescriptor("TencentWebsocketCallbackButtonChatType", PrimitiveKind.INT)
+  override fun serialize(encoder: Encoder, value: TencentWebsocketCallbackButtonChatType) = encoder.encodeInt(value.code)
+  override fun deserialize(decoder: Decoder) = TencentWebsocketCallbackButtonChatType.fromValue(decoder.decodeInt())
+}
+
+@Serializable(with = TencentWebsocketCallbackButtonTypeIntSerializer::class)
+enum class TencentWebsocketCallbackButtonType(val code: Int) {
+  MessageButton(11),
+  QuickMenu(12);
+  companion object {
+    private val map = entries.associateBy { it.code }
+    fun fromValue(code: Int) = map[code] ?: MessageButton
+  }
+}
+
+internal object TencentWebsocketCallbackButtonTypeIntSerializer : KSerializer<TencentWebsocketCallbackButtonType> {
+  override val descriptor = PrimitiveSerialDescriptor("TencentWebsocketCallbackButtonType", PrimitiveKind.INT)
+  override fun serialize(encoder: Encoder, value: TencentWebsocketCallbackButtonType) = encoder.encodeInt(value.code)
+  override fun deserialize(decoder: Decoder) = TencentWebsocketCallbackButtonType.fromValue(decoder.decodeInt())
+}

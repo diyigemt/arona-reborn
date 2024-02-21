@@ -2,7 +2,7 @@
 
 package com.diyigemt.arona.communication.event
 
-import com.diyigemt.arona.communication.TencentBot
+import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.TencentBotAuthEndpointResp
 import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
@@ -10,8 +10,11 @@ import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
 import com.diyigemt.arona.communication.contact.GuildMemberImpl
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.ReflectionUtil
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.encodeToString
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
@@ -132,6 +135,54 @@ internal object TencentWebsocketFriendAddBotHandler :
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotFriendEventRaw, eventId: String) {
     val friend = bot.friends.getOrCreate(payload.id)
     TencentFriendAddEvent(friend, eventId).broadcast()
+  }
+}
+
+internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatchEventHandler<TencentWebsocketCallbackButtonResp>() {
+  override val type = TencentWebsocketEventType.INTERACTION_CREATE
+  override val decoder = TencentWebsocketCallbackButtonResp.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketCallbackButtonResp, eventId: String) {
+    logger.debug("websocket receive callback btn from server.")
+    val contact = when (payload.chatType) {
+      TencentWebsocketCallbackButtonChatType.Guild -> {
+        bot.guilds.getOrCreate(payload.guildId ?: "").let {
+          it.channels.getOrCreate(payload.channelId ?: "").let { ch ->
+            ch to it.members.getOrCreate(payload.data.resolved.userId ?: "")
+          }
+        }
+      }
+      TencentWebsocketCallbackButtonChatType.Group -> {
+        bot.groups.getOrCreate(payload.groupOpenid ?: "").let {
+          it to it.members.getOrCreate(payload.groupMemberOpenid ?: "")
+        }
+      }
+      TencentWebsocketCallbackButtonChatType.Friend -> {
+        bot.friends.getOrCreate(payload.userOpenId ?: "").let {
+          it to it
+        }
+      }
+    }
+    TencentCallbackButtonEvent(
+      id = payload.id,
+      appId = payload.applicationId,
+      buttonId = payload.data.resolved.buttonId,
+      buttonData = payload.data.resolved.buttonData,
+      type = payload.type,
+      chatType = payload.chatType,
+      contact = contact.first,
+      user = contact.second,
+      bot = bot
+    ).broadcast()
+      .also {
+        bot.callOpenapi(
+          TencentEndpoint.Interactions,
+          urlPlaceHolder = mapOf("interaction_id" to eventId)
+        ) {
+          method = HttpMethod.Put
+          setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(it.result)))
+        }
+      }
   }
 }
 

@@ -161,10 +161,11 @@ class TencentCustomKeyboardBuilder internal constructor() {
     )
   }
 
-  fun build(): TencentCustomKeyboard {
+  fun build(botAppId: String): TencentCustomKeyboard {
     return TencentCustomKeyboard(
       TencentCustomKeyboard0(
-        rows.map { it.build() }
+        rows.map { it.build() },
+        botAppId
       )
     )
   }
@@ -302,7 +303,7 @@ class TencentCustomKeyboardButtonBuilder internal constructor() {
  * }
  *
  */
-fun tencentCustomKeyboard(init: TencentCustomKeyboardBuilder.() -> Unit): TencentCustomKeyboard {
+fun tencentCustomKeyboard(botAppId: String, init: TencentCustomKeyboardBuilder.() -> Unit): TencentCustomKeyboard {
   // TODO id去重 按钮上限
-  return TencentCustomKeyboardBuilder().also(init).build()
+  return TencentCustomKeyboardBuilder().also(init).build(botAppId)
 }

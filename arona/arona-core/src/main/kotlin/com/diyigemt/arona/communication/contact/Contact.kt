@@ -27,7 +27,7 @@ import kotlin.coroutines.CoroutineContext
 interface Contact : CoroutineScope {
   val bot: TencentBot // 与之关联的bot
   val id: String // 特定id
-  val unionOpenid: String? // 统一id
+  val unionOpenid: String? // 统一id, bot则为appid
   val unionOpenidOrId
     get() = unionOpenid ?: id
   val fatherSubjectIdOrSelf

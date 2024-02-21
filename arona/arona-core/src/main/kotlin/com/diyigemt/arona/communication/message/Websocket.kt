@@ -1,9 +1,12 @@
 package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.TencentBotClient
+import com.diyigemt.arona.communication.TencentWebsocketCallbackButtonChatType
+import com.diyigemt.arona.communication.TencentWebsocketCallbackButtonType
 import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.communication.event.TencentBotWebsocketConnectionLostEvent
 import com.diyigemt.arona.communication.event.TencentBotWebsocketHandshakeSuccessEvent
+import com.diyigemt.arona.communication.event.TencentCallbackButtonEventResp
 import com.diyigemt.arona.communication.event.TencentWebsocketDispatchEventManager.handleTencentDispatchEvent
 import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.utils.ReflectionUtil
@@ -41,7 +44,7 @@ internal data class TencentWebsocketInteractionNotifyReq(
    *
    * 5: 仅管理员操作
    */
-  val code: Int,
+  val code: TencentCallbackButtonEventResp,
 )
 
 @Serializable
@@ -81,6 +84,50 @@ internal data class TencentWebsocketIdentifyResp(
   val sessionId: String,
   val user: TencentWebsocketIdentifyUserResp,
   val shard: List<Int>,
+)
+
+@Serializable
+data class TencentWebsocketCallbackButtonResp(
+  val id: String,
+  val type: TencentWebsocketCallbackButtonType,
+  @SerialName("chat_type")
+  val chatType: TencentWebsocketCallbackButtonChatType,
+  val data: TencentWebsocketCallbackButtonDataResp,
+  val timestamp: String,
+  @SerialName("guild_id")
+  val guildId: String? = null,
+  @SerialName("channel_id")
+  val channelId: String? = null,
+  @SerialName("user_openid")
+  val userOpenId: String? = null,
+  @SerialName("group_openid")
+  val groupOpenid: String? = null,
+  @SerialName("group_member_openid")
+  val groupMemberOpenid: String? = null,
+  val version: Int = 1,
+  @SerialName("application_id")
+  val applicationId: String = ""
+)
+
+// 回调按钮消息体
+@Serializable
+data class TencentWebsocketCallbackButtonDataResp(
+  val resolved: TencentWebsocketCallbackButtonDataResolvedResp,
+  val type: TencentWebsocketCallbackButtonType,
+)
+
+@Serializable
+data class TencentWebsocketCallbackButtonDataResolvedResp(
+  @SerialName("button_data")
+  val buttonData: String,
+  @SerialName("button_id")
+  val buttonId: String,
+  @SerialName("user_id")
+  val userId: String? = null,
+  @SerialName("feature_id")
+  val featureId: String? = null,
+  @SerialName("message_id")
+  val messageId: String? = null,
 )
 
 @Serializable
@@ -174,19 +221,6 @@ internal object TencentWebsocketDispatchHandler : TencentWebsocketOperationHandl
     source: String,
   ) {
     val preData = json.decodeFromString<TencentWebsocketPayload0>(source)
-    // TODO 为啥不让我通知后台
-    // 通知后台interaction下发成功
-//    if (preData.id != null) {
-//      withContext(coroutineContext) {
-//        bot.callOpenapi(
-//          TencentEndpoint.Interactions,
-//          urlPlaceHolder = mapOf("interaction_id" to preData.id)
-//        ) {
-//          method = HttpMethod.Put
-//          setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(0)))
-//        }
-//      }
-//    }
     handleTencentDispatchEvent(preData.type, source)
   }
 }

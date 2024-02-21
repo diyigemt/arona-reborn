@@ -63,7 +63,7 @@ internal enum class TencentMessageIntentSuperType(val offset: Int) {
   OPEN_FORUMS_EVENT(18),
   AUDIO_OR_LIVE_CHANNEL_MEMBER(19),
   CLIENT_MESSAGE(25), // 私聊 群聊事件
-  INTERACTION(26),
+  INTERACTION(26), // 回调按钮被点击
   MESSAGE_AUDIT(27),
   FORUMS_EVENT(28),
   AUDIO_ACTION(29),

@@ -59,8 +59,8 @@ data class CustomMenuConfig(
       }
     }
   }
-  fun toCustomKeyboard(): TencentCustomKeyboard {
-    return tencentCustomKeyboard {
+  fun toCustomKeyboard(botAppId: String): TencentCustomKeyboard {
+    return tencentCustomKeyboard(botAppId) {
       rows.forEachIndexed { i, r ->
         row {
           r.buttons.forEachIndexed { j, b ->
@@ -125,7 +125,7 @@ object CustomMenuCommand : AbstractCommand(
       append("content", " ")
       append("footer", " ")
     }
-    val kb = (menu ?: CustomMenuConfig.DefaultMenu).toCustomKeyboard()
+    val kb = (menu ?: CustomMenuConfig.DefaultMenu).toCustomKeyboard(bot.unionOpenidOrId)
     sendMessage(MessageChainBuilder().append(md).append(kb).build())
   }
 }

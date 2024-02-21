@@ -64,6 +64,7 @@ internal enum class TencentWebsocketEventType(val type: String) {
   FRIEND_DEL("FRIEND_DEL"), // 机器人被删除好友
   C2C_MSG_REJECT("C2C_MSG_REJECT"), // 好友拒绝机器人的主动消息
   C2C_MSG_RECEIVE("C2C_MSG_RECEIVE"), // 好友允许机器人的主动消息
+  INTERACTION_CREATE("INTERACTION_CREATE"), // 回调按钮被点击
   A("GUILD_CREATE");
 
   companion object {

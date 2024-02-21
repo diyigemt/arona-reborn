@@ -19,7 +19,6 @@ import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.currentTime
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.PrintHelpMessage
-import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.mordant.rendering.AnsiLevel
@@ -277,6 +276,24 @@ suspend fun GroupCommandSender.nextMessage(
   }
 }
 
+suspend inline fun <reified C : UserCommandSender> C.nextButtonInteraction(
+  timeoutMillis: Long = -1,
+  intercept: Boolean = false,
+  noinline filter: suspend C.(TencentCallbackButtonFilter) -> Boolean = { true },
+): TencentCallbackButtonEvent {
+  val mapper: suspend (TencentCallbackButtonEvent) -> TencentCallbackButtonEvent? = mapper@{ ev ->
+    if (!(this.user.id == ev.user.id && this.subject.id == ev.contact.id)) return@mapper null
+    if (!filter(this, TencentCallbackButtonFilter(ev.buttonId, ev.buttonData))) return@mapper null
+    ev
+  }
+  return (if (timeoutMillis == -1L) {
+    GlobalEventChannel.syncFromEvent<TencentCallbackButtonEvent, TencentCallbackButtonEvent>(mapper)
+  } else {
+    withTimeout(timeoutMillis) {
+      GlobalEventChannel.syncFromEvent<TencentCallbackButtonEvent, TencentCallbackButtonEvent>(mapper)
+    }
+  })
+}
 
 @Suppress("UNCHECKED_CAST")
 suspend inline fun <reified C : UserCommandSender> C.nextMessage(

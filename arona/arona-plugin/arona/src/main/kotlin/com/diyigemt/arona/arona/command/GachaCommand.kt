@@ -181,7 +181,7 @@ object GachaCommand : AbstractCommand(
   private fun doGacha(
     pool: GachaPool,
     rate: GachaRate = GachaRate(),
-    pickupRate: GachaPickupRate = GachaPickupRate()
+    pickupRate: GachaPickupRate = GachaPickupRate(),
   ): List<GachaResultItem> {
     val pickupList = pool.students.map { it.id.value }
     val pickupStudentList = pool.students
@@ -299,53 +299,55 @@ object GachaCommand : AbstractCommand(
 class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "student", help = "学生管理cli") {
   private class UpdateStudent : CliktCommand(name = "i", help = "更新一个学生信息") {
     override fun run() {
-      dbQuery {
-        val studentName = terminal.prompt("请输入学生名称", null) as String
-        val schema = StudentSchema.find { StudentTable.name eq studentName }.firstOrNull()?.also {
-          echo("将更新学生信息: $this")
-        }
-        val name = terminal.prompt("请输入学生名称", default = studentName) as String
-        val limit =
-          terminal.prompt("请输入学生限定类型", default = StudentLimitType.Permanent, choices = StudentLimitType
-            .entries.map { it }) { input ->
-            return@prompt StudentLimitType.entries.firstOrNull { it.name.lowercase() == input }?.run {
-              ConversionResult.Valid(this)
-            } ?: ConversionResult.Invalid("只能选这几个")
-          } as StudentLimitType
-        val rarity =
-          terminal.prompt("请输入学生稀有度", default = StudentRarity.SSR, choices = StudentRarity
-            .entries.map { it }) { input ->
-            return@prompt StudentRarity.entries.firstOrNull { it.name.lowercase() == input }?.run {
-              ConversionResult.Valid(this)
-            } ?: ConversionResult.Invalid("只能选这几个")
-          } as StudentRarity
-        var head = terminal.prompt("请输入学生头图文件名", null) as String
-        while (!Files.exists(GachaResourcePath.resolve(head))) {
-          echo("文件不存在")
-          head = terminal.prompt("请输入学生头图文件名", null) as String
-        }
-        if (terminal.confirm(
-            "将${if (schema == null) "新建" else "更新"}信息: name=$name, limit=$limit, rarity=$rarity, " +
-                "head=$head"
-          )
-        ) {
-          if (schema == null) {
+      val studentName = terminal.prompt("请输入学生名称", null) as String
+      val schema = dbQuery { StudentSchema.find { StudentTable.name eq studentName } }.firstOrNull()?.also {
+        echo("将更新学生信息: $this")
+      }
+      val name = terminal.prompt("请输入学生名称", default = studentName) as String
+      val limit =
+        terminal.prompt("请输入学生限定类型", default = StudentLimitType.Permanent, choices = StudentLimitType
+          .entries.map { it }) { input ->
+          return@prompt StudentLimitType.entries.firstOrNull { it.name.lowercase() == input }?.run {
+            ConversionResult.Valid(this)
+          } ?: ConversionResult.Invalid("只能选这几个")
+        } as StudentLimitType
+      val rarity =
+        terminal.prompt("请输入学生稀有度", default = StudentRarity.SSR, choices = StudentRarity
+          .entries.map { it }) { input ->
+          return@prompt StudentRarity.entries.firstOrNull { it.name.lowercase() == input }?.run {
+            ConversionResult.Valid(this)
+          } ?: ConversionResult.Invalid("只能选这几个")
+        } as StudentRarity
+      var head = terminal.prompt("请输入学生头图文件名", null) as String
+      while (!Files.exists(GachaResourcePath.resolve(head))) {
+        echo("文件不存在")
+        head = terminal.prompt("请输入学生头图文件名", null) as String
+      }
+      if (terminal.confirm(
+          "将${if (schema == null) "新建" else "更新"}信息: name=$name, limit=$limit, rarity=$rarity, " +
+              "head=$head"
+        )
+      ) {
+        if (schema == null) {
+          dbQuery {
             StudentSchema.new {
               this@new.name = name
               this@new.limit = limit
               this@new.rarity = rarity
               this@new.headFileName = head
             }
-          } else {
+          }
+        } else {
+          dbQuery {
             schema.name = name
             schema.limit = limit
             schema.rarity = rarity
             schema.headFileName = head
           }
-          echo("成功")
-        } else {
-          echo("取消更新")
         }
+        echo("成功")
+      } else {
+        echo("取消更新")
       }
     }
 
@@ -353,29 +355,28 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
 
   private class DeleteStudent : CliktCommand(name = "d", help = "删除一个学生信息") {
     override fun run() {
-      dbQuery {
-        val schema = studentSelector(this)
-        if (terminal.confirm("将删除学生信息: $schema")) {
+      val schema = studentSelector(this)
+      if (terminal.confirm("将删除学生信息: $schema")) {
+        dbQuery {
           schema.delete()
-        } else {
-          echo("操作取消")
         }
+      } else {
+        echo("操作取消")
       }
     }
   }
 
   private class QueryStudent : CliktCommand(name = "q", help = "查询学生信息") {
     override fun run() {
+      val studentName = terminal.prompt("请输入学生名称", null) as String
       dbQuery {
-        val studentName = terminal.prompt("请输入学生名称", null) as String
         StudentSchema
           .find { StudentTable.name like "%$studentName%" }
-          .toList()
-          .map { "$it" }
-          .forEach {
-            echo(it)
-          }
       }
+        .toList()
+        .forEach {
+          echo(it)
+        }
     }
   }
 
@@ -395,36 +396,35 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
 ) {
   private class QueryPool : CliktCommand(name = "q", help = "查询卡池信息") {
     override fun run() {
-      dbQuery {
-        var poolName: String? = null
-        while (poolName.isNullOrBlank()) {
-          poolName = terminal.prompt("请输入卡池名称", null) as String
-        }
-        val poolList = GachaPoolSchema
-          .find { GachaPoolTable.name like "%$poolName%" }
-          .toList()
-        echo(poolList
-          .mapIndexed { idx, it -> "$idx. ${it.name}(active=${it.active})" }
-        )
-        val idx =
-          terminal.prompt("请输入卡池编号", default = 0, choices = List(poolList.size) { index -> index }) { input ->
-            ConversionResult.Valid(input.toIntOrNull())
-          } as Int
-        echo(poolList[idx].toString())
+      var poolName: String? = null
+      while (poolName.isNullOrBlank()) {
+        poolName = terminal.prompt("请输入卡池名称", null) as String
       }
+      val poolList = dbQuery {
+        GachaPoolSchema
+          .find { GachaPoolTable.name like "%$poolName%" }
+      }.toList()
+      echo(poolList
+        .mapIndexed { idx, it -> "$idx. ${it.name}(active=${it.active})" }
+      )
+      val idx =
+        terminal.prompt("请输入卡池编号", default = 0, choices = List(poolList.size) { index -> index }) { input ->
+          ConversionResult.Valid(input.toIntOrNull())
+        } as Int
+      echo(poolList[idx])
     }
   }
 
   private class CreatePool : CliktCommand(name = "c", help = "创建卡池") {
     override fun run() {
-      dbQuery {
-        val poolName = terminal.prompt("请输入卡池名称", null) as String
-        val fes = terminal.confirm("fes")
-        if (GachaPoolSchema.find { GachaPoolTable.name eq poolName }.toList().firstOrNull() != null) {
-          echo("卡池名称存在", err = true)
-          return@dbQuery
-        }
-        if (terminal.confirm("创建卡池")) {
+      val poolName = terminal.prompt("请输入卡池名称", null) as String
+      val fes = terminal.confirm("fes")
+      if (dbQuery { GachaPoolSchema.find { GachaPoolTable.name eq poolName } }.toList().firstOrNull() != null) {
+        echo("卡池名称存在", err = true)
+        return
+      }
+      if (terminal.confirm("创建卡池")) {
+        dbQuery {
           GachaPoolSchema.new {
             name = poolName
             active = false
@@ -438,93 +438,93 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
 
   private class ActivePool : CliktCommand(name = "a", help = "激活卡池") {
     override fun run() {
-      dbQuery {
-        val pool = poolSelector(this)
-        if (terminal.confirm("激活卡池")) {
-          GachaPoolSchema.activePool(pool.id.value)
-        }
+      val pool = poolSelector(this)
+      if (terminal.confirm("激活卡池")) {
+        GachaPoolSchema.activePool(pool.id.value)
       }
     }
   }
 
   private class DeletePool : CliktCommand(name = "d", help = "删除卡池") {
     override fun run() {
-      dbQuery {
-        val pool = poolSelector(this)
-        echo(pool.toString())
-        if (pool.active) {
-          echo("删除当前卡池将自动激活上一个卡池")
-        }
-        if (terminal.confirm("删除卡池")) {
+      val pool = poolSelector(this)
+      echo(pool.toString())
+      if (pool.active) {
+        echo("删除当前卡池将自动激活上一个卡池")
+      }
+      if (terminal.confirm("删除卡池")) {
+        val prv = dbQuery {
           pool.delete()
-          val prv = GachaPoolSchema.all().orderBy(GachaPoolTable.id to SortOrder.DESC).limit(1).toList().first()
-          GachaPoolSchema.activePool(prv.id.value)
-          echo("已激活:\n$prv")
+          GachaPoolSchema.all().orderBy(GachaPoolTable.id to SortOrder.DESC).limit(1).toList().first()
         }
+        GachaPoolSchema.activePool(prv.id.value)
+        echo("已激活:\n$prv")
       }
     }
   }
 
   private class UpdatePool : CliktCommand(name = "u", help = "更新卡池信息") {
     override fun run() {
-      dbQuery {
-        val poolName = terminal.prompt("请输入卡池名称", null)
-        val pool = if (poolName.isNullOrBlank()) {
+      val poolName = terminal.prompt("请输入卡池名称", null)
+      val pool = dbQuery {
+        if (poolName.isNullOrBlank()) {
           GachaPoolSchema.all().orderBy(GachaPoolTable.id to SortOrder.DESC).limit(1).firstOrNull()
         } else {
           GachaPoolSchema.find { GachaPoolTable.name like "%$poolName%" }.firstOrNull()
         }
-        if (pool == null) {
-          echo("没找到对应的卡池", err = true)
-          return@dbQuery
-        }
-        echo("卡池: $pool")
-        val type = terminal.prompt(
-          "请输入更改类型编号(0改名1改pickup)",
-          default = 0,
-          choices = listOf(0, 1)
-        ) { input ->
-          ConversionResult.Valid(input.toIntOrNull())
-        } as Int
-        when (type) {
-          0 -> {
-            val name = terminal.prompt("请输入卡池名", default = pool.name) as String
-            val fes = terminal.confirm("fes")
-            if (terminal.confirm("新名: $name, fes: $fes")) {
-              pool.name = name
-            }
+      }
+      if (pool == null) {
+        echo("没找到对应的卡池", err = true)
+        return
+      }
+      echo("卡池: $pool")
+      val type = terminal.prompt(
+        "请输入更改类型编号(0改pickup1改名)",
+        default = 0,
+        choices = listOf(0, 1)
+      ) { input ->
+        ConversionResult.Valid(input.toIntOrNull())
+      } as Int
+      when (type) {
+        1 -> {
+          val name = terminal.prompt("请输入卡池名", default = pool.name) as String
+          val fes = terminal.confirm("fes", default = "N")
+          if (terminal.confirm("新名: $name, fes: $fes")) {
+            pool.name = name
           }
+        }
 
-          1 -> {
-            val editType = terminal.prompt("请输入更改类型编号(0增1删)", default = 0, choices = listOf(0, 1)) { input ->
-              ConversionResult.Valid(input.toIntOrNull())
-            } as Int
-            when (editType) {
-              0 -> {
-                val student = studentSelector(this)
-                if (terminal.confirm("添加学生: $student")) {
-                  pool.students += listOf(student.id.value)
-                }
+        0 -> {
+          val editType = terminal.prompt("请输入更改类型编号(0增1删)", default = 0, choices = listOf(0, 1)) { input ->
+            ConversionResult.Valid(input.toIntOrNull())
+          } as Int
+          when (editType) {
+            0 -> {
+              val student = studentSelector(this)
+              if (terminal.confirm("添加学生: $student")) {
+                pool.students += listOf(student.id.value)
               }
+            }
 
-              1 -> {
-                if (pool.students.isEmpty()) {
-                  echo("空的学生列表", err = true)
-                  return@dbQuery
-                }
-                val s = pool.toGachaPool().students
-                echo(s.mapIndexed { idx, it -> "$idx. $it" })
-                val select = terminal.prompt(
-                  "请选择",
-                  default = 0,
-                  choices = List(s.size) {
-                      index,
-                    ->
-                    index
-                  }) { input ->
-                  ConversionResult.Valid(input.toIntOrNull())
-                } as Int
-                if (terminal.confirm("删除学生: ${s[select]}")) {
+            1 -> {
+              if (pool.students.isEmpty()) {
+                echo("空的学生列表", err = true)
+                return
+              }
+              val s = pool.toGachaPool().students
+              echo(s.mapIndexed { idx, it -> "$idx. $it" }.joinToString("\n"))
+              val select = terminal.prompt(
+                "请选择",
+                default = 0,
+                choices = List(s.size) {
+                    index,
+                  ->
+                  index
+                }) { input ->
+                ConversionResult.Valid(input.toIntOrNull())
+              } as Int
+              if (terminal.confirm("删除学生: ${s[select]}")) {
+                dbQuery {
                   pool.students = pool.students.toMutableList().also {
                     it.remove(select)
                   }
@@ -557,56 +557,56 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
 
 fun poolSelector(command: CliktCommand): GachaPoolSchema {
   return command.run {
-    dbQuery {
-      var pool: GachaPoolSchema? = null
-      while (pool == null) {
-        val poolName = terminal.prompt("请输入卡池名称", null) as String
-        val poolList = GachaPoolSchema
+    var pool: GachaPoolSchema? = null
+    while (pool == null) {
+      val poolName = terminal.prompt("请输入卡池名称", null) as String
+      val poolList = dbQuery {
+        GachaPoolSchema
           .find { GachaPoolTable.name like "%$poolName%" }
-          .toList()
-          .onEach { p ->
-            echo(p)
-          }
-        val idx =
-          terminal.prompt(
-            "请输入卡池编号",
-            default = 0,
-            choices = List(poolList.size) { index -> index } + listOf(-1)) { input ->
-            ConversionResult.Valid(input.toIntOrNull())
-          } as Int
-        if (idx != -1) {
-          pool = poolList[idx]
-        }
       }
-      pool
+        .toList()
+        .onEach { p ->
+          echo(p)
+        }
+      val idx =
+        terminal.prompt(
+          "请输入卡池编号",
+          default = 0,
+          choices = List(poolList.size) { index -> index } + listOf(-1)) { input ->
+          ConversionResult.Valid(input.toIntOrNull())
+        } as Int
+      if (idx != -1) {
+        pool = poolList[idx]
+      }
     }
+    pool
   }
 }
 
 fun studentSelector(command: CliktCommand): StudentSchema {
   return command.run {
-    dbQuery {
-      var student: StudentSchema? = null
-      while (student == null) {
-        val studentName = terminal.prompt("请输入学生名称", null) as String
-        val studentList = StudentSchema
+    var student: StudentSchema? = null
+    while (student == null) {
+      val studentName = terminal.prompt("请输入学生名称", null) as String
+      val studentList = dbQuery {
+        StudentSchema
           .find { StudentTable.name like "%$studentName%" }
-          .toList()
-          .also {
-            echo(it)
-          }
-        val idx =
-          terminal.prompt(
-            "请输入学生编号",
-            default = 0,
-            choices = List(studentList.size) { index -> index } + listOf(-1)) { input ->
-            ConversionResult.Valid(input.toIntOrNull())
-          } as Int
-        if (idx != -1) {
-          student = studentList[idx]
-        }
       }
-      student
+        .toList()
+        .also {
+          echo(it)
+        }
+      val idx =
+        terminal.prompt(
+          "请输入学生编号",
+          default = 0,
+          choices = List(studentList.size) { index -> index } + listOf(-1)) { input ->
+          ConversionResult.Valid(input.toIntOrNull())
+        } as Int
+      if (idx != -1) {
+        student = studentList[idx]
+      }
     }
+    student
   }
 }

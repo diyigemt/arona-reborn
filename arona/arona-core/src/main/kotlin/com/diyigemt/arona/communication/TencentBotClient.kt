@@ -239,6 +239,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     }
   }
 
+  @Suppress("UNCHECKED_CAST")
   @OptIn(ExperimentalSerializationApi::class)
   override suspend fun <T> callOpenapi(
     endpoint: TencentEndpoint,
@@ -275,7 +276,9 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
       }
       if (resp.status == HttpStatusCode.OK) {
         bodyTmp = resp.bodyAsText()
-        json.decodeFromString(decoder, bodyTmp)
+        return@runCatching if (decoder == Unit.serializer()) {
+          Unit as T
+        } else json.decodeFromString(decoder, bodyTmp)
       } else {
         bodyTmp = resp.bodyAsText()
         if (bodyTmp.contains("\"code\":22009")) {
@@ -364,6 +367,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     client.close()
   }
 }
+
 @Serializable
 data class TencentApiErrorResp(
   val message: String,
@@ -375,15 +379,17 @@ data class TencentApiErrorResp(
     return "traceId: ${traceId}, message: ${message}, code: ${code}"
   }
 }
+
 sealed class TencentApiErrorException(
   val status: HttpStatusCode,
   val source: TencentApiErrorResp,
   val req: String? = ""
 ) : Exception(source.toString())
 
-class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String = "", req: String? = "") : TencentApiErrorException(
-  status, JsonIgnoreUnknownKeys.decodeFromString(body), req
-) {
+class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String = "", req: String? = "") :
+  TencentApiErrorException(
+    status, JsonIgnoreUnknownKeys.decodeFromString(body), req
+  ) {
   override val message: String = "status: $status, $source, req-body: $req"
 }
 

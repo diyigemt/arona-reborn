@@ -15,7 +15,7 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
   id = "com.diyigemt.arona.test",
   name = "hello",
   author = "diyigemt",
-  version = "0.0.2",
+  version = "0.0.7",
   description = "test interaction"
 )) {
   override fun onLoad() {
@@ -61,8 +61,8 @@ object TestCommand : AbstractCommand(
     sendMessage(MessageChainBuilder().append(md).append(kb).build())
     withTimeoutOrNull(5000L) {
       nextButtonInteraction().also {
-        it.result = TencentCallbackButtonEventResp.Failed
-        sendMessage(MessageChainBuilder(it.eventId).append("点击了 ${it.buttonData} 按钮").build())
+        it.result = TencentCallbackButtonEventResp.Success
+        sendMessage("点击了 ${it.buttonData} 按钮")
       }
     } ?: sendMessage("等待超时")
   }

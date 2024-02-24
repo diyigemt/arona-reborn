@@ -129,8 +129,7 @@ data class TencentKeyboardButtonRenderData(
   @EncodeDefault
   var label: String = "", // 按钮上的文字
   @SerialName("visited_label")
-  @EncodeDefault
-  var visitedLabel: String = label, // 点击后按钮的上文字
+  var visitedLabel: String? = null, // 点击后按钮的上文字
   @EncodeDefault
   var style: TencentKeyboardButtonRenderDataStyle = TencentKeyboardButtonRenderDataStyle.Blue, // 按钮样式
 )
@@ -198,6 +197,9 @@ class TencentCustomKeyboardButtonBuilder internal constructor() {
   @KeyboardDsl
   fun render(init: TencentKeyboardButtonRenderData.() -> Unit) {
     renderData.init()
+    if (renderData.visitedLabel.isNullOrEmpty()) {
+      renderData.visitedLabel = renderData.label
+    }
   }
 
   @KeyboardDsl

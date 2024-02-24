@@ -292,7 +292,9 @@ suspend inline fun <reified C : UserCommandSender> C.nextButtonInteraction(
     withTimeout(timeoutMillis) {
       GlobalEventChannel.syncFromEvent<TencentCallbackButtonEvent, TencentCallbackButtonEvent>(mapper)
     }
-  })
+  }).also {
+    it.result = TencentCallbackButtonEventResp.Success
+  }
 }
 
 @Suppress("UNCHECKED_CAST")

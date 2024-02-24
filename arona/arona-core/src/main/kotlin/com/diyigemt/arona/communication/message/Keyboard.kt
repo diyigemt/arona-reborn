@@ -2,6 +2,7 @@
 
 package com.diyigemt.arona.communication.message
 
+import com.diyigemt.arona.communication.command.UserCommandSender
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -86,10 +87,10 @@ data class TencentKeyboardButtonActionData(
 @Serializable
 data class TencentKeyboardButtonActionPermissionData(
   @EncodeDefault
-  val type: TencentKeyboardButtonActionDataType = TencentKeyboardButtonActionDataType.ANY_ONE,
+  var type: TencentKeyboardButtonActionDataType = TencentKeyboardButtonActionDataType.ANY_ONE,
   @SerialName("specify_user_ids") // 有权限的用户 id 的列表
   @EncodeDefault
-  val specifyUserIds: List<String>? = null,
+  var specifyUserIds: List<String>? = null,
   @SerialName("specify_role_ids") // 有权限的身份组 id 的列表（仅频道可用）
   @EncodeDefault
   val specifyRoleIds: List<String>? = null,
@@ -152,6 +153,7 @@ annotation class KeyboardDsl
 
 class TencentCustomKeyboardBuilder internal constructor() {
   private val rows: MutableList<TencentCustomKeyboardRowBuilder> = mutableListOf()
+  private var userId = ""
 
   @KeyboardDsl
   fun row(init: TencentCustomKeyboardRowBuilder.() -> Unit) {
@@ -160,12 +162,25 @@ class TencentCustomKeyboardBuilder internal constructor() {
     )
   }
 
+  fun UserCommandSender.specifyUser() {
+    userId = user.unionOpenidOrId
+  }
+
   fun build(botAppId: String): TencentCustomKeyboard {
     return TencentCustomKeyboard(
       TencentCustomKeyboard0(
         rows.map { it.build() },
         botAppId
-      )
+      ).also {
+        if (userId.isNotEmpty()) {
+          it.rows.forEach { r ->
+            r.buttons.forEach { b ->
+              b.action.permission.specifyUserIds = listOf(userId)
+              b.action.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
+            }
+          }
+        }
+      }
     )
   }
 }
@@ -181,11 +196,23 @@ fun TencentCustomKeyboardRowBuilder.button(id: String, init: TencentCustomKeyboa
 
 class TencentCustomKeyboardRowBuilder internal constructor() {
   val buttons: MutableList<TencentCustomKeyboardButtonBuilder> = mutableListOf()
+  private var userId = ""
+
+  fun UserCommandSender.specifyUser() {
+    userId = user.unionOpenidOrId
+  }
 
   fun build(): TencentCustomKeyboard1 {
     return TencentCustomKeyboard1(
       buttons.map { it.build() }
-    )
+    ).also {
+      if (userId.isNotEmpty()) {
+        it.buttons.forEach { b ->
+          b.action.permission.specifyUserIds = listOf(userId)
+          b.action.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
+        }
+      }
+    }
   }
 }
 
@@ -193,6 +220,12 @@ class TencentCustomKeyboardButtonBuilder internal constructor() {
   var id = ""
   var renderData = TencentKeyboardButtonRenderData()
   var actionData = TencentKeyboardButtonActionData()
+
+  private var userId = ""
+
+  fun UserCommandSender.specifyUser() {
+    userId = user.unionOpenidOrId
+  }
 
   @KeyboardDsl
   fun render(init: TencentKeyboardButtonRenderData.() -> Unit) {
@@ -208,7 +241,12 @@ class TencentCustomKeyboardButtonBuilder internal constructor() {
   }
 
   fun build(): TencentKeyboardButton {
-    return TencentKeyboardButton(id, renderData, actionData)
+    return TencentKeyboardButton(id, renderData, actionData).also {
+      if (userId.isNotEmpty()) {
+        actionData.permission.specifyUserIds = listOf(userId)
+        actionData.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
+      }
+    }
   }
 }
 

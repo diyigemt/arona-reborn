@@ -29,7 +29,7 @@ interface Contact : CoroutineScope {
   val id: String // 特定id
   val unionOpenid: String? // 统一id, bot则为appid
   val unionOpenidOrId
-    get() = unionOpenid ?: id
+    get() = unionOpenid.takeIf { !it.isNullOrEmpty() } ?: id
   val fatherSubjectIdOrSelf
     get() = if (this is Channel) this.guild.id else id
 

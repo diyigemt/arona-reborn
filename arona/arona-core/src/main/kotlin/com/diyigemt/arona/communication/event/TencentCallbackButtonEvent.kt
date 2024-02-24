@@ -40,7 +40,7 @@ data class TencentCallbackButtonEvent(
   val chatType: TencentWebsocketCallbackButtonChatType,
   val contact: Contact,
   val user: User,
-  var result: TencentCallbackButtonEventResp = TencentCallbackButtonEventResp.Failed,
+  var result: TencentCallbackButtonEventResp = TencentCallbackButtonEventResp.Success,
   override val bot: TencentBot,
 ) : TencentBotEvent, TencentEvent() {
   override val eventId

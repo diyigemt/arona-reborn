@@ -174,15 +174,6 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
       user = contact.second,
       bot = bot
     ).broadcast()
-      .also {
-        bot.callOpenapi(
-          TencentEndpoint.Interactions,
-          urlPlaceHolder = mapOf("interaction_id" to payload.id)
-        ) {
-          method = HttpMethod.Put
-          setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(it.result)))
-        }
-      }
   }
 }
 

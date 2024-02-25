@@ -6,7 +6,7 @@ import com.diyigemt.arona.communication.TencentWebsocketCallbackButtonType
 import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.communication.event.TencentBotWebsocketConnectionLostEvent
 import com.diyigemt.arona.communication.event.TencentBotWebsocketHandshakeSuccessEvent
-import com.diyigemt.arona.communication.event.TencentCallbackButtonEventResp
+import com.diyigemt.arona.communication.event.TencentCallbackButtonEventResult
 import com.diyigemt.arona.communication.event.TencentWebsocketDispatchEventManager.handleTencentDispatchEvent
 import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.utils.ReflectionUtil
@@ -44,7 +44,7 @@ internal data class TencentWebsocketInteractionNotifyReq(
    *
    * 5: 仅管理员操作
    */
-  val code: TencentCallbackButtonEventResp,
+  val code: TencentCallbackButtonEventResult,
 )
 
 @Serializable

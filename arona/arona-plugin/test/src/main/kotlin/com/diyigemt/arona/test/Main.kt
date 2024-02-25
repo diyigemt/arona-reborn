@@ -3,21 +3,19 @@ package com.diyigemt.arona.test
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextButtonInteraction
 import com.diyigemt.arona.communication.command.UserCommandSender
-import com.diyigemt.arona.communication.event.TencentCallbackButtonEventResp
-import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
+import com.diyigemt.arona.communication.event.TencentCallbackButtonEventResult
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.types.int
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
 object PluginMain : AronaPlugin(AronaPluginDescription(
   id = "com.diyigemt.arona.test",
   name = "hello",
   author = "diyigemt",
-  version = "0.0.11",
+  version = "0.0.12",
   description = "test interaction"
 )) {
   override fun onLoad() {
@@ -58,7 +56,7 @@ object TestCommand : AbstractCommand(
     sendMessage(MessageChainBuilder().append(md).append(kb).build())
     withTimeoutOrNull(5000L) {
       nextButtonInteraction().also {
-        it.result = TencentCallbackButtonEventResp.Success
+        it.accept()
         sendMessage("点击了 ${it.buttonData} 按钮")
       }
     } ?: sendMessage("等待超时")

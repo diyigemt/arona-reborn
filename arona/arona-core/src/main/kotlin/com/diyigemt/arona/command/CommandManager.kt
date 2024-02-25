@@ -293,7 +293,7 @@ suspend inline fun <reified C : UserCommandSender> C.nextButtonInteraction(
       GlobalEventChannel.syncFromEvent<TencentCallbackButtonEvent, TencentCallbackButtonEvent>(mapper)
     }
   }).also {
-    it.result = TencentCallbackButtonEventResp.Success
+    it.result = TencentCallbackButtonEventResult.Success
   }
 }
 

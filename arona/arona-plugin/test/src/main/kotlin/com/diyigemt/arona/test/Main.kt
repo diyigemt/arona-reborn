@@ -3,7 +3,6 @@ package com.diyigemt.arona.test
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextButtonInteraction
 import com.diyigemt.arona.communication.command.UserCommandSender
-import com.diyigemt.arona.communication.event.TencentCallbackButtonEventResult
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
@@ -11,13 +10,15 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.types.int
 import kotlinx.coroutines.withTimeoutOrNull
 
-object PluginMain : AronaPlugin(AronaPluginDescription(
-  id = "com.diyigemt.arona.test",
-  name = "hello",
-  author = "diyigemt",
-  version = "0.0.12",
-  description = "test interaction"
-)) {
+object PluginMain : AronaPlugin(
+  AronaPluginDescription(
+    id = "com.diyigemt.arona.test",
+    name = "hello",
+    author = "diyigemt",
+    version = "0.0.12",
+    description = "test interaction"
+  )
+) {
   override fun onLoad() {
 
   }
@@ -39,7 +40,7 @@ object TestCommand : AbstractCommand(
       (0 until row).forEach { i ->
         row {
           (0 until col).forEach { j ->
-            button((i * row + j).toString()) {
+            button(i * row + j) {
               render {
                 label = (i * row + j).toString()
               }
@@ -50,7 +51,6 @@ object TestCommand : AbstractCommand(
             }
           }
         }
-
       }
     }
     sendMessage(MessageChainBuilder().append(md).append(kb).build())

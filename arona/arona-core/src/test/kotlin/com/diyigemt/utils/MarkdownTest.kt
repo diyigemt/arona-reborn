@@ -1,62 +1,69 @@
 package com.diyigemt.utils
 
-//import com.aspose.html.HTMLDocument
-//import com.aspose.html.converters.Converter
-//import com.aspose.html.saving.ImageSaveOptions
-import java.io.ByteArrayInputStream
+import com.diyigemt.arona.communication.message.*
 import kotlin.test.Test
 
 
 class MarkdownTest {
   @Test
-  fun testConvertMarkdown() {
-    val savePath = "./convert.png"
-    ByteArrayInputStream("""
-**test**
-
-# 这是一级标题
-
-- [ ] 未完成
-- [x] 已完成
-    """.trimIndent().toByteArray()).use {
-//      val document = Converter.convertMarkdown(it, "test") ?: return
-//      // Convert Markdown to HTML
-//      runCatching {
-//        Converter.convertHTML(document.apply { body.style.backgroundColor = "white" }, ImageSaveOptions(), savePath)
-//        document.dispose()
-//      }
-    }
-  }
-  @Test
-  fun testDecodeText() {
-    val s = b(intArrayOf(39, 1, 18, 4, 66, 29, 28, 84, 11, 11, 13, 17, 71, 27, 22, 84, 26, 22, 20, 0, 0, 32))
-  }
-  private fun jL(var0: String): String {
-    val var1 = "node.txt"
-    val var2 = StringBuilder(var0.length)
-    for (var3 in var0.indices) {
-      var2.append((var0[var3].code xor "node.txt"[var3 % "node.txt".length].code).toChar())
-    }
-    return var2.toString()
-  }
-
-  private fun b(var0: IntArray?): String? {
-    return if (var0 == null) {
-      null
-    } else if (var0.isEmpty()) {
-      ""
-    } else {
-      var var2 = (var0.size - 1) % 97
-      val var3 = java.lang.StringBuilder(var0.size - 1)
-      for (var4 in 0 until var0.size - 1) {
-        var3.append(var0[var4].toChar())
-        var2 = (var2 + var0[var4]) % 97
+  fun testBuildMarkdownDsl() {
+    val test = tencentCustomMarkdown {
+      title {
+        content = "一级标题"
       }
-      if (var0[var0.size - 1] != var2) {
-        throw IllegalStateException()
-      } else {
-        jL(var3.toString())
+      title {
+        content = "二级标题"
+        level = TitleElement.TitleElementLevel.H2
+      }
+      +"文字测试"
+      text {
+        content = "文字测试2"
+        style = TextElement.TextElementStyle.Bold
+      }
+      "文字测试3" style TextElement.TextElementStyle.Italic
+      br()
+      link {
+        href = "https://114.514.com"
+      }
+      link {
+        "https://114.514.com" to "腾讯网"
+      }
+      image {
+        href = "https://114.514.com"
+        w = 100
+        h = 100
+      }
+      block {
+        + "测试"
+        + "引用"
+        text {
+          content = "测试"
+        }
+        text {
+          "测试2" style TextElement.TextElementStyle.BoldItalic
+        }
+      }
+      divider()
+      list {
+        + "测试列表"
+        + "无序列表"
+      }
+      list {
+        + "测试列表"
+        + "无序列表"
+        hasIndex = true
+      }
+      list {
+        list("测试嵌套") {
+          "这是嵌套的列表1-1" style TextElement.TextElementStyle.StrikeThrough
+          "这是嵌套的列表1-2" style TextElement.TextElementStyle.StarItalic
+        }
+        list("测试嵌套2") {
+          "这是嵌套的列表2-1" style TextElement.TextElementStyle.StrikeThrough
+          "这是嵌套的列表2-2" style TextElement.TextElementStyle.StarItalic
+        }
       }
     }
+    println(test.content)
   }
 }

@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalSerializationApi::class)
 
 package com.diyigemt.arona.communication.message
 
@@ -30,30 +30,61 @@ data class TencentCustomKeyboard(
   }
 }
 
+@DslMarker
+annotation class KeyboardDsl
+
+@KeyboardDsl
 @Serializable
-data class TencentCustomKeyboard0 constructor(
-  val rows: List<TencentCustomKeyboard1>,
+data class TencentCustomKeyboard0(
+  val rows: MutableList<TencentCustomKeyboardRow> = mutableListOf(),
   @SerialName("bot_appid")
   @EncodeDefault
   var botAppid: String? = null
 )
 
+fun TencentCustomKeyboard0.row(block: TencentCustomKeyboardRow.() -> Unit) {
+  rows.add(
+    TencentCustomKeyboardRow().also(block)
+  )
+}
+
+@KeyboardDsl
 @Serializable
-data class TencentCustomKeyboard1(
-  val buttons: List<TencentKeyboardButton>,
+data class TencentCustomKeyboardRow(
+  val buttons: MutableList<TencentKeyboardButton> = mutableListOf(),
 )
 
+fun TencentCustomKeyboardRow.button(id: Int, block: TencentKeyboardButton.() -> Unit) {
+  button(id.toString(), block)
+}
+
+fun TencentCustomKeyboardRow.button(id: String, block: TencentKeyboardButton.() -> Unit) {
+  buttons.add(
+    TencentKeyboardButton(id).also(block)
+  )
+}
+
+@KeyboardDsl
 @Serializable
 data class TencentKeyboardButton(
   @EncodeDefault
   var id: String, // 按钮ID：在一个keyboard消息内设置唯一
   @SerialName("render_data")
   @EncodeDefault
-  var renderData: TencentKeyboardButtonRenderData,
+  var renderData: TencentKeyboardButtonRenderData = TencentKeyboardButtonRenderData(),
   @EncodeDefault
-  var action: TencentKeyboardButtonActionData,
+  var action: TencentKeyboardButtonActionData = TencentKeyboardButtonActionData(),
 )
 
+fun TencentKeyboardButton.render(block: TencentKeyboardButtonRenderData.() -> Unit) {
+  renderData = TencentKeyboardButtonRenderData().also(block)
+}
+
+fun TencentKeyboardButton.action(block: TencentKeyboardButtonActionData.() -> Unit) {
+  action = TencentKeyboardButtonActionData().also(block)
+}
+
+@KeyboardDsl
 @Serializable
 data class TencentKeyboardButtonActionData(
   @EncodeDefault
@@ -124,7 +155,7 @@ enum class TencentKeyboardButtonActionDataType(val id: Int) {
     override fun serialize(encoder: Encoder, value: TencentKeyboardButtonActionDataType) = encoder.encodeInt(value.id)
   }
 }
-
+@KeyboardDsl
 @Serializable
 data class TencentKeyboardButtonRenderData(
   @EncodeDefault
@@ -145,108 +176,6 @@ enum class TencentKeyboardButtonRenderDataStyle(val id: Int) {
     override fun deserialize(decoder: Decoder) = map.getOrDefault(decoder.decodeInt(), Blue)
     override val descriptor = PrimitiveSerialDescriptor("TencentKeyboardButtonRenderDataStyle", PrimitiveKind.INT)
     override fun serialize(encoder: Encoder, value: TencentKeyboardButtonRenderDataStyle) = encoder.encodeInt(value.id)
-  }
-}
-
-@DslMarker
-annotation class KeyboardDsl
-
-class TencentCustomKeyboardBuilder internal constructor() {
-  private val rows: MutableList<TencentCustomKeyboardRowBuilder> = mutableListOf()
-  private var userId = ""
-
-  @KeyboardDsl
-  fun row(init: TencentCustomKeyboardRowBuilder.() -> Unit) {
-    rows.add(
-      TencentCustomKeyboardRowBuilder().also(init)
-    )
-  }
-
-  fun UserCommandSender.specifyUser() {
-    userId = user.unionOpenidOrId
-  }
-
-  fun build(botAppId: String): TencentCustomKeyboard {
-    return TencentCustomKeyboard(
-      TencentCustomKeyboard0(
-        rows.map { it.build() },
-        botAppId
-      ).also {
-        if (userId.isNotEmpty()) {
-          it.rows.forEach { r ->
-            r.buttons.forEach { b ->
-              b.action.permission.specifyUserIds = listOf(userId)
-              b.action.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
-            }
-          }
-        }
-      }
-    )
-  }
-}
-
-@KeyboardDsl
-fun TencentCustomKeyboardRowBuilder.button(id: String, init: TencentCustomKeyboardButtonBuilder.() -> Unit) {
-  buttons.add(
-    TencentCustomKeyboardButtonBuilder().apply {
-      this.id = id
-    }.also(init)
-  )
-}
-
-class TencentCustomKeyboardRowBuilder internal constructor() {
-  val buttons: MutableList<TencentCustomKeyboardButtonBuilder> = mutableListOf()
-  private var userId = ""
-
-  fun UserCommandSender.specifyUser() {
-    userId = user.unionOpenidOrId
-  }
-
-  fun build(): TencentCustomKeyboard1 {
-    return TencentCustomKeyboard1(
-      buttons.map { it.build() }
-    ).also {
-      if (userId.isNotEmpty()) {
-        it.buttons.forEach { b ->
-          b.action.permission.specifyUserIds = listOf(userId)
-          b.action.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
-        }
-      }
-    }
-  }
-}
-
-class TencentCustomKeyboardButtonBuilder internal constructor() {
-  var id = ""
-  var renderData = TencentKeyboardButtonRenderData()
-  var actionData = TencentKeyboardButtonActionData()
-
-  private var userId = ""
-
-  fun UserCommandSender.specifyUser() {
-    userId = user.unionOpenidOrId
-  }
-
-  @KeyboardDsl
-  fun render(init: TencentKeyboardButtonRenderData.() -> Unit) {
-    renderData.init()
-    if (renderData.visitedLabel.isNullOrEmpty()) {
-      renderData.visitedLabel = renderData.label
-    }
-  }
-
-  @KeyboardDsl
-  fun action(init: TencentKeyboardButtonActionData.() -> Unit) {
-    actionData.init()
-  }
-
-  fun build(): TencentKeyboardButton {
-    return TencentKeyboardButton(id, renderData, actionData).also {
-      if (userId.isNotEmpty()) {
-        actionData.permission.specifyUserIds = listOf(userId)
-        actionData.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
-      }
-    }
   }
 }
 
@@ -343,7 +272,7 @@ class TencentCustomKeyboardButtonBuilder internal constructor() {
  * }
  *
  */
-fun tencentCustomKeyboard(botAppId: String, init: TencentCustomKeyboardBuilder.() -> Unit): TencentCustomKeyboard {
+fun tencentCustomKeyboard(botAppId: String, init: TencentCustomKeyboard0.() -> Unit): TencentCustomKeyboard {
   // TODO id去重 按钮上限
-  return TencentCustomKeyboardBuilder().also(init).build(botAppId)
+  return TencentCustomKeyboard(TencentCustomKeyboard0(botAppid = botAppId).also(init))
 }

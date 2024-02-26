@@ -61,7 +61,7 @@ data class CustomMenuConfig(
   }
   fun toCustomKeyboard(botAppId: String): TencentCustomKeyboard {
     return tencentCustomKeyboard(botAppId) {
-      rows.forEachIndexed { i, r ->
+      this@CustomMenuConfig.rows.forEachIndexed { i, r ->
         row {
           r.buttons.forEachIndexed { j, b ->
             button("$i-$j") {

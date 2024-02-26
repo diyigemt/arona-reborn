@@ -559,15 +559,24 @@ data class TencentGuildImage(
   override val size: Long = 0L
 }
 
-interface TencentMarkdown
+@Serializable
+sealed class TencentMarkdown
+
+@Serializable
+data class TencentCustomMarkdown(
+  val content: String
+) : Message, TencentMarkdown() {
+  override fun serialization(): String {
+    TODO("Not yet implemented")
+  }
+}
 
 @Serializable
 data class TencentTemplateMarkdown(
   @SerialName("custom_template_id")
   val id: String,
   val params: List<TencentMarkdownParam>,
-  val content: String? = null,
-) : Message, TencentMarkdown {
+) : Message, TencentMarkdown() {
   constructor(id: String, block: TencentMarkdownParam.Companion.TencentMarkdownParamBuilder.() -> Unit) :
       this(id, TencentMarkdownParam.Companion.TencentMarkdownParamBuilder().apply(block).build())
 
@@ -692,7 +701,7 @@ sealed class TencentMessage(
   @EncodeDefault
   open var image: String? = null,
   @EncodeDefault
-  open var markdown: TencentTemplateMarkdown? = null,
+  open var markdown: TencentMarkdown? = null,
   @EncodeDefault
   open var keyboard: TencentKeyboard? = null,
   @EncodeDefault
@@ -720,7 +729,7 @@ data class TencentGroupMessage(
   override var image: String? = null,
   var media: TencentMessageMediaInfo? = null,
   @Transient
-  override var markdown: TencentTemplateMarkdown? = null,
+  override var markdown: TencentMarkdown? = null,
   @Transient
   override var keyboard: TencentKeyboard? = null,
   @Transient
@@ -743,7 +752,7 @@ data class TencentGuildMessage(
   @Transient
   override var image: String? = null,
   @Transient
-  override var markdown: TencentTemplateMarkdown? = null,
+  override var markdown: TencentMarkdown? = null,
   @Transient
   override var keyboard: TencentKeyboard? = null,
   @Transient
@@ -858,7 +867,7 @@ class TencentMessageBuilder private constructor(
       .joinToString("\n") { it.toString() }
       .takeIf { it.isNotEmpty() } ?: ""
     val im = container.filterIsInstance<TencentImage>().lastOrNull()
-    val md = container.filterIsInstance<TencentTemplateMarkdown>().lastOrNull()
+    val md = container.filterIsInstance<TencentMarkdown>().lastOrNull()
     val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()
     if (isPrivateChannel) {
       return TencentGuildMessage(
@@ -895,7 +904,7 @@ class TencentMessageBuilder private constructor(
       }
     }.apply {
       when (md) {
-        is TencentTemplateMarkdown -> {
+        is TencentTemplateMarkdown, is TencentCustomMarkdown -> {
           messageType = TencentMessageType.MARKDOWN
           markdown = md
         }

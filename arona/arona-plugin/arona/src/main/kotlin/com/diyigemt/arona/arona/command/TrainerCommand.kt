@@ -132,13 +132,26 @@ object TrainerCommand : AbstractCommand(
         if (code != 200) {
           val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
           if (mdConfig.enable) {
-            val md = TencentTemplateMarkdown("102057194_1702305572") {
-              append("search_target", match)
-              filterIndexed { index, _ -> index < 4 }.forEachIndexed { index, it ->
-                append("option_${index + 1}", it.name)
-              }
+            val md = tencentCustomMarkdown {
+              h1("没有找到与 \"${match}\" 有关的信息")
+              +"是否想要查询:"
             }
-            val btn = TencentTempleKeyboard("102057194_1702611887")
+            val btn = tencentCustomKeyboard(bot.unionOpenidOrId) {
+              filterIndexed { index, _ -> index < 4 }
+                .sortedBy { it.name.length }
+                .forEachIndexed { idx, stu ->
+                  row {
+                    button(idx) {
+                      render {
+                        label = stu.name
+                      }
+                      action {
+                        data = "/攻略 ${stu.name}"
+                      }
+                    }
+                  }
+                }
+            }
             sendMessage(MessageChainBuilder().append(md).append(btn).build())
           } else {
             sendMessage("没有与${match}对应的信息, 是否想要输入:\n${

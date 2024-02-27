@@ -199,6 +199,14 @@ fun Markdown.title(block: TitleElement.() -> Unit) {
   children.add(TitleElement().apply(block))
 }
 
+fun Markdown.h1(text: String) {
+  children.add(TitleElement(text))
+}
+
+fun Markdown.h2(text: String) {
+  children.add(TitleElement(text, TitleElement.TitleElementLevel.H2))
+}
+
 fun Markdown.text(block: TextElement.() -> Unit) {
   children.add(TextElement().apply(block))
 }

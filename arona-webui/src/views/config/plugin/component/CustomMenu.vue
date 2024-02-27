@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Plus } from "@element-plus/icons-vue";
+import { ComputedRef } from "vue";
 import { CustomMenuConfig, CustomMenuRow } from "@/interface";
 import { CustomRow } from "@/views/config/plugin/component/CustomButton";
 import { useForceUpdate } from "@/utils";
-import { ComputedRef } from "vue";
 
 defineOptions({
   name: "CustomMenu",
@@ -80,6 +80,18 @@ function update() {
     rows: menu.value.rows,
   });
 }
+onMounted(() => {
+  // 解决第一次加载页面菜单的回显问题
+  const onlyOne = watch(
+    () => props.data,
+    (cur) => {
+      menu.value = cur;
+      forceUpdate();
+      onlyOne();
+    },
+    { deep: true },
+  );
+});
 </script>
 
 <template>

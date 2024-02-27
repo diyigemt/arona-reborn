@@ -66,6 +66,8 @@ const cacheMemberProfileData: { [key: string]: string } = {};
 function jsonParse(text: string): any {
   return props.dataProcessor(JSON.parse(text));
 }
+const updateTrigger = computed(() => [editType.value.type, editType.value.id]);
+provide("updateTrigger", updateTrigger);
 watch(
   () => editType.value.type,
   (cur, prv) => {

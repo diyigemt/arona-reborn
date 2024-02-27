@@ -3,6 +3,7 @@ import { Plus } from "@element-plus/icons-vue";
 import { CustomMenuConfig, CustomMenuRow } from "@/interface";
 import { CustomRow } from "@/views/config/plugin/component/CustomButton";
 import { useForceUpdate } from "@/utils";
+import { ComputedRef } from "vue";
 
 defineOptions({
   name: "CustomMenu",
@@ -44,14 +45,16 @@ const props = withDefaults(defineProps<{ data: CustomMenuConfig }>(), {
     ],
   }),
 });
-watch(
-  () => props.data,
-  (cur) => {
-    menu.value = cur;
-    forceUpdate();
-  },
-  { deep: true },
-);
+const updateTrigger = inject<ComputedRef<string[]>>("updateTrigger");
+if (updateTrigger) {
+  watch(
+    () => updateTrigger.value,
+    () => {
+      menu.value = props.data;
+      forceUpdate();
+    },
+  );
+}
 const menu = ref(props.data);
 const emit = defineEmits<{
   (e: "update:data", data: CustomMenuConfig): void;

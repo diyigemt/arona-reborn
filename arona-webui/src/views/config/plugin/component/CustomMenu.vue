@@ -50,8 +50,10 @@ if (updateTrigger) {
   watch(
     () => updateTrigger.value,
     () => {
-      menu.value = props.data;
-      forceUpdate();
+      setTimeout(() => {
+        menu.value = props.data;
+        forceUpdate();
+      }, 1000);
     },
   );
 }

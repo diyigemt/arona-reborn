@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.8.21"
+    kotlin("jvm") version "1.9.20"
 }
 
 group = "com.diyigemt"
@@ -10,11 +10,13 @@ repositories {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-main-kts:1.8.21")
-    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm:1.8.21")
-    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm:1.8.21")
-    implementation("org.jetbrains.kotlin:kotlin-scripting-common:1.8.21")
-    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host:1.8.21")
+    implementation("org.jetbrains.kotlin:kotlin-main-kts")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-common")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host")
+    implementation("org.jetbrains.kotlin:kotlin-scripting-dependencies")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    implementation("org.apache.ivy:ivy:2.5.2")
 }
 
 tasks.test {

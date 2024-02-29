@@ -20,12 +20,14 @@ import com.diyigemt.arona.arona.tools.GachaTool.NormalRStudent
 import com.diyigemt.arona.arona.tools.GachaTool.NormalSRStudent
 import com.diyigemt.arona.arona.tools.GachaTool.NormalSSRStudent
 import com.diyigemt.arona.command.AbstractCommand
+import com.diyigemt.arona.command.BaseConfig
+import com.diyigemt.arona.command.BuildInCommandOwner
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.updateContactPluginConfig
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.updateUserPluginConfig
-import com.diyigemt.arona.communication.message.MessageChainBuilder
+import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.console.confirm
 import com.diyigemt.arona.utils.currentLocalDateTime
@@ -121,7 +123,7 @@ object GachaCommand : AbstractCommand(
         return
       }
       val result = doGacha(pool.toGachaPool(), pool.rate, pool.pickupRate)
-      sendResult(pool.name, 10, result)
+      sendResult(pool.name, 10, result, true)
       return
     }
 
@@ -145,10 +147,15 @@ object GachaCommand : AbstractCommand(
     updateUserPluginConfig(Arona, recordMap)
 
     // 发送图片
-    sendResult(pool.name, record.point, result)
+    sendResult(pool.name, record.point, result, false)
   }
 
-  private suspend fun UserCommandSender.sendResult(poolName: String, point: Int, result: List<GachaResultItem>) {
+  private suspend fun UserCommandSender.sendResult(
+    poolName: String,
+    point: Int,
+    result: List<GachaResultItem>,
+    isCustom: Boolean,
+  ) {
     val randomFileName = "${uuid()}.jpg"
     val randomFile = Arona.dataFolder("gacha_result", randomFileName).toFile()
     GachaTool.generateGachaImage(
@@ -169,8 +176,43 @@ object GachaCommand : AbstractCommand(
         }
       }
     }
-    subject.uploadImage("https://arona.diyigemt.com/image/gacha_result/$randomFileName").also {
-      sendMessage(it)
+    val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
+    if (mdConfig.enable) {
+      val md = tencentCustomMarkdown {
+        h1(poolName)
+        image {
+          href = "https://arona.diyigemt.com/image/gacha_result/$randomFileName"
+          w = 2340
+          h = 1080
+        }
+      }
+      val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
+        row {
+          button(1) {
+            render {
+              label = "再来一次"
+            }
+            action {
+              data = "/十连" + if (isCustom) {poolName} else {""}
+            }
+          }
+          if (!isCustom) {
+            button(2) {
+              render {
+                label = "查看历史记录"
+              }
+              action {
+                data = "/十连 历史"
+              }
+            }
+          }
+        }
+      }
+      MessageChainBuilder().append(md).append(kb).also { sendMessage(it.build()) }
+    } else {
+      subject.uploadImage("https://arona.diyigemt.com/image/gacha_result/$randomFileName").also {
+        sendMessage(it)
+      }
     }
     runSuspend {
       delay(30000)

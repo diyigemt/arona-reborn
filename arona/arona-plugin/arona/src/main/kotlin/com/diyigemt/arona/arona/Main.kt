@@ -17,7 +17,7 @@ object Arona : AronaPlugin(
     id = "com.diyigemt.arona",
     name = "arona",
     author = "diyigemt",
-    version = "1.1.5",
+    version = "1.1.9",
     description = "hello world"
   )
 ) {

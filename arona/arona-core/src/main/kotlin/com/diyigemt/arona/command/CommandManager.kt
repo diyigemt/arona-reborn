@@ -35,6 +35,7 @@ object CommandManager {
   internal val commandMap: MutableMap<String, Command> = mutableMapOf()
 
   fun matchCommand(commandName: String) = commandMap[commandName.lowercase()]
+  fun getRegisteredCommands(): List<Command> = commandMap.values.toList()
   fun getRegisteredCommands(owner: CommandOwner): List<Command> = commandMap.values.filter { it.owner == owner }
   fun unregisterAllCommands(owner: CommandOwner) {
     for (registeredCommand in getRegisteredCommands(owner)) {

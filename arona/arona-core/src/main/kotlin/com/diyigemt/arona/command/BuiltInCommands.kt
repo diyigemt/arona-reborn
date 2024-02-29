@@ -51,11 +51,11 @@ object BuiltInCommands {
   object LoginCommand : AbstractCommand(
     BuildInCommandOwner,
     "登录",
-    help = "登录webui",
-    description = """
+    description = "登录webui",
+    help = """
       /登录 <code> 登录webui
       
-      code 可以在 https://www.kivotos.com.cn/ 处获得
+      code 可以在 https://www.kivotos.com.cn/login 处获得
       
       具体可看: https://doc.arona.diyigemt.com/v2/manual/webui
     """.trimIndent()
@@ -79,7 +79,10 @@ object BuiltInCommands {
   object BindContactNameCommand : AbstractCommand(
     BuildInOwnerCommandOwner,
     "绑定",
-    help = "绑定群/频道名称"
+    description = "绑定群/频道名称",
+    help = """
+      /绑定 xxxxx
+    """.trimIndent()
   ) {
     private val name by argument("要设置的群名/频道名称")
     suspend fun UserCommandSender.bindContactName() {

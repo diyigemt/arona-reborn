@@ -80,10 +80,10 @@ object TrainerCommand : AbstractCommand(
     
     /攻略 国际服未来视
     
-    /攻略 白子, 学生名, 别再打学生的姓了, 多生分; 支持大部分黑话
+    /攻略 白子, 学生名, 别再查姓了, 多生分; 支持大部分黑话
   """.trimIndent()
 ) {
-  private val arg by argument(name = "图片名", help = "学生名称/别名/主线地图/其他杂图名称")
+  private val arg by argument(name = "查询目标", help = "学生名称/别名/主线地图/其他杂图名称")
   private val serializer = ServerResponse.serializer(ListSerializer(ImageQueryData.serializer()))
   private val json = Json { ignoreUnknownKeys = true }
   private suspend fun getImage(name: String): ServerResponse<List<ImageQueryData>> {

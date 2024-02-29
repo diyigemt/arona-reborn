@@ -19,7 +19,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.chat.command",
     name = "chat-command",
     author = "diyigemt",
-    version = "0.1.1",
+    version = "0.1.2",
     description = "chat-command"
   )
 ) {
@@ -49,7 +49,8 @@ object PluginMain : AronaPlugin(
           is CommandExecuteResult.UnmatchedSignature -> {
             // 发送错误处理
             val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@launch
-            commandSender.sendMessage("$helpMessage\n用户手册:\nhttps://doc.arona.diyigemt.com/v2/manual/command")
+            val fullHelp = result.command.getFormattedHelp() ?: return@launch
+            commandSender.sendMessage("$fullHelp\n用户手册:\nhttps://doc.arona.diyigemt.com/v2/manual/command")
           }
 
           is CommandExecuteResult.ExecutionFailed -> {

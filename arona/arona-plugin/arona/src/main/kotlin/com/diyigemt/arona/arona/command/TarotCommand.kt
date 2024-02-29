@@ -11,12 +11,14 @@ import com.diyigemt.arona.arona.tools.queryTeacherNameFromDB
 import com.diyigemt.arona.arona.tools.randomBoolean
 import com.diyigemt.arona.arona.tools.randomInt
 import com.diyigemt.arona.command.AbstractCommand
+import com.diyigemt.arona.command.BaseConfig
+import com.diyigemt.arona.command.BuildInCommandOwner
+import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
+import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrNull
-import com.diyigemt.arona.communication.message.MessageChainBuilder
-import com.diyigemt.arona.communication.message.MessageReceipt
-import com.diyigemt.arona.communication.message.isFailed
+import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.currentLocalDateTime
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import kotlinx.serialization.Serializable
@@ -35,6 +37,22 @@ data class TarotConfig(
   val cardType: TarotCardType = TarotCardType.A, // 卡面类型
 ) : PluginWebuiConfig() {
   override fun check() {}
+}
+
+private val kb by lazy {
+  tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+    row {
+      button("1") {
+        render {
+          label = "再抽一次"
+        }
+        action {
+          data = "/塔罗牌"
+          enter = true
+        }
+      }
+    }
+  }
 }
 
 @Suppress("unused")
@@ -87,7 +105,7 @@ object TarotCommand : AbstractCommand(
       val tarot = dbQuery {
         TarotSchema.findById(record.tarot)
       }!!
-      send(this, tarot, record.positive, userTarotConfig.cardType)
+      send(tarot, record.positive, userTarotConfig.cardType)
       return
     }
     var tarotIndex = randomInt(TarotCount) + 1
@@ -112,7 +130,7 @@ object TarotCommand : AbstractCommand(
     val tarot = dbQuery {
       TarotSchema.findById(tarotIndex)
     }!!
-    send(this, tarot, positive, userTarotConfig.cardType)
+    send(tarot, positive, userTarotConfig.cardType)
     dbQuery {
       if (record != null) {
         record.day = today
@@ -128,8 +146,7 @@ object TarotCommand : AbstractCommand(
     }
   }
 
-  private suspend fun send(
-    commandSender: UserCommandSender,
+  private suspend fun UserCommandSender.send(
     tarot: TarotSchema,
     positive: Boolean,
     type: TarotCardType,
@@ -153,27 +170,58 @@ object TarotCommand : AbstractCommand(
       cardName = "Arona"
     }
     val path = "/tarot/$name.png"
-    val teacherName = queryTeacherNameFromDB(commandSender.user.id)
-    val from = commandSender.contactType()
+    val teacherName = queryTeacherNameFromDB(user.id)
+    val from = contactType()
     val url = "https://arona.cdn.diyigemt.com/image$path"
-    val im = dbQuery {
-      findImage(name, from)
-    } ?: commandSender.subject.uploadImage(url).also {
-      dbQuery { it.update(name, from) }
-    }
-    val resp = MessageChainBuilder()
-      .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
-      .append(im)
-      .build().let { ch -> commandSender.sendMessage(ch) }
-    if (resp.isFailed) {
-      commandSender.subject.uploadImage(url).also { image ->
-        commandSender.sendMessage(
-          MessageChainBuilder()
-            .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
-            .append(im)
-            .build()
-        )
-        dbQuery { image.update(name, from) }
+
+    val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
+    if (mdConfig.enable) {
+      val dayOne = readPluginConfigOrDefault(Arona, default = TarotConfig()).dayOne
+      val im = when {
+        roll == 2 -> 416 to 640
+        type == TarotCardType.A -> {
+          416 to 817
+        }
+        type == TarotCardType.B -> {
+          990 to 1700
+        }
+        else -> { 416 to 640 }
+      }
+      val md = tencentCustomMarkdown {
+        + "看看${teacherName}抽到了什么:"
+        + "${cardName}(${resName})"
+        + res
+        image {
+          href = url
+          w = im.first
+          h = im.second
+        }
+      }
+      val m = MessageChainBuilder().append(md)
+      if (!dayOne) {
+        m.append(kb)
+      }
+      sendMessage(m.build())
+    } else {
+      val im = dbQuery {
+        findImage(name, from)
+      } ?: subject.uploadImage(url).also {
+        dbQuery { it.update(name, from) }
+      }
+      val resp = MessageChainBuilder()
+        .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
+        .append(im)
+        .build().let { ch -> sendMessage(ch) }
+      if (resp.isFailed) {
+        subject.uploadImage(url).also { image ->
+          sendMessage(
+            MessageChainBuilder()
+              .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
+              .append(im)
+              .build()
+          )
+          dbQuery { image.update(name, from) }
+        }
       }
     }
   }

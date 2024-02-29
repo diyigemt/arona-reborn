@@ -36,7 +36,10 @@ data class TotalAssaultConfig(
 object TotalAssaultCommand : AbstractCommand(
   Arona,
   "总力档线",
-  description = "提供当期总力档线"
+  description = "提供当期总力档线",
+  help = """
+    /总力档线 日服|官服|B服
+  """.trimIndent()
 ) {
   private val server by argument(name = "服务器", help = "可选值: 官服 B服 日服").enum<Server> { it.tag }
     .optional()
@@ -63,7 +66,10 @@ object TotalAssaultCommand : AbstractCommand(
 object TotalAssaultExCommand : AbstractCommand(
   Arona,
   "大决战档线",
-  description = "提供当期大决战档线"
+  description = "提供当期大决战档线",
+  help = """
+    /大决战档线 日服
+  """.trimIndent()
 ) {
   private val server by argument(name = "服务器", help = "可选值: 官服 B服 日服").enum<Server> { it.tag }
     .optional()

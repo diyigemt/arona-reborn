@@ -6,7 +6,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.chat.command.PluginMain"
-version = "0.1.1"
+version = "0.1.2"
 dependencies {
   compileOnly(project(":arona-core"))
   testImplementation(kotlin("test"))

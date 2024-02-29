@@ -7,7 +7,7 @@ plugins {
   id("io.ktor.plugin") version "2.3.7"
   id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
-version = "1.1.33"
+version = "1.1.34"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 
@@ -62,12 +62,12 @@ task("copyToPlugins") {
 dependencies {
 
   // kts
-  implementation("org.jetbrains.kotlin:kotlin-main-kts")
-  implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
-  implementation("org.jetbrains.kotlin:kotlin-scripting-common")
-  implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host")
-  implementation("org.jetbrains.kotlin:kotlin-scripting-dependencies")
-  implementation("org.apache.ivy:ivy:2.5.2")
+  api("org.jetbrains.kotlin:kotlin-main-kts")
+  api("org.jetbrains.kotlin:kotlin-scripting-jvm")
+  api("org.jetbrains.kotlin:kotlin-scripting-common")
+  api("org.jetbrains.kotlin:kotlin-scripting-jvm-host")
+  api("org.jetbrains.kotlin:kotlin-scripting-dependencies")
+  api("org.apache.ivy:ivy:2.5.2")
 
   implementation("io.ktor:ktor-server-cors")
   implementation("io.ktor:ktor-server-core-jvm")

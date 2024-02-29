@@ -1,18 +1,23 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 val kotlinVersion: String by project
 val exposedVersion: String by project
 plugins {
-  kotlin("jvm") version "1.9.10"
+  kotlin("jvm") version "1.9.22"
   id("io.ktor.plugin") version "2.3.7"
-  id("org.jetbrains.kotlin.plugin.serialization") version "1.9.10"
+  id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
 version = "1.1.33"
 application {
-  mainClass.set("com.diyigemt.arona.ApplicationKt")
+  mainClass = "com.diyigemt.arona.ApplicationKt"
 
   val isDevelopment = project.ext.has("development")
   applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
 
+tasks.withType<ShadowJar> {
+  isZip64 = true
+}
 tasks.withType<Tar>{
   duplicatesStrategy = DuplicatesStrategy.WARN
 }
@@ -22,6 +27,16 @@ tasks.withType<Test> {
 tasks.withType<Zip>{
   duplicatesStrategy = DuplicatesStrategy.WARN
 }
+task<Copy>("copyDep") {
+  val workingDir = projectDir.resolve("sandbox")
+  duplicatesStrategy = DuplicatesStrategy.WARN
+  configurations.default.configure {
+    isCanBeResolved = true
+  }
+  into("$workingDir/lib")
+  from(configurations.default)
+  from("lib")
+}
 //tasks.withType<ShadowJar> {
 //  dependsOn("distTar", "distZip")
 //  archiveFileName.set("${project.name}-${project.version}.jar")
@@ -30,7 +45,7 @@ task("copyToPlugins") {
   dependsOn("distTar", "distZip")
   val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox"
   val buildJar = file(project.buildDir.path + "/libs")
-    .listFiles { it -> it.isFile && it.name.contains("-all.jar") }
+    .listFiles { it -> it.isFile && !it.name.contains("-all.jar") }
     ?.firstOrNull()
   if (buildJar == null) {
     logger.error("build file not found: ${project.name}")
@@ -45,6 +60,15 @@ task("copyToPlugins") {
 }
 
 dependencies {
+
+  // kts
+  implementation("org.jetbrains.kotlin:kotlin-main-kts")
+  implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
+  implementation("org.jetbrains.kotlin:kotlin-scripting-common")
+  implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host")
+  implementation("org.jetbrains.kotlin:kotlin-scripting-dependencies")
+  implementation("org.apache.ivy:ivy:2.5.2")
+
   implementation("io.ktor:ktor-server-cors")
   implementation("io.ktor:ktor-server-core-jvm")
   implementation("io.ktor:ktor-server-netty-jvm")
@@ -69,7 +93,7 @@ dependencies {
   api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
   api("org.jetbrains.exposed:exposed-json:$exposedVersion")
 
-  implementation("org.jline:jline:3.24.1")
+  implementation("org.jline:jline:3.25.0")
   implementation("com.github.Towdium:PinIn:1.6.0")
   implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
   implementation("io.github.crackthecodeabhi:kreds:0.9.0")
@@ -82,14 +106,24 @@ dependencies {
   api("io.github.z4kn4fein:semver:1.4.2")
   api("org.reflections:reflections:0.10.2")
   api("com.github.ajalt.clikt:clikt:4.2.1")
-  api("ch.qos.logback:logback-classic:1.4.11")
   api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
 
   api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
   api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
 
+  api("ch.qos.logback:logback-core:1.4.12")
+  api("ch.qos.logback:logback-classic:1.4.14")
+
   testImplementation("io.ktor:ktor-server-tests-jvm")
   testImplementation("io.ktor:ktor-server-test-host-jvm:2.3.3")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")
+}
 
+tasks.withType<Jar>{
+  configurations.default.configure {
+    isCanBeResolved = true
+  }
+  manifest.attributes["Main-Class"] = "com.diyigemt.arona.ApplicationKt"
+  manifest.attributes["Class-Path"] = configurations.default.get().files.toList().joinToString(" ") { "lib/${it.name}" }
+  duplicatesStrategy = DuplicatesStrategy.WARN
 }

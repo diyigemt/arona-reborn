@@ -1,7 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.9.10"
-    java
-    application
+    kotlin("jvm") version "1.9.22"
 }
 
 val projectMainClass = "com.diyigemt.arona.hello.PluginMain"
@@ -13,10 +11,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-application {
-    mainClass.set(projectMainClass)
 }
 
 tasks.withType<Jar> {

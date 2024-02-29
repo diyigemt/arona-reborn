@@ -10,7 +10,7 @@ data class TestDataTransfer(
   val value: Int
 )
 
-fun main(vararg args: String) {
+fun main() {
   val scriptFile = File("test.main.kts")
   println("Executing script $scriptFile")
   val first = kotlin.system.measureTimeMillis {

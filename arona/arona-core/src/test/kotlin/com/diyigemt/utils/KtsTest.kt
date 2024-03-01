@@ -51,4 +51,13 @@ class KtsTest {
       else -> {}
     }
   }
+
+  @Test
+  fun testIndent() {
+    println("""
+      function foo() {
+        console.log("bar");
+      }
+    """.trimIndent())
+  }
 }

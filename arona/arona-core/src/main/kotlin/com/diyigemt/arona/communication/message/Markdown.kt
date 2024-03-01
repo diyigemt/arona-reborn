@@ -1,8 +1,5 @@
 package com.diyigemt.arona.communication.message
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-
 @DslMarker
 annotation class MarkdownDsl
 
@@ -12,7 +9,7 @@ abstract class MarkdownElement {
 }
 
 data class Markdown(
-  val content: String = ""
+  val content: String = "",
 ) : MarkdownElement() {
   val children: MutableList<MarkdownElement> = mutableListOf()
   operator fun String.unaryPlus() {
@@ -22,6 +19,7 @@ data class Markdown(
   infix fun String.style(style: TextElement.TextElementStyle) {
     children.add(TextElement(this, style))
   }
+
   override fun build(): String {
     return children.joinToString("\n") {
       when (it) {
@@ -119,7 +117,7 @@ data class ImageElement(
 
 data class ListElementItem(
   var content: TextElement = TextElement(),
-  var child: ListElement? = null
+  var child: ListElement? = null,
 ) : MarkdownElement() {
   constructor(s: String) : this(TextElement(s))
 
@@ -159,7 +157,7 @@ data class ListElement(
 }
 
 data class BlockElement(
-  val content: MutableList<TextElement> = mutableListOf()
+  val content: MutableList<TextElement> = mutableListOf(),
 ) : MarkdownElement() {
 
   operator fun String.unaryPlus() {
@@ -179,8 +177,23 @@ data class BlockElement(
   }
 }
 
+data class CodeBlockElement(
+  val type: String,
+  val content: MutableList<String> = mutableListOf("``` $type"),
+) : MarkdownElement() {
+
+  operator fun String.unaryPlus() {
+    content.add(this)
+  }
+
+  override fun build(): String {
+    content.add("```")
+    return content.joinToString("\n") { it }
+  }
+}
+
 data class DividerElement(
-  val text: String = ""
+  val text: String = "",
 ) : MarkdownElement() {
   override fun build(): String {
     return "***"
@@ -188,7 +201,7 @@ data class DividerElement(
 }
 
 data class BrElement(
-  val text: String = ""
+  val text: String = "",
 ) : MarkdownElement() {
   override fun build(): String {
     return "\u200B"
@@ -221,6 +234,10 @@ fun Markdown.image(block: ImageElement.() -> Unit) {
 
 fun Markdown.block(block: BlockElement.() -> Unit) {
   children.add(BlockElement().apply(block))
+}
+
+fun Markdown.code(type: String, block: CodeBlockElement.() -> Unit) {
+  children.add(CodeBlockElement(type).apply(block))
 }
 
 fun BlockElement.text(block: TextElement.() -> Unit) {

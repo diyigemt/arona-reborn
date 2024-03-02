@@ -1,6 +1,8 @@
 @file:CompilerOptions("-jvm-target=17")
 @file:DependsOn("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 @file:DependsOn("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+package com.diyigemt.arona.test
 import com.diyigemt.arona.command.nextButtonInteraction
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.*

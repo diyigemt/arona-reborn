@@ -49,6 +49,7 @@ object TestCommand : AbstractCommand(
           bot.logger.info(r.value?.javaClass?.name)
         }
       }
+
       else -> {}
     }
   }

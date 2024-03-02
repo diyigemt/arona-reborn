@@ -24,7 +24,7 @@ fun evalFile(scriptFile: File, context: Map<String, Any>, cacheDir: File? = null
 fun evalFile(scriptFile: File, context: List<ProvidedProperty<*>> = listOf(), cacheDir: File? = null):
     ResultWithDiagnostics<EvaluationResult> =
   withMainKtsCacheDir(cacheDir?.absolutePath ?: "") {
-    val scriptDefinition = createJvmCompilationConfigurationFromTemplate<SimpleMainKtsScript>() {
+    val scriptDefinition = createJvmCompilationConfigurationFromTemplate<SimpleMainKtsScript> {
       providedProperties(
         *(context.map { it.name to KotlinType(it.type) }.toTypedArray())
       )
@@ -32,7 +32,7 @@ fun evalFile(scriptFile: File, context: List<ProvidedProperty<*>> = listOf(), ca
 
     val evaluationEnv = MainKtsEvaluationConfiguration.with {
       jvm {
-        baseClassLoader(this::class.java.classLoader)
+        baseClassLoader(com.diyigemt.arona.AronaApplication::class.java.classLoader)
       }
       constructorArgs(emptyArray<String>())
       enableScriptsInstancesSharing()

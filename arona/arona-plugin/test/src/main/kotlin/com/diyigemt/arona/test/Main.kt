@@ -7,7 +7,9 @@ import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.kts.host.evalFile
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
+import com.diyigemt.arona.utils.runSuspend
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.default
 import com.github.ajalt.clikt.parameters.types.int
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -19,7 +21,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.test",
     name = "hello",
     author = "diyigemt",
-    version = "0.0.15",
+    version = "0.0.16",
     description = "test interaction"
   )
 ) {
@@ -33,8 +35,9 @@ object TestCommand : AbstractCommand(
   PluginMain,
   "测试"
 ) {
+  private val script by argument().default("send")
   suspend fun UserCommandSender.test() {
-    val result = evalFile(File("script/send.main.kts"))
+    val result = evalFile(File("script/$script.main.kts"), mapOf("sender" to this))
     result.reports.forEach {
       println(": ${it.message}" + if (it.exception == null) "" else "${it.exception}")
     }

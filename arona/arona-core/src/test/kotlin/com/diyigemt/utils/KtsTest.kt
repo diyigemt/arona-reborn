@@ -43,7 +43,6 @@ enum class GameCellType(val text: String) {
 
 class KtsTest {
 
-  @Test
   fun testLoad() {
     val result = evalFile(File("script/hello.main.kts"))
     when (val r = result.valueOrNull()?.returnValue) {

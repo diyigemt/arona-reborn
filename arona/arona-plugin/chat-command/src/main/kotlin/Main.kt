@@ -19,7 +19,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.chat.command",
     name = "chat-command",
     author = "diyigemt",
-    version = "0.1.2",
+    version = "0.1.3",
     description = "chat-command"
   )
 ) {

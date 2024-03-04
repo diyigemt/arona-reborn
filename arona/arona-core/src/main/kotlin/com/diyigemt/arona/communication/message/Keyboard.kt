@@ -25,6 +25,11 @@ data class TencentTempleKeyboard(
 data class TencentCustomKeyboard(
   val content: TencentCustomKeyboard0,
 ) : Message, TencentKeyboard() {
+  override fun toString(): String {
+    return content.rows.joinToString("\n") {
+      it.buttons.joinToString("\t") { b -> b.toString() }
+    }
+  }
   override fun serialization(): String {
     TODO("Not yet implemented")
   }
@@ -36,7 +41,7 @@ annotation class KeyboardDsl
 @KeyboardDsl
 @Serializable
 data class TencentCustomKeyboard0(
-  val rows: MutableList<TencentCustomKeyboardRow> = mutableListOf(),
+  internal val rows: MutableList<TencentCustomKeyboardRow> = mutableListOf(),
   @SerialName("bot_appid")
   @EncodeDefault
   var botAppid: String? = null
@@ -74,7 +79,11 @@ data class TencentKeyboardButton(
   var renderData: TencentKeyboardButtonRenderData = TencentKeyboardButtonRenderData(),
   @EncodeDefault
   var action: TencentKeyboardButtonActionData = TencentKeyboardButtonActionData(),
-)
+) {
+  override fun toString(): String {
+    return renderData.label
+  }
+}
 
 fun TencentKeyboardButton.render(block: TencentKeyboardButtonRenderData.() -> Unit) {
   renderData = TencentKeyboardButtonRenderData().also(block)

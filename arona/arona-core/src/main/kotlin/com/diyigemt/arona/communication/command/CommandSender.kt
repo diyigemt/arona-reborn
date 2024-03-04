@@ -249,6 +249,14 @@ fun CommandSender.isPrivate(): Boolean {
   return this is FriendUserCommandSender
 }
 
+@OptIn(ExperimentalContracts::class)
+fun CommandSender.isPrivateChannel(): Boolean {
+  contract {
+    returns(true) implies (this@isPrivateChannel is GuildUserCommandSender)
+  }
+  return this is GuildUserCommandSender
+}
+
 fun CommandSender.isNotConsole(): Boolean {
   contract {
     returns(true) implies (this@isNotConsole !is ConsoleCommandSender)

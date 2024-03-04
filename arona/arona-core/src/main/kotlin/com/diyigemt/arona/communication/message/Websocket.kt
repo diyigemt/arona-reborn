@@ -119,7 +119,7 @@ data class TencentWebsocketCallbackButtonDataResp(
 @Serializable
 data class TencentWebsocketCallbackButtonDataResolvedResp(
   @SerialName("button_data")
-  val buttonData: String,
+  val buttonData: String? = "",
   @SerialName("button_id")
   val buttonId: String,
   @SerialName("user_id")

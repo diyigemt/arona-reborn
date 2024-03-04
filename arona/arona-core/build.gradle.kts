@@ -7,7 +7,7 @@ plugins {
   id("io.ktor.plugin") version "2.3.7"
   id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
-version = "1.1.52"
+version = "1.1.57"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 
@@ -18,13 +18,13 @@ application {
 tasks.withType<ShadowJar> {
   isZip64 = true
 }
-tasks.withType<Tar>{
+tasks.withType<Tar> {
   duplicatesStrategy = DuplicatesStrategy.WARN
 }
 tasks.withType<Test> {
   workingDir = projectDir.resolve("sandbox")
 }
-tasks.withType<Zip>{
+tasks.withType<Zip> {
   duplicatesStrategy = DuplicatesStrategy.WARN
 }
 task<Copy>("copyDep") {
@@ -42,20 +42,21 @@ task<Copy>("copyDep") {
 //  archiveFileName.set("${project.name}-${project.version}.jar")
 //}
 task("copyToPlugins") {
-  dependsOn("distTar", "distZip")
-  val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox"
-  val buildJar = file(project.buildDir.path + "/libs")
-    .listFiles { it -> it.isFile && !it.name.contains("-all.jar") }
-    ?.firstOrNull()
-  if (buildJar == null) {
-    logger.error("build file not found: ${project.name}")
-  } else {
-    // 删除旧版本插件
-    file(pluginDir)
-      .listFiles { it -> it.isFile && it.name.startsWith(project.name) }
-      ?.forEach { it.delete() }
-    buildJar.copyTo(file(pluginDir + "./" + "${project.name}-${project.version}.jar"), true)
-    logger.error("copy ${buildJar.name} to plugin folder")
+  doLast {
+    val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox"
+    val buildJar = file(project.buildDir.path + "/libs")
+      .listFiles { it -> it.isFile && it.name.contains(version.toString()) }
+      ?.firstOrNull()
+    if (buildJar == null) {
+      logger.error("build file not found: ${project.name}")
+    } else {
+      // 删除旧版本插件
+      file(pluginDir)
+        .listFiles { it -> it.isFile && it.name.startsWith(project.name) }
+        ?.forEach { it.delete() }
+      buildJar.copyTo(file(pluginDir + "./" + buildJar.name), true)
+      logger.error("copy ${buildJar.name} to sanbox folder")
+    }
   }
 }
 
@@ -119,7 +120,7 @@ dependencies {
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")
 }
 
-tasks.withType<Jar>{
+tasks.withType<Jar> {
   configurations.default.configure {
     isCanBeResolved = true
   }

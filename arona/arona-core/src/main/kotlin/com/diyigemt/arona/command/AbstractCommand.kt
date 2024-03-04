@@ -99,7 +99,7 @@ internal class CommandReflector(
       .asSequence()
       .filter { it.isSubCommand() } as Sequence<KClass<out AbstractCommand>>
     return s
-      .onEach { it::class.checkModifiers() }
+      .onEach { it.checkModifiers() }
       .map { it.objectInstance!! }
       .onEach { it.checkNames() }
       .toList()
@@ -125,7 +125,7 @@ abstract class AbstractCommand(
   final override val secondaryNames: Array<out String> = arrayOf(),
   override val description: String = "<no description available>",
   help: String = "",
-) : CliktCommand(name = primaryName, help = help, epilog = description), Command {
+) : CliktCommand(name = primaryName, help = help, epilog = description, invokeWithoutSubcommand = true), Command {
   private val commandSender by requireObject<AbstractCommandSender>()
   private val reflector by lazy {
     CommandReflector(this)
@@ -146,6 +146,9 @@ abstract class AbstractCommand(
 
   final override fun run() {
     if (!commandSender.kType.isSubtypeOf(targetExtensionFunction.parameters[1].type)) {
+      return
+    }
+    if (currentContext.invokedSubcommand != null) {
       return
     }
     runBlocking(commandSender.coroutineContext) {

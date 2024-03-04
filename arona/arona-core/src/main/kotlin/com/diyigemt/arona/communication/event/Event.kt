@@ -144,6 +144,7 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
 
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketCallbackButtonResp, eventId: String) {
     logger.debug("websocket receive callback btn from server.")
+    logger.debug(payload.toString())
     val contact = when (payload.chatType) {
       TencentWebsocketCallbackButtonChatType.Guild -> {
         bot.guilds.getOrCreate(payload.guildId ?: "").let {
@@ -167,7 +168,7 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
       id = payload.id,
       appId = payload.applicationId,
       buttonId = payload.data.resolved.buttonId,
-      buttonData = payload.data.resolved.buttonData,
+      buttonData = payload.data.resolved.buttonData ?: "",
       type = payload.type,
       chatType = payload.chatType,
       contact = contact.first,

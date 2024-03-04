@@ -3,8 +3,11 @@
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.command.CommandManager.register
+import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.command.isPrivateChannel
 import com.diyigemt.arona.communication.event.*
+import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactAndUser
@@ -16,6 +19,7 @@ import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDoc
 import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
+import kotlinx.coroutines.withTimeoutOrNull
 
 object BuiltInCommands {
 
@@ -76,23 +80,118 @@ object BuiltInCommands {
     }
   }
 
-  object BindContactNameCommand : AbstractCommand(
-    BuildInOwnerCommandOwner,
+  object ContactManagementCommand : AbstractCommand(
+    BuildInCommandOwner,
     "绑定",
-    description = "绑定群/频道名称",
+    description = "管理系列指令",
     help = """
-      /绑定 xxxxx
+      /绑定 配置名称 <名称> 配置该群/频道在webui中的名称
+      
+      /绑定 管理员认证 将自己加入该群/频道下的管理员用户组
     """.trimIndent()
   ) {
-    private val name by argument("要设置的群名/频道名称")
-    suspend fun UserCommandSender.bindContactName() {
-      val contact = findContactDocumentByIdOrNull(subject.fatherSubjectIdOrSelf)
-      if (contact == null) {
-        sendMessage("当前环境信息查找失败, 去翻文档看看怎么解决吧")
-        return
+    @SubCommand
+    object AuthAdminPriorityCommand : AbstractCommand(
+      BuildInCommandOwner,
+      "管理员认证",
+      description = "给管理员用, 将自己加入该群/频道下的管理员用户组",
+      help = """
+        /绑定 管理员认证
+        
+        非管理员无法点击认证按钮
+      """.trimIndent()
+    ) {
+      private val md = tencentCustomMarkdown {
+        + "请点击认证按钮完成认证"
+        + "非管理员不用试了, 点着没反应的"
       }
-      contact.updateContactDocumentName(name)
-      sendMessage("绑定成功")
+      private val kb by lazy {
+        tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+          row {
+            button(1) {
+              render {
+                label = "认证"
+                visitedLabel = "认证成功"
+              }
+              action {
+                type = TencentKeyboardButtonActionType.CALLBACK
+                clickLimit = 1
+                permission = TencentKeyboardButtonActionPermissionData(
+                  type = TencentKeyboardButtonActionDataType.MANAGER
+                )
+              }
+            }
+          }
+        }
+      }
+      suspend fun UserCommandSender.authAdmin() {
+        if (isPrivateChannel()) {
+          sendMessage("不支持频道私聊使用")
+          return
+        }
+        MessageChainBuilder(kb, md).build().also { sendMessage(it) }
+        val auth = withTimeoutOrNull(10000L) {
+          nextButtonInteraction()
+        }
+        if (auth != null) {
+          auth.accept()
+          createContactAndUser(subject, user, DEFAULT_ADMIN_CONTACT_ROLE_ID)
+          sendMessage("认证成功")
+        }
+      }
+    }
+    @SubCommand
+    object BindContactNameCommand : AbstractCommand(
+       BuildInCommandOwner,
+      "配置名称",
+      description = "配置该群/频道在webui中的名称",
+      help = """
+        /绑定 配置名称 <名称>
+        
+        配置该群/频道在webui中的名称
+      """.trimIndent()
+    ) {
+      private val name by argument("要设置的群名/频道名称")
+      suspend fun UserCommandSender.bindContactName() {
+        val contact = findContactDocumentByIdOrNull(subject.fatherSubjectIdOrSelf)
+        if (contact == null) {
+          sendMessage("当前环境信息查找失败, 去翻文档看看怎么解决吧")
+          return
+        }
+        contact.updateContactDocumentName(name)
+        sendMessage("绑定成功")
+      }
+    }
+    suspend fun UserCommandSender.contactManagement() {
+      val md = tencentCustomMarkdown {
+        + "非管理员不用尝试了, 点着没反应的"
+        (getFormattedHelp() ?: "").split("\n").filter { it.isNotEmpty() }.forEach {
+          + it
+        }
+      }
+      val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
+        var idx = 0
+        registeredSubcommands().map { it.commandName }.windowed(2, 2, true).forEach { r ->
+          row {
+            r.forEach { c ->
+              button(idx++) {
+                render {
+                  label = c
+                }
+                action {
+                  data = "/绑定 $c"
+                  permission = TencentKeyboardButtonActionPermissionData(
+                    type = TencentKeyboardButtonActionDataType.MANAGER
+                  )
+                }
+              }
+            }
+          }
+        }
+      }
+      MessageChainBuilder().append(md).append(kb).build().also {
+        sendMessage(it)
+      }
     }
   }
 

@@ -1,9 +1,12 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
   kotlin("jvm") version "1.9.22"
+  id("io.ktor.plugin") version "2.3.3"
 }
 
-val projectMainClass = "com.diyigemt.arona.test.PluginMain"
-version = "0.0.17"
+val projectMainClass = "com.diyigemt.kivotos.Kivotos"
+version = "0.0.1"
 dependencies {
   compileOnly(project(":arona-core"))
   testImplementation(kotlin("test"))
@@ -12,13 +15,18 @@ dependencies {
 tasks.test {
   useJUnitPlatform()
 }
-
+application {
+  mainClass.set(projectMainClass)
+}
 tasks.withType<Jar> {
   manifest {
     attributes["Main-Class"] = projectMainClass
   }
 }
-
+tasks.withType<ShadowJar> {
+  dependsOn("distTar", "distZip")
+  archiveFileName.set("${project.name}-${project.version}.jar")
+}
 task("copyToPlugins") {
   doLast {
     val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox/plugins"

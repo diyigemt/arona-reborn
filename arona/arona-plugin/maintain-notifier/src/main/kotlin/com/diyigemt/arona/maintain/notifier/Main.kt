@@ -19,7 +19,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.maintain.notifier",
     name = "maintain-notifier",
     author = "diyigemt",
-    version = "0.1.0",
+    version = "0.1.1",
     description = "维护通知器"
   )
 ) {

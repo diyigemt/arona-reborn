@@ -938,6 +938,8 @@ class MessageChainBuilder private constructor(
     append(messageChain)
   }
 
+  constructor(vararg chan: Message) : this(mutableListOf(*chan), "")
+
   fun append(text: String) = this.apply {
     container.add(PlainText(text))
   }

@@ -570,6 +570,10 @@ data class TencentCustomMarkdown(
   override fun serialization(): String {
     TODO("Not yet implemented")
   }
+
+  companion object {
+    val PlaceHolderMarkdown = TencentCustomMarkdown("\u200b")
+  }
 }
 
 @Serializable

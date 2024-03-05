@@ -19,7 +19,7 @@ object Kivotos : AronaPlugin(AronaPluginDescription(
   id = "com.diyigemt.kivotos",
   name = "kivotos",
   author = "diyigemt",
-  version = "0.0.1",
+  version = "0.0.2",
   description = "hello world"
 )) {
   override fun onLoad() {}
@@ -27,7 +27,7 @@ object Kivotos : AronaPlugin(AronaPluginDescription(
 
 private val visitorMenu by lazy {
   tencentCustomMarkdown {
-    + ""
+    + "访客菜单"
   } + tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
     row {
       subButton("注册")
@@ -75,10 +75,10 @@ object KivotosCommand : AbstractCommand(
       return
     }
     // TODO 注册
-    val isRegister = false
+    val isRegister = true
     if (isRegister) {
       // TODO 签到
-      val isTodayFirstLogin = false
+      val isTodayFirstLogin = true
       if (isTodayFirstLogin) {
         val loginResult = tencentCustomMarkdown {
           + "签到成功, 获得100清辉石"
@@ -156,6 +156,47 @@ object KivotosCommand : AbstractCommand(
         expire("$REDIS_KEY.${user.id}", 60u)
       }
       sendMessage(md + kb)
+    }
+  }
+
+  @SubCommand
+  @Suppress("unused")
+  object CoffeeCommand : AbstractCommand(
+    Kivotos,
+    "咖啡厅",
+    description = "咖啡厅系列指令",
+  ) {
+    private val md = tencentCustomMarkdown {
+      h1("夏莱附属咖啡厅一楼")
+    }
+    suspend fun UserCommandSender.coffee() {
+      val studentList = listOf("白子", "静子", "日奈")
+      val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
+        (studentList + listOf("一键摸头")).windowed(2, 2, true).forEach { r ->
+          row {
+            r.forEach { c ->
+              if (c == "一键摸头") {
+                subButton(c, "咖啡厅 一键摸头")
+              } else {
+                subButton("摸摸$c", "咖啡厅 摸头 $c")
+              }
+            }
+          }
+        }
+      }
+      sendMessage(md + kb)
+    }
+    @SubCommand
+    @Suppress("unused")
+    object CoffeeCommand : AbstractCommand(
+      Kivotos,
+      "摸头",
+      description = "咖啡厅摸头指令",
+    ) {
+      private val studentName by argument("学生名")
+      suspend fun UserCommandSender.coffeeTouch() {
+        sendMessage("你摸了摸$studentName, 功德+3")
+      }
     }
   }
 }

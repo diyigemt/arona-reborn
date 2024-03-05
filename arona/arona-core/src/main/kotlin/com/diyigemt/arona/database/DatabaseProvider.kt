@@ -25,7 +25,7 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.sqlite.SQLiteConfig
 
-internal object DatabaseProvider {
+object DatabaseProvider {
   private val sqlDatabase: Database by lazy {
     val database = Database.connect(
       "jdbc:sqlite:./database.db",
@@ -56,9 +56,11 @@ internal object DatabaseProvider {
       .build()
     val settings = MongoClientSettings
       .builder()
-      .applyConnectionString(ConnectionString(
-        aronaConfig.mongodb.toConnectionString()
-      ))
+      .applyConnectionString(
+        ConnectionString(
+          aronaConfig.mongodb.toConnectionString()
+        )
+      )
       .serverApi(serverApi)
       .build()
     MongoClient.create(settings).getDatabase(aronaConfig.mongodb.db)
@@ -70,13 +72,14 @@ internal object DatabaseProvider {
       }
     }
   }
-  fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
 
-  suspend fun <T> sqlDbQuerySuspended(block: suspend () -> T): T =
+  internal fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
+
+  internal suspend fun <T> sqlDbQuerySuspended(block: suspend () -> T): T =
     newSuspendedTransaction(Dispatchers.IO, sqlDatabase) { block() }
 
-  fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
-   suspend fun <T> noSqlDbQuerySuspended(block: suspend MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
+  internal fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
+  internal suspend fun <T> noSqlDbQuerySuspended(block: suspend MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
 
   suspend fun <T> redisDbQuery(block: suspend KredsClient.() -> T) = block.invoke(redisDatabase)
 
@@ -89,6 +92,7 @@ internal enum class RedisPrefixKey(val prefix: String) {
   WEB_LOGIN("login"),
   WEB_TOKEN("token"),
   WEB_BINDING("bind");
+
   companion object {
     fun buildKey(type: RedisPrefixKey, key: String) = "${type.prefix}.$key"
   }
@@ -99,8 +103,8 @@ internal interface DocumentCompanionObject {
 }
 
 internal suspend inline fun <reified T : Any, R> DocumentCompanionObject.withCollection(
-  crossinline block: suspend MongoCollection<T>.() -> R
-) : R =
+  crossinline block: suspend MongoCollection<T>.() -> R,
+): R =
   noSqlDbQuerySuspended {
     block(getCollection(documentName))
   }

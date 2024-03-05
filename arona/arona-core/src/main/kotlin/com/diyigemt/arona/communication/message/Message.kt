@@ -477,6 +477,7 @@ interface Message {
    * 给出序列化保存的字符串
    */
   fun serialization(): String
+  operator fun plus(other: Message) = MessageChainBuilder(this, other).build();
 }
 
 data class PlainText(
@@ -965,6 +966,8 @@ class MessageChainBuilder private constructor(
   fun append(other: TencentMessageBuilder) = this.apply {
 //    other.build().also { append(it) }
   }
+
+  operator fun plus(other: Message) = this.append(other)
 
   // TODO build其他类型消息
   fun build(): MessageChain {

@@ -28,6 +28,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.reflect.full.hasAnnotation
 
 object CommandManager {
   private val logger = KtorSimpleLogger("CommandManager")
@@ -35,8 +36,13 @@ object CommandManager {
   internal val commandMap: MutableMap<String, Command> = mutableMapOf()
 
   fun matchCommand(commandName: String) = commandMap[commandName.lowercase()]
-  fun getRegisteredCommands(): List<Command> = commandMap.values.toList()
-  fun getRegisteredCommands(owner: CommandOwner): List<Command> = commandMap.values.filter { it.owner == owner }
+  fun getRegisteredCommands(): List<Command> = commandMap
+    .values
+    .filter {
+      !it::class.hasAnnotation<UnderDevelopment>()
+    }
+    .toList()
+  fun getRegisteredCommands(owner: CommandOwner): List<Command> = getRegisteredCommands().filter { it.owner == owner }
   fun unregisterAllCommands(owner: CommandOwner) {
     for (registeredCommand in getRegisteredCommands(owner)) {
       unregisterCommand(registeredCommand)

@@ -3,6 +3,7 @@
 package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.utils.uuid
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -56,11 +57,31 @@ fun TencentCustomKeyboard0.row(block: TencentCustomKeyboardRow.() -> Unit) {
 @KeyboardDsl
 @Serializable
 data class TencentCustomKeyboardRow(
-  val buttons: MutableList<TencentKeyboardButton> = mutableListOf(),
+  internal val buttons: MutableList<TencentKeyboardButton> = mutableListOf(),
 )
 
 fun TencentCustomKeyboardRow.button(id: Int, block: TencentKeyboardButton.() -> Unit) {
   button(id.toString(), block)
+}
+
+fun TencentCustomKeyboardRow.button(block: TencentKeyboardButton.() -> Unit) {
+  button(uuid(), block)
+}
+
+fun TencentCustomKeyboardRow.button(label: String, data: String = label, enter: Boolean = false) {
+  button(uuid(), label, data, enter)
+}
+
+fun TencentCustomKeyboardRow.button(id: String, label: String, data: String = label, enter: Boolean = false) {
+  button(id) {
+    render {
+      this@render.label = label
+    }
+    action {
+      this@action.data = data
+      this@action.enter = enter
+    }
+  }
 }
 
 fun TencentCustomKeyboardRow.button(id: String, block: TencentKeyboardButton.() -> Unit) {

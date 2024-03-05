@@ -115,7 +115,25 @@ object GachaCommand : AbstractCommand(
       }
       val pool = poolConfig.pools.firstOrNull { it.name == targetPoolName }
       if (pool == null) {
-        sendMessage("池子不存在!, 可选:\n${poolConfig.pools.joinToString("\n") { it.name }}")
+        if (readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown.enable) {
+          val md = tencentCustomMarkdown {
+            h1("卡池选择")
+            + "池子不存在!"
+            + "仅能抽取管理员预定义的和自己配置的"
+          }
+          val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
+            poolConfig.pools.windowed(2, 2, true).forEach { r ->
+              r.forEach { c ->
+                row {
+                  button(c.name, "/十连 ${c.name}")
+                }
+              }
+            }
+          }
+          sendMessage(md + kb)
+        } else {
+          sendMessage("池子不存在!, 可选:\n${poolConfig.pools.joinToString("\n") { it.name }}")
+        }
         return
       }
       // 开抽!
@@ -193,7 +211,7 @@ object GachaCommand : AbstractCommand(
               label = "再来一次"
             }
             action {
-              data = "/十连" + if (isCustom) {poolName} else {""}
+              data = "/十连 " + if (isCustom) {poolName} else {""}
             }
           }
           if (!isCustom) {
@@ -342,7 +360,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
   private class UpdateStudent : CliktCommand(name = "i", help = "更新一个学生信息") {
     override fun run() {
       val studentName = terminal.prompt("请输入学生名称", null) as String
-      val schema = dbQuery { StudentSchema.find { StudentTable.name eq studentName } }.firstOrNull()?.also {
+      val schema = dbQuery { StudentSchema.find { StudentTable.name eq studentName }.firstOrNull() }?.also {
         echo("将更新学生信息: $this")
       }
       val name = terminal.prompt("请输入学生名称", default = studentName) as String

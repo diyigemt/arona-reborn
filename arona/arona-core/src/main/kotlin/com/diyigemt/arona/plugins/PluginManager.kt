@@ -2,6 +2,7 @@ package com.diyigemt.arona.plugins
 
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
+import com.diyigemt.arona.command.SubCommand
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.internal.MultiFilePluginDataStorageImpl
 import com.diyigemt.arona.console.CommandLineSubCommand
@@ -23,6 +24,7 @@ import java.net.URLClassLoader
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.jar.JarFile
+import kotlin.reflect.full.hasAnnotation
 import kotlin.system.exitProcess
 
 internal val <T> T.job: Job where T : CoroutineScope, T : AronaAbstractPlugin get() = this.coroutineContext[Job]!!
@@ -79,9 +81,12 @@ object PluginManager {
       val commandQuery = org.reflections.scanners.Scanners.SubTypes
         .of(AbstractCommand::class.java)
         .asClass<AbstractCommand>(pluginClassLoader)
-      commandQuery.apply(reflections.store).forEach { clazz ->
+      commandQuery.apply(reflections.store).map { clazz ->
         clazz as Class<AbstractCommand>
-        CommandManager.registerCommand(clazz.kotlin.objectInstance!!, false)
+      }.filter {
+        !it.kotlin.hasAnnotation<SubCommand>()
+      }.forEach {
+        CommandManager.registerCommand(it.kotlin.objectInstance!!, false)
       }
       // 注册自动保存的插件配置文件
       val pluginDataQuery = org.reflections.scanners.Scanners.SubTypes

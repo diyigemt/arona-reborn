@@ -110,13 +110,14 @@ abstract class PluginUserDocument : PluginVisibleData() {
   abstract val id: String
   abstract val unionOpenId: String
   abstract val qq: Long
+  abstract val username: String
 }
 
 @Serializable
 internal data class UserDocument(
   @BsonId
   override val id: String, // 自己定义的唯一id
-  val username: String = "Arona用户$id", // 显示在前端的用户名
+  override val username: String = "Arona用户$id", // 显示在前端的用户名
   override val unionOpenId: String = "", // 藤子定义的唯一id
   override val qq: Long = 0L, // 用户绑定的qq号
   val uid: List<String> = listOf(), // 藤子给定的不同聊天环境下的id

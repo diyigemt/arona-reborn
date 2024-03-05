@@ -112,6 +112,12 @@ internal class CommandReflector(
 }
 
 /**
+ * 标记一个开发中的指令对象
+ */
+@Target(AnnotationTarget.CLASS)
+annotation class UnderDevelopment
+
+/**
  * 标记一个子指令对象
  */
 @Target(AnnotationTarget.CLASS)

@@ -3,10 +3,11 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 plugins {
   kotlin("jvm") version "1.9.22"
   id("io.ktor.plugin") version "2.3.3"
+  id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
 
 val projectMainClass = "com.diyigemt.kivotos.Kivotos"
-version = "0.0.3"
+version = "0.0.9"
 dependencies {
   compileOnly(project(":arona-core"))
   compileOnly(project(":arona-plugin:arona"))

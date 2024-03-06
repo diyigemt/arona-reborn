@@ -567,6 +567,13 @@ sealed class TencentMarkdown
 data class TencentCustomMarkdown(
   val content: String
 ) : Message, TencentMarkdown() {
+  operator fun plus(other: TencentCustomMarkdown): TencentCustomMarkdown {
+    return TencentCustomMarkdown(
+      this.content +
+      "\n" +
+      other.content
+    )
+  }
   override fun serialization(): String {
     TODO("Not yet implemented")
   }

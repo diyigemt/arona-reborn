@@ -26,6 +26,10 @@ data class TencentTempleKeyboard(
 data class TencentCustomKeyboard(
   val content: TencentCustomKeyboard0,
 ) : Message, TencentKeyboard() {
+  operator fun plus(other: TencentCustomKeyboard): TencentCustomKeyboard {
+    content.rows.addAll(other.content.rows)
+    return this
+  }
   override fun toString(): String {
     return "\n" + content.rows.joinToString("\n") {
       it.buttons.joinToString("\t") { b -> b.toString() }

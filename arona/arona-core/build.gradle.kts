@@ -7,7 +7,7 @@ plugins {
   id("io.ktor.plugin") version "2.3.7"
   id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
-version = "1.1.62"
+version = "1.1.64"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 
@@ -93,6 +93,7 @@ dependencies {
   api("org.jetbrains.exposed:exposed-core:$exposedVersion")
   api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
   api("org.jetbrains.exposed:exposed-json:$exposedVersion")
+  api("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
 
   api("io.github.crackthecodeabhi:kreds:0.9.0")
 
@@ -101,7 +102,6 @@ dependencies {
   implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
   //ABAC
   implementation(fileTree("lib"))
-  implementation("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
 
   api("org.xerial:sqlite-jdbc:3.42.0.1")
   api("com.charleskorn.kaml:kaml:0.55.0")

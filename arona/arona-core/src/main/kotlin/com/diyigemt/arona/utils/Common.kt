@@ -56,6 +56,10 @@ fun Instant.toDateTime() = "${toDate()} ${toTime()}"
 fun datetimeToInstant(datetime: String) =
   datetime.replace(" ", "T").toLocalDateTime().toInstant(TimeZone.currentSystemDefault())
 
+fun String.toInstant() =
+  replace(" ", "T").toLocalDateTime().toInstant(TimeZone.currentSystemDefault())
+
+
 private val cpuPool = CoroutineScope(Job() + Dispatchers.Default)
 private val ioPool = CoroutineScope(Job() + Dispatchers.IO)
 fun runCpuSuspend(block: suspend () -> Unit) = cpuPool.launch {

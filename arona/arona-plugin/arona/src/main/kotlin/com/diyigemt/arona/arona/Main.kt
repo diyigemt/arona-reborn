@@ -17,8 +17,8 @@ object Arona : AronaPlugin(
     id = "com.diyigemt.arona",
     name = "arona",
     author = "diyigemt",
-    version = "1.1.14",
-    description = "hello world"
+    version = "1.1.18",
+    description = "arona plugin"
   )
 ) {
   private val json = Json {

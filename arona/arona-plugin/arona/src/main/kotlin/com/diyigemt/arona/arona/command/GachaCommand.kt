@@ -432,8 +432,8 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
       dbQuery {
         StudentSchema
           .find { StudentTable.name like "%$studentName%" }
+          .toList()
       }
-        .toList()
         .forEach {
           echo(it)
         }
@@ -463,7 +463,8 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
       val poolList = dbQuery {
         GachaPoolSchema
           .find { GachaPoolTable.name like "%$poolName%" }
-      }.toList()
+          .toList()
+      }
       echo(poolList
         .mapIndexed { idx, it -> "$idx. ${it.name}(active=${it.active})" }
       )
@@ -478,8 +479,8 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
   private class CreatePool : CliktCommand(name = "c", help = "创建卡池") {
     override fun run() {
       val poolName = terminal.prompt("请输入卡池名称", null) as String
-      val fes = terminal.confirm("fes")
-      if (dbQuery { GachaPoolSchema.find { GachaPoolTable.name eq poolName } }.toList().firstOrNull() != null) {
+      val fes = terminal.confirm("fes", default = "N")
+      if (dbQuery { GachaPoolSchema.find { GachaPoolTable.name eq poolName }.toList().firstOrNull() } != null) {
         echo("卡池名称存在", err = true)
         return
       }
@@ -550,7 +551,9 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
           val name = terminal.prompt("请输入卡池名", default = pool.name) as String
           val fes = terminal.confirm("fes", default = "N")
           if (terminal.confirm("新名: $name, fes: $fes")) {
-            pool.name = name
+            dbQuery {
+              pool.name = name
+            }
           }
         }
 
@@ -562,7 +565,9 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
             0 -> {
               val student = studentSelector(this)
               if (terminal.confirm("添加学生: $student")) {
-                pool.students += listOf(student.id.value)
+                dbQuery {
+                  pool.students += listOf(student.id.value)
+                }
               }
             }
 
@@ -623,8 +628,8 @@ fun poolSelector(command: CliktCommand): GachaPoolSchema {
       val poolList = dbQuery {
         GachaPoolSchema
           .find { GachaPoolTable.name like "%$poolName%" }
+          .toList()
       }
-        .toList()
         .onEach { p ->
           echo(p)
         }
@@ -651,8 +656,8 @@ fun studentSelector(command: CliktCommand): StudentSchema {
       val studentList = dbQuery {
         StudentSchema
           .find { StudentTable.name like "%$studentName%" }
+          .toList()
       }
-        .toList()
         .also {
           echo(it)
         }

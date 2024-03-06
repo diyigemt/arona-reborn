@@ -16,7 +16,7 @@ import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import io.github.crackthecodeabhi.kreds.connection.Endpoint
 import io.github.crackthecodeabhi.kreds.connection.KredsClient
 import io.github.crackthecodeabhi.kreds.connection.newClient
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -76,7 +76,7 @@ object DatabaseProvider {
   internal fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
 
   internal suspend fun <T> sqlDbQuerySuspended(block: suspend () -> T): T =
-    newSuspendedTransaction(Dispatchers.IO, sqlDatabase) { block() }
+    newSuspendedTransaction(currentCoroutineContext(), sqlDatabase) { block() }
 
   internal fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
   internal suspend fun <T> noSqlDbQuerySuspended(block: suspend MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)

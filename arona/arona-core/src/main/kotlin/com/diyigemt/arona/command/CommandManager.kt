@@ -42,7 +42,16 @@ object CommandManager {
       !it::class.hasAnnotation<UnderDevelopment>()
     }
     .toList()
+
   fun getRegisteredCommands(owner: CommandOwner): List<Command> = getRegisteredCommands().filter { it.owner == owner }
+  internal fun internalGetRegisteredCommands(owner: CommandOwner): List<Command> =
+    commandMap
+      .values
+      .filter {
+        it.owner == owner
+      }
+      .toList()
+
   fun unregisterAllCommands(owner: CommandOwner) {
     for (registeredCommand in getRegisteredCommands(owner)) {
       unregisterCommand(registeredCommand)
@@ -156,6 +165,7 @@ internal val crsiveLocalization = object : Localization {
   override fun extraArgumentMany(name: String, count: Int) = "多余的参数: $name"
   override fun invalidChoice(choice: String, choices: List<String>) =
     "参数无效:$choice, 可选值为: ${choices.joinToString(",")}"
+
   override fun badParameterWithMessageAndParam(paramName: String, message: String) = "$paramName 的值无效. $message"
   override fun noSuchSubcommand(name: String, possibilities: List<String>): String {
     return "<$name>子指令 不存在, 是否想要执行: ${possibilities.joinToString(", ") { it }}"

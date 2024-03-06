@@ -123,6 +123,7 @@ annotation class UnderDevelopment
 @Target(AnnotationTarget.CLASS)
 annotation class SubCommand(
   val value: String = "",
+  val forClass: KClass<out AbstractCommand> = AbstractCommand::class
 )
 
 abstract class AbstractCommand(

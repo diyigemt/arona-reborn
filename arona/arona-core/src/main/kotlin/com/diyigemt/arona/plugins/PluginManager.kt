@@ -14,6 +14,8 @@ import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.diyigemt.arona.webui.plugins.RoutingManager
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.subcommands
+import io.ktor.server.application.*
 import io.ktor.util.logging.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -24,6 +26,7 @@ import java.net.URLClassLoader
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.jar.JarFile
+import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.hasAnnotation
 import kotlin.system.exitProcess
 
@@ -40,6 +43,12 @@ object PluginManager {
   private val pluginsFolder by lazy {
     rootPath.resolve("plugins").apply { mkdir() }.toFile()
   }
+  private val classLoader = URLClassLoader(
+    pluginsFolder
+      .listFiles { file -> !file.isDirectory && file.extension == "jar" }
+      ?.map { it.toURI().toURL() }?.toTypedArray() ?: arrayOf(),
+    Application::class.java.classLoader
+  )
   val pluginsDataPath: Path = rootPath.resolve("data").apply { mkdir() }
   val pluginsConfigPath: Path = rootPath.resolve("config").apply { mkdir() }
   fun loadPluginFromPluginDirectory() {
@@ -59,8 +68,6 @@ object PluginManager {
   @OptIn(InternalSerializationApi::class)
   @Suppress("UNCHECKED_CAST")
   private fun loadPluginFromFile(jarFile: File) {
-    val jarURL = jarFile.toURI().toURL()
-    val classLoader = URLClassLoader(arrayOf(jarURL))
     val jar = JarFile(jarFile)
 
     val manifest = jar.manifest
@@ -81,13 +88,27 @@ object PluginManager {
       val commandQuery = org.reflections.scanners.Scanners.SubTypes
         .of(AbstractCommand::class.java)
         .asClass<AbstractCommand>(pluginClassLoader)
-      commandQuery.apply(reflections.store).map { clazz ->
+      // 找到该插件的所有指令
+      val commandStorage = commandQuery.apply(reflections.store).map { clazz ->
         clazz as Class<AbstractCommand>
-      }.filter {
+      }
+      commandStorage.filter {
         !it.kotlin.hasAnnotation<SubCommand>()
       }.forEach {
         CommandManager.registerCommand(it.kotlin.objectInstance!!, false)
       }
+      val registeredMainCommand = CommandManager.internalGetRegisteredCommands(pluginInstance)
+      commandStorage.filter {
+        it.kotlin.hasAnnotation<SubCommand>()
+      }.forEach {
+        val subCommand = it.kotlin.findAnnotation<SubCommand>()!!
+        if (subCommand.forClass != AbstractCommand::class) {
+          registeredMainCommand.firstOrNull { m -> m::class == subCommand.forClass }?.also { m ->
+            (m as? AbstractCommand)?.subcommands(it.kotlin.objectInstance!!)
+          }
+        }
+      }
+
       // 注册自动保存的插件配置文件
       val pluginDataQuery = org.reflections.scanners.Scanners.SubTypes
         .of(AutoSavePluginData::class.java)

@@ -10,7 +10,6 @@ import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.*
 import com.diyigemt.kivotos.Kivotos
 import com.diyigemt.kivotos.KivotosCommand
-import com.diyigemt.kivotos.coffee.CoffeeCommand.updateCoffeeStudents
 import com.diyigemt.kivotos.subButton
 import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
 import com.diyigemt.kivotos.tools.database.idFilter
@@ -134,8 +133,8 @@ object CoffeeCommand : AbstractCommand(
   }
 
   @Suppress("lower_case")
-  private const val StudentUpdateTime0 = "03:00:00"
-  private const val StudentUpdateTime1 = "15:00:00"
+  private const val MORNING_TIME = "03:00:00"
+  private const val AFTERNOON_TIME = "15:00:00"
   private suspend fun UserCommandSender.updateCoffeeStudents(sendMessage: Boolean) {
     val coffee = coffee()
     var md = md + tencentCustomMarkdown {
@@ -218,8 +217,8 @@ object CoffeeCommand : AbstractCommand(
     val now = now()
     val nowDatetime = now.toDateTime()
     val last = last0.toInstant()
-    val morning = "${currentDate()} $StudentUpdateTime0"
-    val afternoon = "${currentDate()} $StudentUpdateTime1"
+    val morning = "${currentDate()} $MORNING_TIME"
+    val afternoon = "${currentDate()} $AFTERNOON_TIME"
     // 超过12小时 肯定需要更新
     return (now - last).inWholeHours >= 12L ||
       morning in last0..nowDatetime ||

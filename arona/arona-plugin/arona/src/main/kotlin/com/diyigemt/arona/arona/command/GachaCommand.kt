@@ -593,7 +593,7 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
               if (terminal.confirm("删除学生: ${s[select]}")) {
                 dbQuery {
                   pool.students = pool.students.toMutableList().also {
-                    it.remove(select)
+                    it.remove(s[select].id.value)
                   }
                 }
               }

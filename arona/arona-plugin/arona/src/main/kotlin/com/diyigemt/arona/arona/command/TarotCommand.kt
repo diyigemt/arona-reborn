@@ -188,6 +188,7 @@ object TarotCommand : AbstractCommand(
         else -> { 416 to 640 }
       }
       val md = tencentCustomMarkdown {
+        at()
         + "看看${teacherName}抽到了什么:"
         + "${cardName}(${resName})"
         + res

@@ -7,7 +7,12 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.arona.Arona"
-version = "1.1.18"
+version = "1.1.21"
+kotlin {
+  compilerOptions {
+    freeCompilerArgs.add("-Xcontext-receivers")
+  }
+}
 dependencies {
   compileOnly(project(":arona-core"))
   compileOnly("io.ktor:ktor-server-core-jvm")

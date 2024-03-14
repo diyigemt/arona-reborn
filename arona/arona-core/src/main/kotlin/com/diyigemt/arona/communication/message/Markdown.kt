@@ -1,5 +1,9 @@
 package com.diyigemt.arona.communication.message
 
+import com.diyigemt.arona.communication.command.UserCommandSender
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+
 @DslMarker
 annotation class MarkdownDsl
 
@@ -101,6 +105,15 @@ data class LinkElement(
     } else {
       "<$href>"
     }
+  }
+}
+
+data class AtElement(
+  val target: String,
+) : MarkdownElement() {
+
+  override fun build(): String {
+    return "<@$target>"
   }
 }
 
@@ -222,6 +235,15 @@ fun Markdown.h2(text: String) {
 
 fun Markdown.text(block: TextElement.() -> Unit) {
   children.add(TextElement().apply(block))
+}
+
+fun Markdown.at(target: String) {
+  children.add(AtElement(target))
+}
+
+context(UserCommandSender)
+fun Markdown.at() {
+  children.add(AtElement(user.id))
 }
 
 fun Markdown.link(block: LinkElement.() -> Unit) {

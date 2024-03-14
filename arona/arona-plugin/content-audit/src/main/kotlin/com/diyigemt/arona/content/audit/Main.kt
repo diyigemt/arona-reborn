@@ -1,6 +1,5 @@
 package com.diyigemt.arona.content.audit
 
-import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.value
 import com.diyigemt.arona.console.CommandLineSubCommand
@@ -15,13 +14,11 @@ import com.qcloud.cos.ClientConfig
 import com.qcloud.cos.auth.BasicCOSCredentials
 import com.qcloud.cos.model.ciModel.auditing.TextAuditingRequest
 import com.qcloud.cos.region.Region
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.SerialName
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
+@Suppress("unused")
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
     id = "com.diyigemt.arona.content.audit",

@@ -21,11 +21,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.serializerOrNull
+import org.reflections.Reflections
 import java.io.File
 import java.net.URLClassLoader
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.jar.JarFile
+import kotlin.reflect.KClass
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.hasAnnotation
 import kotlin.system.exitProcess
@@ -59,9 +61,9 @@ object PluginManager {
 
   fun initPlugin() {
     plugins.forEach {
-      logger.info("loading plugin: ${it.description.name}")
+      logger.info("loading plugin: ${it.description.name}:${it.description.version}")
       it.onLoad()
-      logger.info("plugin: ${it.description.name} loaded")
+      logger.info("plugin: ${it.description.name}:${it.description.version} loaded")
     }
   }
 
@@ -75,39 +77,19 @@ object PluginManager {
     val pluginClass = classLoader.loadClass(mainClass)
 
     if (AronaPlugin::class.java.isAssignableFrom(pluginClass)) {
+      // 加载runtime反射
       val pluginInstance = pluginClass.kotlin.objectInstance as AronaPlugin
-      // 注册指令
       val pluginClassLoader = pluginInstance::class.java.classLoader
-      val reflections = org.reflections.Reflections(
+      val reflections = Reflections(
         org.reflections.util.ConfigurationBuilder()
           .forPackage(
             pluginInstance::class.java.packageName,
             pluginClassLoader
           )
       )
-      val commandQuery = org.reflections.scanners.Scanners.SubTypes
-        .of(AbstractCommand::class.java)
-        .asClass<AbstractCommand>(pluginClassLoader)
-      // 找到该插件的所有指令
-      val commandStorage = commandQuery.apply(reflections.store).map { clazz ->
-        clazz as Class<AbstractCommand>
-      }
-      commandStorage.filter {
-        !it.kotlin.hasAnnotation<SubCommand>()
-      }.forEach {
-        CommandManager.registerCommand(it.kotlin.objectInstance!!, false)
-      }
-      val registeredMainCommand = CommandManager.internalGetRegisteredCommands(pluginInstance)
-      commandStorage.filter {
-        it.kotlin.hasAnnotation<SubCommand>()
-      }.forEach {
-        val subCommand = it.kotlin.findAnnotation<SubCommand>()!!
-        if (subCommand.forClass != AbstractCommand::class) {
-          registeredMainCommand.firstOrNull { m -> m::class == subCommand.forClass }?.also { m ->
-            (m as? AbstractCommand)?.subcommands(it.kotlin.objectInstance!!)
-          }
-        }
-      }
+
+      // 注册指令
+      loadCommands(reflections, pluginInstance)
 
       // 注册自动保存的插件配置文件
       val pluginDataQuery = org.reflections.scanners.Scanners.SubTypes
@@ -160,6 +142,51 @@ object PluginManager {
         pluginInstance.permissionId("command.*"),
         "插件指令父级权限"
       )
+    }
+  }
+
+  private fun loadCommands(reflections: Reflections, instance: AronaPlugin) {
+    val cl = instance::class.java.classLoader
+    val commandQuery = org.reflections.scanners.Scanners.SubTypes
+      .of(AbstractCommand::class.java)
+      .asClass<AbstractCommand>(cl)
+    // 找到该插件的所有指令
+    val commandStorage = commandQuery.apply(reflections.store).map { clazz ->
+      clazz as Class<AbstractCommand>
+    }
+    commandStorage.filter {
+      !it.kotlin.hasAnnotation<SubCommand>()
+    }.forEach {
+      CommandManager.registerCommand(it.kotlin.objectInstance!!, false)
+    }
+    val registeredMainCommands = CommandManager.internalGetRegisteredCommands(instance)
+    val subCommands = commandStorage.filter {
+      it.kotlin.hasAnnotation<SubCommand>() && it.kotlin.findAnnotation<SubCommand>()!!.forClass != AbstractCommand::class
+    }.toMutableList()
+
+    fun <T : CliktCommand> findParent(command: T, t: KClass<*>): CliktCommand? {
+      if (command::class == t) {
+        return command
+      }
+      return command.registeredSubcommands().firstNotNullOfOrNull { findParent(it, t) }
+    }
+
+    var deepCount = 0
+    while (deepCount++ < 10 && subCommands.isNotEmpty()) {
+      val itr = subCommands.iterator()
+      while (itr.hasNext()) {
+        val command = itr.next()
+        val subCommand = command.kotlin.findAnnotation<SubCommand>()!!
+        registeredMainCommands.firstNotNullOfOrNull { findParent(it as CliktCommand, subCommand.forClass) }
+          ?.also { parent ->
+            parent.subcommands(command.kotlin.objectInstance!!)
+            itr.remove()
+          }
+      }
+    }
+    if (subCommands.isNotEmpty()) {
+      logger.warn("some sub command register failed after 10 tries")
+      logger.warn("remaining: ${subCommands.joinToString(",") { it.name }}");
     }
   }
 }

@@ -66,4 +66,17 @@ class MarkdownTest {
     }
     println(test.content)
   }
+  @Test
+  fun testKb() {
+    val kb = tencentCustomKeyboard("") {
+      listOf(1,2,3,4,5,6).windowed(2, 2, true).forEach { r ->
+        r.forEach { c ->
+          row {
+            button(c.toString())
+          }
+        }
+      }
+    }
+    println(kb)
+  }
 }

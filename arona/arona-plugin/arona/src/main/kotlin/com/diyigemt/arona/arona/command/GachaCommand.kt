@@ -123,8 +123,8 @@ object GachaCommand : AbstractCommand(
           }
           val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
             poolConfig.pools.windowed(2, 2, true).forEach { r ->
-              r.forEach { c ->
-                row {
+              row {
+                r.forEach { c ->
                   button(c.name, "/十连 ${c.name}")
                 }
               }
@@ -203,6 +203,7 @@ object GachaCommand : AbstractCommand(
           w = 2340
           h = 1080
         }
+        at()
       }
       val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
         row {
@@ -553,6 +554,7 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
           if (terminal.confirm("新名: $name, fes: $fes")) {
             dbQuery {
               pool.name = name
+              pool.fes = fes
             }
           }
         }

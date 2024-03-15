@@ -26,6 +26,12 @@ data class TencentTempleKeyboard(
 data class TencentCustomKeyboard(
   val content: TencentCustomKeyboard0,
 ) : Message, TencentKeyboard() {
+  infix fun append(other: TencentCustomKeyboard) {
+    content.rows.addAll(other.content.rows)
+  }
+  infix fun insertTo(other: TencentCustomKeyboard) {
+    other.content.rows.addAll(0, content.rows)
+  }
   operator fun plus(other: TencentCustomKeyboard): TencentCustomKeyboard {
     content.rows.addAll(other.content.rows)
     return this

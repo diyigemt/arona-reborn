@@ -3,6 +3,7 @@ package com.diyigemt.utils
 import com.diyigemt.arona.communication.message.TencentMessageIntentsBuilder
 import com.diyigemt.arona.communication.message.TencentRichMessage
 import com.diyigemt.arona.utils.*
+import com.github.ajalt.clikt.core.*
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 import kotlinx.serialization.encodeToString
@@ -52,4 +53,27 @@ class CommonTest {
       .getOrElse { println(2) }
   }
 
+  @Test
+  fun testContext() {
+    val a = object : CliktCommand(invokeWithoutSubcommand = true) {
+      override fun run() {
+        currentContext.findOrSetObject {
+          1
+        }
+        updateContext {
+          obj = "!"
+        }
+        println("father")
+      }
+    }
+    val b = object : CliktCommand(name = "c") {
+      private val i by requireObject<String>()
+      override fun run() {
+        val a = currentContext
+        println("child: ${i}")
+      }
+    }
+    a.subcommands(b)
+    a.parse(listOf("c"))
+  }
 }

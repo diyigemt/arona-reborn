@@ -1,19 +1,13 @@
 package com.diyigemt.kivotos
 
 import com.diyigemt.arona.command.AbstractCommand
-import com.diyigemt.arona.command.SubCommand
 import com.diyigemt.arona.command.UnderDevelopment
 import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.database.DatabaseProvider
 import com.diyigemt.arona.utils.uuid
-import com.diyigemt.kivotos.coffee.CoffeeCommand
-import com.diyigemt.kivotos.user.DeleteCommand
-import com.diyigemt.kivotos.user.RegisterCommand
-import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.findOrSetObject
 
 
 private val visitorMenu by lazy {
@@ -62,6 +56,14 @@ object KivotosCommand : AbstractCommand(
   """.trimIndent()
 ) {
   suspend fun UserCommandSender.menu() {
+    currentContext.findOrSetObject {
+      tencentCustomMarkdown {  }
+    }
+    context {
+      currentContext.findOrSetObject {
+        tencentCustomKeyboard(bot.unionOpenidOrId) {  }
+      }
+    }
     if (currentContext.invokedSubcommand != null) {
       return
     }

@@ -84,7 +84,7 @@ internal class CommandReflector(
     if (objectInstance == null) illegalDeclaration(this, "SubCommand should be object")
     if (visibility == KVisibility.PRIVATE) illegalDeclaration(
       this, "Command function must be accessible, that is, " +
-          "effectively public."
+        "effectively public."
     )
     if (this.hasAnnotation<JvmStatic>()) illegalDeclaration(this, "Command function must not be static.")
 
@@ -107,7 +107,7 @@ internal class CommandReflector(
 
   fun findTargetExtensionFunction() = command::class.declaredMemberExtensionFunctions.first {
     it.extensionReceiverParameter!!.type.isSubtypeOf(CommandSender::class.starProjectedType)
-        && it.parameters.size == 2
+      && it.parameters.size == 2
   }
 }
 
@@ -123,7 +123,7 @@ annotation class UnderDevelopment
 @Target(AnnotationTarget.CLASS)
 annotation class SubCommand(
   val value: String = "",
-  val forClass: KClass<out AbstractCommand> = AbstractCommand::class
+  val forClass: KClass<out AbstractCommand> = AbstractCommand::class,
 )
 
 abstract class AbstractCommand(
@@ -153,9 +153,6 @@ abstract class AbstractCommand(
 
   final override fun run() {
     if (!commandSender.kType.isSubtypeOf(targetExtensionFunction.parameters[1].type)) {
-      return
-    }
-    if (currentContext.invokedSubcommand != null) {
       return
     }
     runBlocking(commandSender.coroutineContext) {

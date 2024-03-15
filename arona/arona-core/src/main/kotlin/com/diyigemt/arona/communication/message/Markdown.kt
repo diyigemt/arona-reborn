@@ -16,6 +16,7 @@ data class Markdown(
   val content: String = "",
 ) : MarkdownElement() {
   val children: MutableList<MarkdownElement> = mutableListOf()
+
   operator fun String.unaryPlus() {
     children.add(TextElement(this))
   }

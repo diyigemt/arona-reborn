@@ -37,7 +37,7 @@ data class CustomPool(
   fun toGachaPool() = dbQuery {
     GachaPool(
       name,
-      StudentSchema.find { StudentTable.id inList pickup }.toList(),
+      StudentSchema.find { StudentTable.id inList pickup }.toMutableList(),
       isFes = false
     )
   }

@@ -16,6 +16,7 @@ import com.diyigemt.arona.arona.tools.GachaResult
 import com.diyigemt.arona.arona.tools.GachaResultItem
 import com.diyigemt.arona.arona.tools.GachaTool
 import com.diyigemt.arona.arona.tools.GachaTool.GachaResourcePath
+import com.diyigemt.arona.arona.tools.GachaTool.NormalPool
 import com.diyigemt.arona.arona.tools.GachaTool.NormalRStudent
 import com.diyigemt.arona.arona.tools.GachaTool.NormalSRStudent
 import com.diyigemt.arona.arona.tools.GachaTool.NormalSSRStudent
@@ -390,7 +391,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
         )
       ) {
         if (schema == null) {
-          dbQuery {
+          val create = dbQuery {
             StudentSchema.new {
               this@new.name = name
               this@new.limit = limit
@@ -398,6 +399,12 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
               this@new.headFileName = head
             }
           }
+          dbQuery {
+            GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().also {
+              it.students += listOf(create.id.value)
+            }
+          }
+          NormalPool.students.add(create)
         } else {
           dbQuery {
             schema.name = name

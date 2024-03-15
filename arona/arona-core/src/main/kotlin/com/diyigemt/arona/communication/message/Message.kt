@@ -565,8 +565,14 @@ sealed class TencentMarkdown
 
 @Serializable
 data class TencentCustomMarkdown(
-  val content: String
+  var content: String
 ) : Message, TencentMarkdown() {
+  infix fun append(other: TencentCustomMarkdown) {
+    content + "\n" + other.content
+  }
+  infix fun insertTo(other: TencentCustomMarkdown) {
+    other.content = content + "\n" + other.content
+  }
   operator fun plus(other: TencentCustomMarkdown): TencentCustomMarkdown {
     return TencentCustomMarkdown(
       this.content +

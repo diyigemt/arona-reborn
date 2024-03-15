@@ -175,7 +175,7 @@ object TarotCommand : AbstractCommand(
     val url = "https://arona.cdn.diyigemt.com/image$path"
 
     val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
-    if (mdConfig.enable) {
+    if (mdConfig.enable and false) { // TODO remove旧版塔罗牌
       val dayOne = readPluginConfigOrDefault(Arona, default = TarotConfig()).dayOne
       val im = when {
         roll == 2 -> 416 to 640

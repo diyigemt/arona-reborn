@@ -225,7 +225,7 @@ internal suspend fun executeCommandImpl(
   }
   return runCatching {
     command.context2 {
-      obj = caller
+      obj = mutableListOf(caller)
       terminal = commandTerminal
       localization = crsiveLocalization
     }

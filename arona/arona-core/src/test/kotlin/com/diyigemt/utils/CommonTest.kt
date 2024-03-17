@@ -60,17 +60,18 @@ class CommonTest {
         currentContext.findOrSetObject {
           1
         }
-        updateContext {
-          obj = "!"
+        currentContext.findOrSetObject {
+          "1"
         }
         println("father")
       }
     }
     val b = object : CliktCommand(name = "c") {
       private val i by requireObject<String>()
+      private val j by requireObject<Int>()
+
       override fun run() {
-        val a = currentContext
-        println("child: ${i}")
+        println("child: $i $j")
       }
     }
     a.subcommands(b)

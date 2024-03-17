@@ -6,8 +6,6 @@ import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.uuid
-import com.github.ajalt.clikt.core.context
-import com.github.ajalt.clikt.core.findOrSetObject
 
 
 private val visitorMenu by lazy {
@@ -57,12 +55,10 @@ object KivotosCommand : AbstractCommand(
 ) {
   suspend fun UserCommandSender.menu() {
     currentContext.findOrSetObject {
-      tencentCustomMarkdown {  }
+      tencentCustomMarkdown { }
     }
-    context {
-      currentContext.findOrSetObject {
-        tencentCustomKeyboard(bot.unionOpenidOrId) {  }
-      }
+    currentContext.findOrSetObject {
+      tencentCustomKeyboard(bot.unionOpenidOrId) { }
     }
     if (currentContext.invokedSubcommand != null) {
       return

@@ -30,6 +30,7 @@ private suspend fun UserCommandSender.coffee() = CoffeeDocument.withCollection<C
   }
 }
 
+
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
 object CoffeeCommand : AbstractCommand(
@@ -43,8 +44,8 @@ object CoffeeCommand : AbstractCommand(
     tencentCustomMarkdown {
       h1("夏莱附属咖啡厅")
     } insertTo md
-    currentContext.findOrSetObject { coffee() }
-    currentContext.findObject<CoffeeDocument>()
+    val coffee = coffee()
+    currentContext.findOrSetObject { coffee }
     updateCoffeeStudents(currentContext.invokedSubcommand == null)
   }
 

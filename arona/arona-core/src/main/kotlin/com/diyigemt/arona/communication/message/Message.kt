@@ -568,7 +568,7 @@ data class TencentCustomMarkdown(
   var content: String
 ) : Message, TencentMarkdown() {
   infix fun append(other: TencentCustomMarkdown) {
-    content + "\n" + other.content
+    content += "\n" + other.content
   }
   infix fun insertTo(other: TencentCustomMarkdown) {
     other.content = content + "\n" + other.content

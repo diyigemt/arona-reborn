@@ -12,7 +12,7 @@ kotlin {
     freeCompilerArgs.add("-Xcontext-receivers")
   }
 }
-version = "1.1.67"
+version = "1.1.69"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 
@@ -106,7 +106,7 @@ dependencies {
   implementation("com.github.Towdium:PinIn:1.6.0")
   implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
   //ABAC
-  implementation(fileTree("lib"))
+  api(fileTree("lib"))
 
   api("org.xerial:sqlite-jdbc:3.42.0.1")
   api("com.charleskorn.kaml:kaml:0.55.0")

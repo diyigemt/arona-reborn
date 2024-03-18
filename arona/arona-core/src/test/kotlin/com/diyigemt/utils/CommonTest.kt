@@ -57,10 +57,10 @@ class CommonTest {
   fun testContext() {
     val a = object : CliktCommand(invokeWithoutSubcommand = true) {
       override fun run() {
-        currentContext.findOrSetObject {
+        currentContext.findOrSetObject("i") {
           1
         }
-        currentContext.findOrSetObject {
+        currentContext.findOrSetObject("j") {
           "1"
         }
         println("father")
@@ -76,5 +76,11 @@ class CommonTest {
     }
     a.subcommands(b)
     a.parse(listOf("c"))
+  }
+  @Test
+  fun testDuration() {
+    val a = "2024-03-18 16:14:00".toInstant()
+    val b = "2024-03-18 19:13:00".toInstant()
+    println((b - a).inWholeHours)
   }
 }

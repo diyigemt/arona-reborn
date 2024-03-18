@@ -1,6 +1,7 @@
 package common
 
 import org.junit.jupiter.api.Test
+import kotlin.properties.ReadOnlyProperty
 
 abstract class T {
   init {
@@ -19,5 +20,24 @@ class TestCommon {
   fun testInit() {
     val f = F()
     println(1)
+  }
+  open class A {
+    val list: List<Any> = listOf()
+  }
+  inline fun <reified T : Any> A.required(): ReadOnlyProperty<A, T?> {
+    return ReadOnlyProperty { thisRef, property ->
+      println(property.name)
+      list.firstOrNull { it is T } as? T
+    }
+  }
+  @Test
+  fun testDelegate() {
+    val c = object : A() {
+      val b by required<Int>()
+      fun test() {
+        println(b)
+      }
+    }
+    c.test()
   }
 }

@@ -12,7 +12,7 @@ kotlin {
     freeCompilerArgs.add("-Xcontext-receivers")
   }
 }
-version = "1.1.69"
+version = "1.1.71"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 
@@ -117,7 +117,6 @@ dependencies {
 
   api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
   api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
-
   api("ch.qos.logback:logback-core:1.4.12")
   api("ch.qos.logback:logback-classic:1.4.14")
 

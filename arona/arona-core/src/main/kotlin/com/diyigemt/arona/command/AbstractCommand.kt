@@ -133,7 +133,7 @@ abstract class AbstractCommand(
   override val description: String = "<no description available>",
   help: String = "",
 ) : CliktCommand(name = primaryName, help = help, epilog = description, invokeWithoutSubcommand = true), Command {
-  private val commandSender by requireObject<AbstractCommandSender>()
+  private val commandSender by requireObject<AbstractCommandSender>("caller")
   private val reflector by lazy {
     CommandReflector(this)
   }

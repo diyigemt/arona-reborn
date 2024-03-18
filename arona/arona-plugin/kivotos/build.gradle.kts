@@ -7,13 +7,17 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.kivotos.Kivotos"
-version = "0.0.17"
+version = "0.0.23"
 dependencies {
   compileOnly(project(":arona-core"))
   compileOnly(project(":arona-plugin:arona"))
   testImplementation(kotlin("test"))
 }
-
+kotlin {
+  compilerOptions {
+    freeCompilerArgs.add("-Xcontext-receivers")
+  }
+}
 tasks.test {
   useJUnitPlatform()
 }

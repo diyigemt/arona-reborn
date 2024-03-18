@@ -21,8 +21,8 @@ private val visitorMenu by lazy {
 private val playerMainMenu by lazy {
   tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
     row {
-      subButton("咖啡厅")
-      subButton("课程表")
+      subButton("咖啡厅", enter = true)
+      subButton("课程表", enter = true)
     }
   }
 }
@@ -54,12 +54,8 @@ object KivotosCommand : AbstractCommand(
   """.trimIndent()
 ) {
   suspend fun UserCommandSender.menu() {
-    currentContext.findOrSetObject {
-      tencentCustomMarkdown { }
-    }
-    currentContext.findOrSetObject {
-      tencentCustomKeyboard(bot.unionOpenidOrId) { }
-    }
+    currentContext.setObject("md", tencentCustomMarkdown { })
+    currentContext.setObject("kb", tencentCustomKeyboard(bot.unionOpenidOrId) { })
     if (currentContext.invokedSubcommand != null) {
       return
     }

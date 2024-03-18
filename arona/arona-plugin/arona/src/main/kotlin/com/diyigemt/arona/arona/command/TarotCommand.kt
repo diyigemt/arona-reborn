@@ -175,14 +175,14 @@ object TarotCommand : AbstractCommand(
     val url = "https://arona.cdn.diyigemt.com/image$path"
 
     val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
-    if (mdConfig.enable and false) { // TODO remove旧版塔罗牌
+    if (mdConfig.enable) { // TODO remove旧版塔罗牌
       val dayOne = readPluginConfigOrDefault(Arona, default = TarotConfig()).dayOne
       val im = when {
         roll == 2 -> 416 to 640
         type == TarotCardType.A -> {
           416 to 817
         }
-        type == TarotCardType.B -> {
+        roll == 1 || type == TarotCardType.B -> {
           990 to 1700
         }
         else -> { 416 to 640 }

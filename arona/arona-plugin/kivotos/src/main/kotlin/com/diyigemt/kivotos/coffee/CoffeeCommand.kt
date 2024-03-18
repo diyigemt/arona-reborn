@@ -45,7 +45,7 @@ object CoffeeCommand : AbstractCommand(
       h1("夏莱附属咖啡厅")
     } insertTo md
     val coffee = coffee()
-    currentContext.findOrSetObject { coffee }
+    currentContext.setObject("coffee", coffee)
     updateCoffeeStudents(currentContext.invokedSubcommand == null)
   }
 
@@ -53,17 +53,11 @@ object CoffeeCommand : AbstractCommand(
   private const val MORNING_TIME = "03:00:00"
   private const val AFTERNOON_TIME = "15:00:00"
   private suspend fun UserCommandSender.updateCoffeeStudents(sendMessage: Boolean) {
-    val coffee = currentContext.findObject<CoffeeDocument>()!!
-    val visitedStudents = DatabaseProvider.dbQuery {
-      StudentSchema.find {
-        StudentTable.id inList coffee.students
-      }.toList()
-    }
+    var coffee = currentContext.findObject<CoffeeDocument>()!!
     md append tencentCustomMarkdown {
       +"当前咖啡厅等级: ${coffee.level}"
     }
-    val last = coffee.lastStudentUpdateTime
-    if (checkStudentUpdate(last)) {
+    if (checkStudentUpdate(coffee.lastStudentUpdateTime)) {
       // 需要更新来访的学生
       val students = DatabaseProvider.dbQuery {
         val max = StudentSchema.count()
@@ -72,51 +66,44 @@ object CoffeeCommand : AbstractCommand(
         }.toList()
       }
       coffee.updateStudents(students.map { it.id.value })
-      md append tencentCustomMarkdown {
-        +"来访学生"
-        list {
-          students.map { it.name }.forEach { s ->
-            +s
-          }
+      coffee = coffee()
+    } else if (checkStudentTouchedUpdate(coffee.lastTouchTime)) {
+      coffee.updateTouchedStudents(coffee.students, false)
+      coffee = coffee()
+    }
+    currentContext.setObject("coffee", coffee)
+    val visitedStudents = DatabaseProvider.dbQuery {
+      StudentSchema.find {
+        StudentTable.id inList coffee.students
+      }.toList()
+    }
+    val touchedStudents = DatabaseProvider.dbQuery {
+      StudentSchema.find {
+        StudentTable.id inList coffee.touchedStudents
+      }.toList()
+    }
+    currentContext.setObject("visitedStudents", visitedStudents)
+    currentContext.setObject("touchedStudents", touchedStudents)
+    md append tencentCustomMarkdown {
+      +"来访学生"
+      list {
+        visitedStudents.map { it.name }.forEach { s ->
+          +s
         }
-      }
-      if (sendMessage) {
-        kb append tencentCustomKeyboard(bot.unionOpenidOrId) {
-          (students.map { it.name } + listOf("一键摸头")).windowed(2, 2, true).forEach { r ->
-            row {
-              r.forEach { c ->
-                if (c == "一键摸头") {
-                  subButton(c, "咖啡厅 一键摸头")
-                } else {
-                  subButton("摸摸$c", "咖啡厅 摸头 $c")
-                }
-              }
-            }
-          }
-        }
-      }
-    } else {
-      md append tencentCustomMarkdown {
-        +"来访学生"
-        list {
-          visitedStudents.map { it.name }.forEach { s ->
-            +s
-          }
-        }
-      }
-      if (sendMessage) {
-        kb append buildTouchButton(
-          bot.unionOpenidOrId,
-          visitedStudents.map { it.name },
-          coffee.touchedStudents.size == coffee.students.size
-        )
       }
     }
+    kb append buildTouchButton(
+      bot.unionOpenidOrId,
+      visitedStudents.map { it.name }
+    )
     if (sendMessage) {
+      md append tencentCustomMarkdown {
+        at()
+      }
       sendMessage(md + kb)
     }
   }
-
+  // 检查学生刷新时间
   private fun checkStudentUpdate(last0: String): Boolean {
     val now = now()
     val nowDatetime = now.toDateTime()
@@ -127,6 +114,13 @@ object CoffeeCommand : AbstractCommand(
     return (now - last).inWholeHours >= 12L ||
       morning in last0..nowDatetime ||
       afternoon in last0..nowDatetime
+  }
+  // 检查学生摸头刷新时间 从第一次摸开始算起3小时刷新
+  private fun checkStudentTouchedUpdate(last0: String): Boolean {
+    val now = now()
+    val last = last0.toInstant()
+    val duration = now - last
+    return duration.inWholeHours >= 3
   }
 
   private fun studentCount(level: Int) = when (level) {
@@ -144,9 +138,9 @@ data class CoffeeDocument(
   val students: List<Int> = listOf(), // 来访的学生
   val touchedStudents: List<Int> = listOf(), // 能摸的学生, 为什么不是摸过的学生呢, 因为有些来的学生你没有啊
   val lastTouchTime: String = "2000-11-04 05:14:00", // 摸头计时器 每3小时刷新一次
-  val lastInviteTime: String = "2000-11-04 05:14:00",
-  val lastStudentUpdateTime: String = "2000-11-04 05:14:00",
-  val lastRewordCollectTime: String = "2000-11-04 05:14:00",
+  val lastInviteTime: String = "2000-11-04 05:14:00", // 上次邀请时间, 冷却时间23小时
+  val lastStudentUpdateTime: String = "2000-11-04 05:14:00", // 上次刷新来访的时间, 每个整3点刷新
+  val lastRewordCollectTime: String = "2000-11-04 05:14:00", // 上次领体力和信用点的时间
 ) {
   suspend fun updateStudents(students: List<Int>) {
     updateStudents0(CoffeeDocument::students.name, students)
@@ -154,8 +148,11 @@ data class CoffeeDocument(
     updateTime(CoffeeDocument::lastStudentUpdateTime.name, currentDateTime())
   }
 
-  suspend fun updateTouchedStudents(students: List<Int>) {
+  suspend fun updateTouchedStudents(students: List<Int>, updateTouchTime: Boolean) {
     updateStudents0(CoffeeDocument::touchedStudents.name, students)
+    if (updateTouchTime) {
+      updateTime(CoffeeDocument::lastTouchTime.name, currentDateTime())
+    }
   }
 
   suspend fun updateTime(name: String, value: String) {
@@ -193,6 +190,8 @@ object CoffeeTouchCommand : AbstractCommand(
 ) {
   private val md by requireObject<TencentCustomMarkdown>()
   private val kb by requireObject<TencentCustomKeyboard>()
+  private val visitedStudents by requireObject<List<StudentSchema>>()
+  private val touchedStudents by requireObject<List<StudentSchema>>()
   private val coffee by requireObject<CoffeeDocument>()
   private val studentName by argument("学生名")
   suspend fun UserCommandSender.coffeeTouch() {
@@ -202,40 +201,34 @@ object CoffeeTouchCommand : AbstractCommand(
     if (targetStudent == null) {
       val md = tencentCustomMarkdown {
         +"没法摸摸$studentName, 学生不存在"
+        at()
       }
-      sendMessage(md)
+      sendMessage(md + kb)
       return
     }
-    val students = DatabaseProvider.dbQuery {
-      StudentSchema.find {
-        StudentTable.id inList coffee.touchedStudents
-      }.toList()
-    }
-    if (studentName !in students.map { it.name }) {
-      val md = tencentCustomMarkdown {
+    if (studentName !in visitedStudents.map { it.name }) {
+      md append tencentCustomMarkdown {
         +"没法摸摸$studentName, 她没来访问呢"
+        at()
       }
-      sendMessage(md)
+      sendMessage(md + kb)
       return
     }
-    val md = md + if (targetStudent.id.value !in coffee.touchedStudents) {
+    val md = md + if (targetStudent.id.value in coffee.touchedStudents) {
       tencentCustomMarkdown {
-        +"你摸了摸$studentName, 功德+3"
+        +"你摸了摸$studentName, 好感+3"
+        at()
       }
     } else {
       tencentCustomMarkdown {
         +"你摸了摸$studentName, 她绷不住了"
+        at()
       }
     }
-    val kb = buildTouchButton(
-      bot.unionOpenidOrId,
-      students.map { it.name },
-      coffee.touchedStudents.size == coffee.students.size
-    )
     sendMessage(md + kb)
     coffee.updateTouchedStudents(coffee.touchedStudents.toMutableList().also {
       it.remove(targetStudent.id.value)
-    })
+    }, coffee.touchedStudents.size == coffee.students.size)
   }
 }
 
@@ -248,32 +241,44 @@ object CoffeeTouchAllCommand : AbstractCommand(
 ) {
   private val md by requireObject<TencentCustomMarkdown>()
   private val kb by requireObject<TencentCustomKeyboard>()
+  private val visitedStudents by requireObject<List<StudentSchema>>()
+  private val touchedStudents by requireObject<List<StudentSchema>>()
   private val coffee by requireObject<CoffeeDocument>()
   suspend fun UserCommandSender.coffeeTouch() {
-    if (coffee.touchedStudents.isEmpty()) {
-      sendMessage("所有学生已经被摸过了, 等下一次刷新吧")
-      return
+    md append tencentCustomMarkdown {
+      +"你分别摸了摸"
+      list {
+        visitedStudents.forEach {
+          +it.name
+        }
+      }
     }
-    val students = DatabaseProvider.dbQuery {
-      StudentSchema.find {
-        StudentTable.id inList coffee.touchedStudents
-      }.toList()
+    md append tencentCustomMarkdown {
+      touchedStudents.forEach {
+        +"${it.name}的好感+3"
+      }
     }
-    sendMessage("你分别对\n${students.joinToString("\n") { it.name }}\n使出了摸摸,效果拔群!")
-    coffee.updateTouchedStudents(listOf())
+    md append tencentCustomMarkdown {
+      visitedStudents.filter { it.id.value !in coffee.touchedStudents }.forEach {
+        +"${it.name}绷不住了"
+      }
+      at()
+    }
+    sendMessage(md)
+    coffee.updateTouchedStudents(listOf(), coffee.touchedStudents.size == coffee.students.size)
   }
 }
 
-private fun buildTouchButton(openid: String, students: List<String>, touchAll: Boolean = false): TencentCustomKeyboard {
+private fun buildTouchButton(openid: String, students: List<String>): TencentCustomKeyboard {
   return tencentCustomKeyboard(openid) {
     (students + listOf("一键摸头")).windowed(2, 2, true)
       .forEach { r ->
         row {
           r.forEach { c ->
-            if ((c == "一键摸头") and touchAll) {
-              subButton(c, "咖啡厅 一键摸头")
+            if (c == "一键摸头") {
+              subButton(c, "咖啡厅 一键摸头", true)
             } else {
-              subButton("摸摸$c", "咖啡厅 摸头 $c")
+              subButton("摸摸$c", "咖啡厅 摸头 $c", true)
             }
           }
         }

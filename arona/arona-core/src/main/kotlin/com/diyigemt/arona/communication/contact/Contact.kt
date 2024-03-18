@@ -209,8 +209,10 @@ internal class GuildImpl(
 
   init {
     this.launch {
-      if (!isPublic) fetchMemberList()
-      fetchChannelList()
+      if (!isPublic) {
+        fetchMemberList()
+        fetchChannelList()
+      }
     }
   }
 

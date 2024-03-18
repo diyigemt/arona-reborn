@@ -4,14 +4,14 @@ import com.diyigemt.arona.command.CommandExecuteResult
 import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.communication.command.CommandSender.Companion.toCommandSender
 import com.diyigemt.arona.communication.event.TencentMessageEvent
-import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.config.AutoSavePluginData
+import com.diyigemt.arona.config.value
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.diyigemt.arona.utils.error
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.UsageError
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 object PluginMain : AronaPlugin(
@@ -19,16 +19,20 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.chat.command",
     name = "chat-command",
     author = "diyigemt",
-    version = "0.1.3",
+    version = "0.1.4",
     description = "chat-command"
   )
 ) {
   override fun onLoad() {
+    val ignoreList = Config.ignoreUser + Config.ignoreGroup + Config.ignoreGuild
     pluginEventChannel().subscribeAlways<TencentMessageEvent>(
       CoroutineExceptionHandler { _, throwable ->
         logger.error(throwable)
       },
     ) {
+      if (it.subject.id in ignoreList) {
+        return@subscribeAlways
+      }
       // TODO 正式环境上线
 //      val text = it.message.filterIsInstance<PlainText>().firstOrNull() ?: return@subscribeAlways
       // 命令必须以 "/" 开头
@@ -73,4 +77,10 @@ object PluginMain : AronaPlugin(
       }
     }
   }
+}
+
+object Config : AutoSavePluginData("config") {
+  val ignoreGuild by value(listOf<String>())
+  val ignoreGroup by value(listOf<String>())
+  val ignoreUser by value(listOf<String>())
 }

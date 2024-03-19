@@ -1,5 +1,7 @@
 package common
 
+import com.diyigemt.kivotos.schema.FavorLevelExcelTable
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import kotlin.properties.ReadOnlyProperty
 
@@ -21,15 +23,18 @@ class TestCommon {
     val f = F()
     println(1)
   }
+
   open class A {
     val list: List<Any> = listOf()
   }
+
   inline fun <reified T : Any> A.required(): ReadOnlyProperty<A, T?> {
     return ReadOnlyProperty { thisRef, property ->
       println(property.name)
       list.firstOrNull { it is T } as? T
     }
   }
+
   @Test
   fun testDelegate() {
     val c = object : A() {
@@ -39,5 +44,12 @@ class TestCommon {
       }
     }
     c.test()
+  }
+
+  @Test
+  fun testFavor() {
+    runBlocking {
+      println(FavorLevelExcelTable.findLevel(16))
+    }
   }
 }

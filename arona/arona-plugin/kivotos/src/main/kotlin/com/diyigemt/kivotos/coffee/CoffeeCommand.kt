@@ -10,6 +10,7 @@ import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.*
 import com.diyigemt.kivotos.Kivotos
 import com.diyigemt.kivotos.KivotosCommand
+import com.diyigemt.kivotos.schema.UserDocument
 import com.diyigemt.kivotos.subButton
 import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
 import com.diyigemt.kivotos.tools.database.idFilter
@@ -21,6 +22,7 @@ import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
+
 
 private suspend fun UserCommandSender.coffee() = CoffeeDocument.withCollection<CoffeeDocument, CoffeeDocument?> {
   find(filter = idFilter(userDocument().id)).limit(1).firstOrNull()
@@ -193,6 +195,7 @@ object CoffeeTouchCommand : AbstractCommand(
   private val visitedStudents by requireObject<List<StudentSchema>>()
   private val touchedStudents by requireObject<List<StudentSchema>>()
   private val coffee by requireObject<CoffeeDocument>()
+  private val kivotosUser by requireObject<UserDocument>()
   private val studentName by argument("学生名")
   suspend fun UserCommandSender.coffeeTouch() {
     val targetStudent = DatabaseProvider.dbQuery {
@@ -215,8 +218,12 @@ object CoffeeTouchCommand : AbstractCommand(
       return
     }
     val md = md + if (targetStudent.id.value in coffee.touchedStudents) {
+      val updates = kivotosUser.updateStudentFavor(targetStudent.id.value, 15)
       tencentCustomMarkdown {
-        +"你摸了摸$studentName, 好感+3"
+        +"你摸了摸$studentName, 好感+15"
+        if (updates != null) {
+          + "$studentName 的好感上升了, 当前等级: ${updates.first}(${updates.second})"
+        }
         at()
       }
     } else {
@@ -244,6 +251,7 @@ object CoffeeTouchAllCommand : AbstractCommand(
   private val visitedStudents by requireObject<List<StudentSchema>>()
   private val touchedStudents by requireObject<List<StudentSchema>>()
   private val coffee by requireObject<CoffeeDocument>()
+  private val kivotosUser by requireObject<UserDocument>()
   suspend fun UserCommandSender.coffeeTouch() {
     md append tencentCustomMarkdown {
       +"你分别摸了摸"
@@ -255,13 +263,22 @@ object CoffeeTouchAllCommand : AbstractCommand(
     }
     md append tencentCustomMarkdown {
       touchedStudents.forEach {
-        +"${it.name}的好感+3"
+        +"${it.name}的好感+15"
       }
     }
     md append tencentCustomMarkdown {
       visitedStudents.filter { it.id.value !in coffee.touchedStudents }.forEach {
         +"${it.name}绷不住了"
       }
+    }
+    touchedStudents.forEach {
+      kivotosUser.updateStudentFavor(it.id.value, 15)?.also { p ->
+        md append tencentCustomMarkdown {
+          +"${it.name} 的好感上升了, 当前等级: ${p.first}(${p.second})"
+        }
+      }
+    }
+    md append tencentCustomMarkdown {
       at()
     }
     sendMessage(md)

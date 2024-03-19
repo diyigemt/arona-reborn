@@ -6,6 +6,7 @@ import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.uuid
+import com.diyigemt.kivotos.schema.kivotosUser
 
 
 private val visitorMenu by lazy {
@@ -56,6 +57,7 @@ object KivotosCommand : AbstractCommand(
   suspend fun UserCommandSender.menu() {
     currentContext.setObject("md", tencentCustomMarkdown { })
     currentContext.setObject("kb", tencentCustomKeyboard(bot.unionOpenidOrId) { })
+    currentContext.setObject("kivotosUser", kivotosUser())
     if (currentContext.invokedSubcommand != null) {
       return
     }

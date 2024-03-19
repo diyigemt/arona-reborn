@@ -380,7 +380,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
             ConversionResult.Valid(this)
           } ?: ConversionResult.Invalid("只能选这几个")
         } as StudentRarity
-      var head = terminal.prompt("请输入学生头图文件名", null) as String
+      var head = terminal.prompt("请输入学生头图文件名", schema?.headFileName ?: "") as String
       while (!Files.exists(GachaResourcePath.resolve(head))) {
         echo("文件不存在")
         head = terminal.prompt("请输入学生头图文件名", null) as String

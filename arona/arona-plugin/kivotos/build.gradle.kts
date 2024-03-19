@@ -12,6 +12,10 @@ dependencies {
   compileOnly(project(":arona-core"))
   compileOnly(project(":arona-plugin:arona"))
   testImplementation(kotlin("test"))
+  testImplementation("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
 }
 kotlin {
   compilerOptions {

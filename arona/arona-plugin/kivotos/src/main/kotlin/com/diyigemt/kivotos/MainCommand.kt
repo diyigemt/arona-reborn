@@ -23,7 +23,7 @@ private val playerMainMenu by lazy {
   tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
     row {
       subButton("咖啡厅", enter = true)
-      subButton("课程表", enter = true)
+      subButton("删号")
     }
   }
 }
@@ -49,7 +49,7 @@ object KivotosCommand : AbstractCommand(
     
     /赛博基沃托斯, 打开主菜单
     
-    /赛博基沃托斯 注册, 注册账号
+    /赛博基沃托斯 咖啡厅, 进入咖啡厅
     
     /赛博基沃托斯 删号, 删除账号
   """.trimIndent()

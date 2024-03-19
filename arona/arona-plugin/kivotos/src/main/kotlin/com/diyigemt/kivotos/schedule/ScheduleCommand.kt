@@ -1,4 +1,4 @@
-package com.diyigemt.kivotos.user
+package com.diyigemt.kivotos.schedule
 
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.SubCommand
@@ -8,12 +8,12 @@ import com.diyigemt.kivotos.KivotosCommand
 
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
-object RegisterCommand : AbstractCommand(
+object ScheduleCommand : AbstractCommand(
   Kivotos,
-  "注册",
-  description = "注册账号"
+  "课程表",
+  description = "课程表系列指令",
 ) {
-  suspend fun UserCommandSender.register() {
-    sendMessage("注册成功")
+  suspend fun UserCommandSender.schedule() {
+    sendMessage("还没做")
   }
 }

@@ -5,6 +5,7 @@ import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
 import com.diyigemt.kivotos.tools.database.idFilter
 import com.diyigemt.kivotos.tools.database.withCollection
 import com.mongodb.client.model.Updates
+import com.mongodb.client.result.DeleteResult
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.Serializable
@@ -28,6 +29,15 @@ data class UserDocument(
   val id: String,
   val student: Map<String, Student> = mapOf(),
 ) {
+  // 删除记录
+  suspend fun deleteAccount(): Boolean {
+    FavorLevelExcelTable.deleteRecord(id)
+    return withCollection<UserDocument, DeleteResult> {
+      deleteOne(
+        filter = idFilter(id)
+      )
+    }.deletedCount == 1L
+  }
   /**
    * 更新学生好感等级, 如果升级, 返回新等级和下一级数据
    */

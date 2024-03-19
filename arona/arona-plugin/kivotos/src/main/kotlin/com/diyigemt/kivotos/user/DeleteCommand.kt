@@ -7,6 +7,8 @@ import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.database.DatabaseProvider
 import com.diyigemt.kivotos.Kivotos
 import com.diyigemt.kivotos.KivotosCommand
+import com.diyigemt.kivotos.schema.UserDocument
+import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 
@@ -18,6 +20,7 @@ object DeleteCommand : AbstractCommand(
   description = "删除账号"
 ) {
   private const val REDIS_KEY = "kivotos.delete."
+  private val kivotosUser by requireObject<UserDocument>()
   private val confirmCode by argument("code", help = "删号代码").optional()
   private fun generateNumber(): String = (1..6).map { "0123456789".random() }.joinToString("")
   suspend fun UserCommandSender.register() {
@@ -27,7 +30,11 @@ object DeleteCommand : AbstractCommand(
       }
       if (code == confirmCode) {
         // TODO 删号
-        sendMessage("删除成功")
+        if (kivotosUser.deleteAccount()) {
+          sendMessage("删除成功")
+        } else {
+          sendMessage("删除失败")
+        }
       } else {
         sendMessage("代码不存在")
       }

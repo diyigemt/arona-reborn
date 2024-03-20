@@ -2,7 +2,7 @@ package com.diyigemt.arona.arona
 
 import com.diyigemt.arona.communication.TencentApiErrorException
 import com.diyigemt.arona.communication.event.*
-import com.diyigemt.arona.communication.message.MessageChainBuilder
+import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import io.ktor.client.*
@@ -35,8 +35,34 @@ object Arona : AronaPlugin(
     pluginEventChannel().subscribeAlways<TencentBotUserChangeEvent> {
       when (it) {
         is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> {
+          val md = tencentCustomMarkdown {
+            +"欢迎连接「シッテムの箱」，老师。"
+            +"使用手册：https://doc.arona.diyigemt.com/v2/manual/command"
+          }
+          val kb = tencentCustomKeyboard(it.bot.unionOpenidOrId) {
+            row {
+              button(1) {
+                render {
+                  label = "菜单"
+                }
+                action {
+                  data = "/菜单"
+                  enter = true
+                }
+              }
+              button(2) {
+                render {
+                  label = "帮助"
+                }
+                action {
+                  data = "/帮助"
+                  enter = true
+                }
+              }
+            }
+          }
           delay(2000L)
-          it.subject.sendMessage("欢迎连接「シッテムの箱」，老师。\n使用手册：https://doc.arona.diyigemt.com/v2/manual/command")
+          it.subject.sendMessage(kb + md)
         }
 
         else -> {

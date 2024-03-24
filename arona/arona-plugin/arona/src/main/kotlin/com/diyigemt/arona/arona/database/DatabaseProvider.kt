@@ -18,14 +18,14 @@ object DatabaseProvider {
       "org.sqlite.JDBC",
       setupConnection = {
         SQLiteConfig().apply {
-          busyTimeout = 1000
+          busyTimeout = 2000
           apply(it)
         }
       },
       databaseConfig = DatabaseConfig {
-        defaultRepetitionAttempts = 3
-        defaultMinRepetitionDelay = 0
-        defaultMaxRepetitionDelay = 1500
+        defaultRepetitionAttempts = 5
+        defaultMinRepetitionDelay = 1000
+        defaultMaxRepetitionDelay = 5000
       }
     )
     transaction(database) {

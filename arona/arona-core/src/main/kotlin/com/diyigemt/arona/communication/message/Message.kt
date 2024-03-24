@@ -3,7 +3,7 @@
 package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.*
-import com.diyigemt.arona.communication.contact.Contact
+import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import io.ktor.http.*
@@ -797,14 +797,13 @@ data class TencentMessageMediaInfo(
 
 @Serializable
 data class TencentRichMessage @OptIn(ExperimentalSerializationApi::class) constructor(
-  val url: String,
+  val url: String? = null,
   @SerialName("file_type")
   @EncodeDefault
   val fileType: TencentRichMessageType = TencentRichMessageType.IMAGE,
   @SerialName("srv_send_msg")
   @EncodeDefault
   val srvSendMsg: Boolean = true,
-  @Transient
   @SerialName("file_data")
   @EncodeDefault
   val fileData: String? = null,
@@ -993,16 +992,58 @@ class MessageChainBuilder private constructor(
 }
 
 @Serializable
-data class MessageReceipt(
+internal data class MessageReceiptImpl(
   val id: String = "",
   val timestamp: String = "",
 ) {
-  companion object {
-    val ErrorMessageReceipt = MessageReceipt("", "")
+  context(Contact)
+  fun toMessageReceipt() = MessageReceipt(this, this@Contact)
+}
+data class MessageReceipt<out C : Contact> internal constructor(
+  private val internalReceipt: MessageReceiptImpl,
+  val target: C,
+) {
+  val id get() = internalReceipt.id
+  val timestamp get() = internalReceipt.timestamp
+  suspend fun recall() {
+    when (target) {
+      is FriendUser -> {
+        target.bot.callOpenapi(
+          TencentEndpoint.DeleteFriendMessage,
+          mapOf("openid" to target.id, "message_id" to id)
+        ) {
+          method = HttpMethod.Delete
+        }
+      }
+      is Group -> {
+        target.bot.callOpenapi(
+          TencentEndpoint.DeleteGroupMessage,
+          mapOf("group_openid" to target.id, "message_id" to id)
+        ) {
+          method = HttpMethod.Delete
+        }
+      }
+      is GuildMember -> {
+        target.bot.callOpenapi(
+          TencentEndpoint.DeleteFriendMessage,
+          mapOf("channel_id" to target.id, "message_id" to id)
+        ) {
+          method = HttpMethod.Delete
+        }
+      }
+      is Guild, is Channel -> {
+        target.bot.callOpenapi(
+          TencentEndpoint.DeleteFriendMessage,
+          mapOf("guild_id" to target.id, "message_id" to id)
+        ) {
+          method = HttpMethod.Delete
+        }
+      }
+    }
   }
 }
 
-val MessageReceipt?.isFailed
+val MessageReceipt<*>?.isFailed
   get() = this == null
 
 fun Message.toMessageChain(): MessageChain = when (this) {

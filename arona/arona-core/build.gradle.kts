@@ -12,7 +12,7 @@ kotlin {
     freeCompilerArgs.add("-Xcontext-receivers")
   }
 }
-version = "1.1.71"
+version = "1.1.72"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 
@@ -105,6 +105,7 @@ dependencies {
   implementation("org.jline:jline:3.25.0")
   implementation("com.github.Towdium:PinIn:1.6.0")
   implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf")
   //ABAC
   api(fileTree("lib"))
 

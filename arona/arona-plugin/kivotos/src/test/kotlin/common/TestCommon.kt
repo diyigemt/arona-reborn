@@ -45,11 +45,4 @@ class TestCommon {
     }
     c.test()
   }
-
-  @Test
-  fun testFavor() {
-    runBlocking {
-      println(FavorLevelExcelTable.findLevel(16))
-    }
-  }
 }

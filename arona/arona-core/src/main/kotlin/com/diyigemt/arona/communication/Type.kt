@@ -76,17 +76,21 @@ internal enum class TencentWebsocketEventType(val type: String) {
 enum class TencentEndpoint(val path: String) {
   WebSocket("/gateway"),
   Interactions("/interactions/{interaction_id}"), // 通知后台接收到websocket推送的消息
-  PostSingleUserMessage("/v2/users/{openid}/messages"), // 向用户发送私信消息
-  PostSingleUserRichMessage("/v2/users/{openid}/files"), // 向用户发送私信消息
+  PostFriendMessage("/v2/users/{openid}/messages"), // 向用户发送私信消息
+  PostFriendRichMessage("/v2/users/{openid}/files"), // 向用户发送私信消息
   PostGroupMessage("/v2/groups/{group_openid}/messages"), // 向群聊发送消息
   PostGroupRichMessage("/v2/groups/{group_openid}/files"), // 向群聊发送消息
   PostGuildMessage("/channels/{channel_id}/messages"), // 向子频道发送消息
   PostGuildMemberMessage("/dms/{guild_id}/messages"), // 向频道成员发送私聊消息
   GetBotGuildList("/users/@me/guilds"), // 获取机器人/创建者加入的频道列表
   GetGuildMemberList("/guilds/{guild_id}/members"), // 获取频道的成员列表
-  GetGuildChannelList("/guilds/{guild_id}/channels"); // 获取频道的子频道列表
+  GetGuildChannelList("/guilds/{guild_id}/channels"), // 获取频道的子频道列表
+  DeleteFriendMessage("/v2/users/{openid}/messages/{message_id}"), // 撤回好友消息
+  DeleteGroupMessage("/v2/groups/{group_openid}/messages/{message_id}"), // 撤回群消息
+  DeleteGuildMessage("/channels/{channel_id}/messages/{message_id}"), // 撤回频道消息
+  DeleteGuildMemberMessage("/dms/{guild_id}/messages/{message_id}"); // 撤回频道私聊消息
   companion object {
     fun TencentEndpoint.isGuildEndMessageEndpoint() = this == PostGuildMessage
-    fun TencentEndpoint.isUserOrGroupMessageEndpoint() = this == PostGroupMessage || this == PostSingleUserMessage
+    fun TencentEndpoint.isUserOrGroupMessageEndpoint() = this == PostGroupMessage || this == PostFriendMessage
   }
 }

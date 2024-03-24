@@ -23,6 +23,8 @@ import kotlinx.serialization.encodeToString
 import org.jetbrains.exposed.sql.and
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.coroutines.CoroutineContext
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 interface Contact : CoroutineScope {
   val bot: TencentBot // 与之关联的bot
@@ -44,9 +46,11 @@ interface Contact : CoroutineScope {
   /**
    * 回复消息, 如果包含messageId或eventId就是被动消息, 不是就是主动消息
    */
-  suspend fun sendMessage(message: MessageChain, messageSequence: Int = 1): MessageReceipt?
+  suspend fun sendMessage(message: MessageChain, messageSequence: Int = 1): MessageReceipt<Contact>?
 
   suspend fun uploadImage(url: String): TencentImage
+
+  suspend fun uploadImage(data: ByteArray): TencentImage
 
   companion object {
     internal suspend fun Contact.toContactDocumentOrNull(): ContactDocument? {
@@ -70,6 +74,7 @@ internal abstract class AbstractContact(
   parentCoroutineContext: CoroutineContext,
 ) : Contact {
   final override val coroutineContext: CoroutineContext = parentCoroutineContext.childScopeContext()
+
   @Suppress("UNCHECKED_CAST")
   suspend fun <C : Contact> callMessageOpenApi(
     endpoint: TencentEndpoint,
@@ -77,8 +82,8 @@ internal abstract class AbstractContact(
     body: MessageChain,
     messageSequence: Int,
     preSendEventConstructor: (C, Message) -> MessagePreSendEvent,
-    postSendEventConstructor: (C, MessageChain, Throwable?, MessageReceipt?) -> MessagePostSendEvent<C>,
-    ): MessageReceipt? {
+    postSendEventConstructor: (C, MessageChain, Throwable?, MessageReceipt<C>?) -> MessagePostSendEvent<C>,
+  ): MessageReceipt<C>? {
     // 消息处理
 
     val chain = kotlin.runCatching {
@@ -89,7 +94,7 @@ internal abstract class AbstractContact(
 
     val result = bot.callOpenapi(
       endpoint,
-      MessageReceipt.serializer(),
+      MessageReceiptImpl.serializer(),
       urlPlaceHolder
     ) {
       method = HttpMethod.Post
@@ -97,14 +102,21 @@ internal abstract class AbstractContact(
       contentType(ContentType.Application.Json)
       setBody(
         bot.json.encodeToString(
-          TencentMessageBuilder(messageSequence = messageSequence).append(chain).build(this@AbstractContact is GuildMember)
+          TencentMessageBuilder(messageSequence = messageSequence).append(chain)
+            .build(this@AbstractContact is GuildMember)
         )
       )
     }
-    postSendEventConstructor(this as C, chain, result.exceptionOrNull(), result.getOrNull()).broadcast()
+    val res = result.getOrNull()?.toMessageReceipt() as MessageReceipt<C>
+    postSendEventConstructor(
+      this as C,
+      chain,
+      result.exceptionOrNull(),
+      res
+    ).broadcast()
 
     // TODO 异常处理
-    return result.getOrNull()
+    return res
   }
 
   override suspend fun uploadImage(
@@ -113,7 +125,7 @@ internal abstract class AbstractContact(
     return when (this) {
       is FriendUser -> {
         bot.callOpenapi(
-          TencentEndpoint.PostSingleUserRichMessage,
+          TencentEndpoint.PostFriendRichMessage,
           TencentMessageMediaInfo.serializer(),
           mapOf("openid" to this.id)
         ) {
@@ -148,6 +160,52 @@ internal abstract class AbstractContact(
       }
 
       else -> TencentGuildImage(url)
+    }
+  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  override suspend fun uploadImage(
+    data: ByteArray,
+  ): TencentImage {
+    val base64Encoded = Base64.encode(data)
+    return when (this) {
+      is FriendUser -> {
+        bot.callOpenapi(
+          TencentEndpoint.PostFriendRichMessage,
+          TencentMessageMediaInfo.serializer(),
+          mapOf("openid" to this.id)
+        ) {
+          method = HttpMethod.Post
+          setBody(
+            bot.json.encodeToString(
+              TencentRichMessage(
+                srvSendMsg = false,
+                fileData = base64Encoded
+              )
+            )
+          )
+        }.getOrThrow().let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, "base64://${base64Encoded}") }
+      }
+
+      is Group -> {
+        bot.callOpenapi(
+          TencentEndpoint.PostGroupRichMessage,
+          TencentMessageMediaInfo.serializer(),
+          mapOf("group_openid" to this.id)
+        ) {
+          method = HttpMethod.Post
+          setBody(
+            bot.json.encodeToString(
+              TencentRichMessage(
+                srvSendMsg = false,
+                fileData = base64Encoded
+              )
+            )
+          )
+        }.getOrThrow().let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, "base64://${base64Encoded}") }
+      }
+
+      else -> TencentGuildImage("base64://${base64Encoded}")
     }
   }
 }
@@ -202,7 +260,7 @@ internal class GuildImpl(
   override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
   override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
   override val isPublic: Boolean = bot.isPublic
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Guild>? {
     // 无法实现
     TODO()
   }
@@ -275,7 +333,7 @@ internal class ChannelImpl(
   override val members: ContactList<GuildChannelMember> =
     GuildChannelMemberContactList { EmptyGuildChannelMemberImpl(this, it) }
 
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Channel>? {
     return callMessageOpenApi(
       TencentEndpoint.PostGuildMessage,
       mapOf("channel_id" to id),
@@ -298,7 +356,7 @@ internal class GroupImpl(
   override val unionOpenid: String? = null,
 ) : Group, AbstractContact(bot, parentCoroutineContext) {
   override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyGroupMemberImpl(this, it) }
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Group>? {
     return callMessageOpenApi(
       TencentEndpoint.PostGroupMessage,
       mapOf("group_openid" to id),
@@ -346,9 +404,9 @@ internal class FriendUserImpl(
   override val id: String,
   override val unionOpenid: String?,
 ) : FriendUser, AbstractContact(bot, parentCoroutineContext) {
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<FriendUser>? {
     return callMessageOpenApi(
-      TencentEndpoint.PostSingleUserMessage,
+      TencentEndpoint.PostFriendMessage,
       mapOf("openid" to id),
       message,
       messageSequence,
@@ -369,7 +427,10 @@ internal class GroupMemberImpl(
   }
 
   override suspend fun uploadImage(url: String) = asSingleUser().uploadImage(url)
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? = asSingleUser().sendMessage(message)
+
+  @Suppress("unchecked_cast")
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<FriendUser>? =
+    asSingleUser().sendMessage(message) as? MessageReceipt<FriendUser>?
 }
 
 internal class GuildChannelMemberImpl(
@@ -380,7 +441,10 @@ internal class GuildChannelMemberImpl(
   override val guild get() = internalMember.guild
   override val unionOpenid: String? = null
   override fun asGuildMember(): GuildMember = channel.guild.members[id]!!
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? = asGuildMember().sendMessage(message)
+
+  @Suppress("unchecked_cast")
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<GuildMember>? =
+    asGuildMember().sendMessage(message) as? MessageReceipt<GuildMember>?
 }
 
 // 通过频道直接获取的频道成员
@@ -393,7 +457,7 @@ internal class GuildMemberImpl(
   override val id get() = unionOpenid ?: internalGuildUser.user?.id ?: EmptyMessageId
 
   // 私聊使用另一个接口, 而不是频道接口
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<GuildMember>? {
     return callMessageOpenApi(
       TencentEndpoint.PostGuildMemberMessage,
       mapOf("guild_id" to guild.id),
@@ -418,9 +482,9 @@ internal class EmptyGuildMemberImpl(
   override val channel: Channel
     get() = guild.findOrCreateMemberPrivateChannel(id)
 
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? = channel.sendMessage(
-    message
-  )
+  @Suppress("unchecked_cast")
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Channel>? =
+    channel.sendMessage(message) as? MessageReceipt<Channel>?
 }
 
 internal class EmptyGuildChannelMemberImpl(
@@ -430,9 +494,10 @@ internal class EmptyGuildChannelMemberImpl(
   override val guild: Guild = channel.guild
   override fun asGuildMember(): GuildMember = guild.members.getOrCreate(id)
   override val unionOpenid = EmptyMessageId
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? = channel.sendMessage(
-    message
-  )
+
+  @Suppress("unchecked_cast")
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Channel>? =
+    channel.sendMessage(message) as? MessageReceipt<Channel>?
 }
 
 internal class EmptyChannelImpl(
@@ -443,7 +508,7 @@ internal class EmptyChannelImpl(
   override val members: ContactList<GuildChannelMember> =
     GuildChannelMemberContactList { EmptyGuildChannelMemberImpl(this, it) }
 
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Channel>? {
     return callMessageOpenApi(
       TencentEndpoint.PostGuildMessage,
       mapOf("channel_id" to id),
@@ -463,7 +528,7 @@ internal class EmptyGuildImpl(
   override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
   override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
   override val isPublic: Boolean = bot.isPublic
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Guild>? {
     TODO("Not yet implemented")
   }
 }
@@ -473,7 +538,7 @@ internal class EmptyGroupMemberImpl(
   override val id: String = EmptyMessageId,
 ) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<GroupMember>? {
     TODO("Not yet implemented")
   }
 
@@ -487,7 +552,7 @@ internal class EmptyFriendUserImpl(
   override val id: String = EmptyMessageId,
 ) : FriendUser, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<FriendUser>? {
     TODO("Not yet implemented")
   }
 }
@@ -498,7 +563,7 @@ internal class EmptyGroupImpl(
 ) : Group, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyGroupMemberImpl(this, it) }
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt? {
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Group>? {
     return callMessageOpenApi(
       TencentEndpoint.PostGroupMessage,
       mapOf("group_openid" to id),

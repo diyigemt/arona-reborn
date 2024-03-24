@@ -18,12 +18,6 @@ data class Student(
 )
 
 @Serializable
-data class FavorLevel(
-  val sum: Int, // 累积值
-  val next: Int, // 下一级值
-)
-
-@Serializable
 data class UserDocument(
   @BsonId
   val id: String,
@@ -39,9 +33,9 @@ data class UserDocument(
     }.deletedCount == 1L
   }
   /**
-   * 更新学生好感等级, 如果升级, 返回新等级和下一级数据
+   * 更新学生好感等级, 返回 是否升级, 当前等级, 累计好感值
    */
-  suspend fun updateStudentFavor(id: Int, delta: Int): Pair<Int, String>? {
+  suspend fun updateStudentFavor(id: Int, delta: Int): Triple<Boolean, Int, String> {
     val st = student[id.toString()] ?: Student().also {
       withCollection<UserDocument, UpdateResult> {
         updateOne(
@@ -58,11 +52,11 @@ data class UserDocument(
         update = Updates.set("${UserDocument::student.name}.$id.${Student::favor.name}", listOf(favor.level, current))
       )
     }
-    return if (st.favor.getOrElse(0) { 0 } != favor.level) {
-      favor.level to "${current - favor.sum}/${favor.next}"
-    } else {
-      null
-    }
+    return Triple(
+      st.favor.getOrElse(0) { 0 } != favor.level,
+      favor.level,
+      "${current - favor.sum}/${favor.next}"
+    )
   }
 
   companion object : DocumentCompanionObject {

@@ -10,7 +10,7 @@ sealed class MessagePostSendEvent<C: Contact> : TencentBotEvent, AbstractEvent()
   final override val bot get() = target.bot
   abstract val message: MessageChain
   abstract val exception: Throwable?
-  abstract val receipt: MessageReceipt?
+  abstract val receipt: MessageReceipt<C>?
 }
 
 @get:JvmSynthetic
@@ -29,7 +29,7 @@ data class GroupMessagePostSendEvent(
   override val target: Group,
   override val message: MessageChain,
   override val exception: Throwable?,
-  override val receipt: MessageReceipt?
+  override val receipt: MessageReceipt<Group>?
 ) : MessagePostSendEvent<Group>() {
   override fun toString(): String {
     return "Group(${target.id}) <- $message"
@@ -40,7 +40,7 @@ data class FriendMessagePostSendEvent(
   override val target: FriendUser,
   override val message: MessageChain,
   override val exception: Throwable?,
-  override val receipt: MessageReceipt?
+  override val receipt: MessageReceipt<FriendUser>?
 ) : MessagePostSendEvent<FriendUser>() {
   override fun toString(): String {
     return "Friend(${target.id}) <- $message"
@@ -51,7 +51,7 @@ data class GuildMessagePostSendEvent(
   override val target: GuildMember,
   override val message: MessageChain,
   override val exception: Throwable?,
-  override val receipt: MessageReceipt?
+  override val receipt: MessageReceipt<GuildMember>?
 ) : MessagePostSendEvent<GuildMember>() {
   override fun toString(): String {
     return "Guild(${target.guild.id}) <- $message"
@@ -62,7 +62,7 @@ data class ChannelMessagePostSendEvent(
   override val target: Channel,
   override val message: MessageChain,
   override val exception: Throwable?,
-  override val receipt: MessageReceipt?
+  override val receipt: MessageReceipt<Channel>?
 ) : MessagePostSendEvent<Channel>() {
   override fun toString(): String {
     return "Channel(${target.id}) <- $message"

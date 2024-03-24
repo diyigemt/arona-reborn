@@ -67,8 +67,8 @@ class CommonTest {
       }
     }
     val b = object : CliktCommand(name = "c") {
-      private val i by requireObject<String>()
-      private val j by requireObject<Int>()
+      private val i by requireObject<String>("j")
+      private val j by requireObject<Int>("i")
 
       override fun run() {
         println("child: $i $j")

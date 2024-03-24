@@ -220,9 +220,9 @@ object CoffeeTouchCommand : AbstractCommand(
     val md = md + if (targetStudent.id.value in coffee.touchedStudents) {
       val updates = kivotosUser.updateStudentFavor(targetStudent.id.value, 15)
       tencentCustomMarkdown {
-        +"你摸了摸$studentName, 好感+15"
-        if (updates != null) {
-          + "$studentName 的好感上升了, 当前等级: ${updates.first}(${updates.second})"
+        +"你摸了摸$studentName, 好感+15 (${updates.third})"
+        if (updates.first) {
+          + "$studentName 的好感上升了, 当前等级: ${updates.second}"
         }
         at()
       }
@@ -272,9 +272,11 @@ object CoffeeTouchAllCommand : AbstractCommand(
       }
     }
     touchedStudents.forEach {
-      kivotosUser.updateStudentFavor(it.id.value, 15)?.also { p ->
-        md append tencentCustomMarkdown {
-          +"${it.name} 的好感上升了, 当前等级: ${p.first}(${p.second})"
+      kivotosUser.updateStudentFavor(it.id.value, 15).also { p ->
+        if (p.first) {
+          md append tencentCustomMarkdown {
+            +"${it.name} 的好感上升了, 当前等级: ${p.second}"
+          }
         }
       }
     }

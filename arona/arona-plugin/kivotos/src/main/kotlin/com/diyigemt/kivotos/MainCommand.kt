@@ -7,6 +7,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.schema.kivotosUser
+import kotlinx.coroutines.delay
 
 
 private val visitorMenu by lazy {
@@ -70,7 +71,10 @@ object KivotosCommand : AbstractCommand(
         val loginResult = tencentCustomMarkdown {
           +"签到成功, 获得100清辉石"
         }
-        sendMessage(loginResult + playerMainMenu)
+        sendMessage(loginResult + playerMainMenu).also {
+          delay(3000L)
+          it?.recall()
+        }
       } else {
         sendMessage(playerMainMenuWithTitle)
       }

@@ -17,7 +17,7 @@ object Arona : AronaPlugin(
     id = "com.diyigemt.arona",
     name = "arona",
     author = "diyigemt",
-    version = "1.1.25",
+    version = "1.2.0",
     description = "arona plugin"
   )
 ) {
@@ -89,7 +89,7 @@ object Arona : AronaPlugin(
           .append("message: ${(it.exception as TencentApiErrorException).source.message}")
           .build()
           .also { ch ->
-            it.target.sendMessage(ch)
+            it.target.sendMessage(ch, (100 .. 200).random())
           }
       }
     }

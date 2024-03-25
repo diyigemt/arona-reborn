@@ -107,7 +107,7 @@ internal abstract class AbstractContact(
         )
       )
     }
-    val res = result.getOrNull()?.toMessageReceipt() as MessageReceipt<C>
+    val res = result.getOrNull()?.toMessageReceipt() as MessageReceipt<C>?
     postSendEventConstructor(
       this as C,
       chain,

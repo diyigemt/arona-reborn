@@ -12,7 +12,7 @@ kotlin {
     freeCompilerArgs.add("-Xcontext-receivers")
   }
 }
-version = "1.1.75"
+version = "1.1.76"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 

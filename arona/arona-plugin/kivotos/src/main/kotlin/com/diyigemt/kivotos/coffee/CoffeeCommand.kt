@@ -261,23 +261,20 @@ object CoffeeTouchAllCommand : AbstractCommand(
         }
       }
     }
-    md append tencentCustomMarkdown {
-      touchedStudents.forEach {
-        +"${it.name}的好感+15"
+    touchedStudents.forEach {
+      kivotosUser.updateStudentFavor(it.id.value, 15).also { p ->
+        md append tencentCustomMarkdown {
+          if (p.first) {
+            +"${it.name}的好感+15, 好感等级上升了, 当前等级: ${p.second}"
+          } else {
+            +"${it.name}的好感+15 (${p.third})"
+          }
+        }
       }
     }
     md append tencentCustomMarkdown {
       visitedStudents.filter { it.id.value !in coffee.touchedStudents }.forEach {
         +"${it.name}绷不住了"
-      }
-    }
-    touchedStudents.forEach {
-      kivotosUser.updateStudentFavor(it.id.value, 15).also { p ->
-        if (p.first) {
-          md append tencentCustomMarkdown {
-            +"${it.name} 的好感上升了, 当前等级: ${p.second}"
-          }
-        }
       }
     }
     md append tencentCustomMarkdown {

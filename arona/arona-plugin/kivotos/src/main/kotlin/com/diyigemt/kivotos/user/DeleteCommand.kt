@@ -36,7 +36,17 @@ object DeleteCommand : AbstractCommand(
           sendMessage("删除失败")
         }
       } else {
-        sendMessage("代码不存在")
+        val message = tencentCustomMarkdown {
+          h1("错误")
+          +"验证码不存在"
+          +"请先执行 \"/赛博基沃托斯 删号\" 指令生成验证码 "
+          at()
+        } + tencentCustomKeyboard(bot.unionOpenidOrId) {
+          row {
+            button("生成验证码", "/赛博基沃托斯 删号", true)
+          }
+        }
+        sendMessage(message)
       }
       return
     }

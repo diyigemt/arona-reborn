@@ -1,6 +1,7 @@
 package com.diyigemt.kivotos.schema
 
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.kivotos.coffee.CoffeeDocument
 import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
 import com.diyigemt.kivotos.tools.database.idFilter
 import com.diyigemt.kivotos.tools.database.withCollection
@@ -26,6 +27,11 @@ data class UserDocument(
   // 删除记录
   suspend fun deleteAccount(): Boolean {
     FavorLevelExcelTable.deleteRecord(id)
+    CoffeeDocument.withCollection<CoffeeDocument, DeleteResult> {
+      deleteOne(
+        filter = idFilter(id)
+      )
+    }
     return withCollection<UserDocument, DeleteResult> {
       deleteOne(
         filter = idFilter(id)

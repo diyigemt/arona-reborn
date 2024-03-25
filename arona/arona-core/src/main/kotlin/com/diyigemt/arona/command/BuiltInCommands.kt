@@ -82,12 +82,12 @@ object BuiltInCommands {
 
   object ContactManagementCommand : AbstractCommand(
     BuildInCommandOwner,
-    "绑定",
+    "管理",
     description = "管理系列指令",
     help = """
-      /绑定 配置名称 <名称> 配置该群/频道在webui中的名称
+      /管理 配置名称 <名称> 配置该群/频道在webui中的名称
       
-      /绑定 管理员认证 将自己加入该群/频道下的管理员用户组
+      /管理 管理员认证 将自己加入该群/频道下的管理员用户组
     """.trimIndent()
   ) {
     @SubCommand
@@ -96,7 +96,7 @@ object BuiltInCommands {
       "管理员认证",
       description = "给管理员用, 将自己加入该群/频道下的管理员用户组",
       help = """
-        /绑定 管理员认证
+        /管理 管理员认证
         
         非管理员无法点击认证按钮
       """.trimIndent()
@@ -146,7 +146,7 @@ object BuiltInCommands {
       "配置名称",
       description = "配置该群/频道在webui中的名称",
       help = """
-        /绑定 配置名称 <名称>
+        /管理 配置名称 <名称>
         
         配置该群/频道在webui中的名称
       """.trimIndent()
@@ -163,6 +163,9 @@ object BuiltInCommands {
       }
     }
     suspend fun UserCommandSender.contactManagement() {
+      if (currentContext.invokedSubcommand != null) {
+        return
+      }
       val md = tencentCustomMarkdown {
         + "非管理员不用尝试了, 点着没反应的"
         (getFormattedHelp() ?: "").split("\n").filter { it.isNotEmpty() }.forEach {

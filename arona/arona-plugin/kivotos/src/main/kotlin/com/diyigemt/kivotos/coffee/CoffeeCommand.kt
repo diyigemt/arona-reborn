@@ -20,6 +20,8 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.plus
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 
@@ -32,6 +34,20 @@ private suspend fun UserCommandSender.coffee() = CoffeeDocument.withCollection<C
   }
 }
 
+private const val MORNING_TIME = "03:00:00"
+private const val AFTERNOON_TIME = "15:00:00"
+
+private fun calcNextTouchTime(coffee: CoffeeDocument): String {
+  val last = coffee.lastTouchTime.toInstant().toTime()
+  val next = coffee.lastTouchTime.toInstant().plus(3, DateTimeUnit.HOUR).toTime()
+  return if ((last < MORNING_TIME) and (next > MORNING_TIME)) {
+    MORNING_TIME
+  } else if ((last < AFTERNOON_TIME) and (next > AFTERNOON_TIME)) {
+    AFTERNOON_TIME
+  } else {
+    next
+  }
+}
 
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
@@ -52,8 +68,6 @@ object CoffeeCommand : AbstractCommand(
   }
 
   @Suppress("lower_case")
-  private const val MORNING_TIME = "03:00:00"
-  private const val AFTERNOON_TIME = "15:00:00"
   private suspend fun UserCommandSender.updateCoffeeStudents(sendMessage: Boolean) {
     var coffee = currentContext.findObject<CoffeeDocument>()!!
     md append tencentCustomMarkdown {
@@ -105,6 +119,7 @@ object CoffeeCommand : AbstractCommand(
       sendMessage(md + kb)
     }
   }
+
   // 检查学生刷新时间
   private fun checkStudentUpdate(last0: String): Boolean {
     val now = now()
@@ -114,9 +129,10 @@ object CoffeeCommand : AbstractCommand(
     val afternoon = "${currentDate()} $AFTERNOON_TIME"
     // 超过12小时 肯定需要更新
     return (now - last).inWholeHours >= 12L ||
-      morning in last0..nowDatetime ||
-      afternoon in last0..nowDatetime
+        morning in last0..nowDatetime ||
+        afternoon in last0..nowDatetime
   }
+
   // 检查学生摸头刷新时间 从第一次摸开始算起3小时刷新
   private fun checkStudentTouchedUpdate(last0: String): Boolean {
     val now = now()
@@ -212,6 +228,7 @@ object CoffeeTouchCommand : AbstractCommand(
     if (studentName !in visitedStudents.map { it.name }) {
       md append tencentCustomMarkdown {
         +"没法摸摸$studentName, 她没来访问呢"
+        +"下次摸头刷新时间: ${calcNextTouchTime(coffee)}"
         at()
       }
       sendMessage(md + kb)
@@ -222,13 +239,14 @@ object CoffeeTouchCommand : AbstractCommand(
       tencentCustomMarkdown {
         +"你摸了摸$studentName, 好感+15 (${updates.third})"
         if (updates.first) {
-          + "$studentName 的好感上升了, 当前等级: ${updates.second}"
+          +"$studentName 的好感上升了, 当前等级: ${updates.second}"
         }
         at()
       }
     } else {
       tencentCustomMarkdown {
         +"你摸了摸$studentName, 她绷不住了"
+        +"下次摸头刷新时间: ${calcNextTouchTime(coffee)}"
         at()
       }
     }
@@ -275,6 +293,11 @@ object CoffeeTouchAllCommand : AbstractCommand(
     md append tencentCustomMarkdown {
       visitedStudents.filter { it.id.value !in coffee.touchedStudents }.forEach {
         +"${it.name}绷不住了"
+      }
+    }
+    if ("绷不住了" in md.content) {
+      md append tencentCustomMarkdown {
+        +"下次摸头刷新时间: ${calcNextTouchTime(coffee)}"
       }
     }
     md append tencentCustomMarkdown {

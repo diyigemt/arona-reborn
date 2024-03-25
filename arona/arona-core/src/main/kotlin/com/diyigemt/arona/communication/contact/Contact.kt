@@ -15,6 +15,7 @@ import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.error
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -91,21 +92,45 @@ internal abstract class AbstractContact(
     }.onFailure {
       commandLineLogger.error(it)
     }.getOrNull()?.message?.toMessageChain() ?: return null
-
-    val result = bot.callOpenapi(
-      endpoint,
-      MessageReceiptImpl.serializer(),
-      urlPlaceHolder
-    ) {
-      method = HttpMethod.Post
-      // TODO 支持其他类型消息
-      contentType(ContentType.Application.Json)
-      setBody(
-        bot.json.encodeToString(
-          TencentMessageBuilder(messageSequence = messageSequence).append(chain)
-            .build(this@AbstractContact is GuildMember)
+    val builder = TencentMessageBuilder(messageSequence = messageSequence).append(chain)
+    val result = if (this is Group || this is FriendUser) {
+      bot.callOpenapi(
+        endpoint,
+        MessageReceiptImpl.serializer(),
+        urlPlaceHolder
+      ) {
+        method = HttpMethod.Post
+        // TODO 支持其他类型消息
+        contentType(ContentType.Application.Json)
+        setBody(
+          bot.json.encodeToString(
+            builder.build(this@AbstractContact is GuildMember)
+          )
         )
-      )
+      }
+    } else {
+      bot.callOpenapi(
+        endpoint,
+        MessageReceiptImpl.serializer(),
+        urlPlaceHolder
+      ) {
+        method = HttpMethod.Post
+        // TODO 支持其他类型消息
+        // 包含本地图片 改用 form-data 发送
+        if (chain.any { it is TencentGuildLocalImage }) {
+          contentType(ContentType.MultiPart.FormData)
+          setBody(
+            builder.buildMultipart()
+          )
+        } else {
+          contentType(ContentType.Application.Json)
+          setBody(
+            bot.json.encodeToString(
+              builder.build(this@AbstractContact is GuildMember)
+            )
+          )
+        }
+      }
     }
     val res = result.getOrNull()?.toMessageReceipt() as MessageReceipt<C>?
     postSendEventConstructor(
@@ -207,7 +232,7 @@ internal abstract class AbstractContact(
           .let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }
       }
 
-      else -> TencentGuildImage("base64://${base64Encoded}")
+      else -> TencentGuildLocalImage(raw = data)
     }
   }
 }

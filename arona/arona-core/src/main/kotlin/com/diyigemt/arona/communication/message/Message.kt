@@ -6,6 +6,7 @@ import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -871,6 +872,29 @@ class TencentMessageBuilder private constructor(
         else -> {}
       }
     }
+  }
+
+  // 频道专有multipart
+  fun buildMultipart(): MultiPartFormDataContent {
+    val rawIm = container.filterIsInstance<TencentGuildLocalImage>().lastOrNull()
+    val content = container
+      .filterIsInstance<PlainText>()
+      .joinToString("\n") { it.toString() }
+      .takeIf { it.isNotEmpty() } ?: ""
+    return MultiPartFormDataContent(
+      formData {
+        append("content", content)
+        append("msg_id", sourceMessageId ?: "")
+        append("event_id", eventId ?: "")
+        append("msg_seq", messageSequence)
+        if (rawIm != null) {
+          append("file_image", rawIm.raw, Headers.build {
+            append(HttpHeaders.ContentType, "image/png")
+            append(HttpHeaders.ContentDisposition, "filename=\"ktor.png\"")
+          })
+        }
+      }
+    )
   }
 }
 

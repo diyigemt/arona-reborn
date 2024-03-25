@@ -78,3 +78,47 @@ data class TencentGuildImage(
   override val width: Int = 0
   override val size: Long = 0L
 }
+
+data class TencentGuildLocalImage(
+  override val url: String = "",
+  override val resourceId: String = "",
+  override val resourceUuid: String = "",
+  override val ttl: Long = 0L,
+  override val raw: ByteArray,
+) : TencentImage, Media {
+  override fun toString() = serialization()
+  override fun serialization() = "[tencent:image:$url]"
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
+
+    other as TencentGuildLocalImage
+
+    if (url != other.url) return false
+    if (resourceId != other.resourceId) return false
+    if (resourceUuid != other.resourceUuid) return false
+    if (ttl != other.ttl) return false
+    if (!raw.contentEquals(other.raw)) return false
+    if (height != other.height) return false
+    if (width != other.width) return false
+    if (size != other.size) return false
+
+    return true
+  }
+
+  override fun hashCode(): Int {
+    var result = url.hashCode()
+    result = 31 * result + resourceId.hashCode()
+    result = 31 * result + resourceUuid.hashCode()
+    result = 31 * result + ttl.hashCode()
+    result = 31 * result + raw.contentHashCode()
+    result = 31 * result + height
+    result = 31 * result + width
+    result = 31 * result + size.hashCode()
+    return result
+  }
+
+  override val height: Int = 0
+  override val width: Int = 0
+  override val size: Long = 0L
+}

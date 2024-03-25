@@ -11,6 +11,10 @@ import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
+interface Media {
+  val raw: ByteArray
+}
+
 @Serializable
 data class MediaInfo(
   @ProtoNumber(1)

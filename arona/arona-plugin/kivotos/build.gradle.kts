@@ -7,7 +7,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.kivotos.Kivotos"
-version = "0.0.28"
+version = "0.0.29"
 dependencies {
   compileOnly(project(":arona-core"))
   compileOnly(project(":arona-plugin:arona"))

@@ -9,7 +9,7 @@ object Kivotos : AronaPlugin(
     id = "com.diyigemt.kivotos",
     name = "kivotos",
     author = "diyigemt",
-    version = "0.0.28",
+    version = "0.0.29",
     description = "hello world"
   )
 ) {

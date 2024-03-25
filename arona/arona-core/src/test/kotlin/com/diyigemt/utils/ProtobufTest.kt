@@ -1,38 +1,13 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.utils
 
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.encodeToByteArray
+import com.diyigemt.arona.communication.message.MediaUuid
+import kotlinx.serialization.*
 import kotlinx.serialization.protobuf.ProtoBuf
 import org.junit.Test
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
-
-@Serializable
-data class Foo(
-  val id: String,
-  val unknown1: ByteArray,
-  val unknown2: Int,
-  val unknown3: Int,
-  val unknown4: Int,
-) {
-  override fun equals(other: Any?): Boolean {
-    if (this === other) return true
-    if (javaClass != other?.javaClass) return false
-    other as Foo
-    if (id != other.id) return false
-    if (!unknown1.contentEquals(other.unknown1)) return false
-
-    return true
-  }
-
-  override fun hashCode(): Int {
-    var result = id.hashCode()
-    result = 31 * result + unknown1.contentHashCode()
-    return result
-  }
-}
 
 class ProtobufTest {
   @OptIn(ExperimentalSerializationApi::class, ExperimentalEncodingApi::class)
@@ -85,7 +60,8 @@ class ProtobufTest {
       0x8a.toByte(),
       0x47.toByte(),
     ).toByteArray()
+    println(Base64.encode(a))
     val encoder = ProtoBuf { encodeDefaults = true }
-    println(encoder.decodeFromByteArray<Foo>(a))
+    println(encoder.decodeFromByteArray<MediaUuid>(a))
   }
 }

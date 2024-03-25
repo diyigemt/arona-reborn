@@ -6,6 +6,7 @@ import com.diyigemt.arona.communication.command.isGroup
 import com.diyigemt.arona.communication.command.isPrivate
 import com.diyigemt.arona.communication.message.TencentImage
 import com.diyigemt.arona.communication.message.TencentOfflineImage
+import com.diyigemt.arona.communication.message.getMediaUrlFromMediaInfo
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.now
 import com.diyigemt.arona.utils.toDateTime
@@ -62,6 +63,7 @@ class ImageCacheSchema(id: EntityID<Int>) : IntEntity(id) {
     resourceId,
     "",
     0,
+    kotlin.runCatching { getMediaUrlFromMediaInfo(resourceId) }.getOrDefault("")
   )
 }
 

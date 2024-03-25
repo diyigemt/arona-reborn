@@ -184,7 +184,8 @@ internal abstract class AbstractContact(
               )
             )
           )
-        }.getOrThrow().let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, "base64://${base64Encoded}") }
+        }.getOrThrow()
+          .let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }
       }
 
       is Group -> {
@@ -202,7 +203,8 @@ internal abstract class AbstractContact(
               )
             )
           )
-        }.getOrThrow().let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, "base64://${base64Encoded}") }
+        }.getOrThrow()
+          .let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }
       }
 
       else -> TencentGuildImage("base64://${base64Encoded}")

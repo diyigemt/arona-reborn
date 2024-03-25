@@ -39,7 +39,6 @@ fun TencentCustomKeyboardRow.subButton(label: String, data: String = label, ente
   button(uuid(), label, "/赛博基沃托斯 $data", enter)
 }
 
-@UnderDevelopment
 @Suppress("unused")
 object KivotosCommand : AbstractCommand(
   Kivotos,

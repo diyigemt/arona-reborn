@@ -228,7 +228,6 @@ object CoffeeTouchCommand : AbstractCommand(
     if (studentName !in visitedStudents.map { it.name }) {
       md append tencentCustomMarkdown {
         +"没法摸摸$studentName, 她没来访问呢"
-        +"下次摸头刷新时间: ${calcNextTouchTime(coffee)}"
         at()
       }
       sendMessage(md + kb)

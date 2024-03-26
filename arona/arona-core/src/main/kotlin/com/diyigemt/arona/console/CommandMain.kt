@@ -10,11 +10,9 @@ import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.*
 import io.ktor.util.logging.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.toList
 import kotlin.system.exitProcess
 
 interface CommandLineSubCommand
@@ -62,6 +60,7 @@ class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invo
 class ExitCommand : CommandLineSubCommand, CliktCommand(name = "exit", help = "安全退出程序") {
   override fun run() {
     echo("exiting")
+    BotManager.close()
     exitProcess(0)
   }
 }

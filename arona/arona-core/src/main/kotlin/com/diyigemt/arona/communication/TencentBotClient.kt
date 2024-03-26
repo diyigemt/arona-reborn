@@ -27,7 +27,7 @@ import org.slf4j.Logger
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
-interface TencentBot : Contact, CoroutineScope {
+interface TencentBot : Closeable, Contact, CoroutineScope {
   val client: HttpClient
   val json: Json
   val logger: Logger
@@ -53,7 +53,7 @@ interface TencentBot : Contact, CoroutineScope {
 }
 
 internal class TencentBotClient
-private constructor(private val config: TencentBotConfig) : Closeable, TencentBot, CoroutineScope {
+private constructor(private val config: TencentBotConfig) : TencentBot, CoroutineScope {
   override val id = config.id
   override val json = Json {
     ignoreUnknownKeys = true
@@ -381,6 +381,7 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     wsJob?.cancel()
     websocketHeartbeatTask?.cancel()
     accessTokenHeartbeatTask?.cancel()
+    this.cancel()
     client.close()
   }
 }

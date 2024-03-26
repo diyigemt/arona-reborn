@@ -7,6 +7,12 @@ object BotManager {
       bots.add(bot)
     }
   }
+
   fun getBot(id: String) = bots.first { it.id == id }
   fun getBot() = bots.first()
+  fun close() {
+    bots.forEach {
+      it.close()
+    }
+  }
 }

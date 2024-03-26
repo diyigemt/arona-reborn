@@ -1,6 +1,7 @@
 package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.command.UserCommandSender
+import io.ktor.http.*
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -26,10 +27,11 @@ data class Markdown(
   }
 
   override fun build(): String {
-    return children.joinToString("\n") {
+    return children.joinToString {
       when (it) {
         is BlockElement, is ListElement -> "${it.build()}\n"
-        else -> it.build()
+        is InlineCommandElement -> it.build()
+        else -> it.build() + "\n"
       }
     }
   }
@@ -222,6 +224,20 @@ data class BrElement(
   }
 }
 
+data class InlineCommandElement(
+  var command: String = "",
+  var placeholder: String = "",
+  var enter: Boolean = false,
+  var reply: Boolean = true
+) : MarkdownElement() {
+  override fun build(): String {
+    if (enter) {
+      reply = false
+    }
+    return "[$placeholder](mqqapi://aio/inlinecmd?command=${command.encodeURLPath()}&reply=$reply&enter=$enter)"
+  }
+}
+
 fun Markdown.title(block: TitleElement.() -> Unit) {
   children.add(TitleElement().apply(block))
 }
@@ -273,6 +289,10 @@ fun Markdown.divider() {
 
 fun Markdown.br() {
   children.add(BrElement())
+}
+
+fun Markdown.inline(block: InlineCommandElement.() -> Unit) {
+  children.add(InlineCommandElement().apply(block))
 }
 
 fun Markdown.list(block: ListElement.() -> Unit) {

@@ -73,15 +73,14 @@ object TrainerCommand : AbstractCommand(
   Arona,
   "攻略",
   description = "提供各种攻略",
-  help = """
-    /攻略 21-2, 提供主线21-2地图攻略
-    
-    /攻略 H21-2, 提供主线H21-2地图攻略
-    
-    /攻略 国际服未来视
-    
-    /攻略 白子, 学生名, 别再查姓了, 多生分; 支持大部分黑话
-  """.trimIndent()
+  help = tencentCustomMarkdown {
+    list {
+      +"/攻略 21-2, 提供主线21-2地图攻略"
+      +"/攻略 H21-2, 提供主线H21-2地图攻略"
+      +"/攻略 国际服未来视|国服活动|日服活动|国际服活动, 其他杂项"
+      +"/攻略 白子, 学生名, **别再查姓了**, 多生分; 支持大部分黑话"
+    }
+  }.content
 ) {
   private val arg by argument(name = "查询目标", help = "学生名称/别名/主线地图/其他杂图名称")
   private val serializer = ServerResponse.serializer(ListSerializer(ImageQueryData.serializer()))
@@ -96,8 +95,8 @@ object TrainerCommand : AbstractCommand(
     val from = contactType()
     with(query) {
       val url = "https://arona.cdn.diyigemt.com/image" +
-          (if (isGuild()) "/s" else "") +
-          content
+        (if (isGuild()) "/s" else "") +
+        content
       val im = dbQuery {
         findImage(hash, from)
       }

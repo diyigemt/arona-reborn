@@ -500,21 +500,32 @@ sealed class TencentMarkdown
 
 @Serializable
 data class TencentCustomMarkdown(
-  var content: String
+  var content: String,
 ) : Message, TencentMarkdown() {
   infix fun append(other: TencentCustomMarkdown) {
     content += "\n" + other.content
   }
+
   infix fun insertTo(other: TencentCustomMarkdown) {
     other.content = content + "\n" + other.content
   }
+
   operator fun plus(other: TencentCustomMarkdown): TencentCustomMarkdown {
     return TencentCustomMarkdown(
       this.content +
-      "\n" +
-      other.content
+        "\n" +
+        other.content
     )
   }
+
+  operator fun plus(other: String): TencentCustomMarkdown {
+    return TencentCustomMarkdown(
+      this.content +
+        "\n" +
+        other
+    )
+  }
+
   override fun serialization(): String {
     TODO("Not yet implemented")
   }
@@ -531,7 +542,7 @@ data class TencentTemplateMarkdown(
   val params: List<TencentMarkdownParam>,
 ) : Message, TencentMarkdown() {
   constructor(id: String, block: TencentMarkdownParam.Companion.TencentMarkdownParamBuilder.() -> Unit) :
-      this(id, TencentMarkdownParam.Companion.TencentMarkdownParamBuilder().apply(block).build())
+    this(id, TencentMarkdownParam.Companion.TencentMarkdownParamBuilder().apply(block).build())
 
   override fun serialization(): String {
     TODO("Not yet implemented")
@@ -957,6 +968,7 @@ internal data class MessageReceiptImpl(
   context(Contact)
   fun toMessageReceipt() = MessageReceipt(this, this@Contact)
 }
+
 data class MessageReceipt<out C : Contact> internal constructor(
   private val internalReceipt: MessageReceiptImpl,
   val target: C,
@@ -973,6 +985,7 @@ data class MessageReceipt<out C : Contact> internal constructor(
           method = HttpMethod.Delete
         }
       }
+
       is Group -> {
         target.bot.callOpenapi(
           TencentEndpoint.DeleteGroupMessage,
@@ -981,6 +994,7 @@ data class MessageReceipt<out C : Contact> internal constructor(
           method = HttpMethod.Delete
         }
       }
+
       is GuildMember -> {
         target.bot.callOpenapi(
           TencentEndpoint.DeleteFriendMessage,
@@ -989,6 +1003,7 @@ data class MessageReceipt<out C : Contact> internal constructor(
           method = HttpMethod.Delete
         }
       }
+
       is Guild, is Channel -> {
         target.bot.callOpenapi(
           TencentEndpoint.DeleteFriendMessage,

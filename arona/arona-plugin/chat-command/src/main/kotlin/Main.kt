@@ -4,6 +4,7 @@ import com.diyigemt.arona.command.CommandExecuteResult
 import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.communication.command.CommandSender.Companion.toCommandSender
 import com.diyigemt.arona.communication.event.TencentMessageEvent
+import com.diyigemt.arona.communication.message.tencentCustomMarkdown
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.value
 import com.diyigemt.arona.plugins.AronaPlugin
@@ -19,7 +20,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.chat.command",
     name = "chat-command",
     author = "diyigemt",
-    version = "0.1.4",
+    version = "0.1.5",
     description = "chat-command"
   )
 ) {
@@ -33,13 +34,6 @@ object PluginMain : AronaPlugin(
       if (it.subject.id in ignoreList) {
         return@subscribeAlways
       }
-      // TODO 正式环境上线
-//      val text = it.message.filterIsInstance<PlainText>().firstOrNull() ?: return@subscribeAlways
-      // 命令必须以 "/" 开头
-//      val commandText = text.toString()
-//      if (!commandText.startsWith("/")) {
-//        return@subscribeAlways
-//      }
       val commandSender = runCatching {
         it.toCommandSender()
       }.getOrNull() ?: return@subscribeAlways
@@ -54,14 +48,20 @@ object PluginMain : AronaPlugin(
             // 发送错误处理
             val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@launch
             val fullHelp = result.command.getFormattedHelp() ?: return@launch
-            commandSender.sendMessage("$fullHelp\n用户手册:\nhttps://doc.arona.diyigemt.com/v2/manual/command")
+            val md = tencentCustomMarkdown { }
+              .apply { content = fullHelp } +
+              "用户手册: [AronaDoc](https://doc.arona.diyigemt.com/v2/manual/command)"
+            commandSender.sendMessage(md)
           }
 
           is CommandExecuteResult.ExecutionFailed -> {
             when (result.exception) {
               is UsageError -> {
                 val helpMessage = result.command.getFormattedHelp(result.exception as? CliktError) ?: return@launch
-                commandSender.sendMessage("$helpMessage\n用户手册:\nhttps://doc.arona.diyigemt.com/v2/manual/command")
+                val md = tencentCustomMarkdown { }
+                  .apply { content = helpMessage } +
+                  "用户手册: [AronaDoc](https://doc.arona.diyigemt.com/v2/manual/command)"
+                commandSender.sendMessage(md)
               }
 
               else -> result.exception.let { it1 -> logger.error(it1) }

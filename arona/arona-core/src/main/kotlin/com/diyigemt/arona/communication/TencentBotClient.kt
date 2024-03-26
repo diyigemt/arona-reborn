@@ -5,7 +5,6 @@ import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.communication.message.TencentWebsocketOperationManager.handleTencentOperation
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
-import com.diyigemt.arona.utils.runSuspend
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -17,17 +16,14 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.logging.*
 import io.ktor.utils.io.core.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
-import java.util.*
-import kotlin.concurrent.schedule
-import kotlin.concurrent.scheduleAtFixedRate
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -77,10 +73,11 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   override val friends: ContactList<FriendUser> = SingleUserContactList { EmptyFriendUserImpl(this, it) }
   override val isPublic = config.public
   override val isDebug = config.debug
-  private val timer = Timer("Bot.${config.appId}", true)
+  private val accessTokenLock = Mutex()
   private var accessToken: String = ""
-  private lateinit var accessTokenHeartbeatTask: TimerTask
-  private lateinit var websocketHeartbeatTask: TimerTask
+  private var accessTokenHeartbeatTask: Job? = null
+  private var websocketHeartbeatTask: Job? = null
+  private var wsJob: Job? = null
   private lateinit var websocketContext: TencentBotClientWebSocketSession
   private val openapiSignHeader: HeadersBuilder.() -> Unit = {
     append("Authorization", botToken)
@@ -90,32 +87,53 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
   private val botToken
     get() = "QQBot $accessToken"
 
+  init {
+    eventChannel.subscribeAlways<TencentBotWebsocketAuthSuccessEvent>(coroutineContext) {
+      if (it.bot.id !== id) {
+        return@subscribeAlways
+      }
+      // 此时bot正式登录成功, 开始维护websocket和token刷新长连接
+      with(websocketContext) {
+        startWebsocketHeartbeat()
+      }
+      // 获取频道列表
+      if (isPublic) {
+        Result.success(Unit)
+      } else {
+        fetchGuildList()
+          .onFailure {
+            logger.warn("get guild list failed")
+          }
+      }.onSuccess {
+        // 通知插件登录成功
+        BotManager.registerBot(this@TencentBotClient)
+        TencentBotOnlineEvent(this@TencentBotClient).broadcast()
+      }
+    }
+    eventChannel.subscribeAlways<TencentBotWebsocketConnectionResumeEvent>(coroutineContext) {
+      if (it.bot.id !== id) {
+        return@subscribeAlways
+      }
+      with(websocketContext) {
+        startWebsocketHeartbeat()
+      }
+    }
+  }
+
   companion object {
     operator fun invoke(config: TencentBotConfig): TencentBotClient {
       return TencentBotClient(config)
     }
   }
 
-  fun auth() = runSuspend {
+  fun auth() {
     eventChannel.subscribeOnce<TencentBotAuthSuccessEvent>(coroutineContext) {
       connectWs()
     }
     subscribeHandshake()
-    eventChannel.subscribeOnce<TencentBotWebsocketAuthSuccessEvent>(coroutineContext) {
-      // 此时bot正式登录成功, 开始维护websocket和token刷新长连接
-      with(websocketContext) {
-        startWebsocketHeartbeat()
-      }
-      // 获取频道列表
-      fetchGuildList().onSuccess {
-        // 通知插件端登录成功
-        TencentBotOnlineEvent(this@TencentBotClient).broadcast()
-        BotManager.registerBot(this@TencentBotClient)
-      }
-    }
     // 处理断联事件
     eventChannel.subscribeAlways<TencentBotWebsocketConnectionLostEvent>(coroutineContext) {
-      websocketHeartbeatTask.cancel()
+      websocketHeartbeatTask?.cancel()
       // 发送resume操作
       // 保存上个context的信息
       val cache = runCatching {
@@ -125,14 +143,13 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
       }.onFailure {
         // 重连失败，再走一遍登录流程
         subscribeHandshake()
-        connectWs {
-          it.startWebsocketHeartbeat()
-        }
+        connectWs()
         return@subscribeAlways
       }.getOrNull() ?: return@subscribeAlways
       // 重新连接
-      connectWs {
-        with(it) {
+      connectWs().onSuccess {
+        delay(2000)
+        with(websocketContext) {
           send(
             json.encodeToString(
               TencentWebsocketPayload(
@@ -147,75 +164,81 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
           )
         }
         delay(2000)
-        TencentBotWebsocketConnectionResumeEvent(it.bot).broadcast()
-        it.startWebsocketHeartbeat()
+        TencentBotWebsocketConnectionResumeEvent(this@TencentBotClient).broadcast()
       }
     }
-    doAuth()
+    launch {
+      updateAccessToken()
+    }
   }
 
   private fun subscribeHandshake() {
     eventChannel.subscribeOnce<TencentBotWebsocketHandshakeSuccessEvent>(coroutineContext) {
       // 发送鉴权
       with(websocketContext) {
-        send(
-          json.encodeToString(
-            TencentWebsocketPayload(
-              operation = TencentWebsocketOperationType.Identify,
-              data = TencentWebsocketIdentifyReq(
-                token = botToken,
-                intents = TencentMessageIntentsBuilder().apply {
-                  if (this@TencentBotClient.isPublic) buildPublicBot()
-                  else buildGuildBot()
-                }
-                  .build(),
-                shard = listOf(0, 1)
+        accessTokenLock.withLock {
+          send(
+            json.encodeToString(
+              TencentWebsocketPayload(
+                operation = TencentWebsocketOperationType.Identify,
+                data = TencentWebsocketIdentifyReq(
+                  token = botToken,
+                  intents = TencentMessageIntentsBuilder().apply {
+                    if (this@TencentBotClient.isPublic) buildPublicBot()
+                    else buildGuildBot()
+                  }
+                    .build(),
+                  shard = listOf(0, 1)
+                )
               )
             )
           )
-        )
+        }
       }
     }
   }
 
-  private suspend fun doAuth() {
+  private suspend fun updateAccessToken() {
+    accessTokenHeartbeatTask?.cancel("timeout")
     val resp = client.post("https://bots.qq.com/app/getAppAccessToken") {
       contentType(ContentType.Application.Json)
       setBody(Json.encodeToString(config.toAuthConfig()))
     }
     if (resp.status == HttpStatusCode.OK) {
-      val authResult = Json.decodeFromString<TencentBotAuthEndpointResp>(resp.bodyAsText())
-      startAccessTokenHeartbeat(authResult.expiresIn)
-      accessToken = authResult.accessToken
-      TencentBotAuthSuccessEvent(this, authResult).broadcast()
-    } else {
-      logger.error("request app token failed")
+      val data = Json.decodeFromString<TencentBotAuthEndpointResp>(resp.bodyAsText())
+      accessTokenLock.withLock {
+        accessToken = data.accessToken
+      }
+      with(this@TencentBotClient) {
+        accessTokenHeartbeatTask = launch(SupervisorJob()) {
+          delay(data.expiresIn * 1000L)
+          updateAccessToken()
+        }
+      }
+      TencentBotAuthSuccessEvent(this, data).broadcast()
     }
   }
 
-  private suspend fun connectWs(onConnected: suspend (TencentBotClientWebSocketSession) -> Unit = {}) {
-    runSuspend {
-      callOpenapi(TencentEndpoint.WebSocket, TencentWebsocketEndpointResp.serializer()) {
-        method = HttpMethod.Get
-      }.onSuccess {
-        client.ws({
-          method = HttpMethod.Get
-          url(it.url)
-        }) {
-          val cxt = this@TencentBotClient.toWebSocketSession(call, this)
-          this@TencentBotClient.websocketContext = cxt
-          runCatching {
-            onConnected(cxt)
-          }.onFailure {
-            logger.error(it)
-          }
-          while (cxt.handleTencentOperation()) {
-            //
+  private suspend fun connectWs(): Result<TencentWebsocketEndpointResp> {
+    return callOpenapi(TencentEndpoint.WebSocket, TencentWebsocketEndpointResp.serializer()) {
+      method = HttpMethod.Get
+    }.onSuccess {
+      wsJob = with(this@TencentBotClient) {
+        launch(SupervisorJob()) {
+          client.ws({
+            method = HttpMethod.Get
+            url(it.url)
+          }) {
+            val cxt = this@TencentBotClient.toWebSocketSession(call, this)
+            this@TencentBotClient.websocketContext = cxt
+            while (cxt.handleTencentOperation()) {
+              //
+            }
           }
         }
-      }.onFailure {
-        logger.error("get websocket endpoint failed.")
       }
+    }.onFailure {
+      logger.error("get websocket endpoint failed.")
     }
   }
 
@@ -227,15 +250,17 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
       method = HttpMethod.Get
       contentType(ContentType.Application.Json)
     }.onSuccess {
-      guilds.delegate.addAll(
-        it.map { guild ->
-          GuildImpl(
-            this,
-            coroutineContext,
-            guild
+      it.forEach { guild ->
+        if (guilds.delegate.none { exist -> exist.id == guild.id }) {
+          guilds.delegate.add(
+            GuildImpl(
+              this,
+              coroutineContext,
+              guild
+            )
           )
         }
-      )
+      }
     }
   }
 
@@ -250,14 +275,8 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     var bodyTmp = ""
     return runCatching {
       val resp = client.request {
-        headers(openapiSignHeader).apply {
-//          when (endpoint) {
-//            TencentEndpoint.PostGuildMessage, TencentEndpoint.PostGroupMessage -> {}
-//            else -> {
-//              remove("Authorization")
-//              append("Authorization", "Bot ${config.appId}.${config.token}")
-//            }
-//          }
+        accessTokenLock.withLock {
+          headers(openapiSignHeader)
         }
         contentType(ContentType.Application.Json)
         url(
@@ -339,9 +358,10 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
     TODO("Not yet implemented")
   }
 
-  private fun TencentBotClientWebSocketSession.startWebsocketHeartbeat() =
-    timer.scheduleAtFixedRate(0, heartbeatInterval) {
-      runSuspend {
+  private fun TencentBotClientWebSocketSession.startWebsocketHeartbeat() {
+    websocketHeartbeatTask?.cancel("timeout")
+    websocketHeartbeatTask = launch(SupervisorJob()) {
+      while (true) {
         sendApiData(
           TencentWebsocketPayload(
             operation = TencentWebsocketOperationType.Heartbeat,
@@ -350,24 +370,17 @@ private constructor(private val config: TencentBotConfig) : Closeable, TencentBo
             data = if (serialNumber == 0L) null else serialNumber
           )
         )
+        delay(heartbeatInterval)
       }
-    }.also { websocketHeartbeatTask = it }
-
-
-  private fun startAccessTokenHeartbeat(interval: Int) {
-    timer.schedule(interval * 1000L) {
-      runSuspend {
-        doAuth()
-      }
-    }.also { accessTokenHeartbeatTask = it }
+    }
   }
 
   override fun toString() = "TencentBot($appId)"
 
   override fun close() {
-    websocketHeartbeatTask.cancel()
-    accessTokenHeartbeatTask.cancel()
-    timer.cancel()
+    wsJob?.cancel()
+    websocketHeartbeatTask?.cancel()
+    accessTokenHeartbeatTask?.cancel()
     client.close()
   }
 }
@@ -387,7 +400,7 @@ data class TencentApiErrorResp(
 sealed class TencentApiErrorException(
   val status: HttpStatusCode,
   val source: TencentApiErrorResp,
-  val req: String? = ""
+  val req: String? = "",
 ) : Exception(source.toString())
 
 class HttpNotOkException(status: HttpStatusCode, body: String, traceId: String = "", req: String? = "") :

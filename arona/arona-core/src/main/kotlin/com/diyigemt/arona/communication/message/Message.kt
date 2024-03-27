@@ -755,6 +755,8 @@ data class TencentRichMessage @OptIn(ExperimentalSerializationApi::class) constr
   val fileData: String? = null,
 )
 
+private val lfSimplified = Regex("^\n\n")
+
 class TencentMessageBuilder private constructor(
   private val container: MutableList<Message>,
   private val messageSequence: Int = 1,
@@ -830,7 +832,11 @@ class TencentMessageBuilder private constructor(
       .joinToString("\n") { it.toString() }
       .takeIf { it.isNotEmpty() } ?: ""
     val im = container.filterIsInstance<TencentImage>().lastOrNull()
-    val md = container.filterIsInstance<TencentMarkdown>().lastOrNull()
+    val md = container.filterIsInstance<TencentMarkdown>().lastOrNull()?.also {
+      if (it is TencentCustomMarkdown) {
+        it.content = it.content.replace(lfSimplified, "\n")
+      }
+    }
     val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()
     if (isPrivateChannel) {
       return TencentGuildMessage(
@@ -997,7 +1003,7 @@ data class MessageReceipt<out C : Contact> internal constructor(
 
       is GuildMember -> {
         target.bot.callOpenapi(
-          TencentEndpoint.DeleteFriendMessage,
+          TencentEndpoint.DeleteGuildMemberMessage,
           mapOf("channel_id" to target.id, "message_id" to id)
         ) {
           method = HttpMethod.Delete
@@ -1006,7 +1012,7 @@ data class MessageReceipt<out C : Contact> internal constructor(
 
       is Guild, is Channel -> {
         target.bot.callOpenapi(
-          TencentEndpoint.DeleteFriendMessage,
+          TencentEndpoint.DeleteGuildMessage,
           mapOf("guild_id" to target.id, "message_id" to id)
         ) {
           method = HttpMethod.Delete

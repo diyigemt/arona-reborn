@@ -70,10 +70,7 @@ object KivotosCommand : AbstractCommand(
         val loginResult = tencentCustomMarkdown {
           +"签到成功, 获得100清辉石"
         }
-        sendMessage(loginResult + playerMainMenu).also {
-          delay(3000L)
-          it?.recall()
-        }
+        sendMessage(loginResult + playerMainMenu)
       } else {
         sendMessage(playerMainMenuWithTitle)
       }

@@ -86,6 +86,8 @@ internal data class TencentWebsocketIdentifyResp(
   val shard: List<Int>,
 )
 
+typealias TencentWebsocketResumeResp = String
+
 @Serializable
 data class TencentWebsocketCallbackButtonResp(
   val id: String,

@@ -93,13 +93,12 @@ object GachaCommand : AbstractCommand(
   Arona,
   "十连",
   description = "抽一发十连",
-  help = """
-    不提供参数时, 抽日服当前最新池子
-    
-    /十连 历史 查看当期池子记录
-    
-    /十连 池子名称, 抽自己定义或当前环境管理员定义的池子
-  """.trimIndent()
+  help = tencentCustomMarkdown {
+    +"不提供参数时, 抽日服当前最新池子"
+    +"/十连 历史 查看当期池子记录"
+    +"/十连 池子名称, 抽自己定义或当前环境管理员定义的池子"
+    +"自定义池子可看 [webui帮助](https://doc.arona.diyigemt.com/v2/manual/webui)"
+  }.content
 ) {
   private val targetPoolName by argument(name = "要抽的池子", help = "对指定的池子抽一次十连").optional()
 
@@ -119,8 +118,8 @@ object GachaCommand : AbstractCommand(
         if (readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown.enable) {
           val md = tencentCustomMarkdown {
             h1("卡池选择")
-            + "池子不存在!"
-            + "仅能抽取管理员预定义的和自己配置的"
+            +"池子不存在!"
+            +"仅能抽取管理员预定义的和自己配置的"
           }
           val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
             poolConfig.pools.windowed(2, 2, true).forEach { r ->
@@ -213,7 +212,11 @@ object GachaCommand : AbstractCommand(
               label = "再来一次"
             }
             action {
-              data = "/十连 " + if (isCustom) {poolName} else {""}
+              data = "/十连 " + if (isCustom) {
+                poolName
+              } else {
+                ""
+              }
             }
           }
           if (!isCustom) {
@@ -387,7 +390,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
       }
       if (terminal.confirm(
           "将${if (schema == null) "新建" else "更新"}信息: name=$name, limit=$limit, rarity=$rarity, " +
-              "head=$head"
+            "head=$head"
         )
       ) {
         if (schema == null) {

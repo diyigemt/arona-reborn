@@ -12,7 +12,6 @@ annotation class MarkdownDsl
 abstract class MarkdownElement {
   abstract fun build(): String
 }
-
 data class Markdown(
   val content: String = "",
 ) : MarkdownElement() {
@@ -27,7 +26,7 @@ data class Markdown(
   }
 
   override fun build(): String {
-    return children.joinToString {
+    return children.joinToString("") {
       when (it) {
         is BlockElement, is ListElement -> "${it.build()}\n"
         is InlineCommandElement -> it.build()

@@ -15,7 +15,7 @@ import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.error
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -149,7 +149,7 @@ internal abstract class AbstractContact(
   ): TencentImage {
     return when (this) {
       is FriendUser -> {
-        bot.callOpenapi(
+        val cache = bot.callOpenapi(
           TencentEndpoint.PostFriendRichMessage,
           TencentMessageMediaInfo.serializer(),
           mapOf("openid" to this.id)
@@ -163,11 +163,22 @@ internal abstract class AbstractContact(
               )
             )
           )
-        }.getOrThrow().let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) }
+        }
+        cache
+          .getOrNull()?.let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) } ?: bot
+          .client
+          .get(url)
+          .let {
+            if (it.status == HttpStatusCode.OK) {
+              uploadImage(it.readBytes())
+            } else {
+              throw cache.exceptionOrNull()!!
+            }
+          }
       }
 
       is Group -> {
-        bot.callOpenapi(
+        val cache = bot.callOpenapi(
           TencentEndpoint.PostGroupRichMessage,
           TencentMessageMediaInfo.serializer(),
           mapOf("group_openid" to this.id)
@@ -181,7 +192,18 @@ internal abstract class AbstractContact(
               )
             )
           )
-        }.getOrThrow().let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) }
+        }
+        cache
+          .getOrNull()?.let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) } ?: bot
+          .client
+          .get(url)
+          .let {
+            if (it.status == HttpStatusCode.OK) {
+              uploadImage(it.readBytes())
+            } else {
+              throw cache.exceptionOrNull()!!
+            }
+          }
       }
 
       else -> TencentGuildImage(url)

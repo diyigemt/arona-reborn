@@ -49,6 +49,7 @@ internal object TencentWebsocketEventTypeAsStringSerializer : KSerializer<Tencen
 internal enum class TencentWebsocketEventType(val type: String) {
   NULL("NULL"),
   READY("READY"), // websocket鉴权成功
+  RESUMED("RESUMED"), // websocket 连接恢复成功
   MESSAGE_CREATE("MESSAGE_CREATE"), // 频道全量消息发送
   AT_MESSAGE_CREATE("AT_MESSAGE_CREATE"), // 频道@机器人消息
   DIRECT_MESSAGE_CREATE("DIRECT_MESSAGE_CREATE"), // 频道私聊消息

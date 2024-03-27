@@ -14,6 +14,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
@@ -26,6 +27,16 @@ internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHand
     logger.info("websocket receive hello from server")
     sessionId = payload.sessionId
     TencentBotWebsocketAuthSuccessEvent(bot, payload).broadcast()
+  }
+}
+
+internal object TencentWebsocketResumedHandler : TencentWebsocketDispatchEventHandler<TencentWebsocketResumeResp>() {
+  override val type = TencentWebsocketEventType.RESUMED
+  override val decoder = TencentWebsocketResumeResp.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketResumeResp, eventId: String) {
+    logger.info("websocket resumed.")
+    TencentBotWebsocketConnectionResumeEvent(bot).broadcast()
   }
 }
 

@@ -163,8 +163,6 @@ private constructor(private val config: TencentBotConfig) : TencentBot, Coroutin
             )
           )
         }
-        delay(2000)
-        TencentBotWebsocketConnectionResumeEvent(this@TencentBotClient).broadcast()
       }
     }
     launch {
@@ -198,24 +196,41 @@ private constructor(private val config: TencentBotConfig) : TencentBot, Coroutin
     }
   }
 
-  private suspend fun updateAccessToken() {
-    accessTokenHeartbeatTask?.cancel("timeout")
+  private suspend fun getAccessToken(): TencentBotAuthEndpointResp? {
     val resp = client.post("https://bots.qq.com/app/getAppAccessToken") {
       contentType(ContentType.Application.Json)
       setBody(Json.encodeToString(config.toAuthConfig()))
     }
-    if (resp.status == HttpStatusCode.OK) {
-      val data = Json.decodeFromString<TencentBotAuthEndpointResp>(resp.bodyAsText())
-      accessTokenLock.withLock {
-        accessToken = data.accessToken
-      }
-      with(this@TencentBotClient) {
-        accessTokenHeartbeatTask = launch(SupervisorJob()) {
-          delay(data.expiresIn * 1000L)
-          updateAccessToken()
+    return if (resp.status == HttpStatusCode.OK) {
+      kotlin.runCatching {
+        Json.decodeFromString<TencentBotAuthEndpointResp>(resp.bodyAsText())
+      }.getOrNull()
+    } else {
+      null
+    }
+  }
+
+  private fun updateAccessToken() {
+    accessTokenHeartbeatTask?.cancel("timeout")
+    accessTokenHeartbeatTask = launch(SupervisorJob()) {
+      var retryCount = 0
+      while (true) {
+        if (retryCount >= 3) {
+          logger.error("get access token failed after 3 retry. abort bot.")
+          this@TencentBotClient.close()
         }
+        val data = getAccessToken()
+        if (data == null) {
+          retryCount++
+        } else {
+          accessTokenLock.withLock {
+            accessToken = data.accessToken
+          }
+          TencentBotAuthSuccessEvent(this@TencentBotClient, data).broadcast()
+        }
+        // 快过期的60s内申请会刷新token
+        delay(((data?.expiresIn?.minus(30)) ?: 1) * 1000L)
       }
-      TencentBotAuthSuccessEvent(this, data).broadcast()
     }
   }
 
@@ -283,7 +298,7 @@ private constructor(private val config: TencentBotConfig) : TencentBot, Coroutin
           "https://${if (isDebug) "sandbox." else ""}api.sgroup.qq.com${endpoint.path}".let {
             var base = it
             urlPlaceHolder.forEach { (k, v) ->
-              base = it.replace("{$k}", v)
+              base = base.replace("{$k}", v)
             }
             base
           }
@@ -381,7 +396,6 @@ private constructor(private val config: TencentBotConfig) : TencentBot, Coroutin
     wsJob?.cancel()
     websocketHeartbeatTask?.cancel()
     accessTokenHeartbeatTask?.cancel()
-    this.cancel()
     client.close()
   }
 }
@@ -415,4 +429,10 @@ class ImageFailedException(status: HttpStatusCode, body: String) : TencentApiErr
   status, JsonIgnoreUnknownKeys.decodeFromString(body)
 ) {
   override val message: String = "image upload failed, $source"
+}
+
+class ImageDownloadFailedException(status: HttpStatusCode, body: String) : TencentApiErrorException(
+  status, JsonIgnoreUnknownKeys.decodeFromString(body)
+) {
+  override val message: String = "image download failed, $source"
 }

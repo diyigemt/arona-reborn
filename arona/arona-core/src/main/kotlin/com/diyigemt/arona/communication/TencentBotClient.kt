@@ -163,6 +163,7 @@ private constructor(private val config: TencentBotConfig) : TencentBot, Coroutin
             )
           )
         }
+        websocketContext.sessionId = cache.first
       }
     }
     launch {

@@ -28,6 +28,7 @@ dependencies {
 
 tasks.test {
   useJUnitPlatform()
+  workingDir = rootProject.project("arona-core").projectDir.resolve("sandbox")
 }
 
 application {

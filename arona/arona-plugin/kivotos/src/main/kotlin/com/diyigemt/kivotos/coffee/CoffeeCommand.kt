@@ -101,7 +101,7 @@ object CoffeeCommand : AbstractCommand(
         coffee.tendencyStudent.size
       )
       val tendency = coffee.tendencyStudent.shuffled().take(tendencyStudentCount)
-      val max = StudentSchema.count()
+      val max = DatabaseProvider.dbQuery { StudentSchema.count() }
       val visit = (1..max.toInt()).toMutableList().also {
         it.removeAll(tendency)
       }.shuffled().take(tendencyStudentCount)
@@ -593,7 +593,7 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
         } + tencentCustomKeyboard {
           row {
             subButton(
-              "添加学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+              "添加学生", "${CoffeeCommand.primaryName} ${
                 CoffeeStudentTendencyCommand
                   .primaryName
               } ${CoffeeStudentTendencyAddCommand.primaryName} $sn"
@@ -618,7 +618,7 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
       }
 
       coffee.updateStudents0(CoffeeDocument::tendencyStudent.name, coffee.tendencyStudent + target.id.value)
-      sendMessage("添加成功")
+      sendMessage("${target.name} 添加成功")
     }
   }
 
@@ -676,7 +676,7 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
         } + tencentCustomKeyboard {
           row {
             subButton(
-              "删除学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+              "删除学生", "${CoffeeCommand.primaryName} ${
                 CoffeeStudentTendencyCommand
                   .primaryName
               } ${CoffeeStudentTendencyRemoveCommand.primaryName} $sn"
@@ -712,7 +712,7 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
           .also {
             it.remove(target.id.value)
           })
-      sendMessage("删除成功")
+      sendMessage("${target.name} 删除成功")
     }
   }
 }

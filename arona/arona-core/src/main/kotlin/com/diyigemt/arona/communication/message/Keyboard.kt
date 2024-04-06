@@ -2,6 +2,7 @@
 
 package com.diyigemt.arona.communication.message
 
+import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.utils.uuid
 import kotlinx.serialization.*
@@ -29,18 +30,22 @@ data class TencentCustomKeyboard(
   infix fun append(other: TencentCustomKeyboard) {
     content.rows.addAll(other.content.rows)
   }
+
   infix fun insertTo(other: TencentCustomKeyboard) {
     other.content.rows.addAll(0, content.rows)
   }
+
   operator fun plus(other: TencentCustomKeyboard): TencentCustomKeyboard {
     content.rows.addAll(other.content.rows)
     return this
   }
+
   override fun toString(): String {
     return "\n" + content.rows.joinToString("\n") {
       it.buttons.joinToString("\t") { b -> b.toString() }
     }
   }
+
   override fun serialization(): String {
     TODO("Not yet implemented")
   }
@@ -111,6 +116,11 @@ data class TencentKeyboardButton(
   @EncodeDefault
   var action: TencentKeyboardButtonActionData = TencentKeyboardButtonActionData(),
 ) {
+  fun UserCommandSender.selfOnly() {
+    action.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
+    action.permission.specifyUserIds = listOf(user.id)
+  }
+
   override fun toString(): String {
     return renderData.label
   }
@@ -195,6 +205,7 @@ enum class TencentKeyboardButtonActionDataType(val id: Int) {
     override fun serialize(encoder: Encoder, value: TencentKeyboardButtonActionDataType) = encoder.encodeInt(value.id)
   }
 }
+
 @KeyboardDsl
 @Serializable
 data class TencentKeyboardButtonRenderData(
@@ -316,3 +327,6 @@ fun tencentCustomKeyboard(botAppId: String, init: TencentCustomKeyboard0.() -> U
   // TODO id去重 按钮上限
   return TencentCustomKeyboard(TencentCustomKeyboard0(botAppid = botAppId).also(init))
 }
+
+fun CommandSender.tencentCustomKeyboard(init: TencentCustomKeyboard0.() -> Unit) =
+  tencentCustomKeyboard(bot?.unionOpenidOrId ?: "", init)

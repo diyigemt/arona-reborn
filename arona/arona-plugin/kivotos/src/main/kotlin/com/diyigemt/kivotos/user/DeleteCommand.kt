@@ -39,11 +39,11 @@ object DeleteCommand : AbstractCommand(
         val message = tencentCustomMarkdown {
           h1("错误")
           +"验证码不存在"
-          +"请先执行 \"/赛博基沃托斯 删号\" 指令生成验证码 "
+          +"请先执行 \"/${KivotosCommand.primaryName} 删号\" 指令生成验证码 "
           at()
-        } + tencentCustomKeyboard(bot.unionOpenidOrId) {
+        } + tencentCustomKeyboard {
           row {
-            button("生成验证码", "/赛博基沃托斯 删号", true)
+            button("生成验证码", "/${KivotosCommand.primaryName} 删号", true)
           }
         }
         sendMessage(message)
@@ -56,16 +56,16 @@ object DeleteCommand : AbstractCommand(
       +"确认要删除账号吗, 删除后将立即生效无法找回!"
       +"如果真的需要删除, 请点击确认按钮并附上随机生成的6位数字"
       +"验证码: $code"
-      +"如 /赛博基沃托斯 删号 123456"
+      +"如 /${KivotosCommand.primaryName} 删号 123456"
     }
-    val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
+    val kb = tencentCustomKeyboard {
       row {
         button {
           render {
             label = "确认删号"
           }
           action {
-            data = "/赛博基沃托斯 删号 "
+            data = "/${KivotosCommand.primaryName} 删号 "
           }
         }
         button {

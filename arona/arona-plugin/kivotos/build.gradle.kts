@@ -7,10 +7,14 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.kivotos.Kivotos"
-version = "0.0.31"
+version = "0.0.33"
 dependencies {
   compileOnly(project(":arona-core"))
   compileOnly(project(":arona-plugin:arona"))
+  compileOnly("io.ktor:ktor-client-cio")
+  compileOnly("io.ktor:ktor-client-core")
+  compileOnly("io.ktor:ktor-client-content-negotiation")
+  compileOnly("io.ktor:ktor-serialization-kotlinx-json-jvm")
   testImplementation(kotlin("test"))
   testImplementation("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")

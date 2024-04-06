@@ -12,7 +12,7 @@ kotlin {
     freeCompilerArgs.add("-Xcontext-receivers")
   }
 }
-version = "1.1.77"
+version = "1.1.78"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 
@@ -100,7 +100,7 @@ dependencies {
   api("org.jetbrains.exposed:exposed-json:$exposedVersion")
   api("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
 
-  api("io.github.crackthecodeabhi:kreds:0.9.0")
+  api("io.github.crackthecodeabhi:kreds:0.9.1")
 
   implementation("org.jline:jline:3.25.0")
   implementation("com.github.Towdium:PinIn:1.6.0")

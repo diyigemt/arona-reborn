@@ -94,9 +94,11 @@ object GachaCommand : AbstractCommand(
   "十连",
   description = "抽一发十连",
   help = tencentCustomMarkdown {
-    +"不提供参数时, 抽日服当前最新池子"
-    +"/十连 历史 查看当期池子记录"
-    +"/十连 池子名称, 抽自己定义或当前环境管理员定义的池子"
+    list {
+      +"不提供参数时, 抽日服当前最新池子"
+      +"/十连 历史 查看当期池子记录"
+      +"/十连 池子名称, 抽自己定义或当前环境管理员定义的池子"
+    }
     +"自定义池子可看 [webui帮助](https://doc.arona.diyigemt.com/v2/manual/webui)"
   }.content
 ) {
@@ -121,7 +123,7 @@ object GachaCommand : AbstractCommand(
             +"池子不存在!"
             +"仅能抽取管理员预定义的和自己配置的"
           }
-          val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
+          val kb = tencentCustomKeyboard {
             poolConfig.pools.windowed(2, 2, true).forEach { r ->
               row {
                 r.forEach { c ->
@@ -205,7 +207,7 @@ object GachaCommand : AbstractCommand(
         }
         at()
       }
-      val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
+      val kb = tencentCustomKeyboard {
         row {
           button(1) {
             render {
@@ -390,7 +392,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
       }
       if (terminal.confirm(
           "将${if (schema == null) "新建" else "更新"}信息: name=$name, limit=$limit, rarity=$rarity, " +
-            "head=$head"
+              "head=$head"
         )
       ) {
         if (schema == null) {

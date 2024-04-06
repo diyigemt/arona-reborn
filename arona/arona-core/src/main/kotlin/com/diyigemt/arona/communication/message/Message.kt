@@ -503,26 +503,38 @@ data class TencentCustomMarkdown(
   var content: String,
 ) : Message, TencentMarkdown() {
   infix fun append(other: TencentCustomMarkdown) {
-    content += "\n" + other.content
+    content += if (content.endsWith("\n")) {
+      other.content
+    } else {
+      "\n" + other.content
+    }
   }
 
   infix fun insertTo(other: TencentCustomMarkdown) {
-    other.content = content + "\n" + other.content
+    other.content = content + if (content.endsWith("\n")) {
+      other.content
+    } else {
+      "\n" + other.content
+    }
   }
 
   operator fun plus(other: TencentCustomMarkdown): TencentCustomMarkdown {
     return TencentCustomMarkdown(
-      this.content +
-        "\n" +
+      content + if (content.endsWith("\n")) {
         other.content
+      } else {
+        "\n" + other.content
+      }
     )
   }
 
   operator fun plus(other: String): TencentCustomMarkdown {
     return TencentCustomMarkdown(
-      this.content +
-        "\n" +
+      content + if (content.endsWith("\n")) {
         other
+      } else {
+        "\n" + other
+      }
     )
   }
 
@@ -542,7 +554,7 @@ data class TencentTemplateMarkdown(
   val params: List<TencentMarkdownParam>,
 ) : Message, TencentMarkdown() {
   constructor(id: String, block: TencentMarkdownParam.Companion.TencentMarkdownParamBuilder.() -> Unit) :
-    this(id, TencentMarkdownParam.Companion.TencentMarkdownParamBuilder().apply(block).build())
+      this(id, TencentMarkdownParam.Companion.TencentMarkdownParamBuilder().apply(block).build())
 
   override fun serialization(): String {
     TODO("Not yet implemented")

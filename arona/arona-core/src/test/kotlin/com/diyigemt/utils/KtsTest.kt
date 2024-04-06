@@ -5,7 +5,6 @@ import com.diyigemt.arona.communication.message.render
 import com.diyigemt.arona.communication.message.row
 import com.diyigemt.arona.communication.message.tencentCustomKeyboard
 import com.diyigemt.arona.kts.host.evalFile
-import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.script.experimental.api.ResultValue
 import kotlin.script.experimental.api.valueOrNull

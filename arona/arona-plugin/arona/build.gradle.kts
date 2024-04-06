@@ -7,7 +7,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.arona.Arona"
-version = "1.2.4"
+version = "1.2.5"
 kotlin {
   compilerOptions {
     freeCompilerArgs.add("-Xcontext-receivers")
@@ -16,10 +16,10 @@ kotlin {
 dependencies {
   compileOnly(project(":arona-core"))
   compileOnly("io.ktor:ktor-server-core-jvm")
-  implementation("io.ktor:ktor-client-cio")
-  implementation("io.ktor:ktor-client-core")
-  implementation("io.ktor:ktor-client-content-negotiation")
-  implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
+  compileOnly("io.ktor:ktor-client-cio")
+  compileOnly("io.ktor:ktor-client-core")
+  compileOnly("io.ktor:ktor-client-content-negotiation")
+  compileOnly("io.ktor:ktor-serialization-kotlinx-json-jvm")
   implementation("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.7.9")
   implementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.7.9")
   implementation("net.coobird:thumbnailator:0.4.20")

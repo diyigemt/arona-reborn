@@ -1,15 +1,20 @@
 package com.diyigemt.kivotos.coffee
 
+import com.diyigemt.arona.arona.command.ImageQueryData
 import com.diyigemt.arona.arona.database.DatabaseProvider
+import com.diyigemt.arona.arona.database.image.ImageCacheTable.hash
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.arona.database.student.StudentTable
 import com.diyigemt.arona.command.AbstractCommand
+import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.command.SubCommand
+import com.diyigemt.arona.command.nextButtonInteraction
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.*
 import com.diyigemt.kivotos.Kivotos
 import com.diyigemt.kivotos.KivotosCommand
+import com.diyigemt.kivotos.schema.ErrorDocument
 import com.diyigemt.kivotos.schema.UserDocument
 import com.diyigemt.kivotos.subButton
 import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
@@ -17,12 +22,22 @@ import com.diyigemt.kivotos.tools.database.idFilter
 import com.diyigemt.kivotos.tools.database.withCollection
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.optional
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.bson.codecs.pojo.annotations.BsonId
 
 
@@ -55,6 +70,13 @@ object CoffeeCommand : AbstractCommand(
   Kivotos,
   "咖啡厅",
   description = "咖啡厅系列指令",
+  help = tencentCustomMarkdown {
+    list {
+      +"/赛博基沃托斯 咖啡厅 摸头 白子, 摸摸白子"
+      +"/赛博基沃托斯 咖啡厅 一键摸头, 全摸了"
+      +"/赛博基沃托斯 咖啡厅 邀请 白子, 邀请白子来咖啡厅"
+    }
+  }.content
 ) {
   private val md by requireObject<TencentCustomMarkdown>()
   private val kb by requireObject<TencentCustomKeyboard>()
@@ -109,8 +131,8 @@ object CoffeeCommand : AbstractCommand(
       }
     }
     kb append buildTouchButton(
-      bot.unionOpenidOrId,
-      visitedStudents.map { it.name }
+      visitedStudents.map { it.name },
+      coffee = coffee
     )
     if (sendMessage) {
       md append tencentCustomMarkdown {
@@ -152,14 +174,21 @@ object CoffeeCommand : AbstractCommand(
 @Serializable
 data class CoffeeDocument(
   @BsonId val id: String, // 用户id userDocument().id
-  val level: Int = 5,
+  val level: Int = 12,
   val students: List<Int> = listOf(), // 来访的学生
   val touchedStudents: List<Int> = listOf(), // 能摸的学生, 为什么不是摸过的学生呢, 因为有些来的学生你没有啊
   val lastTouchTime: String = "2000-11-04 05:14:00", // 摸头计时器 每3小时刷新一次
-  val lastInviteTime: String = "2000-11-04 05:14:00", // 上次邀请时间, 冷却时间23小时
+  val nextInviteTime: String = "2000-11-04 05:14:00", // 下次能邀请的时间, 冷却时间23小时
   val lastStudentUpdateTime: String = "2000-11-04 05:14:00", // 上次刷新来访的时间, 每个整3点刷新
   val lastRewordCollectTime: String = "2000-11-04 05:14:00", // 上次领体力和信用点的时间
+  val lastInviteStudent: String = "白子", // 上次邀请的学生
 ) {
+  /**
+   * 是否能邀请学生
+   */
+  val canInviteStudent
+    get() = currentDateTime() >= nextInviteTime
+
   suspend fun updateStudents(students: List<Int>) {
     updateStudents0(CoffeeDocument::students.name, students)
     updateStudents0(CoffeeDocument::touchedStudents.name, students)
@@ -182,7 +211,7 @@ data class CoffeeDocument(
     }
   }
 
-  private suspend fun updateStudents0(name: String, students: List<Int>) {
+  suspend fun updateStudents0(name: String, students: List<Int>) {
     withCollection<CoffeeDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
@@ -203,7 +232,7 @@ object CoffeeTouchCommand : AbstractCommand(
   "摸头",
   description = "咖啡厅摸头指令",
   help = """
-      /赛博基沃托斯 咖啡厅 摸头 日奈
+      /${KivotosCommand.primaryName} 咖啡厅 摸头 日奈
     """.trimIndent()
 ) {
   private val md by requireObject<TencentCustomMarkdown>()
@@ -271,12 +300,7 @@ object CoffeeTouchAllCommand : AbstractCommand(
   private val kivotosUser by requireObject<UserDocument>()
   suspend fun UserCommandSender.coffeeTouch() {
     md append tencentCustomMarkdown {
-      +"你分别摸了摸"
-      list {
-        visitedStudents.forEach {
-          +it.name
-        }
-      }
+      +"你分别摸了摸学生们"
     }
     touchedStudents.forEach {
       kivotosUser.updateStudentFavor(it.id.value, 15).also { p ->
@@ -307,17 +331,180 @@ object CoffeeTouchAllCommand : AbstractCommand(
   }
 }
 
-private fun buildTouchButton(openid: String, students: List<String>): TencentCustomKeyboard {
-  return tencentCustomKeyboard(openid) {
-    (students + listOf("一键摸头")).windowed(2, 2, true)
+@SubCommand(forClass = CoffeeCommand::class)
+@Suppress("unused")
+object CoffeeInviteCommand : AbstractCommand(
+  Kivotos,
+  "邀请",
+  description = "咖啡厅邀请指令",
+  help = """
+      /${KivotosCommand.primaryName} 咖啡厅 邀请 日奈
+    """.trimIndent()
+) {
+  private val json = Json {
+    ignoreUnknownKeys = true
+  }
+  private val httpClient = HttpClient(CIO) {
+    install(ContentNegotiation) {
+      json
+    }
+  }
+  private val md by requireObject<TencentCustomMarkdown>()
+  private val kb by requireObject<TencentCustomKeyboard>()
+  private val coffee by requireObject<CoffeeDocument>()
+  private val visitedStudents by requireObject<List<StudentSchema>>()
+  private val touchedStudents by requireObject<List<StudentSchema>>()
+  private val kivotosUser by requireObject<UserDocument>()
+  private val studentName by argument("学生名").optional()
+  suspend fun UserCommandSender.invite() {
+    if (!coffee.canInviteStudent) {
+      md append tencentCustomMarkdown {
+        at()
+        +"还没到邀请刷新时间, 下次刷新: ${coffee.nextInviteTime}"
+      }
+      sendMessage(md)
+      return
+    }
+    if (studentName == null) {
+      val message = tencentCustomMarkdown {
+        at()
+        +"请输入学生名, 如"
+        +"/${KivotosCommand.primaryName} 咖啡厅 邀请 日奈"
+      } + tencentCustomKeyboard {
+        row {
+          subButton("邀请学生", "/${KivotosCommand.primaryName} 咖啡厅 邀请 ")
+        }
+      }
+      sendMessage(message)
+      return
+    }
+    val sn = studentName!!
+    // 尝试在本地数据库查找
+    val student = DatabaseProvider.dbQuery {
+      StudentSchema.find {
+        StudentTable.name eq sn
+      }.firstOrNull()
+    }?.name ?: // 没找到 尝试在远端找
+    httpClient.get("https://arona.diyigemt.com/api/v2/image") {
+      parameter("name", sn)
+    }.let {
+      return@let kotlin.runCatching {
+        if (it.status == HttpStatusCode.OK) {
+          val tmp = it.bodyAsText().let {
+            json.decodeFromString<ServerResponse<List<ImageQueryData>>>(it)
+          }
+          return@runCatching if (tmp.code == HttpStatusCode.OK) {
+            tmp.data?.firstOrNull()?.content?.substringAfterLast("/")?.substringBefore(".")
+          } else {
+            null
+          }
+        } else {
+          null
+        }
+      }.getOrNull()
+    }
+    if (student == null) {
+      val message = tencentCustomMarkdown {
+        at()
+        +"没有找到该学生, 试着提供其他别名"
+      } + tencentCustomKeyboard {
+        row {
+          subButton("邀请学生", "咖啡厅 邀请 ")
+        }
+      }
+      sendMessage(message)
+      return
+    }
+    // 找到学生
+
+    // 开始邀请
+    val target = DatabaseProvider.dbQuery {
+      StudentSchema.find {
+        StudentTable.name eq student
+      }.firstOrNull()
+    }
+
+    if (target == null) {
+      sendMessage("错误: 邀请学生不存在, 目标: $student 建议上报")
+      ErrorDocument.createError(404, "错误: 邀请学生不存在, 目标: $student")
+      return
+    }
+
+    // 判断来没来
+    if (target.id.value in coffee.students) {
+      sendMessage("${target.name} 已经在咖啡厅里了")
+      return
+    }
+
+    (tencentCustomMarkdown {
+      h2("确认")
+      at()
+      +"确认邀请 $student 来咖啡厅吗?"
+    } + tencentCustomKeyboard {
+      row {
+        button {
+          render {
+            label = "确认"
+          }
+          action {
+            type = TencentKeyboardButtonActionType.CALLBACK
+            data = "Y"
+          }
+          selfOnly()
+        }
+        button {
+          render {
+            label = "取消"
+          }
+          action {
+            type = TencentKeyboardButtonActionType.CALLBACK
+            data = "N"
+          }
+          selfOnly()
+        }
+      }
+    }).also {
+      sendMessage(it)
+    }
+    val to = withTimeoutOrNull(10000L) {
+      val next = nextButtonInteraction()
+      next.accept()
+      if (next.buttonData == "Y") {
+        coffee.updateStudents0(CoffeeDocument::students.name, coffee.students + target.id.value)
+        coffee.updateTouchedStudents(coffee.touchedStudents + target.id.value, false)
+        coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(23, DateTimeUnit.HOUR).toDateTime())
+        CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅"))
+      }
+    }
+    if (to == null) {
+      sendMessage("操作超时")
+    }
+  }
+}
+
+infix fun <A, B, C> Pair<A, B>.to(other: C) = Triple(this.first, this.second, other)
+
+private fun UserCommandSender.buildTouchButton(
+  students: List<String>,
+  coffee: CoffeeDocument
+): TencentCustomKeyboard {
+  return tencentCustomKeyboard {
+    (students.map {
+      "摸摸$it" to "咖啡厅 摸头 $it" to true
+    } + listOf(
+      "一键摸头" to "咖啡厅 一键摸头" to true
+    ) + if (coffee.canInviteStudent) {
+      listOf(
+        "邀请${coffee.lastInviteStudent}" to "咖啡厅 邀请 ${coffee.lastInviteStudent}" to true,
+        "邀请学生" to "咖啡厅 邀请" to false
+      )
+    } else {
+      listOf()
+    }).windowed(2, 2, true)
       .forEach { r ->
         row {
           r.forEach { c ->
-            if (c == "一键摸头") {
-              subButton(c, "咖啡厅 一键摸头", true)
-            } else {
-              subButton("摸摸$c", "咖啡厅 摸头 $c", true)
-            }
+            subButton(c.first, c.second, c.third)
           }
         }
       }

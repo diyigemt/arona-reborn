@@ -1,13 +1,11 @@
 package com.diyigemt.kivotos
 
 import com.diyigemt.arona.command.AbstractCommand
-import com.diyigemt.arona.command.UnderDevelopment
 import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.schema.kivotosUser
-import kotlinx.coroutines.delay
 
 
 private val visitorMenu by lazy {
@@ -31,12 +29,12 @@ private val playerMainMenu by lazy {
 
 private val playerMainMenuWithTitle by lazy {
   tencentCustomMarkdown {
-    h1("赛博基沃托斯")
+    h1(KivotosCommand.primaryName)
   } + playerMainMenu
 }
 
 fun TencentCustomKeyboardRow.subButton(label: String, data: String = label, enter: Boolean = false) {
-  button(uuid(), label, "/赛博基沃托斯 $data", enter)
+  button(uuid(), label, "/${KivotosCommand.primaryName} $data", enter)
 }
 
 @Suppress("unused")
@@ -44,19 +42,19 @@ object KivotosCommand : AbstractCommand(
   Kivotos,
   "赛博基沃托斯",
   description = "赛博基沃托斯主菜单",
-  help = """
-    欢迎来到赛博基沃托斯, 使用
-    
-    /赛博基沃托斯, 打开主菜单
-    
-    /赛博基沃托斯 咖啡厅, 进入咖啡厅
-    
-    /赛博基沃托斯 删号, 删除账号
-  """.trimIndent()
+  help = tencentCustomMarkdown {
+    +"欢迎来到赛博基沃托斯, 使用"
+    list {
+      +"/赛博基沃托斯, 打开主菜单"
+      +"/赛博基沃托斯 咖啡厅, 进入咖啡厅"
+      +"/赛博基沃托斯 竞技场, 进入竞技场"
+      +"/赛博基沃托斯 删号, 删除账号"
+    }
+  }.content
 ) {
   suspend fun UserCommandSender.menu() {
     currentContext.setObject("md", tencentCustomMarkdown { })
-    currentContext.setObject("kb", tencentCustomKeyboard(bot.unionOpenidOrId) { })
+    currentContext.setObject("kb", tencentCustomKeyboard { })
     currentContext.setObject("kivotosUser", kivotosUser())
     if (currentContext.invokedSubcommand != null) {
       return

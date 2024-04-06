@@ -14,8 +14,6 @@ import com.diyigemt.arona.database.permission.ContactDocument.Companion.createCo
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
-import com.diyigemt.arona.database.permission.UserDocument
-import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
 import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -102,8 +100,8 @@ object BuiltInCommands {
       """.trimIndent()
     ) {
       private val md = tencentCustomMarkdown {
-        + "请点击认证按钮完成认证"
-        + "非管理员不用试了, 点着没反应的"
+        +"请点击认证按钮完成认证"
+        +"非管理员不用试了, 点着没反应的"
       }
       private val kb by lazy {
         tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
@@ -124,6 +122,7 @@ object BuiltInCommands {
           }
         }
       }
+
       suspend fun UserCommandSender.authAdmin() {
         if (isPrivateChannel()) {
           sendMessage("不支持频道私聊使用")
@@ -140,9 +139,10 @@ object BuiltInCommands {
         }
       }
     }
+
     @SubCommand
     object BindContactNameCommand : AbstractCommand(
-       BuildInCommandOwner,
+      BuildInCommandOwner,
       "配置名称",
       description = "配置该群/频道在webui中的名称",
       help = """
@@ -162,17 +162,18 @@ object BuiltInCommands {
         sendMessage("绑定成功")
       }
     }
+
     suspend fun UserCommandSender.contactManagement() {
       if (currentContext.invokedSubcommand != null) {
         return
       }
       val md = tencentCustomMarkdown {
-        + "非管理员不用尝试了, 点着没反应的"
+        +"非管理员不用尝试了, 点着没反应的"
         (getFormattedHelp() ?: "").split("\n").filter { it.isNotEmpty() }.forEach {
-          + it
+          +it
         }
       }
-      val kb = tencentCustomKeyboard(bot.unionOpenidOrId) {
+      val kb = tencentCustomKeyboard {
         var idx = 0
         registeredSubcommands().map { it.commandName }.windowed(2, 2, true).forEach { r ->
           row {

@@ -135,7 +135,7 @@ object TrainerCommand : AbstractCommand(
               h1("没有找到与 \"${match}\" 有关的信息")
               +"是否想要查询:"
             }
-            val btn = tencentCustomKeyboard(bot.unionOpenidOrId) {
+            val btn = tencentCustomKeyboard {
               filterIndexed { index, _ -> index < 4 }
                 .sortedBy { it.name.length }
                 .forEachIndexed { idx, stu ->

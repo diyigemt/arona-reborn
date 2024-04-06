@@ -104,10 +104,10 @@ object CoffeeCommand : AbstractCommand(
       val max = DatabaseProvider.dbQuery { StudentSchema.count() }
       val visit = (1..max.toInt()).toMutableList().also {
         it.removeAll(tendency)
-      }.shuffled().take(tendencyStudentCount)
+      }.shuffled().take(studentCount(coffee.level) - tendencyStudentCount)
       val students = DatabaseProvider.dbQuery {
         StudentSchema.find {
-          StudentTable.id inList visit
+          StudentTable.id inList visit + tendency
         }.toList()
       }
       coffee.updateStudents(students.map { it.id.value })

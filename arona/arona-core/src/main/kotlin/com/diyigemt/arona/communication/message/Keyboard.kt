@@ -27,6 +27,15 @@ data class TencentTempleKeyboard(
 data class TencentCustomKeyboard(
   val content: TencentCustomKeyboard0,
 ) : Message, TencentKeyboard() {
+
+  fun windowed(size: Int = 2) {
+    val buttons = content.rows.flatMap { it.buttons }
+    content.rows.clear()
+    content.rows.addAll(buttons.windowed(size, size, true).map {
+      TencentCustomKeyboardRow(it.toMutableList())
+    })
+  }
+
   infix fun append(other: TencentCustomKeyboard) {
     content.rows.addAll(other.content.rows)
   }
@@ -36,7 +45,9 @@ data class TencentCustomKeyboard(
   }
 
   operator fun plus(other: TencentCustomKeyboard): TencentCustomKeyboard {
-    content.rows.addAll(other.content.rows)
+    if (other.content.rows.isNotEmpty()) {
+      content.rows.addAll(other.content.rows)
+    }
     return this
   }
 

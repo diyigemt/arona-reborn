@@ -1,8 +1,6 @@
 package com.diyigemt.kivotos.coffee
 
-import com.diyigemt.arona.arona.command.ImageQueryData
 import com.diyigemt.arona.arona.database.DatabaseProvider
-import com.diyigemt.arona.arona.database.image.ImageCacheTable.hash
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.arona.database.student.StudentTable
 import com.diyigemt.arona.command.AbstractCommand
@@ -20,18 +18,15 @@ import com.diyigemt.kivotos.subButton
 import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
 import com.diyigemt.kivotos.tools.database.idFilter
 import com.diyigemt.kivotos.tools.database.withCollection
+import com.diyigemt.kivotos.tools.normalizeStudentName
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.DateTimeUnit
@@ -39,6 +34,7 @@ import kotlinx.datetime.plus
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.bson.codecs.pojo.annotations.BsonId
+import kotlin.math.min
 
 
 private suspend fun UserCommandSender.coffee() = CoffeeDocument.withCollection<CoffeeDocument, CoffeeDocument?> {
@@ -97,10 +93,21 @@ object CoffeeCommand : AbstractCommand(
     }
     if (checkStudentUpdate(coffee.lastStudentUpdateTime)) {
       // 需要更新来访的学生
+      // 随机倾向名单 每个来访学生独立计算, 20%来一个倾向名单内的学生, min保证不会来多余倾向名单内的学生
+      val tendencyStudentCount = min(
+        (1..studentCount(coffee.level)).filter {
+          (1..100).random() > 80
+        }.size,
+        coffee.tendencyStudent.size
+      )
+      val tendency = coffee.tendencyStudent.shuffled().take(tendencyStudentCount)
+      val max = StudentSchema.count()
+      val visit = (1..max.toInt()).toMutableList().also {
+        it.removeAll(tendency)
+      }.shuffled().take(tendencyStudentCount)
       val students = DatabaseProvider.dbQuery {
-        val max = StudentSchema.count()
         StudentSchema.find {
-          StudentTable.id inList IntArray(studentCount(coffee.level)) { (1..max.toInt()).random() }.toList()
+          StudentTable.id inList visit
         }.toList()
       }
       coffee.updateStudents(students.map { it.id.value })
@@ -138,6 +145,12 @@ object CoffeeCommand : AbstractCommand(
       md append tencentCustomMarkdown {
         at()
       }
+      kb append tencentCustomKeyboard {
+        row {
+          button("来访倾向管理", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} 来访倾向")
+        }
+      }
+      kb.windowed()
       sendMessage(md + kb)
     }
   }
@@ -182,6 +195,7 @@ data class CoffeeDocument(
   val lastStudentUpdateTime: String = "2000-11-04 05:14:00", // 上次刷新来访的时间, 每个整3点刷新
   val lastRewordCollectTime: String = "2000-11-04 05:14:00", // 上次领体力和信用点的时间
   val lastInviteStudent: String = "白子", // 上次邀请的学生
+  val tendencyStudent: List<Int> = listOf(), // 更容易来访的学生
 ) {
   /**
    * 是否能邀请学生
@@ -380,33 +394,11 @@ object CoffeeInviteCommand : AbstractCommand(
     }
     val sn = studentName!!
     // 尝试在本地数据库查找
-    val student = DatabaseProvider.dbQuery {
-      StudentSchema.find {
-        StudentTable.name eq sn
-      }.firstOrNull()
-    }?.name ?: // 没找到 尝试在远端找
-    httpClient.get("https://arona.diyigemt.com/api/v2/image") {
-      parameter("name", sn)
-    }.let {
-      return@let kotlin.runCatching {
-        if (it.status == HttpStatusCode.OK) {
-          val tmp = it.bodyAsText().let {
-            json.decodeFromString<ServerResponse<List<ImageQueryData>>>(it)
-          }
-          return@runCatching if (tmp.code == HttpStatusCode.OK) {
-            tmp.data?.firstOrNull()?.content?.substringAfterLast("/")?.substringBefore(".")
-          } else {
-            null
-          }
-        } else {
-          null
-        }
-      }.getOrNull()
-    }
+    val student = normalizeStudentName(sn)
     if (student == null) {
       val message = tencentCustomMarkdown {
-        at()
         +"没有找到该学生, 试着提供其他别名"
+        at()
       } + tencentCustomKeyboard {
         row {
           subButton("邀请学生", "咖啡厅 邀请 ")
@@ -472,12 +464,255 @@ object CoffeeInviteCommand : AbstractCommand(
       if (next.buttonData == "Y") {
         coffee.updateStudents0(CoffeeDocument::students.name, coffee.students + target.id.value)
         coffee.updateTouchedStudents(coffee.touchedStudents + target.id.value, false)
-        coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(23, DateTimeUnit.HOUR).toDateTime())
+        coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(20, DateTimeUnit.HOUR).toDateTime())
         CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅"))
       }
     }
     if (to == null) {
       sendMessage("操作超时")
+    }
+  }
+}
+
+@SubCommand(forClass = CoffeeCommand::class)
+@Suppress("unused")
+object CoffeeStudentTendencyCommand : AbstractCommand(
+  Kivotos,
+  "来访倾向",
+  description = "咖啡厅来访倾向管理指令",
+  help = """
+      /${KivotosCommand.primaryName} 咖啡厅 来访倾向 添加 日奈
+      /${KivotosCommand.primaryName} 咖啡厅 来访倾向 删除 日奈
+    """.trimIndent()
+) {
+  private val coffee by requireObject<CoffeeDocument>()
+  suspend fun UserCommandSender.tendency() {
+    val tendencyStudents = DatabaseProvider.dbQuery {
+      StudentSchema.find {
+        StudentTable.id inList coffee.tendencyStudent
+      }.toList()
+    }
+    currentContext.setObject("tendencyStudents", tendencyStudents)
+    val md = tencentCustomMarkdown {
+      h2("来访倾向配置")
+      block {
+        +"因为放不了家具, 所以互动家具吸引学生的设定就手动配吧"
+        +"最多配置4个, 被配置的学生将有独立的乘区更容易来咖啡厅"
+      }
+      +"目前已经配置的学生: ${if (coffee.tendencyStudent.isEmpty()) "空" else ""}"
+      if (coffee.tendencyStudent.isNotEmpty()) {
+        list {
+          tendencyStudents.forEach {
+            +it.name
+          }
+        }
+      }
+    }
+    val kb = (tencentCustomKeyboard {
+      tendencyStudents.forEach {
+        row {
+          button(
+            "删除${it.name}", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+              CoffeeStudentTendencyCommand
+                .primaryName
+            } ${CoffeeStudentTendencyRemoveCommand.primaryName} ${it.name}"
+          )
+        }
+      }
+    } + tencentCustomKeyboard {
+      row {
+        button(
+          "添加学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+            CoffeeStudentTendencyCommand
+              .primaryName
+          } ${CoffeeStudentTendencyAddCommand.primaryName}"
+        )
+      }
+    }).also { it.windowed() }
+    currentContext.setObject("kb", kb)
+    currentContext.setObject("md", md)
+    if (currentContext.invokedSubcommand == null) {
+      md append tencentCustomMarkdown {
+        at()
+      }
+      sendMessage(md + kb)
+    }
+  }
+
+  @SubCommand
+  @Suppress("unused")
+  object CoffeeStudentTendencyAddCommand : AbstractCommand(
+    Kivotos,
+    "添加",
+    description = "咖啡厅来访倾向添加指令",
+    help = """
+      /${KivotosCommand.primaryName} 咖啡厅 来访倾向 添加 日奈
+    """.trimIndent()
+  ) {
+    private val coffee by requireObject<CoffeeDocument>()
+    private val tendencyStudents by requireObject<List<StudentSchema>>()
+    private val md by requireObject<TencentCustomMarkdown>()
+    private val studentName by argument("学生名").optional()
+
+    suspend fun UserCommandSender.tendencyAdd() {
+      if (studentName == null) {
+        md append tencentCustomMarkdown {
+          +"缺少参数: 学生名称, 如"
+          +"/${KivotosCommand.primaryName} 咖啡厅 来访倾向 添加 日奈"
+          at()
+        }
+        val kb = tencentCustomKeyboard {
+          row {
+            button(
+              "添加日奈", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+                CoffeeStudentTendencyCommand
+                  .primaryName
+              } ${CoffeeStudentTendencyAddCommand.primaryName} 日奈"
+            )
+            button(
+              "添加学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+                CoffeeStudentTendencyCommand
+                  .primaryName
+              } ${CoffeeStudentTendencyAddCommand.primaryName}"
+            )
+          }
+        }
+        sendMessage(md + kb)
+        return
+      }
+      if (coffee.tendencyStudent.size >= 4) {
+        sendMessage("已经配置了4位学生, 没法再添加了")
+        return
+      }
+      val sn = studentName!!
+      val student = normalizeStudentName(sn)
+      if (student == null) {
+        val message = tencentCustomMarkdown {
+          +"没有找到该学生, 试着提供其他别名"
+          at()
+        } + tencentCustomKeyboard {
+          row {
+            subButton(
+              "添加学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+                CoffeeStudentTendencyCommand
+                  .primaryName
+              } ${CoffeeStudentTendencyAddCommand.primaryName} $sn"
+            )
+          }
+        }
+        sendMessage(message)
+        return
+      }
+
+      // 开始添加
+      val target = DatabaseProvider.dbQuery {
+        StudentSchema.find {
+          StudentTable.name eq student
+        }.firstOrNull()
+      }
+
+      if (target == null) {
+        sendMessage("错误: 要添加的学生不存在, 目标: $student 建议上报")
+        ErrorDocument.createError(404, "错误: 要添加的学生不存在, 目标: $student")
+        return
+      }
+
+      coffee.updateStudents0(CoffeeDocument::tendencyStudent.name, coffee.tendencyStudent + target.id.value)
+      sendMessage("添加成功")
+    }
+  }
+
+  @SubCommand
+  @Suppress("unused")
+  object CoffeeStudentTendencyRemoveCommand : AbstractCommand(
+    Kivotos,
+    "删除",
+    description = "咖啡厅来访倾向删除指令",
+    help = """
+      /${KivotosCommand.primaryName} 咖啡厅 来访倾向 删除 日奈
+    """.trimIndent()
+  ) {
+    private val coffee by requireObject<CoffeeDocument>()
+    private val tendencyStudents by requireObject<List<StudentSchema>>()
+    private val md by requireObject<TencentCustomMarkdown>()
+    private val studentName by argument("学生名").optional()
+
+    suspend fun UserCommandSender.tendencyAdd() {
+      if (studentName == null) {
+        md append tencentCustomMarkdown {
+          +"缺少参数: 学生名称, 如"
+          +"/${KivotosCommand.primaryName} 咖啡厅 来访倾向 删除 日奈"
+          at()
+        }
+        val kb = tencentCustomKeyboard {
+          row {
+            button(
+              "删除日奈", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+                CoffeeStudentTendencyCommand
+                  .primaryName
+              } ${CoffeeStudentTendencyRemoveCommand.primaryName} 日奈"
+            )
+            button(
+              "删除学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+                CoffeeStudentTendencyCommand
+                  .primaryName
+              } ${CoffeeStudentTendencyRemoveCommand.primaryName}"
+            )
+          }
+        }
+        sendMessage(md + kb)
+        return
+      }
+      if (coffee.tendencyStudent.isEmpty()) {
+        sendMessage("已经空了, 没法再删除了")
+        return
+      }
+      val sn = studentName!!
+      val student = normalizeStudentName(sn)
+      if (student == null) {
+        val message = tencentCustomMarkdown {
+          +"没有找到该学生, 试着提供其他别名"
+          at()
+        } + tencentCustomKeyboard {
+          row {
+            subButton(
+              "删除学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
+                CoffeeStudentTendencyCommand
+                  .primaryName
+              } ${CoffeeStudentTendencyRemoveCommand.primaryName} $sn"
+            )
+          }
+        }
+        sendMessage(message)
+        return
+      }
+
+      // 开始删除
+      val target = DatabaseProvider.dbQuery {
+        StudentSchema.find {
+          StudentTable.name eq student
+        }.firstOrNull()
+      }
+
+      if (target == null) {
+        sendMessage("错误: 要删除的学生不存在, 目标: $student 建议上报")
+        ErrorDocument.createError(404, "错误: 要删除的学生不存在, 目标: $student")
+        return
+      }
+
+      if (target.id.value !in coffee.tendencyStudent) {
+        sendMessage("$student 不在倾向列表里")
+        return
+      }
+
+      coffee.updateStudents0(
+        CoffeeDocument::tendencyStudent.name,
+        coffee.tendencyStudent
+          .toMutableList()
+          .also {
+            it.remove(target.id.value)
+          })
+      sendMessage("删除成功")
     }
   }
 }

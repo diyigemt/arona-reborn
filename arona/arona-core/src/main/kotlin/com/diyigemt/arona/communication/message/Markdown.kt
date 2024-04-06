@@ -28,7 +28,7 @@ data class Markdown(
   override fun build(): String {
     return children.joinToString("") {
       when (it) {
-        is BlockElement, is ListElement -> "${it.build()}\n"
+        is BlockElement, is ListElement -> "${it.build()}\n\n"
         is InlineCommandElement -> it.build()
         else -> it.build() + "\n"
       }

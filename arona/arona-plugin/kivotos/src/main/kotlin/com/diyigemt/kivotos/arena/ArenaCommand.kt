@@ -3,8 +3,6 @@ package com.diyigemt.kivotos.arena
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.SubCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
-import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
-import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrNull
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.kivotos.Kivotos
 import com.diyigemt.kivotos.KivotosCommand

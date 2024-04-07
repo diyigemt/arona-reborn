@@ -101,13 +101,12 @@ object CoffeeCommand : AbstractCommand(
         coffee.tendencyStudent.size
       )
       val tendency = coffee.tendencyStudent.shuffled().take(tendencyStudentCount)
-      val max = DatabaseProvider.dbQuery { StudentSchema.count() }
-      val visit = (1..max.toInt()).toMutableList().also {
+      val visit = StudentSchema.randomStudentIdList().also {
         it.removeAll(tendency)
       }.shuffled().take(studentCount(coffee.level) - tendencyStudentCount)
       val students = DatabaseProvider.dbQuery {
         StudentSchema.find {
-          StudentTable.id inList visit + tendency
+          StudentTable.id inList (visit + tendency)
         }.toList()
       }
       coffee.updateStudents(students.map { it.id.value })
@@ -466,6 +465,7 @@ object CoffeeInviteCommand : AbstractCommand(
         coffee.updateStudents0(CoffeeDocument::students.name, coffee.students + target.id.value)
         coffee.updateTouchedStudents(coffee.touchedStudents + target.id.value, false)
         coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(20, DateTimeUnit.HOUR).toDateTime())
+        coffee.updateTime(CoffeeDocument::lastInviteStudent.name, student)
         CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅"))
       }
     }

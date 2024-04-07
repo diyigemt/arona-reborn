@@ -1,6 +1,7 @@
 package com.diyigemt.arona.arona.database.student
 
 import com.diyigemt.arona.arona.database.Database
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -21,12 +22,22 @@ object StudentTable : IntIdTable(name = "Student") {
   val headFileName = varchar("head_file_name", length = 255)
 }
 
-class StudentSchema (id: EntityID<Int>) : IntEntity(id) {
-  companion object : IntEntityClass<StudentSchema>(StudentTable)
+class StudentSchema(id: EntityID<Int>) : IntEntity(id) {
   var name by StudentTable.name
   var limit by StudentTable.limit
   var rarity by StudentTable.rarity
   var headFileName by StudentTable.headFileName
+
+  companion object : IntEntityClass<StudentSchema>(StudentTable) {
+    fun randomStudentIdList(): MutableList<Int> {
+      return dbQuery {
+        StudentSchema.all().toList()
+      }.map { it.id.value }
+        .toMutableList()
+        .also { it.remove(173) }
+    }
+  }
+
   override fun toString(): String {
     return "StudentSchema(name=$name, limit=$limit, rarity=$rarity, head=$headFileName)"
   }
@@ -45,6 +56,7 @@ enum class StudentRarity {
     fun fromInt(i: Int) = list.getOrNull(i) ?: SSR
   }
 }
+
 object StudentRaritySerializer : KSerializer<StudentRarity> {
   override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("StudentRaritySerializer", PrimitiveKind.INT)
   override fun deserialize(decoder: Decoder) = StudentRarity.fromInt(decoder.decodeInt())
@@ -62,8 +74,11 @@ enum class StudentLimitType {
     fun fromString(name: String) = map.getOrDefault(name, Permanent)
   }
 }
+
 object StudentLimitTypeSerializer : KSerializer<StudentLimitType> {
-  override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("StudentLimitTypeSerializer", PrimitiveKind.STRING)
+  override val descriptor: SerialDescriptor =
+    PrimitiveSerialDescriptor("StudentLimitTypeSerializer", PrimitiveKind.STRING)
+
   override fun deserialize(decoder: Decoder) = StudentLimitType.fromString(decoder.decodeString())
   override fun serialize(encoder: Encoder, value: StudentLimitType) = encoder.encodeString(value.name)
 }

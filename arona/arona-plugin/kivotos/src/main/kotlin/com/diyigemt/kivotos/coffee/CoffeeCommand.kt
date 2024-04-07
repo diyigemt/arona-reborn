@@ -386,7 +386,7 @@ object CoffeeInviteCommand : AbstractCommand(
         +"/${KivotosCommand.primaryName} 咖啡厅 邀请 日奈"
       } + tencentCustomKeyboard {
         row {
-          subButton("邀请学生", "/${KivotosCommand.primaryName} 咖啡厅 邀请 ")
+          subButton("邀请学生", "咖啡厅 邀请 ")
         }
       }
       sendMessage(message)

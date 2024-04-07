@@ -371,6 +371,7 @@ object CoffeeInviteCommand : AbstractCommand(
   private val kivotosUser by requireObject<UserDocument>()
   private val studentName by argument("学生名").optional()
   suspend fun UserCommandSender.invite() {
+    val coffee = this@CoffeeInviteCommand.coffee
     if (!coffee.canInviteStudent) {
       md append tencentCustomMarkdown {
         at()

@@ -8,7 +8,7 @@ import com.diyigemt.kivotos.KivotosCommand
 
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
-object ScheduleCommand : AbstractCommand(
+class ScheduleCommand : AbstractCommand(
   Kivotos,
   "课程表",
   description = "课程表系列指令",

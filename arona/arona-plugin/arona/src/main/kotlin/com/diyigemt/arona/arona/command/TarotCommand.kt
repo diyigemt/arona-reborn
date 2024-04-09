@@ -56,7 +56,7 @@ private val kb by lazy {
 }
 
 @Suppress("unused")
-object TarotCommand : AbstractCommand(
+class TarotCommand : AbstractCommand(
   Arona,
   "塔罗牌",
   description = "抽一张ba风格的塔罗牌",
@@ -68,7 +68,6 @@ object TarotCommand : AbstractCommand(
     都在webui里修改
   """.trimIndent()
 ) {
-  private const val TarotCount = 22
   private val PositiveMap = mapOf(
     1 to true,
     2 to true,
@@ -225,5 +224,8 @@ object TarotCommand : AbstractCommand(
         }
       }
     }
+  }
+  companion object {
+    private const val TarotCount = 22
   }
 }

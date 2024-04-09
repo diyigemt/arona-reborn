@@ -7,6 +7,7 @@ import com.diyigemt.arona.permission.PermissionService
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.core.subcommands
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -19,7 +20,6 @@ interface Command {
   val secondaryNames: Array<out String>
   val description: String
   val owner: CommandOwner
-  val targetExtensionFunction: KFunction<*>
   val permission: Permission
 
   companion object {
@@ -56,11 +56,11 @@ class IllegalCommandDeclarationException : Exception {
 }
 
 internal class CommandReflector(
-  val command: Command,
+  val command: KClass<out Command>,
 ) {
-  private fun getSubCommandNames(command: Command): String {
-    val annotated = command::class.findAnnotation<SubCommand>()!!.value
-    return annotated.ifEmpty { command::class.simpleName ?: command::class.qualifiedName ?: command::class.jvmName }
+  private fun getSubCommandNames(command: KClass<out Command>): String {
+    val annotated = command.findAnnotation<SubCommand>()!!.value
+    return annotated.ifEmpty { command.simpleName ?: command.qualifiedName ?: command.jvmName }
   }
 
   @Suppress("NOTHING_TO_INLINE")
@@ -68,20 +68,20 @@ internal class CommandReflector(
     correspondingCommand: KClass<*>,
     message: String,
   ): Nothing {
-    throw IllegalCommandDeclarationException(command::class, correspondingCommand, message)
+    throw IllegalCommandDeclarationException(command, correspondingCommand, message)
   }
 
   private fun KClass<*>.isSubCommand() = isSubclassOf(AbstractCommand::class) && this.hasAnnotation<SubCommand>()
 
-  private fun Command.checkNames() {
+  private fun KClass<out Command>.checkNames() {
     val name = getSubCommandNames(this)
     ILLEGAL_SUB_NAME_CHARS.find { it in name }?.let {
-      this::class.illegalDeclaration(this::class, "'$it' is forbidden in command name.")
+      this.illegalDeclaration(this, "'$it' is forbidden in command name.")
     }
   }
 
   private fun KClass<*>.checkModifiers() {
-    if (objectInstance == null) illegalDeclaration(this, "SubCommand should be object")
+    if (objectInstance != null) illegalDeclaration(this, "SubCommand should not be object")
     if (visibility == KVisibility.PRIVATE) illegalDeclaration(
       this, "Command function must be accessible, that is, " +
         "effectively public."
@@ -94,18 +94,17 @@ internal class CommandReflector(
   }
 
   @Suppress("UNCHECKED_CAST")
-  fun findSubCommand(): List<AbstractCommand> {
-    val s = command::class.nestedClasses
+  fun findSubCommand(): List<KClass<out AbstractCommand>> {
+    val s = command.nestedClasses
       .asSequence()
       .filter { it.isSubCommand() } as Sequence<KClass<out AbstractCommand>>
     return s
       .onEach { it.checkModifiers() }
-      .map { it.objectInstance!! }
       .onEach { it.checkNames() }
       .toList()
   }
 
-  fun findTargetExtensionFunction() = command::class.declaredMemberExtensionFunctions.first {
+  fun findTargetExtensionFunction() = command.declaredMemberExtensionFunctions.first {
     it.extensionReceiverParameter!!.type.isSubtypeOf(CommandSender::class.starProjectedType)
       && it.parameters.size == 2
   }
@@ -133,30 +132,20 @@ abstract class AbstractCommand(
   override val description: String = "<no description available>",
   help: String = "",
 ) : CliktCommand(name = primaryName, help = help, epilog = description, invokeWithoutSubcommand = true), Command {
-  private val commandSender by requireObject<AbstractCommandSender>("caller")
-  private val reflector by lazy {
-    CommandReflector(this)
-  }
-  override val targetExtensionFunction by lazy {
-    reflector.findTargetExtensionFunction()
-  }
+  private val caller by requireObject<AbstractCommandSender>("caller")
+  private val signature by requireObject<CommandSignature>("signature")
 
   init {
     Command.checkCommandName(primaryName)
     secondaryNames.forEach(Command.Companion::checkCommandName)
-    runCatching {
-      subcommands(reflector.findSubCommand())
-    }.onFailure {
-      throw it
-    }
   }
 
   final override fun run() {
-    if (!commandSender.kType.isSubtypeOf(targetExtensionFunction.parameters[1].type)) {
+    if (!caller.kType.isSubtypeOf(targetExtensionFunction.parameters[1].type)) {
       return
     }
-    runBlocking(commandSender.coroutineContext) {
-      targetExtensionFunction.callSuspend(this@AbstractCommand, commandSender)
+    caller.launch {
+      targetExtensionFunction.callSuspend(this@AbstractCommand, caller)
     }
   }
 

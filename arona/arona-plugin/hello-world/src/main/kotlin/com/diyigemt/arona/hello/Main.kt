@@ -22,7 +22,7 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
   }
 }
 
-object TestCommand : AbstractCommand(
+class TestCommand : AbstractCommand(
   PluginMain,
   "测试"
 ) {

@@ -57,7 +57,7 @@ private val kb by lazy {
 }
 
 @Suppress("unused")
-object HelpCommand : AbstractCommand(
+class HelpCommand : AbstractCommand(
   Arona, "帮助", description = "给出文档连接"
 ) {
   suspend fun UserCommandSender.help() {

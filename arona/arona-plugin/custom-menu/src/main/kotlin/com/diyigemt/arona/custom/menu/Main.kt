@@ -21,7 +21,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.custom.menu",
     name = "custom-menu",
     author = "diyigemt",
-    version = "0.2.5",
+    version = "0.3.0",
     description = "快捷菜单"
   )
 ) {
@@ -104,7 +104,7 @@ data class CustomMenuConfig(
   }
 }
 @Suppress("unused")
-object CustomMenuCommand : AbstractCommand(
+class CustomMenuCommand : AbstractCommand(
   PluginMain, "菜单", description = "提供快捷菜单, 或者默认菜单"
 ) {
   suspend fun UserCommandSender.menu() {

@@ -31,7 +31,7 @@ private fun redisBattleKey(bid: String) = redisKey("battle.$bid")
 
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
-object ArenaCommand : AbstractCommand(
+class ArenaCommand : AbstractCommand(
   Kivotos,
   "竞技场",
   description = "竞技场系列指令"
@@ -55,7 +55,7 @@ object ArenaCommand : AbstractCommand(
 
 @SubCommand(forClass = ArenaCommand::class)
 @Suppress("unused")
-object ArenaMatchCommand : AbstractCommand(
+class ArenaMatchCommand : AbstractCommand(
   Kivotos,
   "匹配",
   description = "竞技场匹配指令"
@@ -78,12 +78,14 @@ object ArenaMatchCommand : AbstractCommand(
 
 @SubCommand(forClass = ArenaCommand::class)
 @Suppress("unused")
-object ArenaRankCommand : AbstractCommand(
+class ArenaRankCommand : AbstractCommand(
   Kivotos,
   "排行榜",
   description = "竞技场排行榜指令"
 ) {
+  suspend fun UserCommandSender.rank() {
 
+  }
 }
 
 @Serializable

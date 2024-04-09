@@ -18,6 +18,7 @@ import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.reflect.KClass
 
 object BuiltInCommands {
 
@@ -44,13 +45,16 @@ object BuiltInCommands {
       ),
       "内置指令父级权限"
     )
+    @Suppress("UNCHECKED_CAST")
     BuiltInCommands::class.nestedClasses.forEach {
-      (it.objectInstance as? Command)?.register()
+      (it as? KClass<out AbstractCommand>)?.also { a ->
+        CommandManager.registerCommandSignature(a, false)
+      }
     }
     PluginWebuiConfigRecorder.register(BuildInCommandOwner, BaseConfig.serializer())
   }
 
-  object LoginCommand : AbstractCommand(
+  class LoginCommand : AbstractCommand(
     BuildInCommandOwner,
     "登录",
     description = "登录webui",
@@ -78,7 +82,7 @@ object BuiltInCommands {
     }
   }
 
-  object ContactManagementCommand : AbstractCommand(
+  class ContactManagementCommand : AbstractCommand(
     BuildInCommandOwner,
     "管理",
     description = "管理系列指令",
@@ -89,7 +93,7 @@ object BuiltInCommands {
     """.trimIndent()
   ) {
     @SubCommand
-    object AuthAdminPriorityCommand : AbstractCommand(
+    class AuthAdminPriorityCommand : AbstractCommand(
       BuildInCommandOwner,
       "管理员认证",
       description = "给管理员用, 将自己加入该群/频道下的管理员用户组",
@@ -141,7 +145,7 @@ object BuiltInCommands {
     }
 
     @SubCommand
-    object BindContactNameCommand : AbstractCommand(
+    class BindContactNameCommand : AbstractCommand(
       BuildInCommandOwner,
       "配置名称",
       description = "配置该群/频道在webui中的名称",
@@ -183,7 +187,7 @@ object BuiltInCommands {
                   label = c
                 }
                 action {
-                  data = "/绑定 $c"
+                  data = "/管理 $c"
                   permission = TencentKeyboardButtonActionPermissionData(
                     type = TencentKeyboardButtonActionDataType.MANAGER
                   )

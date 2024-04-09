@@ -14,12 +14,11 @@ import com.github.ajalt.clikt.parameters.arguments.optional
 
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
-object DeleteCommand : AbstractCommand(
+class DeleteCommand : AbstractCommand(
   Kivotos,
   "删号",
   description = "删除账号"
 ) {
-  private const val REDIS_KEY = "kivotos.delete."
   private val kivotosUser by requireObject<UserDocument>()
   private val confirmCode by argument("code", help = "删号代码").optional()
   private fun generateNumber(): String = (1..6).map { "0123456789".random() }.joinToString("")
@@ -81,5 +80,8 @@ object DeleteCommand : AbstractCommand(
       expire("$REDIS_KEY.${user.id}", 60u)
     }
     sendMessage(md + kb)
+  }
+  companion object {
+    private const val REDIS_KEY = "kivotos.delete."
   }
 }

@@ -21,7 +21,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.test",
     name = "hello",
     author = "diyigemt",
-    version = "0.0.17",
+    version = "0.1.0",
     description = "test interaction"
   )
 ) {
@@ -31,7 +31,7 @@ object PluginMain : AronaPlugin(
 }
 
 @Suppress("unused")
-object TestCommand : AbstractCommand(
+class TestCommand : AbstractCommand(
   PluginMain,
   "测试"
 ) {

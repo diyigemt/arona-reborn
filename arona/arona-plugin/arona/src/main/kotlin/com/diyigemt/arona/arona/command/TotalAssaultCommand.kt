@@ -33,7 +33,7 @@ data class TotalAssaultConfig(
 }
 
 @Suppress("unused")
-object TotalAssaultCommand : AbstractCommand(
+class TotalAssaultCommand : AbstractCommand(
   Arona,
   "总力档线",
   description = "提供当期总力档线",
@@ -63,7 +63,7 @@ object TotalAssaultCommand : AbstractCommand(
 }
 
 @Suppress("unused")
-object TotalAssaultExCommand : AbstractCommand(
+class TotalAssaultExCommand : AbstractCommand(
   Arona,
   "大决战档线",
   description = "提供当期大决战档线",

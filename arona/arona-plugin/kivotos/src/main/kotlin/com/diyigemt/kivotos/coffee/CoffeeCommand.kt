@@ -62,7 +62,7 @@ private fun calcNextTouchTime(coffee: CoffeeDocument): String {
 
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
-object CoffeeCommand : AbstractCommand(
+class CoffeeCommand : AbstractCommand(
   Kivotos,
   "咖啡厅",
   description = "咖啡厅系列指令",
@@ -146,7 +146,7 @@ object CoffeeCommand : AbstractCommand(
       }
       kb append tencentCustomKeyboard {
         row {
-          button("来访倾向管理", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} 来访倾向")
+          button("来访倾向管理", "/${KivotosCommand.primaryName} 咖啡厅 来访倾向")
         }
       }
       kb.windowed()
@@ -240,7 +240,7 @@ data class CoffeeDocument(
 
 @SubCommand(forClass = CoffeeCommand::class)
 @Suppress("unused")
-object CoffeeTouchCommand : AbstractCommand(
+class CoffeeTouchCommand : AbstractCommand(
   Kivotos,
   "摸头",
   description = "咖啡厅摸头指令",
@@ -300,7 +300,7 @@ object CoffeeTouchCommand : AbstractCommand(
 
 @SubCommand(forClass = CoffeeCommand::class)
 @Suppress("unused")
-object CoffeeTouchAllCommand : AbstractCommand(
+class CoffeeTouchAllCommand : AbstractCommand(
   Kivotos,
   "一键摸头",
   description = "咖啡厅一键摸头指令",
@@ -346,7 +346,7 @@ object CoffeeTouchAllCommand : AbstractCommand(
 
 @SubCommand(forClass = CoffeeCommand::class)
 @Suppress("unused")
-object CoffeeInviteCommand : AbstractCommand(
+class CoffeeInviteCommand : AbstractCommand(
   Kivotos,
   "邀请",
   description = "咖啡厅邀请指令",
@@ -370,7 +370,6 @@ object CoffeeInviteCommand : AbstractCommand(
   private val kivotosUser by requireObject<UserDocument>()
   private val studentName by argument("学生名").optional()
   suspend fun UserCommandSender.invite() {
-    val coffee = this@CoffeeInviteCommand.coffee
     if (!coffee.canInviteStudent) {
       md append tencentCustomMarkdown {
         at()
@@ -477,7 +476,7 @@ object CoffeeInviteCommand : AbstractCommand(
 
 @SubCommand(forClass = CoffeeCommand::class)
 @Suppress("unused")
-object CoffeeStudentTendencyCommand : AbstractCommand(
+class CoffeeStudentTendencyCommand : AbstractCommand(
   Kivotos,
   "来访倾向",
   description = "咖啡厅来访倾向管理指令",
@@ -513,20 +512,14 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
       tendencyStudents.forEach {
         row {
           button(
-            "删除${it.name}", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
-              CoffeeStudentTendencyCommand
-                .primaryName
-            } ${CoffeeStudentTendencyRemoveCommand.primaryName} ${it.name}"
+            "删除${it.name}", "/${KivotosCommand.primaryName} 咖啡厅 来访倾向 删除 ${it.name}"
           )
         }
       }
     } + tencentCustomKeyboard {
       row {
         button(
-          "添加学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
-            CoffeeStudentTendencyCommand
-              .primaryName
-          } ${CoffeeStudentTendencyAddCommand.primaryName}"
+          "添加学生", "/${KivotosCommand.primaryName} 咖啡厅 来访倾向 添加 "
         )
       }
     }).also { it.windowed() }
@@ -542,7 +535,7 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
 
   @SubCommand
   @Suppress("unused")
-  object CoffeeStudentTendencyAddCommand : AbstractCommand(
+  class CoffeeStudentTendencyAddCommand : AbstractCommand(
     Kivotos,
     "添加",
     description = "咖啡厅来访倾向添加指令",
@@ -565,16 +558,10 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
         val kb = tencentCustomKeyboard {
           row {
             button(
-              "添加日奈", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
-                CoffeeStudentTendencyCommand
-                  .primaryName
-              } ${CoffeeStudentTendencyAddCommand.primaryName} 日奈"
+              "添加日奈", "/${KivotosCommand.primaryName} 咖啡厅 来访倾向 添加 日奈"
             )
             button(
-              "添加学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
-                CoffeeStudentTendencyCommand
-                  .primaryName
-              } ${CoffeeStudentTendencyAddCommand.primaryName}"
+              "添加学生", "/${KivotosCommand.primaryName} 咖啡厅 来访倾向 添加 "
             )
           }
         }
@@ -594,10 +581,7 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
         } + tencentCustomKeyboard {
           row {
             subButton(
-              "添加学生", "${CoffeeCommand.primaryName} ${
-                CoffeeStudentTendencyCommand
-                  .primaryName
-              } ${CoffeeStudentTendencyAddCommand.primaryName} $sn"
+              "添加学生", "咖啡厅 来访倾向 添加 $sn"
             )
           }
         }
@@ -625,7 +609,7 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
 
   @SubCommand
   @Suppress("unused")
-  object CoffeeStudentTendencyRemoveCommand : AbstractCommand(
+  class CoffeeStudentTendencyRemoveCommand : AbstractCommand(
     Kivotos,
     "删除",
     description = "咖啡厅来访倾向删除指令",
@@ -648,16 +632,10 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
         val kb = tencentCustomKeyboard {
           row {
             button(
-              "删除日奈", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
-                CoffeeStudentTendencyCommand
-                  .primaryName
-              } ${CoffeeStudentTendencyRemoveCommand.primaryName} 日奈"
+              "删除日奈", "/${KivotosCommand.primaryName} 咖啡厅 来访倾向 删除 日奈"
             )
             button(
-              "删除学生", "/${KivotosCommand.primaryName} ${CoffeeCommand.primaryName} ${
-                CoffeeStudentTendencyCommand
-                  .primaryName
-              } ${CoffeeStudentTendencyRemoveCommand.primaryName}"
+              "删除学生", "/${KivotosCommand.primaryName} 咖啡厅 来访倾向 删除 "
             )
           }
         }
@@ -677,10 +655,7 @@ object CoffeeStudentTendencyCommand : AbstractCommand(
         } + tencentCustomKeyboard {
           row {
             subButton(
-              "删除学生", "${CoffeeCommand.primaryName} ${
-                CoffeeStudentTendencyCommand
-                  .primaryName
-              } ${CoffeeStudentTendencyRemoveCommand.primaryName} $sn"
+              "删除学生", "咖啡厅 来访倾向 删除 $sn"
             )
           }
         }

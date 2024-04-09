@@ -38,17 +38,17 @@ fun TencentCustomKeyboardRow.subButton(label: String, data: String = label, ente
 }
 
 @Suppress("unused")
-object KivotosCommand : AbstractCommand(
+class KivotosCommand : AbstractCommand(
   Kivotos,
-  "赛博基沃托斯",
+  primaryName,
   description = "赛博基沃托斯主菜单",
   help = tencentCustomMarkdown {
     +"欢迎来到赛博基沃托斯, 使用"
     list {
-      +"/赛博基沃托斯, 打开主菜单"
-      +"/赛博基沃托斯 咖啡厅, 进入咖啡厅"
-      +"/赛博基沃托斯 竞技场, 进入竞技场"
-      +"/赛博基沃托斯 删号, 删除账号"
+      +"/$primaryName, 打开主菜单"
+      +"/$primaryName 咖啡厅, 进入咖啡厅"
+      +"/$primaryName 竞技场, 进入竞技场"
+      +"/$primaryName 删号, 删除账号"
     }
   }.content
 ) {
@@ -75,5 +75,8 @@ object KivotosCommand : AbstractCommand(
     } else {
       sendMessage(visitorMenu)
     }
+  }
+  companion object {
+    const val primaryName = "赛博基沃托斯"
   }
 }

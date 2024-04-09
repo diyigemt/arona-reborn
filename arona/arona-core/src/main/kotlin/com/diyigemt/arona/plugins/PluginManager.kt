@@ -1,8 +1,7 @@
 package com.diyigemt.arona.plugins
 
-import com.diyigemt.arona.command.AbstractCommand
-import com.diyigemt.arona.command.CommandManager
-import com.diyigemt.arona.command.SubCommand
+import com.diyigemt.arona.command.*
+import com.diyigemt.arona.command.CommandSignature
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.internal.MultiFilePluginDataStorageImpl
 import com.diyigemt.arona.console.CommandLineSubCommand
@@ -145,6 +144,7 @@ object PluginManager {
     }
   }
 
+  @Suppress("UNCHECKED_CAST")
   private fun loadCommands(reflections: Reflections, instance: AronaPlugin) {
     val cl = instance::class.java.classLoader
     val commandQuery = org.reflections.scanners.Scanners.SubTypes
@@ -157,18 +157,18 @@ object PluginManager {
     commandStorage.filter {
       !it.kotlin.hasAnnotation<SubCommand>()
     }.forEach {
-      CommandManager.registerCommand(it.kotlin.objectInstance!!, false)
+      CommandManager.registerCommandSignature(it.kotlin, false)
     }
     val registeredMainCommands = CommandManager.internalGetRegisteredCommands(instance)
     val subCommands = commandStorage.filter {
       it.kotlin.hasAnnotation<SubCommand>() && it.kotlin.findAnnotation<SubCommand>()!!.forClass != AbstractCommand::class
     }.toMutableList()
 
-    fun <T : CliktCommand> findParent(command: T, t: KClass<*>): CliktCommand? {
-      if (command::class == t) {
-        return command
+    fun findParent(signature: CommandSignature, t: KClass<*>): CommandSignature? {
+      if (signature.clazz == t) {
+        return signature
       }
-      return command.registeredSubcommands().firstNotNullOfOrNull { findParent(it, t) }
+      return signature.children.firstNotNullOfOrNull { findParent(it, t) }
     }
 
     var deepCount = 0
@@ -177,9 +177,9 @@ object PluginManager {
       while (itr.hasNext()) {
         val command = itr.next()
         val subCommand = command.kotlin.findAnnotation<SubCommand>()!!
-        registeredMainCommands.firstNotNullOfOrNull { findParent(it as CliktCommand, subCommand.forClass) }
+        registeredMainCommands.firstNotNullOfOrNull { findParent(it, subCommand.forClass) }
           ?.also { parent ->
-            parent.subcommands(command.kotlin.objectInstance!!)
+            parent.children.add(command.kotlin.createSignature())
             itr.remove()
           }
       }

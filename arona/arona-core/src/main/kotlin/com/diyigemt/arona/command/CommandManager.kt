@@ -20,6 +20,7 @@ import com.diyigemt.arona.utils.currentTime
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.core.context2
+import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.Terminal
@@ -28,23 +29,73 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
+import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.hasAnnotation
+
+internal data class CommandSignature(
+  val clazz: KClass<out AbstractCommand>,
+  val children: MutableList<CommandSignature>,
+  val owner: CommandOwner,
+  val primaryName: String,
+  val isUnderDevelopment: Boolean,
+  val targetExtensionFunction: KFunction<*>,
+)
+
+internal fun CommandSignature.createInstance(): AbstractCommand {
+  val instance = clazz.createInstance()
+  children.forEach {
+    it.createInstance(instance)
+  }
+  return instance
+}
+
+internal fun CommandSignature.createInstance(parent: AbstractCommand): AbstractCommand {
+  val instance = clazz.createInstance()
+  parent.subcommands(instance)
+  children.forEach {
+    it.createInstance(instance)
+  }
+  return instance
+}
+
+internal fun KClass<out AbstractCommand>.createSignature(): CommandSignature {
+  return kotlin.runCatching {
+    val instance = createInstance()
+    val reflector = CommandReflector(this)
+    CommandSignature(
+      this,
+      reflector.findSubCommand().map { it.createSignature() }.toMutableList(),
+      instance.owner,
+      instance.primaryName,
+      hasAnnotation<UnderDevelopment>(),
+      reflector.findTargetExtensionFunction()
+    )
+  }.getOrThrow()
+}
 
 object CommandManager {
   private val logger = KtorSimpleLogger("CommandManager")
   private val modifyLock = ReentrantLock()
-  internal val commandMap: MutableMap<String, Command> = mutableMapOf()
+  internal val commandMap: MutableMap<String, CommandSignature> = mutableMapOf()
 
-  fun matchCommand(commandName: String) = commandMap[commandName.lowercase()]
+  fun matchCommand(commandName: String): Command? = commandMap[commandName.lowercase()]?.createInstance()
+  internal fun matchCommandSignature(commandName: String): CommandSignature? = commandMap[commandName.lowercase()]
   fun getRegisteredCommands(): List<Command> = commandMap
     .values
     .filter {
-      !it::class.hasAnnotation<UnderDevelopment>()
+      !it.isUnderDevelopment
     }
+    .map { it.createInstance() }
     .toList()
 
-  fun getRegisteredCommands(owner: CommandOwner): List<Command> = getRegisteredCommands().filter { it.owner == owner }
-  internal fun internalGetRegisteredCommands(owner: CommandOwner): List<Command> =
+  fun getRegisteredCommands(owner: CommandOwner): List<Command> = getRegisteredCommands()
+    .filter {
+      it.owner == owner
+    }
+
+  internal fun internalGetRegisteredCommands(owner: CommandOwner): List<CommandSignature> =
     commandMap
       .values
       .filter {
@@ -58,33 +109,36 @@ object CommandManager {
     }
   }
 
+  @Suppress("UNCHECKED_CAST")
   fun registerCommand(command: Command, override: Boolean): Boolean {
-    kotlin.runCatching {
-      command.secondaryNames // init lazy
-      command.description // init lazy
-      command.targetExtensionFunction // init lazy
-      (command as? AbstractCommand)
-    }.onFailure {
-      throw IllegalStateException("Failed to init command ${command}.", it)
-    }
-
-    modifyLock.withLock {
-      if (!override) {
-        if (command.findDuplicate() != null) return false
-      }
-      val lowerCaseName = command.name
-      commandMap[lowerCaseName] = command
-      return true
-    }
+    return registerCommandSignature(command::class as KClass<AbstractCommand>, override)
   }
 
-  fun findDuplicateCommand(command: Command): Command? = commandMap.values.firstOrNull { it.name == command.name }
+  internal fun registerCommandSignature(command: KClass<out AbstractCommand>, override: Boolean): Boolean {
+    return kotlin.runCatching {
+      val instance = command.createInstance()
+      if (!override && findDuplicateCommand(instance) != null) {
+        return false
+      }
+      val signature = command.createSignature()
+      return@runCatching modifyLock.withLock {
+        val lowerCaseName = instance.primaryName
+        commandMap[lowerCaseName] = signature
+        true
+      }
+    }.getOrThrow()
+  }
+
+  fun findDuplicateCommand(command: Command): Command? = commandMap
+    .values
+    .firstOrNull { it.primaryName == command.primaryName }
+    ?.createInstance()
 
   fun unregisterCommand(command: Command): Boolean = modifyLock.withLock {
-    commandMap.remove(command.name) != null
+    commandMap.remove(command.primaryName) != null
   }
 
-  fun isCommandRegistered(command: Command): Boolean = matchCommand(command.name) != null
+  fun isCommandRegistered(command: Command): Boolean = matchCommand(command.primaryName) != null
 
   suspend fun executeCommand(
     caller: CommandSender,
@@ -94,9 +148,7 @@ object CommandManager {
     return executeCommandImpl(message, caller, checkPermission)
   }
 
-  private fun Command.findDuplicate() = findDuplicateCommand(this)
-
-  private val Command.name
+  private val CommandSignature.name
     get() = primaryName.lowercase()
 
   @Suppress("NOTHING_TO_INLINE")
@@ -183,9 +235,10 @@ internal suspend fun executeCommandImpl(
     call.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return CommandExecuteResult.UnresolvedCommand()
   val commandStr =
     messageString.split(" ").toMutableList().removeFirstOrNull() ?: return CommandExecuteResult.UnresolvedCommand()
-  val command =
-    CommandManager.matchCommand(commandStr.replaceFirst("/", "")) as? AbstractCommand ?: return CommandExecuteResult
+  val commandSignature =
+    CommandManager.matchCommandSignature(commandStr.replaceFirst("/", "")) ?: return CommandExecuteResult
       .UnresolvedCommand()
+  val command = commandSignature.createInstance()
   val arg = call.toString()
   val parseArg = arg
     .split(" ")
@@ -225,7 +278,10 @@ internal suspend fun executeCommandImpl(
   }
   return runCatching {
     command.context2 {
-      obj = mutableMapOf("caller" to caller)
+      obj = mutableMapOf(
+        "caller" to caller,
+        "signature" to commandSignature.targetExtensionFunction
+      )
       terminal = commandTerminal
       localization = crsiveLocalization
     }

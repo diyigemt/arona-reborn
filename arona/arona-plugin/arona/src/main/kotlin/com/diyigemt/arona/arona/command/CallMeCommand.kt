@@ -13,7 +13,7 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 
 @Suppress("unused")
-object CallMeCommand : AbstractCommand(
+class CallMeCommand : AbstractCommand(
   Arona,
   "叫我",
   description = "记录用于称呼的名字",

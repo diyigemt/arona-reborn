@@ -37,6 +37,7 @@ import kotlin.reflect.full.hasAnnotation
 internal data class CommandSignature(
   val clazz: KClass<out AbstractCommand>,
   val children: MutableList<CommandSignature>,
+  val childrenMap: MutableMap<KClass<out AbstractCommand>, KFunction<*>>,
   val owner: CommandOwner,
   val primaryName: String,
   val isUnderDevelopment: Boolean,
@@ -60,13 +61,30 @@ internal fun CommandSignature.createInstance(parent: AbstractCommand): AbstractC
   return instance
 }
 
+internal fun CommandSignature.flat(): Map<KClass<out AbstractCommand>, KFunction<*>> {
+  if (children.isEmpty()) {
+    return mapOf(clazz to targetExtensionFunction)
+  }
+  val map = mutableMapOf(clazz to targetExtensionFunction)
+  children.forEach {
+    map.putAll(it.flat())
+  }
+  return map
+}
+
 internal fun KClass<out AbstractCommand>.createSignature(): CommandSignature {
   return kotlin.runCatching {
     val instance = createInstance()
     val reflector = CommandReflector(this)
+    val subCommands = reflector.findSubCommand().map { it.createSignature() }.toMutableList()
+    val map = mutableMapOf(this to reflector.findTargetExtensionFunction())
+    subCommands.forEach {
+      map.putAll(it.flat())
+    }
     CommandSignature(
       this,
-      reflector.findSubCommand().map { it.createSignature() }.toMutableList(),
+      subCommands,
+      map,
       instance.owner,
       instance.primaryName,
       hasAnnotation<UnderDevelopment>(),
@@ -280,7 +298,7 @@ internal suspend fun executeCommandImpl(
     command.context2 {
       obj = mutableMapOf(
         "caller" to caller,
-        "signature" to commandSignature.targetExtensionFunction
+        "signature" to commandSignature
       )
       terminal = commandTerminal
       localization = crsiveLocalization

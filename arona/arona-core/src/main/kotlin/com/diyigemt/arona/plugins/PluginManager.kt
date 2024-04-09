@@ -179,11 +179,26 @@ object PluginManager {
         val subCommand = command.kotlin.findAnnotation<SubCommand>()!!
         registeredMainCommands.firstNotNullOfOrNull { findParent(it, subCommand.forClass) }
           ?.also { parent ->
-            parent.children.add(command.kotlin.createSignature())
+            command.kotlin.createSignature().also { sign ->
+              parent.children.add(sign)
+              parent.childrenMap[sign.clazz] = sign.targetExtensionFunction
+            }
             itr.remove()
           }
       }
     }
+    // 整理一下顶级signature的map
+    fun mergeChild(root: CommandSignature, self: CommandSignature) {
+      root.childrenMap[self.clazz] = self.targetExtensionFunction
+      self.children.forEach { child ->
+        mergeChild(root, child)
+      }
+    }
+
+    registeredMainCommands.forEach {
+      mergeChild(it, it)
+    }
+
     if (subCommands.isNotEmpty()) {
       logger.warn("some sub command register failed after 10 tries")
       logger.warn("remaining: ${subCommands.joinToString(",") { it.name }}");

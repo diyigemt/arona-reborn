@@ -84,7 +84,7 @@ internal class CommandReflector(
     if (objectInstance != null) illegalDeclaration(this, "SubCommand should not be object")
     if (visibility == KVisibility.PRIVATE) illegalDeclaration(
       this, "Command function must be accessible, that is, " +
-        "effectively public."
+          "effectively public."
     )
     if (this.hasAnnotation<JvmStatic>()) illegalDeclaration(this, "Command function must not be static.")
 
@@ -106,7 +106,7 @@ internal class CommandReflector(
 
   fun findTargetExtensionFunction() = command.declaredMemberExtensionFunctions.first {
     it.extensionReceiverParameter!!.type.isSubtypeOf(CommandSender::class.starProjectedType)
-      && it.parameters.size == 2
+        && it.parameters.size == 2
   }
 }
 
@@ -141,15 +141,34 @@ abstract class AbstractCommand(
   }
 
   final override fun run() {
-    if (!caller.kType.isSubtypeOf(targetExtensionFunction.parameters[1].type)) {
+    val fn = signature.childrenMap[this@AbstractCommand::class]!!
+    if (!caller.kType.isSubtypeOf(fn.parameters[1].type)) {
       return
     }
-    caller.launch {
-      targetExtensionFunction.callSuspend(this@AbstractCommand, caller)
+    if (currentContext.invokedSubcommand != null) {
+      runBlocking(caller.coroutineContext) {
+        fn.callSuspend(this@AbstractCommand, caller)
+      }
+    } else {
+      caller.launch {
+        fn.callSuspend(this@AbstractCommand, caller)
+      }
     }
   }
 
   final override val permission = findOrCreateCommandPermission(owner.permission)
+
+  companion object {
+    private fun findTargetExtensionFunction(
+      root: CommandSignature,
+      target: KClass<out AbstractCommand>
+    ): KFunction<*>? {
+      if (root.clazz == target) {
+        return root.targetExtensionFunction
+      }
+      return root.children.firstNotNullOfOrNull { findTargetExtensionFunction(it, target) }
+    }
+  }
 }
 
 internal fun Command.findOrCreateCommandPermission(parent: Permission): Permission {

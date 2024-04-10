@@ -61,6 +61,20 @@ internal fun CommandSignature.createInstance(parent: AbstractCommand): AbstractC
   return instance
 }
 
+internal fun CommandSignature.createMinimumInstance(path: List<String>): AbstractCommand {
+  val instance = clazz.createInstance()
+  var parentInstance = instance
+  var parentSignature = this
+  path.forEach {
+    val tmp = parentSignature.children.firstOrNull { c -> c.primaryName == it } ?: return instance
+    val child = tmp.clazz.createInstance()
+    parentInstance.subcommands(child)
+    parentInstance = child
+    parentSignature = tmp
+  }
+  return instance
+}
+
 internal fun CommandSignature.flat(): Map<KClass<out AbstractCommand>, KFunction<*>> {
   if (children.isEmpty()) {
     return mapOf(clazz to targetExtensionFunction)
@@ -256,7 +270,6 @@ internal suspend fun executeCommandImpl(
   val commandSignature =
     CommandManager.matchCommandSignature(commandStr.replaceFirst("/", "")) ?: return CommandExecuteResult
       .UnresolvedCommand()
-  val command = commandSignature.createInstance()
   val arg = call.toString()
   val parseArg = arg
     .split(" ")
@@ -273,6 +286,7 @@ internal suspend fun executeCommandImpl(
           }
         }
     }
+  val command = commandSignature.createMinimumInstance(parseArg)
   if (checkPermission) {
     val document = caller.subject?.toContactDocumentOrNull()
     val user = caller.user?.toUserDocumentOrNull()

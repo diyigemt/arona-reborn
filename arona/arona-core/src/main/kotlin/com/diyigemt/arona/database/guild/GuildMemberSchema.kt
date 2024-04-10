@@ -10,10 +10,10 @@ import org.jetbrains.exposed.sql.Column
 
 @AronaDatabase
 internal object GuildMemberTable : IdTable<String>(name = "GuildMember") {
-  override val id: Column<EntityID<String>> = text("id").entityId()
-  val botId: Column<String> = text("bot")
-  val guildId: Column<String> = text("guild")
-  val channelId: Column<String> = text("channel")
+  override val id: Column<EntityID<String>> = char("id", 255).entityId()
+  val botId: Column<String> = char("bot", 255)
+  val guildId: Column<String> = char("guild", 255)
+  val channelId: Column<String> = char("channel", 255)
   override val primaryKey: PrimaryKey = PrimaryKey(id, botId, guildId, channelId)
 }
 

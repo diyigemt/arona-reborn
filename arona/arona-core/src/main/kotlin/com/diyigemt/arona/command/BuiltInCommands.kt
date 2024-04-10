@@ -2,12 +2,15 @@
 
 package com.diyigemt.arona.command
 
-import com.diyigemt.arona.command.CommandManager.register
 import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.isPrivateChannel
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.config.AutoSavePluginData
+import com.diyigemt.arona.config.AutoSavePluginDataHolder
+import com.diyigemt.arona.config.internal.MultiFilePluginDataStorageImpl
+import com.diyigemt.arona.config.value
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactAndUser
@@ -15,12 +18,17 @@ import com.diyigemt.arona.database.permission.ContactDocument.Companion.findCont
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.permission.PermissionService
+import com.diyigemt.arona.plugins.PluginManager.pluginsConfigPath
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.Serializable
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.KClass
 
-object BuiltInCommands {
+object BuiltInCommands : AutoSavePluginDataHolder {
 
   internal fun registerAll() {
     // 注册指令权限
@@ -52,6 +60,8 @@ object BuiltInCommands {
       }
     }
     PluginWebuiConfigRecorder.register(BuildInCommandOwner, BaseConfig.serializer())
+    val storage = MultiFilePluginDataStorageImpl(pluginsConfigPath)
+    storage.load(BuiltInCommands, ConsoleConfig)
   }
 
   class LoginCommand : AbstractCommand(
@@ -258,4 +268,20 @@ object BuiltInCommands {
 //    }
   }
 
+  override val autoSaveIntervalMillis: LongRange = (30 * 1000L)..(10 * 1000L)
+
+  override val dataHolderName = "Console"
+  override val coroutineContext: CoroutineContext = EmptyCoroutineContext + CoroutineName("Console Config Saver")
+}
+
+@Serializable
+data class DbConfig(
+  val host: String = "",
+  val db: String = "",
+  val user: String = "arona",
+  val password: String = "",
+)
+
+object ConsoleConfig : AutoSavePluginData("Console") {
+  val db by value(DbConfig())
 }

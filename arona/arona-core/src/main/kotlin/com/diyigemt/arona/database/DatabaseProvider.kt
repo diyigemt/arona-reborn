@@ -1,5 +1,6 @@
 package com.diyigemt.arona.database
 
+import com.diyigemt.arona.command.ConsoleConfig
 import com.diyigemt.arona.database.DatabaseProvider.noSqlDbQuerySuspended
 import com.diyigemt.arona.utils.MongoConfig.Companion.toConnectionString
 import com.diyigemt.arona.utils.ReflectionUtil
@@ -23,19 +24,14 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.sqlite.SQLiteConfig
 
 object DatabaseProvider {
   private val sqlDatabase: Database by lazy {
     val database = Database.connect(
-      "jdbc:sqlite:./database.db",
-      "org.sqlite.JDBC",
-      setupConnection = {
-        SQLiteConfig().apply {
-          busyTimeout = 2000
-          apply(it)
-        }
-      },
+      "jdbc:mariadb://${ConsoleConfig.db.host}/${ConsoleConfig.db.db  }",
+      "org.mariadb.jdbc.Driver",
+      user = ConsoleConfig.db.user,
+      password = ConsoleConfig.db.password,
       databaseConfig = DatabaseConfig {
         defaultRepetitionAttempts = 5
         defaultMinRepetitionDelay = 1000

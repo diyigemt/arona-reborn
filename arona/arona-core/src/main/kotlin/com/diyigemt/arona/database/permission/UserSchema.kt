@@ -41,7 +41,7 @@ private val BASE_ID: String
 
 @AronaDatabase
 internal object UserTable : IdTable<String>(name = "User") {
-  override val id: Column<EntityID<String>> = text("id").entityId() // 藤子给定的id
+  override val id: Column<EntityID<String>> = char("id", 255).entityId() // 藤子给定的id
   val username = text("username").clientDefault { "老师" } // 用户自定义的昵称
   val from = text("from") // 来源的环境id
   val uid = text("uid") // 对应的自己定义的唯一id 和 UserDocument 的 id 关联

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
@@ -21,6 +23,8 @@ import com.diyigemt.arona.communication.command.UserCommandSender.Companion.read
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.currentLocalDateTime
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlin.math.max
 
@@ -32,8 +36,11 @@ enum class TarotCardType(val index: Int) {
 
 @Serializable
 data class TarotConfig(
-  val fxxkDestiny: Boolean = false, // 是否启用逆天改命
+  @EncodeDefault
+  val fxxkDestiny: Boolean = true, // 是否启用逆天改命
+  @EncodeDefault
   val dayOne: Boolean = true, // 每天最多抽一次?
+  @EncodeDefault
   val cardType: TarotCardType = TarotCardType.A, // 卡面类型
 ) : PluginWebuiConfig() {
   override fun check() {}

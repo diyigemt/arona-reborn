@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
@@ -11,6 +13,8 @@ import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.types.enum
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 enum class Server(val tag: String) {
@@ -26,7 +30,9 @@ enum class Server(val tag: String) {
 
 @Serializable
 data class TotalAssaultConfig(
+  @EncodeDefault
   val defaultTotalAssault: Server = Server.JP, // 总力战档线默认数据
+  @EncodeDefault
   val defaultTotalAssaultEx: Server = Server.JP, // 大决战档线默认数据
 ) : PluginWebuiConfig() {
   override fun check() {}

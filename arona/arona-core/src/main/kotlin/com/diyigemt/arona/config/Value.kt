@@ -42,7 +42,7 @@ internal fun PluginData.booleanValueImpl(): SerializerAwareValue<Boolean> = Bool
 internal fun PluginData.valueImpl(default: String): SerializerAwareValue<String> = StringValueImpl(default)
 internal fun PluginData.stringValueImpl(): SerializerAwareValue<String> = StringValueImpl()
 
-internal class LazyReferenceValueImpl<T> : Value<T> {
+internal class LazyReferenceValueImpl<T> : AbstractValueImpl<T>() {
   private var initialied: Boolean = false
   private var valueField: T? = null
 

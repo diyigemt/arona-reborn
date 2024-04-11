@@ -7,10 +7,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.isPrivateChannel
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.AutoSavePluginDataHolder
-import com.diyigemt.arona.config.internal.MultiFilePluginDataStorageImpl
-import com.diyigemt.arona.config.value
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactAndUser
@@ -18,12 +15,10 @@ import com.diyigemt.arona.database.permission.ContactDocument.Companion.findCont
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.permission.PermissionService
-import com.diyigemt.arona.plugins.PluginManager.pluginsConfigPath
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.Serializable
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.KClass
@@ -60,8 +55,6 @@ object BuiltInCommands : AutoSavePluginDataHolder {
       }
     }
     PluginWebuiConfigRecorder.register(BuildInCommandOwner, BaseConfig.serializer())
-    val storage = MultiFilePluginDataStorageImpl(pluginsConfigPath)
-    storage.load(BuiltInCommands, ConsoleConfig)
   }
 
   class LoginCommand : AbstractCommand(
@@ -173,7 +166,7 @@ object BuiltInCommands : AutoSavePluginDataHolder {
           return
         }
         contact.updateContactDocumentName(name)
-        sendMessage("绑定成功")
+        sendMessage("名称修改为: $name")
       }
     }
 
@@ -189,7 +182,7 @@ object BuiltInCommands : AutoSavePluginDataHolder {
       }
       val kb = tencentCustomKeyboard {
         var idx = 0
-        registeredSubcommands().map { it.commandName }.windowed(2, 2, true).forEach { r ->
+        listOf("管理员认证", "配置名称").windowed(2, 2, true).forEach { r ->
           row {
             r.forEach { c ->
               button(idx++) {
@@ -270,18 +263,6 @@ object BuiltInCommands : AutoSavePluginDataHolder {
 
   override val autoSaveIntervalMillis: LongRange = (30 * 1000L)..(10 * 1000L)
 
-  override val dataHolderName = "Console"
+  override val dataHolderName = "Core"
   override val coroutineContext: CoroutineContext = EmptyCoroutineContext + CoroutineName("Console Config Saver")
-}
-
-@Serializable
-data class DbConfig(
-  val host: String = "",
-  val db: String = "",
-  val user: String = "arona",
-  val password: String = "",
-)
-
-object ConsoleConfig : AutoSavePluginData("Console") {
-  val db by value(DbConfig())
 }

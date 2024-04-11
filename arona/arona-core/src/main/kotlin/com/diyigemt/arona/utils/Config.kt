@@ -27,11 +27,20 @@ data class MongoConfig(
 }
 
 @Serializable
+data class MariaDBConfig(
+  val host: String = "127.0.0.1:3306",
+  val db: String = "arona",
+  val user: String = "arona",
+  val password: String = "",
+)
+
+@Serializable
 data class AronaConfig(
   val bot: TencentBotConfig,
   val adminToken: String,
   val redis: RedisConfig,
   val mongodb: MongoConfig,
+  val mariadb: MariaDBConfig,
   val debug: Boolean = false,
 )
 

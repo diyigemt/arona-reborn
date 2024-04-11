@@ -14,12 +14,11 @@ internal object GuildMemberTable : IdTable<String>(name = "GuildMember") {
   val botId: Column<String> = char("bot", 255)
   val guildId: Column<String> = char("guild", 255)
   val channelId: Column<String> = char("channel", 255)
-  override val primaryKey: PrimaryKey = PrimaryKey(id, botId, guildId, channelId)
+  override val primaryKey: PrimaryKey = PrimaryKey(id)
 }
 
 internal class GuildMemberSchema(id: EntityID<String>) : Entity<String>(id) {
   companion object : EntityClass<String, GuildMemberSchema>(GuildMemberTable)
-
   var botId by GuildMemberTable.botId
   var guildId by GuildMemberTable.guildId
   var channelId by GuildMemberTable.channelId

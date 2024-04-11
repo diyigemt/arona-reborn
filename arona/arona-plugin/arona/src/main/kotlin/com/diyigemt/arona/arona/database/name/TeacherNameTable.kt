@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.Column
 
 @Database
 object TeacherNameTable: IdTable<String>(name = "TeacherName") {
-  override val id: Column<EntityID<String>> = text("id").entityId()
+  override val id: Column<EntityID<String>> = char("id", 255).entityId()
   val name: Column<String> = char("name", 20)
 
   override val primaryKey: PrimaryKey = PrimaryKey(id)

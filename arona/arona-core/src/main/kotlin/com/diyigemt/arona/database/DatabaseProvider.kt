@@ -1,6 +1,5 @@
 package com.diyigemt.arona.database
 
-import com.diyigemt.arona.command.ConsoleConfig
 import com.diyigemt.arona.database.DatabaseProvider.noSqlDbQuerySuspended
 import com.diyigemt.arona.utils.MongoConfig.Companion.toConnectionString
 import com.diyigemt.arona.utils.ReflectionUtil
@@ -28,10 +27,10 @@ import org.jetbrains.exposed.sql.transactions.transaction
 object DatabaseProvider {
   private val sqlDatabase: Database by lazy {
     val database = Database.connect(
-      "jdbc:mariadb://${ConsoleConfig.db.host}/${ConsoleConfig.db.db  }",
+      "jdbc:mariadb://${aronaConfig.mariadb.host}/${aronaConfig.mariadb.db  }",
       "org.mariadb.jdbc.Driver",
-      user = ConsoleConfig.db.user,
-      password = ConsoleConfig.db.password,
+      user = aronaConfig.mariadb.user,
+      password = aronaConfig.mariadb.password,
       databaseConfig = DatabaseConfig {
         defaultRepetitionAttempts = 5
         defaultMinRepetitionDelay = 1000

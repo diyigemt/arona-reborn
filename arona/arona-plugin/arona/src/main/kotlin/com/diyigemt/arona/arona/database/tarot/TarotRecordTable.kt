@@ -10,7 +10,7 @@ import org.jetbrains.exposed.sql.Column
 
 @Database
 object TarotRecordTable : IdTable<String>(name = "TarotRecord") {
-  override val id = text("id").entityId()
+  override val id = char("id", 255).entityId()
   val day: Column<Int> = integer("day").clientDefault { currentLocalDateTime().date.dayOfMonth }
   val tarot: Column<Int> = integer("tarot").clientDefault { 0 }
   val positive: Column<Boolean> = bool("positive").clientDefault { true }

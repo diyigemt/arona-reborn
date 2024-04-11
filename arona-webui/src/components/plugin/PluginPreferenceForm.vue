@@ -111,7 +111,7 @@ watch(
         emits("update:form", jsonParse(cacheMemberProfileData[cur]));
       } else {
         ContactApi.fetchMemberPluginPreference(cur, props.pId, props.pKey).then((data) => {
-          if (data) {
+          if (data && data !== "" && data !== "{}") {
             cacheMemberProfileData[cur] = data;
           }
           emits("update:form", data ? jsonParse(data) : props.defaultForm);
@@ -201,7 +201,7 @@ onMounted(() => {
     contacts.value = data;
   });
   PluginPreferenceApi.fetchPluginPreference(props.pId, props.pKey).then((data) => {
-    if (data) {
+    if (data && data !== "" && data !== "{}") {
       cacheProfileData = data;
       emits("update:form", jsonParse(data));
     } else {

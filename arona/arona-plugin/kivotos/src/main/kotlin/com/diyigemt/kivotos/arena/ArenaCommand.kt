@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.kivotos.arena
 
 import com.diyigemt.arona.command.AbstractCommand
@@ -10,6 +12,8 @@ import com.diyigemt.kivotos.subButton
 import com.github.ajalt.clikt.core.requireObject
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -90,6 +94,7 @@ class ArenaRankCommand : AbstractCommand(
 
 @Serializable
 data class ArenaConfig(
+  @EncodeDefault
   val limit: Boolean = true, // 是否限制同一时间只能有一个战局
 ) : PluginWebuiConfig() {
   override fun check() {}

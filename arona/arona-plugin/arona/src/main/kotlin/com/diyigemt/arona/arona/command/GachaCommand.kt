@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
@@ -42,6 +44,8 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.mordant.terminal.ConversionResult
 import kotlinx.coroutines.delay
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import net.coobird.thumbnailator.Thumbnails
 import org.jetbrains.exposed.sql.SortOrder
@@ -51,8 +55,11 @@ import java.nio.file.Files
 
 @Serializable
 data class UserGachaRecordItem(
+  @EncodeDefault
   var point: Int = 0,
+  @EncodeDefault
   var ssr: Int = 0,
+  @EncodeDefault
   var pickup: Int = 0,
 )
 
@@ -76,6 +83,7 @@ data class ContactGachaLimitItem(
  */
 @Serializable
 data class ContactGachaLimitRecord(
+  @EncodeDefault
   val map: MutableMap<String, MutableMap<Int, ContactGachaLimitItem>> = mutableMapOf(),
 ) : PluginWebuiConfig() {
   override fun check() {}
@@ -83,6 +91,7 @@ data class ContactGachaLimitRecord(
 
 @Serializable
 data class ContactGachaConfig(
+  @EncodeDefault
   val limit: Int = 0,
 ) : PluginWebuiConfig() {
   override fun check() {}

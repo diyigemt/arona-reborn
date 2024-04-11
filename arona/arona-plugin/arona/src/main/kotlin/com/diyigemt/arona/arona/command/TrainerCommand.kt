@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
@@ -20,6 +22,8 @@ import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.github.ajalt.clikt.parameters.arguments.argument
 import io.ktor.client.request.*
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -40,6 +44,7 @@ data class ImageQueryData(
 
 @Serializable
 data class TrainerConfig(
+  @EncodeDefault
   val override: List<TrainerOverrideConfig> = listOf(),
 ) : PluginWebuiConfig() {
   override fun check() {}

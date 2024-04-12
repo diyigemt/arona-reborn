@@ -3,6 +3,8 @@ package com.diyigemt.kivotos
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 
+const val KivotosRedisKey = "kivotos"
+
 @Suppress("unused")
 object Kivotos : AronaPlugin(
   AronaPluginDescription(

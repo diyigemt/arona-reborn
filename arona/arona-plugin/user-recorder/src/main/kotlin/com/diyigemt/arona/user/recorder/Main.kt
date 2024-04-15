@@ -17,6 +17,10 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.default
 import com.github.ajalt.clikt.parameters.types.int
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimePeriod
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
@@ -29,11 +33,11 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.1.3",
+    version = "1.2.0",
     description = "record user data"
   )
 ) {
-  private val timer = Timer("user-recorder", true)
+  lateinit var dauJob: Job
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
       // 统计消息数
@@ -90,14 +94,14 @@ object PluginMain : AronaPlugin(
       val commandStr =
         messageString.split(" ").toMutableList().removeFirstOrNull() ?: return@subscribeAlways
       val command =
-        CommandManager.matchCommand(commandStr.replace("/", "")) as? AbstractCommand ?: return@subscribeAlways
+        CommandManager.matchCommandName(commandStr.replace("/", "")) ?: return@subscribeAlways
       // 统计command
       dbQuery {
-        when (val fCommand = Command.find { CommandTable.name eq command.primaryName }.firstOrNull()) {
+        when (val fCommand = Command.find { CommandTable.name eq command }.firstOrNull()) {
           is Command -> fCommand.count++
           else -> {
             Command.new {
-              name = command.primaryName
+              name = command
               count = 1
             }
           }
@@ -141,23 +145,26 @@ object PluginMain : AronaPlugin(
         }
       }
     }
-    timer.scheduleAtFixedRate(0L, 10 * 60 * 1000L) {
-      // 统计dau
+    dauJob = launch(SupervisorJob()) {
       dbQuery {
         val today = currentDate()
-        val c = User.find(UserTable.lastActive greater today).count().toInt()
+        val u = User.find(UserTable.lastActive greater today).count().toInt()
+        val c = Contact.find(ContactTable.lastActive greater today).count().toInt()
         when (val record = DailyActiveUser.findById(today)) {
           is DailyActiveUser -> {
-            record.count = c
+            record.count = u
+            record.contact = c
           }
 
           else -> {
             DailyActiveUser.new(today) {
-              count = c
+              count = u
+              contact = c
             }
           }
         }
       }
+      delay(60 * 1000L)
     }
   }
 }
@@ -173,7 +180,8 @@ class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显
       val date = now().minus(DateTimePeriod(days = offset), TimeZone.currentSystemDefault()).toDate()
       val dau = DailyActiveUser.findById(date)
       echo("date: $date")
-      echo("contact: $contactCount, user: $userCount, $dau")
+      echo("contact: $contactCount, user: $userCount")
+      echo(dau)
     }
     // 指令执行次数
     dbQuery {

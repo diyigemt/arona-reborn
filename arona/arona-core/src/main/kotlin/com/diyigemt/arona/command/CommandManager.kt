@@ -113,6 +113,7 @@ object CommandManager {
   internal val commandMap: MutableMap<String, CommandSignature> = mutableMapOf()
 
   fun matchCommand(commandName: String): Command? = commandMap[commandName.lowercase()]?.createInstance()
+  fun matchCommandName(commandName: String): String? = commandMap[commandName.lowercase()]?.primaryName
   internal fun matchCommandSignature(commandName: String): CommandSignature? = commandMap[commandName.lowercase()]
   fun getRegisteredCommands(): List<Command> = commandMap
     .values
@@ -170,7 +171,7 @@ object CommandManager {
     commandMap.remove(command.primaryName) != null
   }
 
-  fun isCommandRegistered(command: Command): Boolean = matchCommand(command.primaryName) != null
+  fun isCommandRegistered(command: Command): Boolean = matchCommandName(command.primaryName) != null
 
   suspend fun executeCommand(
     caller: CommandSender,

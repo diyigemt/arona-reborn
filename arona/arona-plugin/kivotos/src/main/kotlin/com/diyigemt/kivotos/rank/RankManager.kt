@@ -1,16 +1,58 @@
 package com.diyigemt.kivotos.rank
 
+import com.diyigemt.arona.utils.runSuspend
 import com.diyigemt.kivotos.KivotosRedisKey
-import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery as redis
+import io.github.crackthecodeabhi.kreds.args.SetOption
+import io.github.crackthecodeabhi.kreds.args.ZAddGTOrLT
+import io.github.crackthecodeabhi.kreds.connection.Endpoint
+import io.github.crackthecodeabhi.kreds.connection.KredsClient
+import io.github.crackthecodeabhi.kreds.connection.newClient
 
 private const val RankRedisKey = "$KivotosRedisKey.rank"
 private const val FavorRankKey = "$RankRedisKey.favor"
+private const val FavorRankSidKey = "$FavorRankKey.sid"
+private const val FavorRankUidKey = "$FavorRankKey.uid"
+private val redis: KredsClient by lazy {
+  newClient(Endpoint("127.0.0.1", 6379)).apply {
+    runSuspend {
+      select(0u)
+    }
+  }
+}
+/**
+ * 好感等级背倍增10w以支持累计值排行
+ *
+ * 累计值当前最高7365
+ *
+ * 如等级5累计55好感 -> 5 * 10000000 + 55 = 50000055
+ *
+ * 反序列化 500055 / 10000000 = 5.0000055  好感等级5累计55好感
+ */
+private const val FavorBase = 10000000
 
 object RankManager {
 
-  suspend fun saveUserMaxFavor(student: Int, max: Int) {
-    redis {
-      zscore()
+  /**
+   * kivotos.rank.favor -> sorted_set(favor, uid-sid) // 总榜 好感最高的学生及老师
+   * kivotos.rank.favor.sid.sid -> sorted_set(favor, uid) // 分榜 学生好感最高的老师
+   * kivotos.rank.favor.uid.uid -> sorted_set(favor, sid) // 分榜 老师好感最高的学生
+   * @param uid 用户id
+   * @param sid 学生id
+   * @param favor 好感等级 to 好感累计值
+   */
+  suspend fun updateUserMaxFavor(uid: String, sid: Int, favor: Pair<Int, Int>) {
+    val sKey = "$FavorRankSidKey.$sid"
+    val uKey = "$FavorRankUidKey.$uid"
+    val score = favor.first * FavorBase + favor.second
+    with(redis) {
+      zadd(uKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = score to sid.toString())
+      zadd(sKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = score to uid)
+      // 获取老师好感最高的学生计入总榜
+      val (id, rank) = zrange(uKey, 0, 0, by = null, rev = true, limit = null, withScores = true).let {
+        it[0] to it[1].toInt()
+      }
+      val suKey = "$uid-$id"
+      zadd(FavorRankKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = rank to suKey)
     }
   }
 }

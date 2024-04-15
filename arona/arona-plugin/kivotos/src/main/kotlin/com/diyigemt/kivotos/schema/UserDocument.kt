@@ -2,6 +2,7 @@ package com.diyigemt.kivotos.schema
 
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.kivotos.coffee.CoffeeDocument
+import com.diyigemt.kivotos.rank.RankManager
 import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
 import com.diyigemt.kivotos.tools.database.idFilter
 import com.diyigemt.kivotos.tools.database.withCollection
@@ -58,6 +59,8 @@ data class UserDocument(
         update = Updates.set("${UserDocument::student.name}.$id.${Student::favor.name}", listOf(favor.level, current))
       )
     }
+    // 更新redis好感度
+    RankManager.updateUserMaxFavor(this@UserDocument.id, id, favor.level to current - favor.sum)
     return Triple(
       st.favor.getOrElse(0) { 0 } != favor.level,
       favor.level,

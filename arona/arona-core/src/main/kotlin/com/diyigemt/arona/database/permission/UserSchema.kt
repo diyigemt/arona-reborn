@@ -8,12 +8,17 @@ import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.name
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
+import com.mongodb.client.model.Projections
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.*
+import org.bson.Document
 import org.bson.codecs.pojo.annotations.BsonId
+import org.bson.codecs.pojo.annotations.BsonProperty
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -111,6 +116,19 @@ abstract class PluginUserDocument : PluginVisibleData() {
   abstract val unionOpenId: String
   abstract val qq: Long
   abstract val username: String
+}
+
+@Serializable
+data class SimplifiedUserDocument(
+  @BsonProperty("_id")
+  @BsonId
+  val id: String,
+  val username: String,
+) {
+  companion object {
+    suspend fun queryUsername(ids: List<String>): List<SimplifiedUserDocument> =
+      UserDocument.queryUsername(ids)
+  }
 }
 
 @Serializable
@@ -221,6 +239,23 @@ internal data class UserDocument(
 
     suspend fun findUserDocumentByIdOrNull(id: String): UserDocument? = withCollection {
       find(idFilter(id)).limit(1).firstOrNull()
+    }
+
+    suspend fun queryUsername(ids: List<String>): List<SimplifiedUserDocument> {
+      val filter = Aggregates.match(Filters.`in`("_id", ids))
+      return withCollection<UserDocument, List<SimplifiedUserDocument>> {
+        aggregate<SimplifiedUserDocument>(
+          listOf(
+            filter,
+            Aggregates.project(
+              Projections.fields(
+                Document("_id", 1),
+                Document(UserDocument::username.name, 1)
+              )
+            )
+          )
+        ).toList()
+      }
     }
   }
 }

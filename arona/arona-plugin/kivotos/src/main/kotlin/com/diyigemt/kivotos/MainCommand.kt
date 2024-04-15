@@ -22,6 +22,7 @@ private val playerMainMenu by lazy {
   tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
     row {
       subButton("咖啡厅", enter = true)
+      subButton("排行榜", enter = true)
       subButton("删号")
     }
   }
@@ -47,7 +48,7 @@ class KivotosCommand : AbstractCommand(
     list {
       +"/$primaryName, 打开主菜单"
       +"/$primaryName 咖啡厅, 进入咖啡厅"
-      +"/$primaryName 竞技场, 进入竞技场"
+      +"/$primaryName 排行榜, 进入排行榜"
       +"/$primaryName 删号, 删除账号"
     }
   }.content

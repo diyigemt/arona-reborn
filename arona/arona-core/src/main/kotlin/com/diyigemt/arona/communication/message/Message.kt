@@ -544,6 +544,7 @@ data class TencentCustomMarkdown(
 
   companion object {
     val PlaceHolderMarkdown = TencentCustomMarkdown("\u200b")
+    val EmptyMarkdown = TencentCustomMarkdown("\u200b")
   }
 }
 

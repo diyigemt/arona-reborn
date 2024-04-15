@@ -1,24 +1,15 @@
 package com.diyigemt.kivotos.rank
 
-import com.diyigemt.arona.utils.runSuspend
+import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery as redis
 import com.diyigemt.kivotos.KivotosRedisKey
-import io.github.crackthecodeabhi.kreds.args.SetOption
 import io.github.crackthecodeabhi.kreds.args.ZAddGTOrLT
-import io.github.crackthecodeabhi.kreds.connection.Endpoint
-import io.github.crackthecodeabhi.kreds.connection.KredsClient
-import io.github.crackthecodeabhi.kreds.connection.newClient
 
 private const val RankRedisKey = "$KivotosRedisKey.rank"
 private const val FavorRankKey = "$RankRedisKey.favor"
 private const val FavorRankSidKey = "$FavorRankKey.sid"
 private const val FavorRankUidKey = "$FavorRankKey.uid"
-private val redis: KredsClient by lazy {
-  newClient(Endpoint("127.0.0.1", 6379)).apply {
-    runSuspend {
-      select(0u)
-    }
-  }
-}
+private fun uFavorKey(uid: String) = "$FavorRankUidKey.$uid"
+
 /**
  * 好感等级背倍增10w以支持累计值排行
  *
@@ -32,6 +23,8 @@ private const val FavorBase = 10000000
 
 object RankManager {
 
+  private fun packFavorScore(rank: Int, current: Int) = rank * FavorBase + current
+  private fun unpackFavorScore(score: Int) = (score / FavorBase) to (score - (score / FavorBase) * FavorBase)
   /**
    * kivotos.rank.favor -> sorted_set(favor, uid-sid) // 总榜 好感最高的学生及老师
    * kivotos.rank.favor.sid.sid -> sorted_set(favor, uid) // 分榜 学生好感最高的老师
@@ -42,9 +35,9 @@ object RankManager {
    */
   suspend fun updateUserMaxFavor(uid: String, sid: Int, favor: Pair<Int, Int>) {
     val sKey = "$FavorRankSidKey.$sid"
-    val uKey = "$FavorRankUidKey.$uid"
-    val score = favor.first * FavorBase + favor.second
-    with(redis) {
+    val uKey = uFavorKey(uid)
+    val score = packFavorScore(favor.first, favor.second)
+    redis {
       zadd(uKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = score to sid.toString())
       zadd(sKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = score to uid)
       // 获取老师好感最高的学生计入总榜
@@ -53,6 +46,51 @@ object RankManager {
       }
       val suKey = "$uid-$id"
       zadd(FavorRankKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = rank to suKey)
+    }
+  }
+
+  /**
+   * 获取用户好感最高的学生id
+   */
+  suspend fun getUserFavorStudent(uid: String): Int? {
+    return redis {
+      zrange(uFavorKey(uid), 0, 0, by = null, rev = true, limit = null, withScores = false).firstOrNull()?.toInt()
+    }
+  }
+
+  /**
+   * 获取用户在总榜上的排名
+   */
+  suspend fun getUserFavorRank(uid: String): FavorRankData? {
+    val sid = getUserFavorStudent(uid) ?: return null
+    return redis {
+      zrank(FavorRankKey, "$uid-$sid")
+    }?.let {
+      FavorRankData(
+        uid,
+        sid,
+        unpackFavorScore(it.toInt())
+      )
+    }
+  }
+
+  /**
+   * 获取总榜数据
+   *
+   * [[uid, sid, rank to current]]
+   */
+  suspend fun getFavorRank(offset: Int = 0, limit: Int = 10): List<FavorRankData> {
+    return redis {
+      zrange(FavorRankKey, 0, limit.toLong(), by = null, rev = true, limit = null, withScores = true)
+    }.let {
+      it.windowed(2, 2, true).map { window ->
+        val tmp = window[0].split("-")
+        FavorRankData(
+          tmp[0],
+          tmp[1].toInt(),
+          unpackFavorScore(window[1].toInt())
+        )
+      }
     }
   }
 }

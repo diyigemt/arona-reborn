@@ -27,7 +27,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 object DatabaseProvider {
   private val sqlDatabase: Database by lazy {
     val database = Database.connect(
-      "jdbc:mariadb://${aronaConfig.mariadb.host}/${aronaConfig.mariadb.db  }",
+      "jdbc:mariadb://${aronaConfig.mariadb.host}/${aronaConfig.mariadb.db}",
       "org.mariadb.jdbc.Driver",
       user = aronaConfig.mariadb.user,
       password = aronaConfig.mariadb.password,

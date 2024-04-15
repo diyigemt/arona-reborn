@@ -110,6 +110,7 @@ dependencies {
   api(fileTree("lib"))
 
   api("org.mariadb.jdbc:mariadb-java-client:3.3.3")
+  api("org.xerial:sqlite-jdbc:3.42.0.1")
   api("com.charleskorn.kaml:kaml:0.55.0")
   api("io.github.z4kn4fein:semver:1.4.2")
   api("org.reflections:reflections:0.10.2")

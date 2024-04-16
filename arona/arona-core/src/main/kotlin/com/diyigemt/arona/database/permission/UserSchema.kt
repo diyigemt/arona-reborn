@@ -62,23 +62,33 @@ internal class UserSchema(id: EntityID<String>) : Entity<String>(id) {
   var uid by UserTable.uid
   val registerTime by UserTable.registerTime
 }
+
 fun String.toMongodbKey() = this.replace(".", "·")
 fun String.fromMongodbKey() = this.replace("·", ".")
 abstract class PluginVisibleData {
   abstract val config: Map<String, Map<String, String>>
+
   @OptIn(InternalSerializationApi::class)
   inline fun <reified T : PluginWebuiConfig> readPluginConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
     readPluginConfigOrNull(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
 
   @OptIn(InternalSerializationApi::class)
-  inline fun <reified T : PluginWebuiConfig> readPluginConfigOrDefault(plugin: CommandOwner, default: T, key: String = T::class.name) =
+  inline fun <reified T : PluginWebuiConfig> readPluginConfigOrDefault(
+    plugin: CommandOwner,
+    default: T,
+    key: String = T::class.name,
+  ) =
     readPluginConfigOrDefault(plugin.permission.id.nameSpace.toMongodbKey(), default, key, T::class.serializer())
 
   @OptIn(InternalSerializationApi::class)
   inline fun <reified T : PluginWebuiConfig> readPluginConfig(plugin: CommandOwner, key: String = T::class.name) =
     readPluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
 
-  suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(plugin: CommandOwner, value: T, key: String = T::class.name) =
+  suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(
+    plugin: CommandOwner,
+    value: T,
+    key: String = T::class.name,
+  ) =
     updatePluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, JsonIgnoreUnknownKeys.encodeToString(value))
 
   fun <T : PluginWebuiConfig> readPluginConfigOrNull(pluginId: String, key: String, serializer: KSerializer<T>): T? {
@@ -87,7 +97,12 @@ abstract class PluginVisibleData {
     }
   }
 
-  fun <T : PluginWebuiConfig> readPluginConfigOrDefault(pluginId: String, default: T, key: String, serializer: KSerializer<T>): T {
+  fun <T : PluginWebuiConfig> readPluginConfigOrDefault(
+    pluginId: String,
+    default: T,
+    key: String,
+    serializer: KSerializer<T>,
+  ): T {
     return config[pluginId.toMongodbKey()]?.get(key)?.let {
       JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
     } ?: default
@@ -118,6 +133,10 @@ abstract class PluginUserDocument : PluginVisibleData() {
   abstract val username: String
 }
 
+interface ExposedUserDocument {
+  suspend fun queryUsername(ids: List<String>): Map<String, SimplifiedUserDocument>
+}
+
 @Serializable
 data class SimplifiedUserDocument(
   @BsonProperty("_id")
@@ -125,10 +144,7 @@ data class SimplifiedUserDocument(
   val id: String,
   val username: String,
 ) {
-  companion object {
-    suspend fun queryUsername(ids: List<String>): List<SimplifiedUserDocument> =
-      UserDocument.queryUsername(ids)
-  }
+  companion object : ExposedUserDocument by UserDocument.Companion
 }
 
 @Serializable
@@ -165,7 +181,10 @@ internal data class UserDocument(
     withCollection<UserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
-        update = Updates.set("${UserDocument::config.name}.${pluginId.toMongodbKey()}.$key", JsonIgnoreUnknownKeys.encodeToString(value))
+        update = Updates.set(
+          "${UserDocument::config.name}.${pluginId.toMongodbKey()}.$key",
+          JsonIgnoreUnknownKeys.encodeToString(value)
+        )
       )
     }
   }
@@ -187,12 +206,12 @@ internal data class UserDocument(
     pluginId: String,
     key: String,
     value: String,
-    cid: String
+    cid: String,
   ) {
     updatePluginConfig(pluginId, key, value)
   }
 
-  companion object : DocumentCompanionObject {
+  companion object : DocumentCompanionObject, ExposedUserDocument {
     override val documentName = "User"
     suspend fun createUserDocument(uid: String, contactId: String): UserDocument {
       val ud = UserDocument(
@@ -241,9 +260,9 @@ internal data class UserDocument(
       find(idFilter(id)).limit(1).firstOrNull()
     }
 
-    suspend fun queryUsername(ids: List<String>): List<SimplifiedUserDocument> {
+    override suspend fun queryUsername(ids: List<String>): Map<String, SimplifiedUserDocument> {
       val filter = Aggregates.match(Filters.`in`("_id", ids))
-      return withCollection<UserDocument, List<SimplifiedUserDocument>> {
+      val res = withCollection<UserDocument, List<SimplifiedUserDocument>> {
         aggregate<SimplifiedUserDocument>(
           listOf(
             filter,
@@ -255,6 +274,9 @@ internal data class UserDocument(
             )
           )
         ).toList()
+      }
+      return ids.associateWith {
+        res.first { s -> s.id == it }
       }
     }
   }

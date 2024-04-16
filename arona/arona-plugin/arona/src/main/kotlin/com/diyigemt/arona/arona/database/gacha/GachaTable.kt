@@ -17,8 +17,8 @@ import org.jetbrains.exposed.sql.update
 
 data class GachaPool(
   val name: String,
-  val students: MutableList<StudentSchema>,
-  val isFes: Boolean = false
+  val students: List<StudentSchema>,
+  val isFes: Boolean = false,
 )
 
 @Database
@@ -55,13 +55,12 @@ class GachaPoolSchema(id: EntityID<Int>) : IntEntity(id) {
   var students by GachaPoolTable.students
   var active by GachaPoolTable.active
   var fes by GachaPoolTable.fes
-  fun toGachaPool() = dbQuery {
+  fun toGachaPool() =
     GachaPool(
       name,
-      StudentSchema.find { StudentTable.id inList students }.toMutableList(),
+      dbQuery { StudentSchema.find { StudentTable.id inList students }.toList() },
       isFes = fes
     )
-  }
 
   override fun toString(): String {
     val students = toGachaPool().students.joinToString("\n") { it.toString() }

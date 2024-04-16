@@ -298,12 +298,26 @@ fun Markdown.list(block: ListElement.() -> Unit) {
   children.add(ListElement().apply(block))
 }
 
+
+fun Markdown.indexedList(block: ListElement.() -> Unit) {
+  children.add(ListElement(hasIndex = true).apply(block))
+}
+
 fun ListElement.list(title: String, block: ListElement.() -> Unit) {
   content.add(ListElementItem(content = TextElement(title), child = ListElement().apply(block)))
 }
 
+fun ListElement.indexedList(title: String, block: ListElement.() -> Unit) {
+  content.add(ListElementItem(content = TextElement(title), child = ListElement(hasIndex = true).apply(block)))
+}
+
+
 fun ListElement.list(title: TextElement, block: ListElement.() -> Unit) {
   content.add(ListElementItem(content = title, child = ListElement().apply(block)))
+}
+
+fun ListElement.indexedList(title: TextElement, block: ListElement.() -> Unit) {
+  content.add(ListElementItem(content = title, child = ListElement(hasIndex = true).apply(block)))
 }
 
 fun tencentCustomMarkdown(block: Markdown.() -> Unit): TencentCustomMarkdown {

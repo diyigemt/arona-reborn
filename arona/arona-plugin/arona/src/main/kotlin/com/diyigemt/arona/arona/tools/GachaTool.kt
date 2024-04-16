@@ -2,19 +2,15 @@ package com.diyigemt.arona.arona.tools
 
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.arona.database.gacha.GachaPool
 import com.diyigemt.arona.arona.database.gacha.GachaPoolSchema
 import com.diyigemt.arona.arona.database.gacha.GachaPoolTable
+import com.diyigemt.arona.arona.database.student.StudentLimitType
 import com.diyigemt.arona.arona.database.student.StudentRarity
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
+import com.diyigemt.arona.arona.database.student.StudentSchema
+import com.diyigemt.arona.arona.database.student.StudentTable
 import org.jetbrains.skia.*
 import java.nio.file.Files
-import java.nio.file.Paths
 import kotlin.math.max
 import kotlin.math.min
 
@@ -60,23 +56,26 @@ object GachaTool {
   private val ssrColor = Color4f.new(242, 194, 218)
   private val boldFont = Font(Typeface.makeFromFile(Arona.dataFolder("gacha", "font-bold.otf").toFile().path), 54f)
   private val normalFont = Font(Typeface.makeFromFile(Arona.dataFolder("gacha", "font-bold.otf").toFile().path), 32f)
-  val NormalPool by lazy { // 常驻池
-    dbQuery {
-      GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().toGachaPool()
-    }
+  var NormalPool = dbQuery {
+    GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().toGachaPool()
   }
   var CurrentPickupPool = dbQuery {
     GachaPoolSchema.find { GachaPoolTable.active eq true }.toList().firstOrNull()
   }
-  val NormalSSRStudent by lazy {
-    NormalPool.students.filter { it.rarity == StudentRarity.SSR }
+  var NormalSSRStudent = NormalPool.students.filter { it.rarity == StudentRarity.SSR }
+  var NormalSRStudent = NormalPool.students.filter { it.rarity == StudentRarity.SR }
+  var NormalRStudent = NormalPool.students.filter { it.rarity == StudentRarity.R }
+  fun updateNormalPoolInfo() {
+    NormalPool = GachaPool(
+      "常驻池",
+      dbQuery { StudentSchema.find { StudentTable.limit eq StudentLimitType.Permanent }.toList() },
+      isFes = false
+    )
+    NormalSSRStudent = NormalPool.students.filter { it.rarity == StudentRarity.SSR }
+    NormalSRStudent = NormalPool.students.filter { it.rarity == StudentRarity.SR }
+    NormalRStudent = NormalPool.students.filter { it.rarity == StudentRarity.R }
   }
-  val NormalSRStudent by lazy {
-    NormalPool.students.filter { it.rarity == StudentRarity.SR }
-  }
-  val NormalRStudent by lazy {
-    NormalPool.students.filter { it.rarity == StudentRarity.R }
-  }
+
   fun generateGachaImage(result: GachaResult): Surface {
     val surface = Surface.makeRasterN32Premul(2340, 1080)
     val canvas = surface.canvas
@@ -463,7 +462,7 @@ object GachaTool {
 
   private fun Color4f.Companion.new(r: Int, g: Int, b: Int, a: Int = 255): Color4f = Color4f(
     r / 255f, g / 255f, b / 255f, a /
-        255f
+      255f
   )
 
   /**
@@ -521,7 +520,7 @@ object GachaTool {
     return IRect.makeLTRB(
       max(0, left - 15), max(0, top - 15), min(bitmap.width, right + 15), min(
         bitmap.height, bottom
-            + 15
+          + 15
       )
     )
   }

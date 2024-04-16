@@ -1,8 +1,6 @@
 package com.diyigemt.kivotos.coffee
 
-import com.diyigemt.arona.arona.database.DatabaseProvider
 import com.diyigemt.arona.arona.database.student.StudentSchema
-import com.diyigemt.arona.arona.database.student.StudentTable
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.command.SubCommand
@@ -101,14 +99,13 @@ class CoffeeCommand : AbstractCommand(
         coffee.tendencyStudent.size
       )
       val tendency = coffee.tendencyStudent.shuffled().take(tendencyStudentCount)
-      val visit = StudentSchema.randomStudentIdList().also {
+      val visit = StudentSchema.studentIdList().toMutableList().also {
         it.removeAll(tendency)
       }.shuffled().take(studentCount(coffee.level) - tendencyStudentCount)
-      val students = DatabaseProvider.dbQuery {
-        StudentSchema.find {
-          StudentTable.id inList (visit + tendency)
-        }.toList()
-      }
+
+      val students = StudentSchema.StudentCache.filter {
+        it.key in (visit + tendency)
+      }.values
       coffee.updateStudents(students.map { it.id.value })
       coffee = coffee()
     } else if (checkStudentTouchedUpdate(coffee.lastTouchTime)) {
@@ -116,18 +113,15 @@ class CoffeeCommand : AbstractCommand(
       coffee = coffee()
     }
     currentContext.setObject("coffee", coffee)
-    val visitedStudents = DatabaseProvider.dbQuery {
-      StudentSchema.find {
-        StudentTable.id inList coffee.students
-      }.toList()
-    }
-    val touchedStudents = DatabaseProvider.dbQuery {
-      StudentSchema.find {
-        StudentTable.id inList coffee.touchedStudents
-      }.toList()
-    }
-    currentContext.setObject("visitedStudents", visitedStudents)
-    currentContext.setObject("touchedStudents", touchedStudents)
+
+    val visitedStudents = StudentSchema.StudentCache.filter {
+      it.key in coffee.students
+    }.values
+    val touchedStudents = StudentSchema.StudentCache.filter {
+      it.key in coffee.touchedStudents
+    }.values
+    currentContext.setObject("visitedStudents", visitedStudents.toList())
+    currentContext.setObject("touchedStudents", touchedStudents.toList())
     md append tencentCustomMarkdown {
       +"来访学生"
       list {
@@ -256,9 +250,9 @@ class CoffeeTouchCommand : AbstractCommand(
   private val kivotosUser by requireObject<UserDocument>()
   private val studentName by argument("学生名")
   suspend fun UserCommandSender.coffeeTouch() {
-    val targetStudent = DatabaseProvider.dbQuery {
-      StudentSchema.find { StudentTable.name eq studentName }.firstOrNull()
-    }
+    val targetStudent = StudentSchema.StudentCache.filter {
+      it.value.name == studentName
+    }.values.firstOrNull()
     if (targetStudent == null) {
       val md = tencentCustomMarkdown {
         +"没法摸摸$studentName, 学生不存在"
@@ -409,11 +403,10 @@ class CoffeeInviteCommand : AbstractCommand(
     // 找到学生
 
     // 开始邀请
-    val target = DatabaseProvider.dbQuery {
-      StudentSchema.find {
-        StudentTable.name eq student
-      }.firstOrNull()
-    }
+
+    val target = StudentSchema.StudentCache.filter {
+      it.value.name == student
+    }.values.firstOrNull()
 
     if (target == null) {
       sendMessage("错误: 邀请学生不存在, 目标: $student 建议上报")
@@ -487,12 +480,10 @@ class CoffeeStudentTendencyCommand : AbstractCommand(
 ) {
   private val coffee by requireObject<CoffeeDocument>()
   suspend fun UserCommandSender.tendency() {
-    val tendencyStudents = DatabaseProvider.dbQuery {
-      StudentSchema.find {
-        StudentTable.id inList coffee.tendencyStudent
-      }.toList()
-    }
-    currentContext.setObject("tendencyStudents", tendencyStudents)
+    val tendencyStudents = StudentSchema.StudentCache.filter {
+      it.key in coffee.tendencyStudent
+    }.values
+    currentContext.setObject("tendencyStudents", tendencyStudents.toList())
     val md = tencentCustomMarkdown {
       h2("来访倾向配置")
       block {
@@ -590,11 +581,9 @@ class CoffeeStudentTendencyCommand : AbstractCommand(
       }
 
       // 开始添加
-      val target = DatabaseProvider.dbQuery {
-        StudentSchema.find {
-          StudentTable.name eq student
-        }.firstOrNull()
-      }
+      val target = StudentSchema.StudentCache.filter {
+        it.value.name == student
+      }.values.firstOrNull()
 
       if (target == null) {
         sendMessage("错误: 要添加的学生不存在, 目标: $student 建议上报")
@@ -664,11 +653,9 @@ class CoffeeStudentTendencyCommand : AbstractCommand(
       }
 
       // 开始删除
-      val target = DatabaseProvider.dbQuery {
-        StudentSchema.find {
-          StudentTable.name eq student
-        }.firstOrNull()
-      }
+      val target = StudentSchema.StudentCache.filter {
+        it.value.name == student
+      }.values.firstOrNull()
 
       if (target == null) {
         sendMessage("错误: 要删除的学生不存在, 目标: $student 建议上报")

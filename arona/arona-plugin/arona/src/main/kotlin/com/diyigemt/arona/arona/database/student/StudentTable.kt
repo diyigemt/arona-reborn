@@ -2,6 +2,7 @@ package com.diyigemt.arona.arona.database.student
 
 import com.diyigemt.arona.arona.database.Database
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.arona.tools.GachaTool
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -29,12 +30,17 @@ class StudentSchema(id: EntityID<Int>) : IntEntity(id) {
   var headFileName by StudentTable.headFileName
 
   companion object : IntEntityClass<StudentSchema>(StudentTable) {
-    fun randomStudentIdList(): MutableList<Int> {
-      return dbQuery {
+    var StudentCache = dbQuery {
+      StudentSchema.all().toList()
+    }.associateBy { it.id.value }
+    fun updateStudentCache() {
+      GachaTool.updateNormalPoolInfo()
+      StudentCache = dbQuery {
         StudentSchema.all().toList()
-      }.map { it.id.value }
-        .toMutableList()
-        .also { it.remove(173) }
+      }.associateBy { it.id.value }
+    }
+    fun studentIdList(): List<Int> {
+      return StudentCache.keys.toList()
     }
   }
 

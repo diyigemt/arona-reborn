@@ -418,7 +418,6 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
               it.students += listOf(create.id.value)
             }
           }
-          NormalPool.students.add(create)
         } else {
           dbQuery {
             schema.name = name
@@ -428,6 +427,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
           }
         }
         echo("成功")
+        StudentSchema.updateStudentCache()
       } else {
         echo("取消更新")
       }

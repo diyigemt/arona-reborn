@@ -1,5 +1,6 @@
 package com.diyigemt.kivotos.rank
 
+import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.SubCommand
 import com.diyigemt.arona.communication.BotManager
@@ -9,13 +10,10 @@ import com.diyigemt.arona.communication.message.TencentCustomMarkdown.Companion.
 import com.diyigemt.arona.database.permission.SimplifiedUserDocument
 import com.diyigemt.kivotos.Kivotos
 import com.diyigemt.kivotos.KivotosCommand
-import com.diyigemt.arona.arona.database.DatabaseProvider
-import com.diyigemt.arona.arona.database.student.StudentSchema
-import com.diyigemt.arona.arona.database.student.StudentTable
 import com.diyigemt.kivotos.subButton
+import com.diyigemt.kivotos.tools.normalizeStudentName
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
@@ -29,6 +27,11 @@ class RankCommand : AbstractCommand(
     }
   }.content
 ) {
+  private val md by lazy {
+    tencentCustomMarkdown {
+      h1("排行榜")
+    }
+  }
   private val kb by lazy {
     tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
       row {
@@ -37,17 +40,19 @@ class RankCommand : AbstractCommand(
       }
     }
   }
+
   suspend fun UserCommandSender.rank() {
     if (currentContext.invokedSubcommand == null) {
-      sendMessage(EmptyMarkdown + kb)
+      sendMessage(md + kb)
     }
   }
 }
 
 data class FavorRankData(
+  val rank: Long,
   val uid: String,
   val sid: Int,
-  val favor: Pair<Int, Int>
+  val favor: Pair<Int, Int>,
 )
 
 @SubCommand(forClass = RankCommand::class)
@@ -65,26 +70,57 @@ class RankFavorCommand : AbstractCommand(
 ) {
   private val student by argument("学生名").optional()
   suspend fun UserCommandSender.favorRank() {
-    val ranks = RankManager.getFavorRank()
-    val usernames = SimplifiedUserDocument.queryUsername(ranks.map { it.uid })
-    val students = DatabaseProvider.dbQuery {
-      StudentSchema.find( StudentTable.id inList ranks.map { it.sid } ).toList()
+    val sid = student?.let {
+      normalizeStudentName(it)?.let { name ->
+        StudentSchema.StudentCache.values.firstOrNull { st -> name == st.name }
+      }
     }
-    val studentNames = ranks.map { it.sid }.associateWith { students.first { s -> s.id.value == it } }
-    if (student == null) {
-      // 总榜
-      RankManager.getFavorRank().let {
-        tencentCustomMarkdown {
-          list {
-            it.forEachIndexed { index, data ->
-              +("${index + 1}.\t${studentNames[data.sid]?.name}(${data.favor.first}级/${data.favor.second})\t" +
-                  "${usernames[index].username}\t")
-            }
+    if (sid == null) {
+      sendRank(
+        "好感度总榜",
+        RankManager.getFavorRank(),
+        RankManager.getUserFavorRank(userDocument().id) ?: FavorRankData(0L, userDocument().id, 0, 0 to 0)
+      )
+    } else {
+      sendRank(
+        "${sid.name}好感度榜",
+        RankManager.getFavorRank(sid.id.value),
+        RankManager.getUserFavorRank(userDocument().id, sid.id.value) ?: FavorRankData(0L, userDocument().id, 0, 0 to 0)
+      )
+    }
+  }
+
+  private suspend fun UserCommandSender.sendRank(title: String, ranks: List<FavorRankData>, self: FavorRankData) {
+    val usernames = SimplifiedUserDocument.queryUsername(ranks.map { it.uid } + listOf(self.uid))
+    val students = StudentSchema.StudentCache.filter { it.key in (ranks.map { r -> r.sid } + listOf(self.sid)) }.values
+    val studentNames = (ranks.map { it.sid } + listOf(self.sid))
+      .associateWith {
+        students
+          .firstOrNull { s -> s.id.value == it }
+      }
+
+    fun toString(data: FavorRankData) = "${studentNames[data.sid]?.name ?: "-"}(${data.favor.first}级/${data.favor
+      .second})" +
+      "\t" + usernames[data.uid]?.username
+    ranks.let {
+      tencentCustomMarkdown {
+        h1(title)
+        indexedList {
+          it.forEach { data ->
+            +toString(data)
           }
         }
-      }.also {
-        sendMessage(it)
+        +"当前位置:"
+        +"${self.rank}. ${toString(self)}"
+        at()
+      } + tencentCustomKeyboard {
+        row {
+          subButton("看看我的", "排行榜 好感度", enter = true)
+          subButton("看看子榜", "排行榜 好感度 日奈")
+        }
       }
+    }.also {
+      sendMessage(it)
     }
   }
 }

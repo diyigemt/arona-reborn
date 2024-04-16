@@ -111,7 +111,7 @@ class RankFavorCommand : AbstractCommand(
           }
         }
         +"当前位置:"
-        +"${self.rank}. ${toString(self)}"
+        +"${self.rank + 1}. ${toString(self)}"
         at()
       } + tencentCustomKeyboard {
         row {

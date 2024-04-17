@@ -234,7 +234,21 @@ internal object TencentWebsocketHeartbeatAckHandler : TencentWebsocketOperationH
   override suspend fun TencentBotClientWebSocketSession.handler(
     payload: TencentWebsocketPayload<Unit>?,
     source: String,
-  ) {}
+  ) {
+    logger.debug("receive ws HeartbeatAck.")
+  }
+}
+
+@Suppress("UNUSED")
+internal object TencentWebsocketReconnectHandler : TencentWebsocketOperationHandler<Unit>() {
+  override val type = TencentWebsocketOperationType.Reconnect
+  override val decoder = Unit.serializer()
+  override suspend fun TencentBotClientWebSocketSession.handler(
+    payload: TencentWebsocketPayload<Unit>?,
+    source: String,
+  ) {
+    logger.info("receive ws Reconnect.")
+  }
 }
 
 internal object TencentWebsocketOperationManager {

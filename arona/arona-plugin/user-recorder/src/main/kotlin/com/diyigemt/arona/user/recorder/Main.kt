@@ -33,7 +33,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.2.0",
+    version = "1.2.1",
     description = "record user data"
   )
 ) {
@@ -146,25 +146,27 @@ object PluginMain : AronaPlugin(
       }
     }
     dauJob = launch(SupervisorJob()) {
-      dbQuery {
-        val today = currentDate()
-        val u = User.find(UserTable.lastActive greater today).count().toInt()
-        val c = Contact.find(ContactTable.lastActive greater today).count().toInt()
-        when (val record = DailyActiveUser.findById(today)) {
-          is DailyActiveUser -> {
-            record.count = u
-            record.contact = c
-          }
+      while (true) {
+        dbQuery {
+          val today = currentDate()
+          val u = User.find(UserTable.lastActive greater today).count().toInt()
+          val c = Contact.find(ContactTable.lastActive greater today).count().toInt()
+          when (val record = DailyActiveUser.findById(today)) {
+            is DailyActiveUser -> {
+              record.count = u
+              record.contact = c
+            }
 
-          else -> {
-            DailyActiveUser.new(today) {
-              count = u
-              contact = c
+            else -> {
+              DailyActiveUser.new(today) {
+                count = u
+                contact = c
+              }
             }
           }
         }
+        delay(60 * 1000L)
       }
-      delay(60 * 1000L)
     }
   }
 }

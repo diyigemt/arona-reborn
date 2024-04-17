@@ -91,7 +91,7 @@ class CoffeeCommand : AbstractCommand(
     }
     if (checkStudentUpdate(coffee.lastStudentUpdateTime)) {
       // 需要更新来访的学生
-      // 随机倾向名单 每个来访学生独立计算, 20%来一个倾向名单内的学生, min保证不会来多余倾向名单内的学生
+      // 随机倾向名单 每个来访学生独立计算, 20%来一个倾向名单内的学生, min保证不会来多于倾向名单内的学生
       val tendencyStudentCount = min(
         (1..studentCount(coffee.level)).filter {
           (1..100).random() > 80

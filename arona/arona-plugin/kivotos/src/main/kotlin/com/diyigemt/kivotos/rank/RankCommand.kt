@@ -111,7 +111,11 @@ class RankFavorCommand : AbstractCommand(
           }
         }
         +"当前位置:"
-        +"${self.rank + 1}. ${toString(self)}"
+        +(if (self.rank > 0) {
+          "${self.rank + 1}. ${toString(self)}"
+        } else {
+          "无记录,请先至少进行一次摸头"
+        })
         at()
       } + tencentCustomKeyboard {
         row {

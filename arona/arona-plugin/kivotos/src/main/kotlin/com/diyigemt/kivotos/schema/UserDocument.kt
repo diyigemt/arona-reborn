@@ -25,6 +25,9 @@ data class UserDocument(
   val id: String,
   val student: Map<String, Student> = mapOf(),
 ) {
+  val inventory by lazy {
+
+  }
   // 删除记录
   suspend fun deleteAccount(): Boolean {
     FavorLevelExcelTable.deleteRecord(id)

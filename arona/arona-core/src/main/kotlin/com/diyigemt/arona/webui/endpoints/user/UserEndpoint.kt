@@ -1,15 +1,19 @@
 package com.diyigemt.arona.webui.endpoints.user
 
+import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.badRequest
+import com.diyigemt.arona.utils.errorMessage
 import com.diyigemt.arona.utils.internalServerError
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints._aronaUser
+import com.diyigemt.arona.webui.event.ContentAuditEvent
+import com.diyigemt.arona.webui.event.isBlock
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
@@ -111,6 +115,10 @@ internal object UserEndpoint {
   @AronaBackendEndpointPut("")
   suspend fun PipelineContext<Unit, ApplicationCall>.updateProfile() {
     val data = context.receiveJsonOrNull<UserProfileUpdateReq>() ?: return badRequest()
+    val audit = ContentAuditEvent(data.username).broadcast()
+    if (audit.isBlock) {
+      return errorMessage("内容审核失败: ${audit.message}")
+    }
     return if (
       UserDocument.withCollection<UserDocument, UpdateResult> {
         updateOne(

@@ -134,7 +134,7 @@ abstract class PluginUserDocument : PluginVisibleData() {
 }
 
 interface ExposedUserDocument {
-  suspend fun queryUsername(ids: List<String>): Map<String, SimplifiedUserDocument>
+  suspend fun querySimplifiedUser(ids: List<String>): Map<String, SimplifiedUserDocument>
 }
 
 @Serializable
@@ -260,7 +260,7 @@ internal data class UserDocument(
       find(idFilter(id)).limit(1).firstOrNull()
     }
 
-    override suspend fun queryUsername(ids: List<String>): Map<String, SimplifiedUserDocument> {
+    override suspend fun querySimplifiedUser(ids: List<String>): Map<String, SimplifiedUserDocument> {
       val filter = Aggregates.match(Filters.`in`("_id", ids))
       val res = withCollection<UserDocument, List<SimplifiedUserDocument>> {
         aggregate<SimplifiedUserDocument>(

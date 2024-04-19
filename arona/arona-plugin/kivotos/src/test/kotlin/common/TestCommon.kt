@@ -45,4 +45,10 @@ class TestCommon {
     }
     c.test()
   }
+
+  @Test
+  fun testMap() {
+    val m = mapOf("测试" to 1, "从而产生2" to 2)
+    println(m)
+  }
 }

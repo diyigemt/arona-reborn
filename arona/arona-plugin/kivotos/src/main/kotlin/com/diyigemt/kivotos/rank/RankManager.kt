@@ -96,6 +96,25 @@ object RankManager {
   }
 
   /**
+   * 获取用户自己的学生好感度排行
+   */
+  suspend fun getUserStudentFavorRank(uid: String): List<FavorRankData> {
+    return redis {
+      zrange(uFavorKey(uid), 0, 9, by = null, rev = true, limit = null, withScores = true).let {
+        var rank = 0L
+        it.windowed(2, 2, true).map { window ->
+          FavorRankData(
+            ++rank,
+            uid,
+            window[0].toInt(),
+            unpackFavorScore(window[1].toInt())
+          )
+        }
+      }
+    }
+  }
+
+  /**
    * 获取好感总榜/学生排行榜数据
    *
    * [[uid, sid, rank to current]]

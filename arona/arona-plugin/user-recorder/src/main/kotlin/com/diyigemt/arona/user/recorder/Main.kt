@@ -1,6 +1,5 @@
 package com.diyigemt.arona.user.recorder
 
-import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.PlainText
@@ -25,27 +24,27 @@ import kotlinx.datetime.DateTimePeriod
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
-import java.util.*
-import kotlin.concurrent.scheduleAtFixedRate
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.2.1",
+    version = "1.2.3",
     description = "record user data"
   )
 ) {
-  lateinit var dauJob: Job
+  private lateinit var dauJob: Job
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
       // 统计消息数
-      dbQuery {
-        val today = currentDate()
+      val today = currentDate()
+      val currentDateTime = currentDateTime()
+      val dauRecord = dbQuery {
         when (val record = DailyActiveUser.findById(today)) {
           is DailyActiveUser -> {
             record.message += 1
+            record
           }
 
           else -> {
@@ -59,7 +58,7 @@ object PluginMain : AronaPlugin(
       dbQuery {
         when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
           is Contact -> {
-            contact.lastActive = currentDateTime()
+            contact.lastActive = currentDateTime
           }
 
           else -> {
@@ -79,7 +78,7 @@ object PluginMain : AronaPlugin(
         when (val user = User.find { UserTable.id eq sender.id }.firstOrNull()) {
           is User -> {
             user.actionCount
-            user.lastActive = currentDateTime()
+            user.lastActive = currentDateTime
           }
 
           else -> {
@@ -97,6 +96,7 @@ object PluginMain : AronaPlugin(
         CommandManager.matchCommandName(commandStr.replace("/", "")) ?: return@subscribeAlways
       // 统计command
       dbQuery {
+        // 累计command
         when (val fCommand = Command.find { CommandTable.name eq command }.firstOrNull()) {
           is Command -> fCommand.count++
           else -> {
@@ -104,6 +104,14 @@ object PluginMain : AronaPlugin(
               name = command
               count = 1
             }
+          }
+        }
+        // 日command
+        dbQuery {
+          if (command in dauRecord.commands) {
+            dauRecord.commands[command] = dauRecord.commands[command]!! + 1
+          } else {
+            dauRecord.commands[command] = 1
           }
         }
       }
@@ -176,15 +184,15 @@ class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显
   private val offset by argument().int().default(0)
   override fun run() {
     // dau
-    dbQuery {
+    val date = now().minus(DateTimePeriod(days = offset), TimeZone.currentSystemDefault()).toDate()
+    val dau = dbQuery {
       val contactCount = Contact.count()
       val userCount = User.count()
-      val date = now().minus(DateTimePeriod(days = offset), TimeZone.currentSystemDefault()).toDate()
-      val dau = DailyActiveUser.findById(date)
       echo("date: $date")
       echo("contact: $contactCount, user: $userCount")
-      echo(dau)
+      DailyActiveUser.findById(date)
     }
+    echo(dau)
     // 指令执行次数
     dbQuery {
       Command.all()

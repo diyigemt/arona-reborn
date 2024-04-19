@@ -32,11 +32,11 @@ class CallMeCommand : AbstractCommand(
       return
     }
     var name = expect as String
-    if (name.length > 20) {
-      sendMessage("名称不能超过20个字符")
+    if (name.length > 10) {
+      sendMessage("名称不能超过10个字符")
       return
     }
-    val ev = ContentAuditEvent(name).broadcast()
+    val ev = ContentAuditEvent(name, level = 80).broadcast()
     if (ev.isBlock) {
       sendMessage("违禁词: ${ev.message}")
       return

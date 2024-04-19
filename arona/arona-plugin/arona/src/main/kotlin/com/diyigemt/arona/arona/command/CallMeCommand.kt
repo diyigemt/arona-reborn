@@ -26,7 +26,7 @@ class CallMeCommand : AbstractCommand(
   private val expect by argument(name = "期望的称呼", help = "期望的称呼").optional()
   suspend fun UserCommandSender.callMe() {
     if (expect.isNullOrBlank()) {
-      queryTeacherNameFromDB(user.id).also {
+      queryTeacherNameFromDB(userDocument().id).also {
         sendMessage("怎么了, $it")
       }
       return
@@ -42,7 +42,7 @@ class CallMeCommand : AbstractCommand(
       return
     }
     if (!name.endsWith("老师")) name = "${name}老师"
-    updateTeacherName(user.id, name)
+    updateTeacherName(userDocument().id, name)
     sendMessage("好的, $name")
   }
 

@@ -108,7 +108,7 @@ class RankFavorCommand : AbstractCommand(
     self: FavorRankData? = null,
     showSelfPosition: Boolean = true,
   ) {
-    val ids = (ranks.map { it.uid } + listOf(self?.uid ?: user.unionOpenidOrId))
+    val ids = (ranks.map { it.uid } + listOf(self?.uid ?: userDocument().id))
     // 根据uid反查botId
     val usernames = dbQuery {
       TeacherNameSchema.find {

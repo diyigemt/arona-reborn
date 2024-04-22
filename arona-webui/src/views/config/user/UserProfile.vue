@@ -46,7 +46,7 @@ onMounted(() => {
     <ElDescriptionsItem label="id">{{ user.id }}</ElDescriptionsItem>
     <ElDescriptionsItem label="用户名">
       <div v-if="updateBasicInfo">
-        <ElInput v-model="basicInfoForm.username"></ElInput>
+        <ElInput v-model="basicInfoForm.username" maxlength="15" show-word-limit></ElInput>
       </div>
       <div v-else>
         {{ user.username }}

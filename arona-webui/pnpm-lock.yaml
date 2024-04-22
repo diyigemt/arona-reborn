@@ -157,8 +157,8 @@ devDependencies:
     specifier: ^2.2.2
     version: 2.3.0
   pnpm:
-    specifier: ^7.9.0
-    version: 7.25.0
+    specifier: ^8.15.7
+    version: 8.15.7
   prettier:
     specifier: ^3.1.0
     version: 3.1.0
@@ -6920,9 +6920,9 @@ packages:
       pathe: 1.1.1
     dev: true
 
-  /pnpm@7.25.0:
-    resolution: {integrity: sha512-FGFQUON8kJ6ma39elJ8lyD8wPIfgp3opGJD9sX0TgIJk4zSr556qCgC8AN+3BFHe4yuRkEauf4JVLW2RKyyEcA==}
-    engines: {node: '>=14.6'}
+  /pnpm@8.15.7:
+    resolution: {integrity: sha512-yFzSG22hAzIVaxyiqnnAph7nrS6wRTuIqymSienoypPmCRIyslwHy/YfbfdxKNnISeXJrG5EhU29IRxJ86Z63A==}
+    engines: {node: '>=16.14'}
     hasBin: true
     dev: true
 
@@ -8345,7 +8345,6 @@ packages:
       - '@vitest/browser'
       - '@vitest/ui'
       - encoding
-      - happy-dom
       - jsdom
       - less
       - lightningcss

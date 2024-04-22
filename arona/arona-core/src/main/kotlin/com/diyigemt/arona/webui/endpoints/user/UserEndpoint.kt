@@ -114,8 +114,8 @@ internal object UserEndpoint {
   @AronaBackendEndpointPut("")
   suspend fun PipelineContext<Unit, ApplicationCall>.updateProfile() {
     val data = context.receiveJsonOrNull<UserProfileUpdateReq>() ?: return badRequest()
-    if (data.username.length > 10) {
-      return errorMessage("用户名不能超过10个字符")
+    if (data.username.length > 15) {
+      return errorMessage("用户名不能超过15个字符")
     }
     val audit = ContentAuditEvent(data.username, level = 80).broadcast()
     if (audit.isBlock) {

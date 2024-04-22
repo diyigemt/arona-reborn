@@ -3,6 +3,7 @@ package com.diyigemt.arona.user.recorder
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.BuildInSuperAdminCommandOwner
 import com.diyigemt.arona.command.CommandManager
+import com.diyigemt.arona.command.UnderDevelopment
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.PlainText
@@ -36,7 +37,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.2.7",
+    version = "1.2.8",
     description = "record user data"
   )
 ) {
@@ -215,6 +216,7 @@ class DauClCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "æ
 }
 
 @Suppress("unused")
+@UnderDevelopment
 class DauCommand : AbstractCommand(
   BuildInSuperAdminCommandOwner,
   "dau",

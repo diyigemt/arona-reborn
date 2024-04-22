@@ -143,9 +143,9 @@ data class Policy(
               rule = listOf(
                 PolicyRule(
                   type = PolicyRuleType.Subject,
-                  operator = PolicyRuleOperator.Contains,
-                  key = "roles",
-                  value = DEFAULT_SUPER_ROLE_ID
+                  operator = PolicyRuleOperator.IsIn,
+                  key = "id",
+                  value = aronaConfig.superAdminUidAsString,
                 )
               )
             )

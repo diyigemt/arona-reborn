@@ -60,7 +60,7 @@ interface Permission {
         .flatten()
         .toMutableList()
         .apply {
-          add(BuildInAllowPolicy)
+//          add(BuildInAllowPolicy)
         }
       // 添加常驻禁止策略
       val deny = policies
@@ -69,7 +69,7 @@ interface Permission {
         .flatten()
         .toMutableList()
         .apply {
-//          add(BuildInDenyPolicy)
+          add(BuildInDenyPolicy)
         }
       return runCatching {
         EnforcementPointDefault(allow, deny).enforceAuthorization(

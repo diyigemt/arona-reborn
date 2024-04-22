@@ -5,7 +5,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.user.recorder.PluginMain"
-version = "1.2.7"
+version = "1.2.8"
 dependencies {
   compileOnly(project(":arona-core"))
   testImplementation(kotlin("test"))

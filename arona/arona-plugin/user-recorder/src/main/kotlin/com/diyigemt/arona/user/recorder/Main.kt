@@ -36,7 +36,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.2.5",
+    version = "1.2.7",
     description = "record user data"
   )
 ) {
@@ -203,15 +203,12 @@ class DauClCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "�
       DailyActiveUser.findById(date)!!
     }
     echo(dau)
-    dau.commands.entries.sortedBy { it.value }.forEach {
-      echo("${it.key}: ${it.value}")
-    }
     // 指令执行次数
     dbQuery {
       Command.all()
         .sortedBy { it.count }
         .forEach {
-          echo("${it.name}: ${it.count}")
+          echo("${it.name}: ${dau.commands[it.name] ?: 0}/${it.count}")
         }
     }
   }
@@ -240,6 +237,9 @@ class DauCommand : AbstractCommand(
       }
       DailyActiveUser.findById(date)!!
     }
+    val total = dbQuery {
+      Command.all().toList().associateBy { it.name }
+    }
     md append tencentCustomMarkdown {
       +"dau: ${dau.count}"
       +"contact: ${dau.contact}"
@@ -247,7 +247,7 @@ class DauCommand : AbstractCommand(
       +"commands:"
       indexedList {
         dau.commands.entries.sortedBy { it.value }.forEach {
-          +"${it.key}: ${it.value}"
+          +"${it.key}: ${it.value}/${total[it.key]?.count ?: "-"}"
         }
       }
     }

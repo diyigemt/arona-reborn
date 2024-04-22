@@ -4,7 +4,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender
 
 suspend fun UserCommandSender.queryTeacherNameFromDB(): String {
   val tmp = userDocument().username
-  return if (!tmp.endsWith("老师")) {
+  return if (tmp.startsWith("Arona用户1")) {
     "老师"
   } else {
     tmp

@@ -10,10 +10,16 @@ redis:
   host: "127.0.0.1"
   port: 6379
   db: 0
+mariadb:
+  host: "127.0.0.1:3306"
+  db: "arona"
+  user: "arona"
+  password: ""
 mongodb:
   host: ""
   port: 27017
   user: ""
   password: ""
   db: ""
+superAdminUid: []
 debug: false

@@ -1,8 +1,6 @@
 package com.diyigemt.kivotos.rank
 
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.name.TeacherNameSchema
-import com.diyigemt.arona.arona.database.name.TeacherNameTable
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.SubCommand
@@ -15,6 +13,7 @@ import com.diyigemt.kivotos.subButton
 import com.diyigemt.kivotos.tools.normalizeStudentName
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
+import com.diyigemt.arona.database.permission.SimplifiedUserDocument
 
 @SubCommand(forClass = KivotosCommand::class)
 @Suppress("unused")
@@ -110,14 +109,9 @@ class RankFavorCommand : AbstractCommand(
   ) {
     val ids = (ranks.map { it.uid } + listOf(self?.uid ?: userDocument().id))
     // 根据uid反查botId
-    val usernames = dbQuery {
-      TeacherNameSchema.find {
-        TeacherNameTable.id inList
-          ids
-      }.toList()
-    }.let {
-      it.associateBy {
-        ids.first { s -> s == it.id.value }
+    val usernames = SimplifiedUserDocument.querySimplifiedUser(ids).let {
+      it.values.associateBy {
+        ids.first { s -> s == it.id }
       }
     }
     val students = StudentSchema.StudentCache
@@ -133,7 +127,7 @@ class RankFavorCommand : AbstractCommand(
       data.favor
         .second
     })" +
-      "\t" + usernames[data.uid]?.name
+      "\t" + usernames[data.uid]?.username
     ranks.let {
       tencentCustomMarkdown {
         h1(title)

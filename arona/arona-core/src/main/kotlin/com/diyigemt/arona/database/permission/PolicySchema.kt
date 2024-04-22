@@ -9,6 +9,7 @@ import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMB
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_SUPER_ROLE_ID
 import com.diyigemt.arona.database.permission.PolicyNode.Companion.build
 import com.diyigemt.arona.database.permission.PolicyRule.Companion.build
+import com.diyigemt.arona.utils.aronaConfig
 import com.diyigemt.arona.utils.uuid
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
@@ -121,7 +122,7 @@ data class Policy(
     internal val PROTECTED_POLICY_ID = listOf(
       PROTECTED_BUILD_IN_POLICY_ID
     )
-    val BuildInPolicy = Policy(
+    val BuildInDenyPolicy = Policy(
       "policy.buildIn",
       "内置策略",
       effect = PolicyNodeEffect.DENY,
@@ -145,6 +146,38 @@ data class Policy(
                   operator = PolicyRuleOperator.Contains,
                   key = "roles",
                   value = DEFAULT_SUPER_ROLE_ID
+                )
+              )
+            )
+          )
+        )
+      )
+    ).build().first()
+
+    val BuildInAllowPolicy = Policy(
+      "policy.buildIn",
+      "内置策略",
+      effect = PolicyNodeEffect.ALLOW,
+      rules = listOf(
+        PolicyRoot(
+          groupType = PolicyNodeGroupType.ALL,
+          rule = listOf(
+            PolicyRule(
+              type = PolicyRuleType.Resource,
+              operator = PolicyRuleOperator.IsChild,
+              key = "id",
+              value = "buildIn.super:*"
+            )
+          ),
+          children = listOf(
+            PolicyNode(
+              groupType = PolicyNodeGroupType.ALL,
+              rule = listOf(
+                PolicyRule(
+                  type = PolicyRuleType.Subject,
+                  operator = PolicyRuleOperator.IsIn,
+                  key = "id",
+                  value = aronaConfig.superAdminUidAsString,
                 )
               )
             )

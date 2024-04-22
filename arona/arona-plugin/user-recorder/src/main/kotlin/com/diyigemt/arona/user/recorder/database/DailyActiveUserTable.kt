@@ -26,8 +26,8 @@ class DailyActiveUser(id: EntityID<String>) : Entity<String>(id) {
   var count by DailyActiveUserTable.count
   var message by DailyActiveUserTable.message
   var contact by DailyActiveUserTable.contact
-  val commands by DailyActiveUserTable.commands
+  var commands by DailyActiveUserTable.commands
   override fun toString(): String {
-    return "Record(\ndau=$count,contact=$contact,message=$message,\nexecuted=$commands\n)"
+    return "Record(dau=$count,contact=$contact,message=$message)"
   }
 }

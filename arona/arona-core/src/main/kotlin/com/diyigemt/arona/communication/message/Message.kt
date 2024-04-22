@@ -478,7 +478,7 @@ interface Message {
    * 给出序列化保存的字符串
    */
   fun serialization(): String
-  operator fun plus(other: Message) = MessageChainBuilder(this, other).build();
+  operator fun plus(other: Message) = MessageChainBuilder(this, other).build()
 }
 
 data class PlainText(

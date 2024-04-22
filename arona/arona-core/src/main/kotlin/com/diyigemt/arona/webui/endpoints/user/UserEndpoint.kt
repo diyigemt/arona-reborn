@@ -11,7 +11,6 @@ import com.diyigemt.arona.utils.errorMessage
 import com.diyigemt.arona.utils.internalServerError
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.webui.endpoints.*
-import com.diyigemt.arona.webui.endpoints._aronaUser
 import com.diyigemt.arona.webui.event.ContentAuditEvent
 import com.diyigemt.arona.webui.event.isBlock
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
@@ -115,7 +114,10 @@ internal object UserEndpoint {
   @AronaBackendEndpointPut("")
   suspend fun PipelineContext<Unit, ApplicationCall>.updateProfile() {
     val data = context.receiveJsonOrNull<UserProfileUpdateReq>() ?: return badRequest()
-    val audit = ContentAuditEvent(data.username).broadcast()
+    if (data.username.length > 10) {
+      return errorMessage("用户名不能超过10个字符")
+    }
+    val audit = ContentAuditEvent(data.username, level = 80).broadcast()
     if (audit.isBlock) {
       return errorMessage("内容审核失败: ${audit.message}")
     }

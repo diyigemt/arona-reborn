@@ -41,8 +41,13 @@ data class AronaConfig(
   val redis: RedisConfig,
   val mongodb: MongoConfig,
   val mariadb: MariaDBConfig,
+  val superAdminUid : List<String>,
   val debug: Boolean = false,
-)
+) {
+  val superAdminUidAsString by lazy {
+    superAdminUid.joinToString(",")
+  }
+}
 
 internal val aronaConfig: AronaConfig by lazy {
   val reader = File("config.yaml").bufferedReader(Charset.forName("UTF-8"))

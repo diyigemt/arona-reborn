@@ -23,8 +23,11 @@ private val playerMainMenu by lazy {
     row {
       subButton("咖啡厅", enter = true)
       subButton("排行榜", enter = true)
+      subButton("设置", enter = true)
       subButton("删号")
     }
+  }.also {
+    it.windowed()
   }
 }
 

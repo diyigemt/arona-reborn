@@ -176,7 +176,7 @@ class TarotCommand : AbstractCommand(
       cardName = "Arona"
     }
     val path = "/tarot/$name.png"
-    val teacherName = queryTeacherNameFromDB(user.id)
+    val teacherName = queryTeacherNameFromDB()
     val from = contactType()
     val url = "https://arona.cdn.diyigemt.com/image$path"
 

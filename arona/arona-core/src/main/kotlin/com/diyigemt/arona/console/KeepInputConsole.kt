@@ -19,6 +19,7 @@ internal val lineReader: LineReader by lazy {
     .jna(true)
     .jansi(true)
     .system(true)
+    .signalHandler {  }
     .build()
   LineReaderBuilder.builder().terminal(terminal).completer { _, _, candidates ->
     candidates.addAll(

@@ -1,12 +1,14 @@
 package com.diyigemt.arona.arona.tools
 
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.name.TeacherNameSchema
+import com.diyigemt.arona.communication.command.UserCommandSender
 
-fun queryTeacherNameFromDB(id: String): String {
-  return dbQuery {
-    TeacherNameSchema.findById(id)
-  }?.name ?: "老师"
+suspend fun UserCommandSender.queryTeacherNameFromDB(): String {
+  val tmp = userDocument().username
+  return if (!tmp.endsWith("老师")) {
+    "老师"
+  } else {
+    tmp
+  }
 }
 
 fun randomInt(bound: Int): Int = (System.currentTimeMillis() % bound).toInt()

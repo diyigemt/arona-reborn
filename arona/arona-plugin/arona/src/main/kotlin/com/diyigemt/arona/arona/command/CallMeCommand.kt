@@ -1,8 +1,6 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.name.TeacherNameSchema
 import com.diyigemt.arona.arona.tools.queryTeacherNameFromDB
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.UserCommandSender
@@ -26,7 +24,7 @@ class CallMeCommand : AbstractCommand(
   private val expect by argument(name = "期望的称呼", help = "期望的称呼").optional()
   suspend fun UserCommandSender.callMe() {
     if (expect.isNullOrBlank()) {
-      queryTeacherNameFromDB(userDocument().id).also {
+      queryTeacherNameFromDB().also {
         sendMessage("怎么了, $it")
       }
       return
@@ -42,20 +40,7 @@ class CallMeCommand : AbstractCommand(
       return
     }
     if (!name.endsWith("老师")) name = "${name}老师"
-    updateTeacherName(userDocument().id, name)
+    userDocument().updateUsername(name)
     sendMessage("好的, $name")
-  }
-
-  private fun updateTeacherName(id: String, name: String) {
-    dbQuery {
-      val record = TeacherNameSchema.findById(id)
-      if (record == null) {
-        TeacherNameSchema.new(id) {
-          this@new.name = name
-        }
-      } else {
-        record.name = name
-      }
-    }
   }
 }

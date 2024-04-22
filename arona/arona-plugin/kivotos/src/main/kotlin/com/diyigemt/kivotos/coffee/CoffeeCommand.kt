@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.diyigemt.kivotos.coffee
 
 import com.diyigemt.arona.arona.database.student.StudentSchema
@@ -6,6 +8,7 @@ import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.command.SubCommand
 import com.diyigemt.arona.command.nextButtonInteraction
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.*
 import com.diyigemt.kivotos.Kivotos
@@ -29,6 +32,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.bson.codecs.pojo.annotations.BsonId
@@ -419,50 +423,67 @@ class CoffeeInviteCommand : AbstractCommand(
       sendMessage("${target.name} 已经在咖啡厅里了")
       return
     }
-
-    (tencentCustomMarkdown {
-      h2("确认")
-      at()
-      +"确认邀请 $student 来咖啡厅吗?"
-    } + tencentCustomKeyboard {
-      row {
-        button {
-          render {
-            label = "确认"
+    val configure = readUserPluginConfigOrDefault(Kivotos, CoffeeConfig())
+    if (configure.inviteDoubleCheck) {
+      val message = (tencentCustomMarkdown {
+        h2("确认")
+        at()
+        +"确认邀请 $student 来咖啡厅吗?"
+      } + tencentCustomKeyboard {
+        row {
+          button {
+            render {
+              label = "确认"
+            }
+            action {
+              type = TencentKeyboardButtonActionType.CALLBACK
+              data = "Y"
+            }
+            selfOnly()
           }
-          action {
-            type = TencentKeyboardButtonActionType.CALLBACK
-            data = "Y"
+          button {
+            render {
+              label = "取消"
+            }
+            action {
+              type = TencentKeyboardButtonActionType.CALLBACK
+              data = "N"
+            }
+            selfOnly()
           }
-          selfOnly()
         }
-        button {
-          render {
-            label = "取消"
+      }).let {
+        sendMessage(it)
+      }
+      val to = withTimeoutOrNull(10000L) {
+        val next = nextButtonInteraction()
+        next.accept()
+        if (next.buttonData == "Y") {
+          message?.recall()
+          coffee.updateStudents0(CoffeeDocument::students.name, coffee.students + target.id.value)
+          coffee.updateTouchedStudents(coffee.touchedStudents + target.id.value, false)
+          coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(20, DateTimeUnit.HOUR).toDateTime())
+          coffee.updateTime(CoffeeDocument::lastInviteStudent.name, student)
+          if (configure.touchAfterInvite) {
+            CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅 摸头 $student"))
+          } else {
+            CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅"))
           }
-          action {
-            type = TencentKeyboardButtonActionType.CALLBACK
-            data = "N"
-          }
-          selfOnly()
         }
       }
-    }).also {
-      sendMessage(it)
-    }
-    val to = withTimeoutOrNull(10000L) {
-      val next = nextButtonInteraction()
-      next.accept()
-      if (next.buttonData == "Y") {
-        coffee.updateStudents0(CoffeeDocument::students.name, coffee.students + target.id.value)
-        coffee.updateTouchedStudents(coffee.touchedStudents + target.id.value, false)
-        coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(20, DateTimeUnit.HOUR).toDateTime())
-        coffee.updateTime(CoffeeDocument::lastInviteStudent.name, student)
+      if (to == null) {
+        sendMessage("操作超时")
+      }
+    } else {
+      coffee.updateTouchedStudents(coffee.touchedStudents + target.id.value, false)
+      coffee.updateStudents0(CoffeeDocument::students.name, coffee.students + target.id.value)
+      coffee.updateTime(CoffeeDocument::lastInviteStudent.name, student)
+      coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(20, DateTimeUnit.HOUR).toDateTime())
+      if (configure.touchAfterInvite) {
+        CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅 摸头 $student"))
+      } else {
         CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅"))
       }
-    }
-    if (to == null) {
-      sendMessage("操作超时")
     }
   }
 }
@@ -706,5 +727,7 @@ private fun UserCommandSender.buildTouchButton(
           }
         }
       }
+  }.also {
+    it.windowed()
   }
 }

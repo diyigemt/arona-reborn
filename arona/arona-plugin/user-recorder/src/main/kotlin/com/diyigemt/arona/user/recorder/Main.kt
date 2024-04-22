@@ -1,8 +1,14 @@
 package com.diyigemt.arona.user.recorder
 
+import com.diyigemt.arona.command.AbstractCommand
+import com.diyigemt.arona.command.BuildInSuperAdminCommandOwner
 import com.diyigemt.arona.command.CommandManager
+import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.communication.message.h1
+import com.diyigemt.arona.communication.message.indexedList
+import com.diyigemt.arona.communication.message.tencentCustomMarkdown
 import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
@@ -30,7 +36,7 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.2.3",
+    version = "1.2.5",
     description = "record user data"
   )
 ) {
@@ -109,9 +115,13 @@ object PluginMain : AronaPlugin(
         // 日command
         dbQuery {
           if (command in dauRecord.commands) {
-            dauRecord.commands[command] = dauRecord.commands[command]!! + 1
+            val tmp = dauRecord.commands.toMutableMap()
+            tmp[command] = tmp[command]!! + 1
+            dauRecord.commands = tmp
           } else {
-            dauRecord.commands[command] = 1
+            val tmp = dauRecord.commands.toMutableMap()
+            tmp[command] = 1
+            dauRecord.commands = tmp
           }
         }
       }
@@ -180,7 +190,7 @@ object PluginMain : AronaPlugin(
 }
 
 @Suppress("unused")
-class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显示当日dau") {
+class DauClCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显示当日dau") {
   private val offset by argument().int().default(0)
   override fun run() {
     // dau
@@ -190,9 +200,12 @@ class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显
       val userCount = User.count()
       echo("date: $date")
       echo("contact: $contactCount, user: $userCount")
-      DailyActiveUser.findById(date)
+      DailyActiveUser.findById(date)!!
     }
     echo(dau)
+    dau.commands.entries.sortedBy { it.value }.forEach {
+      echo("${it.key}: ${it.value}")
+    }
     // 指令执行次数
     dbQuery {
       Command.all()
@@ -201,5 +214,43 @@ class DauCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显
           echo("${it.name}: ${it.count}")
         }
     }
+  }
+}
+
+@Suppress("unused")
+class DauCommand : AbstractCommand(
+  BuildInSuperAdminCommandOwner,
+  "dau",
+  description = "展示当日dau",
+) {
+  private val offset by argument().int().default(0)
+
+  suspend fun UserCommandSender.dau() {
+    val date = now()
+      .minus(DateTimePeriod(days = offset), TimeZone.currentSystemDefault())
+      .toDate()
+    val md = tencentCustomMarkdown {
+      h1(date)
+    }
+    val dau = dbQuery {
+      val contactCount = Contact.count()
+      val userCount = User.count()
+      md append tencentCustomMarkdown {
+        +"total contact: $contactCount, total user: $userCount"
+      }
+      DailyActiveUser.findById(date)!!
+    }
+    md append tencentCustomMarkdown {
+      +"dau: ${dau.count}"
+      +"contact: ${dau.contact}"
+      +"message: ${dau.message}"
+      +"commands:"
+      indexedList {
+        dau.commands.entries.sortedBy { it.value }.forEach {
+          +"${it.key}: ${it.value}"
+        }
+      }
+    }
+    sendMessage(md)
   }
 }

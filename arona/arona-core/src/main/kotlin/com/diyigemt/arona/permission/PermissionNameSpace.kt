@@ -3,11 +3,11 @@ package com.diyigemt.arona.permission
 import codes.laurence.warden.AccessRequest
 import codes.laurence.warden.atts.HasAtts
 import codes.laurence.warden.enforce.EnforcementPointDefault
-import codes.laurence.warden.enforce.NotAuthorizedException
 import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactMember.Companion.toPermissionSubject
 import com.diyigemt.arona.database.permission.Policy
-import com.diyigemt.arona.database.permission.Policy.Companion.BuildInPolicy
+import com.diyigemt.arona.database.permission.Policy.Companion.BuildInAllowPolicy
+import com.diyigemt.arona.database.permission.Policy.Companion.BuildInDenyPolicy
 import com.diyigemt.arona.database.permission.Policy.Companion.build
 import com.diyigemt.arona.database.permission.PolicyNodeEffect
 
@@ -52,13 +52,25 @@ interface Permission {
     internal suspend fun Permission.testPermission(
       subject: ContactMember,
       policies: List<Policy>,
-      environment: Map<String, Any?> = mapOf()
+      environment: Map<String, Any?> = mapOf(),
     ): Boolean {
-      val allow = policies.filter { it.effect == PolicyNodeEffect.ALLOW }.map { it.build() }.flatten()
+      val allow = policies
+        .filter { it.effect == PolicyNodeEffect.ALLOW }
+        .map { it.build() }
+        .flatten()
+        .toMutableList()
+        .apply {
+          add(BuildInAllowPolicy)
+        }
       // 添加常驻禁止策略
-      val deny = policies.filter { it.effect == PolicyNodeEffect.DENY }.map { it.build() }.flatten().toMutableList().apply {
-        add(BuildInPolicy)
-      }
+      val deny = policies
+        .filter { it.effect == PolicyNodeEffect.DENY }
+        .map { it.build() }
+        .flatten()
+        .toMutableList()
+        .apply {
+//          add(BuildInDenyPolicy)
+        }
       return runCatching {
         EnforcementPointDefault(allow, deny).enforceAuthorization(
           AccessRequest(

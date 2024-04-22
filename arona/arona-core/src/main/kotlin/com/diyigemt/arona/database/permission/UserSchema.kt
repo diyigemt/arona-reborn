@@ -131,6 +131,14 @@ abstract class PluginUserDocument : PluginVisibleData() {
   abstract val unionOpenId: String
   abstract val qq: Long
   abstract val username: String
+  suspend fun updateUsername(name: String) {
+    UserDocument.withCollection<UserDocument, UpdateResult> {
+      updateOne(
+        filter = idFilter(id),
+        update = Updates.set(UserDocument::username.name, name)
+      )
+    }
+  }
 }
 
 interface ExposedUserDocument {

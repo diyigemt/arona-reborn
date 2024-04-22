@@ -27,7 +27,7 @@ jobs:
         node-version: '18.x'
     - uses: pnpm/action-setup@master
       with:
-        version: v7.9.0
+        version: v8.15.7
     - name: Build
       run: |
         cd arona-webui

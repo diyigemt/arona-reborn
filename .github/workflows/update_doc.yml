@@ -27,7 +27,7 @@ jobs:
         node-version: '18.x'
     - uses: pnpm/action-setup@master
       with:
-        version: latest
+        version: v8.15.7
     - name: Build
       run: |
         cd arona-doc

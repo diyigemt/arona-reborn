@@ -50,6 +50,27 @@ private suspend fun UserCommandSender.coffee() = CoffeeDocument.withCollection<C
 private const val MORNING_TIME = "03:00:00"
 private const val AFTERNOON_TIME = "15:00:00"
 
+// 检查学生刷新时间
+private fun checkStudentUpdate(last0: String): Boolean {
+  val now = now()
+  val nowDatetime = now.toDateTime()
+  val last = last0.toInstant()
+  val morning = "${currentDate()} $MORNING_TIME"
+  val afternoon = "${currentDate()} $AFTERNOON_TIME"
+  // 超过12小时 肯定需要更新
+  return (now - last).inWholeHours >= 12L ||
+    morning in last0..nowDatetime ||
+    afternoon in last0..nowDatetime
+}
+
+// 检查学生摸头刷新时间 从第一次摸开始算起3小时刷新
+private fun checkStudentTouchedUpdate(last0: String): Boolean {
+  val now = now()
+  val last = last0.toInstant()
+  val duration = now - last
+  return duration.inWholeHours >= 3
+}
+
 private fun calcNextTouchTime(coffee: CoffeeDocument): String {
   val last = coffee.lastTouchTime.toInstant().toTime()
   val next = coffee.lastTouchTime.toInstant().plus(3, DateTimeUnit.HOUR).toTime()
@@ -150,27 +171,6 @@ class CoffeeCommand : AbstractCommand(
       kb.windowed()
       sendMessage(md + kb)
     }
-  }
-
-  // 检查学生刷新时间
-  private fun checkStudentUpdate(last0: String): Boolean {
-    val now = now()
-    val nowDatetime = now.toDateTime()
-    val last = last0.toInstant()
-    val morning = "${currentDate()} $MORNING_TIME"
-    val afternoon = "${currentDate()} $AFTERNOON_TIME"
-    // 超过12小时 肯定需要更新
-    return (now - last).inWholeHours >= 12L ||
-        morning in last0..nowDatetime ||
-        afternoon in last0..nowDatetime
-  }
-
-  // 检查学生摸头刷新时间 从第一次摸开始算起3小时刷新
-  private fun checkStudentTouchedUpdate(last0: String): Boolean {
-    val now = now()
-    val last = last0.toInstant()
-    val duration = now - last
-    return duration.inWholeHours >= 3
   }
 
   private fun studentCount(level: Int) = when (level) {
@@ -337,7 +337,16 @@ class CoffeeTouchAllCommand : AbstractCommand(
     md append tencentCustomMarkdown {
       at()
     }
-    sendMessage(md)
+    val kb = if (coffee.canInviteStudent) {
+      tencentCustomKeyboard {
+        row {
+          subButton("邀请${coffee.lastInviteStudent}", "咖啡厅 邀请 ${coffee.lastInviteStudent}", enter = true)
+          subButton("邀请学生", "咖啡厅 邀请 ${coffee.lastInviteStudent}", enter = false)
+        }
+        selfOnly()
+      }
+    } else PlainText("")
+    sendMessage(md + kb)
     coffee.updateTouchedStudents(listOf(), coffee.touchedStudents.size == coffee.students.size)
   }
 }
@@ -383,7 +392,7 @@ class CoffeeInviteCommand : AbstractCommand(
         +"/${KivotosCommand.primaryName} 咖啡厅 邀请 日奈"
       } + tencentCustomKeyboard {
         row {
-          subButton("邀请学生", "咖啡厅 邀请 ")
+          subButton("邀请学生", "咖啡厅 邀请 ${coffee.lastInviteStudent}")
         }
       }
       sendMessage(message)
@@ -398,7 +407,7 @@ class CoffeeInviteCommand : AbstractCommand(
         at()
       } + tencentCustomKeyboard {
         row {
-          subButton("邀请学生", "咖啡厅 邀请 ")
+          subButton("邀请学生", "咖啡厅 邀请 ${coffee.lastInviteStudent}")
         }
       }
       sendMessage(message)
@@ -715,7 +724,7 @@ private fun UserCommandSender.buildTouchButton(
     ) + if (coffee.canInviteStudent) {
       listOf(
         "邀请${coffee.lastInviteStudent}" to "咖啡厅 邀请 ${coffee.lastInviteStudent}" to true,
-        "邀请学生" to "咖啡厅 邀请" to false
+        "邀请学生" to "咖啡厅 邀请 ${coffee.lastInviteStudent}" to false
       )
     } else {
       listOf()

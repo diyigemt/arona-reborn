@@ -42,7 +42,8 @@ internal class DynamicCommandExecutor(
   private val lock = Mutex()
   private val pool = ArrayDeque<AbstractCommand>()
   val poolSize
-  get() = pool.size
+    get() = pool.size
+
   private fun createCommandInstance() = parentSignature.clazz.createInstance().also {
     var c = it
     for (child in minimumSignature) {
@@ -51,6 +52,7 @@ internal class DynamicCommandExecutor(
       c = tmp
     }
   }
+
   private fun shouldIncreaseCapacity() {
     // 快速增长临时扩容
     if (extensionCounter.incrementAndGet() - capacity > 1.5 * capacity + 5) {
@@ -59,6 +61,7 @@ internal class DynamicCommandExecutor(
     }
     commandLineLogger.debug("pop, target=$primaryName, current=${extensionCounter.value}")
   }
+
   private fun shouldDecreaseCapacity() {
     if (extensionCounter.decrementAndGet() < capacity / 1.5 - 5) {
       capacity = max(rawCapacity, (capacity / 1.5).toInt())
@@ -66,10 +69,11 @@ internal class DynamicCommandExecutor(
     }
     commandLineLogger.debug("push, target=$primaryName, current=${extensionCounter.value}")
   }
+
   suspend fun execute(args: List<String>, caller: CommandSender, checkPermission: Boolean):
     CommandExecuteResult {
     var worker = lock.withLock {
-      pool.firstOrNull()
+      pool.removeFirstOrNull()
     }
     if (worker == null) {
       worker = createCommandInstance()
@@ -108,6 +112,7 @@ internal class DynamicCommandExecutor(
         localization = crsiveLocalization
       }
       worker.parse(args)
+      commitWorker(worker)
       CommandExecuteResult.Success(worker)
     }.getOrElse {
       shouldDecreaseCapacity()
@@ -119,12 +124,13 @@ internal class DynamicCommandExecutor(
       }
     }
   }
-  suspend fun commitWorker(command: AbstractCommand) {
+
+  private suspend fun commitWorker(command: AbstractCommand) {
     shouldDecreaseCapacity()
     lock.withLock {
       if (pool.size < capacity) {
         // 清除多余的引用
-        command.context2 {  }
+        command.context2 { }
         pool.addLast(command)
       }
     }

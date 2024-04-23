@@ -6,8 +6,6 @@ import com.diyigemt.arona.permission.Permission
 import com.diyigemt.arona.permission.PermissionService
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.requireObject
-import com.github.ajalt.clikt.core.subcommands
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -147,15 +145,8 @@ abstract class AbstractCommand(
     if (!caller.kType.isSubtypeOf(fn.parameters[1].type)) {
       return
     }
-    if (currentContext.invokedSubcommand != null) {
-      runBlocking(caller.coroutineContext) {
-        fn.callSuspend(this@AbstractCommand, caller)
-      }
-    } else {
-      caller.launch {
-        fn.callSuspend(this@AbstractCommand, caller)
-        commitWorker(workerName, root)
-      }
+    runBlocking(caller.coroutineContext) {
+      fn.callSuspend(this@AbstractCommand, caller)
     }
   }
 

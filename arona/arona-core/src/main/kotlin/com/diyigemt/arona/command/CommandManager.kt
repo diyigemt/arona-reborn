@@ -301,10 +301,6 @@ internal suspend fun executeCommandImpl(
   return executor.execute(parseArg, caller, checkPermission)
 }
 
-internal suspend fun commitWorker(name: String, worker: AbstractCommand) {
-  ExecutorMap[name]?.commitWorker(worker)
-}
-
 suspend fun GuildUserCommandSender.nextMessage(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,

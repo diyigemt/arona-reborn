@@ -72,7 +72,16 @@ data class TencentCustomKeyboard0(
   @SerialName("bot_appid")
   @EncodeDefault
   var botAppid: String? = null
-)
+) {
+  fun UserCommandSender.selfOnly() {
+    rows.forEach {
+      it.buttons.forEach { b ->
+        b.action.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
+        b.action.permission.specifyUserIds = listOf(user.id)
+      }
+    }
+  }
+}
 
 fun TencentCustomKeyboard0.row(block: TencentCustomKeyboardRow.() -> Unit) {
   rows.add(
@@ -84,7 +93,14 @@ fun TencentCustomKeyboard0.row(block: TencentCustomKeyboardRow.() -> Unit) {
 @Serializable
 data class TencentCustomKeyboardRow(
   internal val buttons: MutableList<TencentKeyboardButton> = mutableListOf(),
-)
+) {
+  fun UserCommandSender.selfOnly() {
+    buttons.forEach {
+      it.action.permission.type = TencentKeyboardButtonActionDataType.SPECIFY
+      it.action.permission.specifyUserIds = listOf(user.id)
+    }
+  }
+}
 
 fun TencentCustomKeyboardRow.button(id: Int, block: TencentKeyboardButton.() -> Unit) {
   button(id.toString(), block)

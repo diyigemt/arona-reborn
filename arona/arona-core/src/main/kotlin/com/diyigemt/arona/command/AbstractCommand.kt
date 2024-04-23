@@ -132,6 +132,8 @@ abstract class AbstractCommand(
   override val description: String = "<no description available>",
   help: String = "",
 ) : CliktCommand(name = primaryName, help = help, epilog = description, invokeWithoutSubcommand = true), Command {
+  private val workerName by requireObject<String>("worker")
+  private val root by requireObject<AbstractCommand>("root")
   private val caller by requireObject<AbstractCommandSender>("caller")
   private val signature by requireObject<CommandSignature>("signature")
 
@@ -152,6 +154,7 @@ abstract class AbstractCommand(
     } else {
       caller.launch {
         fn.callSuspend(this@AbstractCommand, caller)
+        commitWorker(workerName, root)
       }
     }
   }

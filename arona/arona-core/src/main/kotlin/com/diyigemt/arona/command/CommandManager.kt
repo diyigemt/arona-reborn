@@ -29,6 +29,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.math.min
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.createInstance
@@ -61,18 +62,19 @@ internal fun CommandSignature.createInstance(parent: AbstractCommand): AbstractC
   return instance
 }
 
-internal fun CommandSignature.createMinimumInstance(path: List<String>): AbstractCommand {
-  val instance = clazz.createInstance()
-  var parentInstance = instance
+internal val ExecutorMap: MutableMap<String, DynamicCommandExecutor> = mutableMapOf()
+
+internal fun CommandSignature.matchChildPath(path: List<String>): List<String> {
+  if (path.isEmpty()) return listOf(primaryName)
+  if (path.size == 1) return if (this.children.any { it.primaryName == path[0] }) path else listOf(primaryName)
+  val result = mutableListOf(primaryName)
   var parentSignature = this
-  path.forEach {
-    val tmp = parentSignature.children.firstOrNull { c -> c.primaryName == it } ?: return instance
-    val child = tmp.clazz.createInstance()
-    parentInstance.subcommands(child)
-    parentInstance = child
+  for (it in path) {
+    val tmp = parentSignature.children.firstOrNull { c -> c.primaryName == it } ?: break
+    result.add(tmp.primaryName)
     parentSignature = tmp
   }
-  return instance
+  return result
 }
 
 internal fun CommandSignature.flat(): Map<KClass<out AbstractCommand>, KFunction<*>> {
@@ -87,7 +89,7 @@ internal fun CommandSignature.flat(): Map<KClass<out AbstractCommand>, KFunction
 }
 
 internal fun KClass<out AbstractCommand>.createSignature(): CommandSignature {
-  return kotlin.runCatching {
+  return kotlin.run {
     val instance = createInstance()
     val reflector = CommandReflector(this)
     val subCommands = reflector.findSubCommand().map { it.createSignature() }.toMutableList()
@@ -104,7 +106,7 @@ internal fun KClass<out AbstractCommand>.createSignature(): CommandSignature {
       hasAnnotation<UnderDevelopment>(),
       reflector.findTargetExtensionFunction()
     )
-  }.getOrThrow()
+  }
 }
 
 object CommandManager {
@@ -275,7 +277,6 @@ internal suspend fun executeCommandImpl(
   val parseArg = arg
     .split(" ")
     .filter { it.isNotEmpty() }
-    .map { it.trim() }
     .toMutableList()
     .apply {
       // 如果第一个是at机器人, 继续移除掉
@@ -287,51 +288,22 @@ internal suspend fun executeCommandImpl(
           }
         }
     }
-  val command = commandSignature.createMinimumInstance(parseArg)
-  if (checkPermission) {
-    val document = caller.subject?.toContactDocumentOrNull()
-    val user = caller.user?.toUserDocumentOrNull()
-    if (document != null) {
-      val u = document.findContactMemberOrNull(user?.id ?: "") ?: ContactMember(
-        "",
-        "",
-        listOf(DEFAULT_MEMBER_CONTACT_ROLE_ID)
-      )
-      val environment = mapOf(
-        "time" to currentTime().substringBeforeLast(":"),
-        "date" to currentDate(),
-        "datetime" to currentDateTime(),
-        "param1" to (parseArg.getOrNull(0) ?: ""),
-        "param2" to (parseArg.getOrNull(1) ?: "")
-      )
-      if (!command.permission.testPermission(u, document.policies, environment)) {
-        return CommandExecuteResult.PermissionDenied(command)
-      }
-    }
+  // 过滤参数
+
+  val primaryName = commandSignature.matchChildPath(parseArg).joinToString(",")
+  val executor = ExecutorMap[primaryName] ?: DynamicCommandExecutor(
+    parseArg,
+    primaryName,
+    commandSignature
+  ).also {
+    ExecutorMap[primaryName] = it
   }
-  return runCatching {
-    command.context2 {
-      obj = mutableMapOf(
-        "caller" to caller,
-        "signature" to commandSignature
-      )
-      terminal = commandTerminal
-      localization = crsiveLocalization
-    }
-    command.parse(
-      parseArg
-    )
-    CommandExecuteResult.Success(command)
-  }.getOrElse {
-    when (it) {
-      is MissingArgument -> CommandExecuteResult.UnmatchedSignature(it, command)
-      is TimeoutCancellationException -> CommandExecuteResult.Success(command)
-      is PrintHelpMessage -> CommandExecuteResult.UnmatchedSignature(it, command)
-      else -> CommandExecuteResult.ExecutionFailed(it, command)
-    }
-  }
+  return executor.execute(parseArg, caller, checkPermission)
 }
 
+internal suspend fun commitWorker(name: String, worker: AbstractCommand) {
+  ExecutorMap[name]?.commitWorker(worker)
+}
 
 suspend fun GuildUserCommandSender.nextMessage(
   timeoutMillis: Long = -1,

@@ -20,37 +20,8 @@ class CommonTest {
   }
 
   @Test
-  fun testApply() {
-    fun a(block: () -> Unit) {
-      block.apply {
-        println("b")
-        this()
-      }
-    }
-  }
-
-  @Test
-  fun testBitOp() {
-    val a = 1 shl 0 or 1 shl 9 or 1 shl 1
-    println(1 shl 0 or 1 shl 9 or 1 shl 1)
-  }
-
-  @Test
   fun testIntentBuilder() {
     println(TencentMessageIntentsBuilder().buildPublicBot().build())
-  }
-
-  @Test
-  fun testJson() {
-    println(Json.encodeToString(TencentRichMessage("123")))
-  }
-
-  @Test
-  fun testException() {
-    runCatching {
-      throw Exception("")
-    }.onFailure { println(1) }
-      .getOrElse { println(2) }
   }
 
   @Test
@@ -77,10 +48,13 @@ class CommonTest {
     a.subcommands(b)
     a.parse(listOf("c"))
   }
+
   @Test
-  fun testDuration() {
-    val a = "2024-03-18 16:14:00".toInstant()
-    val b = "2024-03-18 19:13:00".toInstant()
-    println((b - a).inWholeHours)
+  fun testArgParse() {
+    val tmp = "/测试 123  333 545 "
+      .split(" ")
+      .filter { it.isNotEmpty() }
+      .toMutableList()
+    println(tmp)
   }
 }

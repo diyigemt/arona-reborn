@@ -1,5 +1,6 @@
 package com.diyigemt.arona.console
 
+import com.diyigemt.arona.command.ExecutorMap
 import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.utils.ReflectionUtil
@@ -89,6 +90,20 @@ class GlobalAnnouncementCommand : CommandLineSubCommand, CliktCommand(name = "an
         BotManager.getBot().guilds.getOrCreate(g.id).sendMessage(message)
         echo("send guild($index/${guilds.size}): ${g.contactName}")
       }
+    }
+  }
+}
+
+@Suppress("unused")
+class MonitorCommand : CommandLineSubCommand, CliktCommand(name = "monitor", help = "系统资源监视") {
+  override fun run() {
+    val rt = Runtime.getRuntime()
+    val max = rt.maxMemory() / 1024 / 8
+    val usage = (rt.totalMemory() - rt.freeMemory()) / 1024 / 8
+    val free = rt.freeMemory() / 1024 / 8
+    echo("max: $max MB, usage: $usage MB, free: $free MB")
+    ExecutorMap.entries.sortedBy { it.key.length }.forEach {
+      echo("${it.key} -> ${it.value.extensionCounter.value}-${it.value.poolSize}/${it.value.capacity}")
     }
   }
 }

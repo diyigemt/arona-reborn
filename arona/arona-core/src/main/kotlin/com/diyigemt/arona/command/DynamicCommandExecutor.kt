@@ -28,6 +28,7 @@ internal class DynamicCommandExecutor(
   var capacity: Int = 10,
 ) {
   private val rawCapacity = capacity
+  private val capacityDecrementCounter = atomic(0)
   val extensionCounter = atomic(0)
   private val minimumSignature: List<CommandSignature> = run {
     var ps = parentSignature
@@ -57,13 +58,14 @@ internal class DynamicCommandExecutor(
     // 快速增长临时扩容
     if (extensionCounter.incrementAndGet() - capacity > 1.5 * capacity + 5) {
       capacity = (capacity * 1.5).toInt()
+      capacityDecrementCounter.lazySet(capacity)
       commandLineLogger.debug("trigger increment, target=$primaryName, capacity=$capacity")
     }
     commandLineLogger.debug("pop, target=$primaryName, current=${extensionCounter.value}")
   }
 
   private fun shouldDecreaseCapacity() {
-    if (extensionCounter.decrementAndGet() < capacity / 1.5 - 5) {
+    if (capacityDecrementCounter.decrementAndGet() <= 0 && extensionCounter.decrementAndGet() < capacity / 1.5 - 5) {
       capacity = max(rawCapacity, (capacity / 1.5).toInt())
       commandLineLogger.debug("trigger decrement, target=$primaryName, capacity=$capacity")
     }

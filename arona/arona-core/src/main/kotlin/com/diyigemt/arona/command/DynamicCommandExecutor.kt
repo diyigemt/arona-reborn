@@ -103,8 +103,6 @@ internal class DynamicCommandExecutor(
     return runCatching {
       worker.context2 {
         obj = mutableMapOf(
-          "worker" to primaryName,
-          "root" to worker,
           "caller" to caller,
           "signature" to parentSignature
         )

@@ -103,7 +103,7 @@ class MonitorCommand : CommandLineSubCommand, CliktCommand(name = "monitor", hel
     val free = rt.freeMemory() / 1024 / 8
     echo("max: $max MB, usage: $usage MB, free: $free MB")
     ExecutorMap.entries.sortedBy { it.key.length }.forEach {
-      echo("${it.key} -> ${it.value.extensionCounter.value}-${it.value.poolSize}/${it.value.capacity}")
+      echo("${it.key} -> ${it.value.runningCounter.value}-${it.value.idleWorkers}/${it.value.capacity}")
     }
   }
 }

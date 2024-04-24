@@ -478,10 +478,10 @@ internal object ContactEndpoint {
     if (ev.isBlock) return errorMessage("内容审核失败: ${ev.message}")
     contact.findContactMemberOrNull(aronaUser.id)?.also {
       it.updatePluginConfig(
-        contact.id,
         obj.id,
         obj.key,
-        value
+        value,
+        contact.id,
       )
       return success()
     }

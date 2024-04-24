@@ -4,10 +4,16 @@ import com.diyigemt.arona.communication.message.TencentMessageIntentsBuilder
 import com.diyigemt.arona.communication.message.TencentRichMessage
 import com.diyigemt.arona.utils.*
 import com.github.ajalt.clikt.core.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 
 class CommonTest {
@@ -56,5 +62,33 @@ class CommonTest {
       .filter { it.isNotEmpty() }
       .toMutableList()
     println(tmp)
+  }
+
+  class B : CoroutineScope {
+    override val coroutineContext: CoroutineContext = EmptyCoroutineContext
+    suspend fun foo() {
+      println("bar")
+    }
+  }
+
+  class A {
+    fun run(b: B) {
+      b.launch {
+        delay(1000)
+        b.foo()
+      }
+    }
+  }
+  @Test
+  fun testRunBlocking() {
+    suspend fun bar() {
+      val a = A()
+      val b = B()
+      a.run(b)
+    }
+    runBlocking {
+      bar()
+      println(1)
+    }
   }
 }

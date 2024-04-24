@@ -15,7 +15,7 @@ import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.core.subcommands
 import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.math.max
@@ -25,11 +25,13 @@ internal class DynamicCommandExecutor(
   val path: List<String>,
   private val primaryName: String,
   private val parentSignature: CommandSignature,
-  var capacity: Int = 10,
-) {
+  var capacity: Int = 16,
+  private val workerIdleTimeout: Int = 120, // 扩容120s后若低于负载, 恢复初始容量
+) : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName(primaryName)) {
   private val rawCapacity = capacity
-  private val capacityDecrementCounter = atomic(0)
-  val extensionCounter = atomic(0)
+  private var decrementJob: Job? = null
+  private var capacityIncrementCounter = atomic(0)
+  val runningCounter = atomic(0)
   private val minimumSignature: List<CommandSignature> = run {
     var ps = parentSignature
     val result = mutableListOf<CommandSignature>()
@@ -40,9 +42,10 @@ internal class DynamicCommandExecutor(
     }
     result
   }
-  private val lock = Mutex()
-  private val pool = ArrayDeque<AbstractCommand>()
-  val poolSize
+  private val capacityModifyLock = Mutex()
+  private val poolModifyLock = Mutex()
+  private val pool = ArrayDeque<AbstractCommand>(16)
+  val idleWorkers
     get() = pool.size
 
   private fun createCommandInstance() = parentSignature.clazz.createInstance().also {
@@ -55,26 +58,39 @@ internal class DynamicCommandExecutor(
   }
 
   private fun shouldIncreaseCapacity() {
+    if (capacityModifyLock.isLocked) {
+      return
+    }
     // 快速增长临时扩容
-    if (extensionCounter.incrementAndGet() - capacity > 1.5 * capacity + 5) {
-      capacity = (capacity * 1.5).toInt()
-      capacityDecrementCounter.lazySet(capacity)
+    if (runningCounter.value + idleWorkers > 2 * capacity) {
+      if (!capacityModifyLock.tryLock()) {
+        return
+      }
+      decrementJob?.cancel()
+      capacity *= 2
+      capacityIncrementCounter.incrementAndGet()
+      decrementJob = launch {
+        while (capacityIncrementCounter.decrementAndGet() >= 0) {
+          delay(workerIdleTimeout * 1000L)
+          capacityModifyLock.withLock {
+            capacity = max(rawCapacity, capacity / 2)
+          }
+          commandLineLogger.debug("trigger decrement, target=$primaryName, capacity=$capacity")
+        }
+      }
+      capacityModifyLock.unlock()
       commandLineLogger.debug("trigger increment, target=$primaryName, capacity=$capacity")
     }
-    commandLineLogger.debug("pop, target=$primaryName, current=${extensionCounter.value}")
+    commandLineLogger.debug("pop, target=$primaryName, current=${runningCounter.value}")
   }
 
   private fun shouldDecreaseCapacity() {
-    if (capacityDecrementCounter.decrementAndGet() <= 0 && extensionCounter.decrementAndGet() < capacity / 1.5 - 5) {
-      capacity = max(rawCapacity, (capacity / 1.5).toInt())
-      commandLineLogger.debug("trigger decrement, target=$primaryName, capacity=$capacity")
-    }
-    commandLineLogger.debug("push, target=$primaryName, current=${extensionCounter.value}")
+    commandLineLogger.debug("push, target=$primaryName, current=${runningCounter.value}")
   }
 
   suspend fun execute(args: List<String>, caller: CommandSender, checkPermission: Boolean):
     CommandExecuteResult {
-    var worker = lock.withLock {
+    var worker = poolModifyLock.withLock {
       pool.removeFirstOrNull()
     }
     if (worker == null) {
@@ -126,11 +142,11 @@ internal class DynamicCommandExecutor(
   }
 
   private suspend fun commitWorker(command: AbstractCommand) {
+    // 清除多余的引用
+    command.context2 { }
     shouldDecreaseCapacity()
-    lock.withLock {
-      if (pool.size < capacity) {
-        // 清除多余的引用
-        command.context2 { }
+    if (pool.size < capacity) {
+      poolModifyLock.withLock {
         pool.addLast(command)
       }
     }

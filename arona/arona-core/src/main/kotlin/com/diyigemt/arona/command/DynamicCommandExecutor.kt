@@ -18,6 +18,7 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.collections.ArrayDeque
 import kotlin.math.max
 import kotlin.reflect.full.createInstance
 
@@ -70,7 +71,10 @@ internal class DynamicCommandExecutor(
       capacity *= 2
       capacityIncrementCounter.incrementAndGet()
       decrementJob = launch {
-        while (capacityIncrementCounter.decrementAndGet() >= 0) {
+        while (
+          (idleWorkers >= capacity / 2) &&
+          capacityIncrementCounter.decrementAndGet() >= 0
+        ) {
           delay(workerIdleTimeout * 1000L)
           capacityModifyLock.withLock {
             capacity = max(rawCapacity, capacity / 2)
@@ -85,14 +89,13 @@ internal class DynamicCommandExecutor(
   }
 
   private fun shouldDecreaseCapacity() {
+    runningCounter.decrementAndGet()
     commandLineLogger.debug("push, target=$primaryName, current=${runningCounter.value}")
   }
 
   suspend fun execute(args: List<String>, caller: CommandSender, checkPermission: Boolean):
     CommandExecuteResult {
-    var worker = poolModifyLock.withLock {
-      pool.removeFirstOrNull()
-    }
+    var worker = pool.removeFirstOrNull()
     if (worker == null) {
       worker = createCommandInstance()
     }
@@ -118,6 +121,7 @@ internal class DynamicCommandExecutor(
         }
       }
     }
+    runningCounter.incrementAndGet()
     return runCatching {
       worker.context2 {
         obj = mutableMapOf(
@@ -131,7 +135,7 @@ internal class DynamicCommandExecutor(
       commitWorker(worker)
       CommandExecuteResult.Success(worker)
     }.getOrElse {
-      shouldDecreaseCapacity()
+      commitWorker(worker)
       when (it) {
         is MissingArgument -> CommandExecuteResult.UnmatchedSignature(it, worker)
         is TimeoutCancellationException -> CommandExecuteResult.Success(worker)
@@ -146,9 +150,7 @@ internal class DynamicCommandExecutor(
     command.context2 { }
     shouldDecreaseCapacity()
     if (pool.size < capacity) {
-      poolModifyLock.withLock {
-        pool.addLast(command)
-      }
+      pool.addLast(command)
     }
   }
 }

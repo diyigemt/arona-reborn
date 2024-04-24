@@ -252,7 +252,7 @@ internal data class UserDocument(
     }
 
     suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? {
-      val u = sqlDbQuery {
+      val u = sqlDbQuerySuspended {
         UserSchema.findById(uid)
       }
       return if (u == null) {

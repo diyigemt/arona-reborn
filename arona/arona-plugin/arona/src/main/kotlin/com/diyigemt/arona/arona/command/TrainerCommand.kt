@@ -4,6 +4,7 @@ package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
 import com.diyigemt.arona.arona.database.image.update
@@ -102,7 +103,7 @@ class TrainerCommand : AbstractCommand(
       val url = "https://arona.cdn.diyigemt.com/image" +
         (if (isGuild()) "/s" else "") +
         content
-      val im = dbQuery {
+      val im = dbQuerySuspended {
         findImage(hash, from)
       }
       when (im) {
@@ -111,7 +112,7 @@ class TrainerCommand : AbstractCommand(
             if (it.isFailed) {
               subject.uploadImage(url).also { image ->
                 sendMessage(image)
-                dbQuery { image.update(hash, from) }
+                dbQuerySuspended { image.update(hash, from) }
               }
             }
           }
@@ -120,7 +121,7 @@ class TrainerCommand : AbstractCommand(
         else -> {
           subject.uploadImage(url).also {
             sendMessage(it)
-            dbQuery { it.update(hash, from) }
+            dbQuerySuspended { it.update(hash, from) }
           }
         }
       }

@@ -1,6 +1,5 @@
 package com.diyigemt.kivotos.rank
 
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.SubCommand

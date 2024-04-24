@@ -4,6 +4,7 @@ package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
 import com.diyigemt.arona.arona.database.image.update
@@ -104,11 +105,11 @@ class TarotCommand : AbstractCommand(
       readUserPluginConfigOrNull(Arona) ?: contactDocument().readPluginConfigOrDefault(Arona, default = TarotConfig())
     val id = userDocument().id
     val today = currentLocalDateTime().date.dayOfMonth
-    val record = dbQuery {
+    val record = dbQuerySuspended {
       TarotRecordSchema.findById(id)
     }
     if (record != null && record.day == today && tarotConfig.dayOne) {
-      val tarot = dbQuery {
+      val tarot = dbQuerySuspended {
         TarotSchema.findById(record.tarot)
       }!!
       send(tarot, record.positive, userTarotConfig.cardType)
@@ -126,18 +127,18 @@ class TarotCommand : AbstractCommand(
         positive = PositiveMap[t] ?: true
       } else {
         record?.run {
-          dbQuery {
+          dbQuerySuspended {
             this@run.negativeCount++
             this@run.maxNegativeCount = max(this@run.maxNegativeCount, this.negativeCount)
           }
         }
       }
     }
-    val tarot = dbQuery {
+    val tarot = dbQuerySuspended {
       TarotSchema.findById(tarotIndex)
     }!!
     send(tarot, positive, userTarotConfig.cardType)
-    dbQuery {
+    dbQuerySuspended {
       if (record != null) {
         record.day = today
         record.tarot = tarotIndex
@@ -210,10 +211,10 @@ class TarotCommand : AbstractCommand(
       }
       sendMessage(m.build())
     } else {
-      val im = dbQuery {
+      val im = dbQuerySuspended {
         findImage(name, from)
       } ?: subject.uploadImage(url).also {
-        dbQuery { it.update(name, from) }
+        dbQuerySuspended { it.update(name, from) }
       }
       val resp = MessageChainBuilder()
         .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
@@ -227,7 +228,7 @@ class TarotCommand : AbstractCommand(
               .append(im)
               .build()
           )
-          dbQuery { image.update(name, from) }
+          dbQuerySuspended { image.update(name, from) }
         }
       }
     }

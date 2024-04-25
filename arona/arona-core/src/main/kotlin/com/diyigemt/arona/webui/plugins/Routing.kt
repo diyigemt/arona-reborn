@@ -1,6 +1,6 @@
 package com.diyigemt.arona.webui.plugins
 
-import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuerySuspended
+import com.diyigemt.arona.database.DatabaseProvider.sqlDbQueryReadUncommited
 import com.diyigemt.arona.utils.ReflectionUtil
 import com.diyigemt.arona.webui.endpoints.*
 import io.ktor.http.*
@@ -101,7 +101,7 @@ suspend fun PipelineContext<Unit, ApplicationCall>.checkTransaction(clazz: Any, 
   if (withoutTransaction(clazz::class, fn)) {
     fn.callSuspend(clazz, this)
   } else {
-    sqlDbQuerySuspended {
+    sqlDbQueryReadUncommited {
       fn.callSuspend(clazz, this)
     }
   }

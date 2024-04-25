@@ -2,34 +2,22 @@
 
 package com.diyigemt.arona.command
 
+import com.diyigemt.arona.command.CommandManager.commandMap
 import com.diyigemt.arona.communication.command.*
-import com.diyigemt.arona.communication.contact.Contact.Companion.toContactDocumentOrNull
-import com.diyigemt.arona.communication.contact.User.Companion.toUserDocumentOrNull
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.Message
 import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toReadableTencentAt
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
 import com.diyigemt.arona.communication.message.toMessageChain
-import com.diyigemt.arona.database.permission.ContactMember
-import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
-import com.diyigemt.arona.permission.Permission.Companion.testPermission
-import com.diyigemt.arona.utils.currentDate
-import com.diyigemt.arona.utils.currentDateTime
-import com.diyigemt.arona.utils.currentTime
-import com.github.ajalt.clikt.core.MissingArgument
-import com.github.ajalt.clikt.core.PrintHelpMessage
-import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.util.logging.*
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.math.min
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.createInstance
@@ -60,6 +48,31 @@ internal fun CommandSignature.createInstance(parent: AbstractCommand): AbstractC
     it.createInstance(instance)
   }
   return instance
+}
+
+internal fun buildDynamicExecutor(root: CommandSignature, current: CommandSignature, path: List<String>) {
+  val newPath = path + listOf(current.primaryName)
+  if (current.children.isEmpty()) {
+    val primaryName = newPath.joinToString(",")
+    ExecutorMap[primaryName] = DynamicCommandExecutor(newPath, primaryName, root)
+  } else {
+    current.children.forEach {
+      buildDynamicExecutor(root, it, newPath)
+    }
+  }
+}
+
+internal fun initExecutorMap() {
+  commandMap.forEach { (_, u) ->
+    if (u.children.isNotEmpty()) {
+      u.children.forEach {
+        buildDynamicExecutor(u, it, listOf(u.primaryName))
+      }
+    } else {
+      val primaryName = u.primaryName
+      ExecutorMap[primaryName] = DynamicCommandExecutor(listOf(u.primaryName), primaryName, u)
+    }
+  }
 }
 
 internal val ExecutorMap: MutableMap<String, DynamicCommandExecutor> = mutableMapOf()
@@ -291,13 +304,7 @@ internal suspend fun executeCommandImpl(
   // 过滤参数
 
   val primaryName = commandSignature.matchChildPath(parseArg).joinToString(",")
-  val executor = ExecutorMap[primaryName] ?: DynamicCommandExecutor(
-    parseArg,
-    primaryName,
-    commandSignature
-  ).also {
-    ExecutorMap[primaryName] = it
-  }
+  val executor = ExecutorMap[primaryName] ?: return CommandExecuteResult.UnresolvedCommand()
   return executor.execute(parseArg, caller, checkPermission)
 }
 

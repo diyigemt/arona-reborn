@@ -596,6 +596,20 @@ internal class EmptyGroupMemberImpl(
   }
 }
 
+internal class EmptyMockGroupMemberImpl(
+  override val group: Group,
+  override val id: String = EmptyMessageId,
+) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
+  override val unionOpenid: String = EmptyMessageId
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<GroupMember>? {
+    TODO("Not yet implemented")
+  }
+
+  override fun asSingleUser(): FriendUser {
+    TODO("Not yet implemented")
+  }
+}
+
 internal class EmptyFriendUserImpl(
   bot: TencentBot,
   override val id: String = EmptyMessageId,
@@ -621,6 +635,17 @@ internal class EmptyGroupImpl(
       ::GroupMessagePreSendEvent,
       ::GroupMessagePostSendEvent,
     )
+  }
+}
+
+internal class EmptyMockGroupImpl(
+  bot: TencentBot,
+  override val id: String = EmptyMessageId,
+) : Group, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
+  override val unionOpenid: String = EmptyMessageId
+  override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyMockGroupMemberImpl(this, it) }
+  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Group>? {
+    return MessageReceipt(MessageReceiptImpl("", ""), this)
   }
 }
 

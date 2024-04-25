@@ -26,7 +26,7 @@ internal class DynamicCommandExecutor(
   val path: List<String>,
   private val primaryName: String,
   private val parentSignature: CommandSignature,
-  var capacity: Int = 16,
+  var capacity: Int = 8,
   private val workerIdleTimeout: Int = 120, // 扩容120s后若低于负载, 恢复初始容量
 ) : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName(primaryName)) {
   private val rawCapacity = capacity
@@ -63,7 +63,7 @@ internal class DynamicCommandExecutor(
       return
     }
     // 快速增长临时扩容
-    if (runningCounter.value + idleWorkers > 2 * capacity) {
+    if (runningCounter.value >= 2 * capacity) {
       if (!capacityModifyLock.tryLock()) {
         return
       }
@@ -71,15 +71,17 @@ internal class DynamicCommandExecutor(
       capacity *= 2
       capacityIncrementCounter.incrementAndGet()
       decrementJob = launch {
-        while (
-          (idleWorkers >= capacity / 2) &&
-          capacityIncrementCounter.decrementAndGet() >= 0
-        ) {
+        while (true) {
           delay(workerIdleTimeout * 1000L)
-          capacityModifyLock.withLock {
-            capacity = max(rawCapacity, capacity / 2)
+          if (idleWorkers >= capacity / 2) {
+            capacityModifyLock.withLock {
+              capacity = max(rawCapacity, capacity / 2)
+            }
+            commandLineLogger.debug("trigger decrement, target=$primaryName, capacity=$capacity")
+            if (capacityIncrementCounter.decrementAndGet() <= 0) {
+              break
+            }
           }
-          commandLineLogger.debug("trigger decrement, target=$primaryName, capacity=$capacity")
         }
       }
       capacityModifyLock.unlock()
@@ -95,10 +97,13 @@ internal class DynamicCommandExecutor(
 
   suspend fun execute(args: List<String>, caller: CommandSender, checkPermission: Boolean):
     CommandExecuteResult {
-    var worker = pool.removeFirstOrNull()
+    var worker = poolModifyLock.withLock {
+      pool.removeFirstOrNull()
+    }
     if (worker == null) {
       worker = createCommandInstance()
     }
+    runningCounter.incrementAndGet()
     shouldIncreaseCapacity()
     if (checkPermission) {
       val document = caller.subject?.toContactDocumentOrNull()
@@ -117,11 +122,11 @@ internal class DynamicCommandExecutor(
           "param2" to (args.getOrNull(1) ?: "")
         )
         if (!worker.permission.testPermission(u, document.policies, environment)) {
+          commitWorker(worker)
           return CommandExecuteResult.PermissionDenied(worker)
         }
       }
     }
-    runningCounter.incrementAndGet()
     return runCatching {
       worker.context2 {
         obj = mutableMapOf(
@@ -150,7 +155,9 @@ internal class DynamicCommandExecutor(
     command.context2 { }
     shouldDecreaseCapacity()
     if (pool.size < capacity) {
-      pool.addLast(command)
+      poolModifyLock.withLock {
+        pool.addLast(command)
+      }
     }
   }
 }

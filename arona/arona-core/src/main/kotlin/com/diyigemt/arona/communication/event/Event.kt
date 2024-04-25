@@ -5,17 +5,15 @@ package com.diyigemt.arona.communication.event
 import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.TencentBotAuthEndpointResp
 import com.diyigemt.arona.communication.TencentWebsocketEventType
+import com.diyigemt.arona.communication.contact.EmptyMockGroupImpl
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
 import com.diyigemt.arona.communication.contact.GuildMemberImpl
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.ReflectionUtil
-import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encodeToString
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
@@ -101,6 +99,15 @@ internal object TencentWebsocketDirectMessageCreateHandler :
       tmp
     ).broadcast()
   }
+}
+
+suspend fun mockGroupMessage(gid: String, uid: String, content: String, eid: String = "") {
+  val bot = BotManager.getBot()
+  val group = bot.groups[gid] ?: EmptyMockGroupImpl(bot, gid).also { group ->
+    bot.groups.delegate.add(group)
+  }
+  val member = group.members.getOrCreate(uid)
+  TencentGroupMessageEvent(PlainText(content).toMessageChain(), eid, member).broadcast()
 }
 
 internal object TencentWebsocketGroupAtMessageCreateHandler :

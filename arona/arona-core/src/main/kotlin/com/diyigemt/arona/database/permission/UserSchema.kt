@@ -3,7 +3,7 @@ package com.diyigemt.arona.database.permission
 import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.database.*
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
-import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuerySuspended
+import com.diyigemt.arona.database.DatabaseProvider.sqlDbQueryReadUncommited
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.name
@@ -230,7 +230,7 @@ internal data class UserDocument(
       withCollection {
         insertOne(ud)
       }
-      sqlDbQuerySuspended {
+      sqlDbQueryReadUncommited {
         when (val saveUser = UserSchema.findById(uid)) {
           is UserSchema -> {
             saveUser.uid = ud.id
@@ -252,7 +252,7 @@ internal data class UserDocument(
     }
 
     suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? {
-      val u = sqlDbQuerySuspended {
+      val u = sqlDbQueryReadUncommited {
         UserSchema.findById(uid)
       }
       return if (u == null) {

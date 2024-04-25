@@ -23,6 +23,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.sql.Connection
 
 object DatabaseProvider {
   private val sqlDatabase: Database by lazy {
@@ -72,6 +73,10 @@ object DatabaseProvider {
 
   internal suspend fun <T> sqlDbQuerySuspended(block: suspend () -> T): T =
     newSuspendedTransaction(currentCoroutineContext(), sqlDatabase) { block() }
+
+  suspend fun <T> sqlDbQueryReadUncommited(block: suspend () -> T): T =
+    newSuspendedTransaction(currentCoroutineContext(), sqlDatabase, Connection.TRANSACTION_READ_UNCOMMITTED) { block() }
+
 
   internal fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
   internal suspend fun <T> noSqlDbQuerySuspended(block: suspend MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)

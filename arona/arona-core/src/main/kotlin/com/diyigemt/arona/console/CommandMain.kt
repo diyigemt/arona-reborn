@@ -97,12 +97,13 @@ class GlobalAnnouncementCommand : CommandLineSubCommand, CliktCommand(name = "an
 @Suppress("unused")
 class MonitorCommand : CommandLineSubCommand, CliktCommand(name = "monitor", help = "系统资源监视") {
   override fun run() {
-    val rt = Runtime.getRuntime()
-    val max = rt.maxMemory() / 1024 / 8
-    val usage = (rt.totalMemory() - rt.freeMemory()) / 1024 / 8
-    val free = rt.freeMemory() / 1024 / 8
-    echo("max: $max MB, usage: $usage MB, free: $free MB")
-    ExecutorMap.entries.sortedBy { it.key.length }.forEach {
+    ExecutorMap
+      .entries
+      .filter {
+        it.value.runningCounter.value > 0 || it.value.capacity != 8
+      }
+      .sortedBy { it.key.length }
+      .forEach {
       echo("${it.key} -> ${it.value.runningCounter.value}-${it.value.idleWorkers}/${it.value.capacity}")
     }
   }

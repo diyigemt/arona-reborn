@@ -1,6 +1,8 @@
 package com.diyigemt.arona
 
 import com.diyigemt.arona.command.BuiltInCommands
+import com.diyigemt.arona.command.CommandManager
+import com.diyigemt.arona.command.initExecutorMap
 import com.diyigemt.arona.communication.TencentBotClient
 import com.diyigemt.arona.console.launchConsole
 import com.diyigemt.arona.plugins.PluginManager
@@ -24,6 +26,7 @@ object AronaApplication : CoroutineScope {
     }
     PluginManager.loadPluginFromPluginDirectory()
     PluginManager.initPlugin()
+    initExecutorMap()
     TencentBotClient.invoke(aronaConfig.bot).auth()
     val environment = applicationEngineEnvironment {
       connector {

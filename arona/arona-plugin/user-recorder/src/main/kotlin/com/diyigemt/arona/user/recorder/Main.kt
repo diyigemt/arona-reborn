@@ -37,84 +37,84 @@ object PluginMain : AronaPlugin(
     id = "com.diyigemt.arona.user.recorder",
     name = "user-recorder",
     author = "diyigemt",
-    version = "1.2.8",
+    version = "1.2.10",
     description = "record user data"
   )
 ) {
   private lateinit var dauJob: Job
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {
-      // 统计消息数
-      val today = currentDate()
-      val currentDateTime = currentDateTime()
-      val dauRecord = dbQuery {
-        when (val record = DailyActiveUser.findById(today)) {
-          is DailyActiveUser -> {
-            record.message += 1
-            record
-          }
-
-          else -> {
-            DailyActiveUser.new(today) {
-              message = 1
+      PluginMain.launch {
+        // 统计消息数
+        val today = currentDate()
+        val currentDateTime = currentDateTime()
+        val dauRecord = dbQuery {
+          when (val record = DailyActiveUser.findById(today)) {
+            is DailyActiveUser -> {
+              record.message += 1
+              record
             }
-          }
-        }
-      }
-      // 统计contact
-      dbQuery {
-        when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
-          is Contact -> {
-            contact.lastActive = currentDateTime
-          }
 
-          else -> {
-            Contact.new(it.subject.id) {
-              type = when (it) {
-                is TencentFriendEvent -> ContactType.Private
-                is TencentGroupEvent -> ContactType.Group
-                is TencentGuildEvent -> ContactType.Channel
-                else -> ContactType.PrivateChannel
+            else -> {
+              DailyActiveUser.new(today) {
+                message = 1
               }
             }
           }
         }
-      }
-      // 统计user
-      dbQuery {
-        when (val user = User.find { UserTable.id eq sender.id }.firstOrNull()) {
-          is User -> {
-            user.actionCount
-            user.lastActive = currentDateTime
-          }
+        // 统计contact
+        dbQuery {
+          when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
+            is Contact -> {
+              contact.lastActive = currentDateTime
+            }
 
-          else -> {
-            User.new(
-              id = sender.id
-            ) { }
-          }
-        }
-      }
-      val messageString =
-        it.message.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return@subscribeAlways
-      val commandStr =
-        messageString.split(" ").toMutableList().removeFirstOrNull() ?: return@subscribeAlways
-      val command =
-        CommandManager.matchCommandName(commandStr.replace("/", "")) ?: return@subscribeAlways
-      // 统计command
-      dbQuery {
-        // 累计command
-        when (val fCommand = Command.find { CommandTable.name eq command }.firstOrNull()) {
-          is Command -> fCommand.count++
-          else -> {
-            Command.new {
-              name = command
-              count = 1
+            else -> {
+              Contact.new(it.subject.id) {
+                type = when (it) {
+                  is TencentFriendEvent -> ContactType.Private
+                  is TencentGroupEvent -> ContactType.Group
+                  is TencentGuildEvent -> ContactType.Channel
+                  else -> ContactType.PrivateChannel
+                }
+              }
             }
           }
         }
-        // 日command
+        // 统计user
         dbQuery {
+          when (val user = User.find { UserTable.id eq sender.id }.firstOrNull()) {
+            is User -> {
+              user.actionCount
+              user.lastActive = currentDateTime
+            }
+
+            else -> {
+              User.new(
+                id = sender.id
+              ) { }
+            }
+          }
+        }
+        val messageString =
+          it.message.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return@launch
+        val commandStr =
+          messageString.split(" ").toMutableList().removeFirstOrNull() ?: return@launch
+        val command =
+          CommandManager.matchCommandName(commandStr.replace("/", "")) ?: return@launch
+        // 统计command
+        dbQuery {
+          // 累计command
+          when (val fCommand = Command.find { CommandTable.name eq command }.firstOrNull()) {
+            is Command -> fCommand.count++
+            else -> {
+              Command.new {
+                name = command
+                count = 1
+              }
+            }
+          }
+          // 日command
           if (command in dauRecord.commands) {
             val tmp = dauRecord.commands.toMutableMap()
             tmp[command] = tmp[command]!! + 1
@@ -128,36 +128,38 @@ object PluginMain : AronaPlugin(
       }
     }
     pluginEventChannel().subscribeAlways<TencentBotUserChangeEvent> {
-      when (val subject = it.subject) {
-        is com.diyigemt.arona.communication.contact.User -> {
-          dbQuery {
-            when (User.find { UserTable.id eq subject.id }.firstOrNull()) {
-              is User -> {}
-              else -> {
-                User.new(
-                  id = subject.id
-                ) { }
+      PluginMain.launch {
+        when (val subject = it.subject) {
+          is com.diyigemt.arona.communication.contact.User -> {
+            dbQuery {
+              when (User.find { UserTable.id eq subject.id }.firstOrNull()) {
+                is User -> {}
+                else -> {
+                  User.new(
+                    id = subject.id
+                  ) { }
+                }
               }
             }
           }
         }
-      }
-      dbQuery {
-        when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
-          is Contact -> {
-            contact.active = when (it) {
-              is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> true
-              else -> false
+        dbQuery {
+          when (val contact = Contact.find { ContactTable.id eq it.subject.id }.firstOrNull()) {
+            is Contact -> {
+              contact.active = when (it) {
+                is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> true
+                else -> false
+              }
             }
-          }
 
-          else -> {
-            Contact.new(it.subject.id) {
-              type = when (it) {
-                is TencentFriendEvent -> ContactType.Private
-                is TencentGroupEvent -> ContactType.Group
-                is TencentGuildEvent -> ContactType.Channel
-                else -> ContactType.PrivateChannel
+            else -> {
+              Contact.new(it.subject.id) {
+                type = when (it) {
+                  is TencentFriendEvent -> ContactType.Private
+                  is TencentGroupEvent -> ContactType.Group
+                  is TencentGuildEvent -> ContactType.Channel
+                  else -> ContactType.PrivateChannel
+                }
               }
             }
           }

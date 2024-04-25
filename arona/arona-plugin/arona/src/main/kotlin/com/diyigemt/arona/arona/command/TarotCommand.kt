@@ -3,7 +3,7 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQueryReadUncommited
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
@@ -105,11 +105,11 @@ class TarotCommand : AbstractCommand(
       readUserPluginConfigOrNull(Arona) ?: contactDocument().readPluginConfigOrDefault(Arona, default = TarotConfig())
     val id = userDocument().id
     val today = currentLocalDateTime().date.dayOfMonth
-    val record = dbQuerySuspended {
+    val record = dbQueryReadUncommited {
       TarotRecordSchema.findById(id)
     }
     if (record != null && record.day == today && tarotConfig.dayOne) {
-      val tarot = dbQuerySuspended {
+      val tarot = dbQueryReadUncommited {
         TarotSchema.findById(record.tarot)
       }!!
       send(tarot, record.positive, userTarotConfig.cardType)
@@ -127,18 +127,18 @@ class TarotCommand : AbstractCommand(
         positive = PositiveMap[t] ?: true
       } else {
         record?.run {
-          dbQuerySuspended {
+          dbQueryReadUncommited {
             this@run.negativeCount++
             this@run.maxNegativeCount = max(this@run.maxNegativeCount, this.negativeCount)
           }
         }
       }
     }
-    val tarot = dbQuerySuspended {
+    val tarot = dbQueryReadUncommited {
       TarotSchema.findById(tarotIndex)
     }!!
     send(tarot, positive, userTarotConfig.cardType)
-    dbQuerySuspended {
+    dbQueryReadUncommited {
       if (record != null) {
         record.day = today
         record.tarot = tarotIndex

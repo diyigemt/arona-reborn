@@ -1,11 +1,9 @@
 package com.diyigemt.arona.arona.webui
 
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
+import com.diyigemt.arona.arona.database.DatabaseProvider.dbQueryReadUncommited
 import com.diyigemt.arona.arona.database.student.StudentLimitType
 import com.diyigemt.arona.arona.database.student.StudentRarity
 import com.diyigemt.arona.arona.database.student.StudentSchema
-import com.diyigemt.arona.arona.database.student.StudentTable
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
@@ -31,7 +29,7 @@ fun StudentSchema.toStudent() = Student(
 object GachaEndpoint {
   @AronaBackendEndpointGet("/students")
   suspend fun PipelineContext<Unit, ApplicationCall>.getStudentList() {
-    success(dbQuerySuspended {
+    success(dbQueryReadUncommited {
       StudentSchema.all().map { it.toStudent() }.toList()
     })
   }

@@ -10,6 +10,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.sql.Connection
 
 object DatabaseProvider {
   private val database: DB by lazy {
@@ -31,6 +32,9 @@ object DatabaseProvider {
     }
     database
   }
+
+  suspend fun <T> dbQueryReadUncommited(block: suspend () -> T): T =
+    newSuspendedTransaction(currentCoroutineContext(), database, Connection.TRANSACTION_READ_UNCOMMITTED) { block() }
 
   suspend fun <T> dbQuerySuspended(block: suspend () -> T): T =
     newSuspendedTransaction(currentCoroutineContext(), database) { block() }

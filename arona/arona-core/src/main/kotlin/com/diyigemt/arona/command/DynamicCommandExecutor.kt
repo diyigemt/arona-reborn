@@ -36,7 +36,10 @@ internal class DynamicCommandExecutor(
   private val minimumSignature: List<CommandSignature> = run {
     var ps = parentSignature
     val result = mutableListOf<CommandSignature>()
-    for (it in path) {
+    val p = path.toMutableList().also {
+      it.removeFirst()
+    }
+    for (it in p) {
       val tmp = ps.children.firstOrNull { c -> c.primaryName == it } ?: break
       result.add(tmp)
       ps = tmp

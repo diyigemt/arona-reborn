@@ -52,25 +52,19 @@ internal fun CommandSignature.createInstance(parent: AbstractCommand): AbstractC
 
 internal fun buildDynamicExecutor(root: CommandSignature, current: CommandSignature, path: List<String>) {
   val newPath = path + listOf(current.primaryName)
-  if (current.children.isEmpty()) {
-    val primaryName = newPath.joinToString(",")
-    ExecutorMap[primaryName] = DynamicCommandExecutor(newPath, primaryName, root)
-  } else {
-    current.children.forEach {
-      buildDynamicExecutor(root, it, newPath)
-    }
+  val primaryName = newPath.joinToString(",")
+  ExecutorMap[primaryName] = DynamicCommandExecutor(newPath, primaryName, root)
+  current.children.forEach {
+    buildDynamicExecutor(root, it, newPath)
   }
 }
 
 internal fun initExecutorMap() {
   commandMap.forEach { (_, u) ->
-    if (u.children.isNotEmpty()) {
-      u.children.forEach {
-        buildDynamicExecutor(u, it, listOf(u.primaryName))
-      }
-    } else {
-      val primaryName = u.primaryName
-      ExecutorMap[primaryName] = DynamicCommandExecutor(listOf(u.primaryName), primaryName, u)
+    val primaryName = u.primaryName
+    ExecutorMap[primaryName] = DynamicCommandExecutor(listOf(u.primaryName), primaryName, u)
+    u.children.forEach {
+      buildDynamicExecutor(u, it, listOf(u.primaryName))
     }
   }
 }
@@ -79,7 +73,12 @@ internal val ExecutorMap: MutableMap<String, DynamicCommandExecutor> = mutableMa
 
 internal fun CommandSignature.matchChildPath(path: List<String>): List<String> {
   if (path.isEmpty()) return listOf(primaryName)
-  if (path.size == 1) return if (this.children.any { it.primaryName == path[0] }) path else listOf(primaryName)
+  if (path.size == 1) {
+    return if (this.children.any { it.primaryName == path[0] })
+      listOf(primaryName) + path
+    else
+      listOf (primaryName)
+  }
   val result = mutableListOf(primaryName)
   var parentSignature = this
   for (it in path) {

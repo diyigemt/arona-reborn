@@ -15,7 +15,8 @@ data class TencentBotConfig(
   val token: String,
   val secret: String,
   val public: Boolean = false,
-  val debug: Boolean = false
+  val debug: Boolean = false,
+  val shard: List<Int> = listOf(0, 1) // [0,4] 分4片当前第0片, 默认[0,1]
 ) {
   fun toAuthConfig() = TencentBotAuthEndpointReq(appId, secret)
 }
@@ -37,6 +38,24 @@ internal data class TencentBotAuthEndpointResp(
 @Serializable
 internal data class TencentWebsocketEndpointResp(
   val url: String,
+)
+
+@Serializable
+internal data class TencentWebsocketShardEndpointResp(
+  val url: String,
+  val shards: Int,
+  @SerialName("session_start_limit")
+  val sessionStartLimit: TencentWebsocketShardSessionStartLimit
+)
+
+@Serializable
+internal data class TencentWebsocketShardSessionStartLimit(
+  val total: Int, // 每 24 小时可创建 Session 数
+  val remaining: Int, // 目前还可以创建的 Session 数
+  @SerialName("reset_after")
+  val resetAfter: Int, // 重置计数的剩余时间(ms)
+  @SerialName("max_concurrency")
+  val maxConcurrency: Int // 每 5s 可以创建的 Session 数
 )
 
 internal object TencentWebsocketEventTypeAsStringSerializer : KSerializer<TencentWebsocketEventType> {
@@ -76,6 +95,7 @@ internal enum class TencentWebsocketEventType(val type: String) {
 
 enum class TencentEndpoint(val path: String) {
   WebSocket("/gateway"),
+  ShardWebSocket("/gateway/bot"),
   Interactions("/interactions/{interaction_id}"), // 通知后台接收到websocket推送的消息
   PostFriendMessage("/v2/users/{openid}/messages"), // 向用户发送私信消息
   PostFriendRichMessage("/v2/users/{openid}/files"), // 向用户发送私信消息

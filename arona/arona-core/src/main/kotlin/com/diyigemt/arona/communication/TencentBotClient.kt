@@ -187,7 +187,7 @@ private constructor(private val config: TencentBotConfig) : TencentBot, Coroutin
                     else buildGuildBot()
                   }
                     .build(),
-                  shard = listOf(0, 1)
+                  shard = config.shard
                 )
               )
             )
@@ -235,8 +235,8 @@ private constructor(private val config: TencentBotConfig) : TencentBot, Coroutin
     }
   }
 
-  private suspend fun connectWs(): Result<TencentWebsocketEndpointResp> {
-    return callOpenapi(TencentEndpoint.WebSocket, TencentWebsocketEndpointResp.serializer()) {
+  private suspend fun connectWs(): Result<TencentWebsocketShardEndpointResp> {
+    return callOpenapi(TencentEndpoint.ShardWebSocket, TencentWebsocketShardEndpointResp.serializer()) {
       method = HttpMethod.Get
     }.onSuccess {
       wsJob = with(this@TencentBotClient) {

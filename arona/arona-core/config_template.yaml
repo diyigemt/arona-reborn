@@ -5,6 +5,7 @@ bot:
   secret: ""
   public: false
   debug: false
+  shard: [0, 1]
 adminToken: ""
 redis:
   host: "127.0.0.1"
@@ -21,5 +22,7 @@ mongodb:
   user: ""
   password: ""
   db: ""
+web:
+  port: 12355
 superAdminUid: []
 debug: false

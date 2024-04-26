@@ -1,7 +1,6 @@
 package com.diyigemt.arona
 
 import com.diyigemt.arona.command.BuiltInCommands
-import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.command.initExecutorMap
 import com.diyigemt.arona.communication.TencentBotClient
 import com.diyigemt.arona.console.launchConsole
@@ -30,7 +29,7 @@ object AronaApplication : CoroutineScope {
     TencentBotClient.invoke(aronaConfig.bot).auth()
     val environment = applicationEngineEnvironment {
       connector {
-        port = 12355
+        port = aronaConfig.web.port
         host = "127.0.0.1"
       }
       rootPath = "/api/v1"

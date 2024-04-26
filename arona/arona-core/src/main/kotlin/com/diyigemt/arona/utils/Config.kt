@@ -35,12 +35,18 @@ data class MariaDBConfig(
 )
 
 @Serializable
+data class WebConfig(
+  val port: Int
+)
+
+@Serializable
 data class AronaConfig(
   val bot: TencentBotConfig,
   val adminToken: String,
   val redis: RedisConfig,
   val mongodb: MongoConfig,
   val mariadb: MariaDBConfig,
+  val web: WebConfig,
   val superAdminUid : List<String>,
   val debug: Boolean = false,
 ) {

@@ -659,7 +659,7 @@ abstract class ContactList<out C : Contact>(
   abstract val generator: (id: String) -> C
 
   // TODO 恢复保存功能
-  fun getOrCreate(id: String): C = get(id) ?: generator(id)
+  fun getOrCreate(id: String): C = get(id) ?: generator(id).also { delegate.add(it) }
 
   fun getOrFail(id: String): C = get(id) ?: throw NoSuchElementException("Contact $id not found.")
 

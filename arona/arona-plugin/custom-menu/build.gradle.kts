@@ -6,7 +6,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.custom.menu.PluginMain"
-version = "0.3.0"
+version = "0.3.1"
 dependencies {
   compileOnly(project(":arona-core"))
   testImplementation(kotlin("test"))

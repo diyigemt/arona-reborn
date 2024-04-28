@@ -39,7 +39,7 @@ data class TotalAssaultConfig(
 }
 
 @Suppress("unused")
-class TotalAssaultCommand : AbstractCommand(
+object TotalAssaultCommand : AbstractCommand(
   Arona,
   "总力档线",
   description = "提供当期总力档线",
@@ -64,12 +64,12 @@ class TotalAssaultCommand : AbstractCommand(
     if (config == null && server == null) {
       sendMessage("未配置默认服务器,发送日服数据,配置可随时在webui更改")
     }
-    CommandManager.executeCommand(this, PlainText("/攻略 $name"))
+    CommandManager.executeCommand(this, PlainText("/攻略 $name")).await()
   }
 }
 
 @Suppress("unused")
-class TotalAssaultExCommand : AbstractCommand(
+object TotalAssaultExCommand : AbstractCommand(
   Arona,
   "大决战档线",
   description = "提供当期大决战档线",
@@ -86,7 +86,7 @@ class TotalAssaultExCommand : AbstractCommand(
       Server.B,
       Server.CN -> sendMessage("还没开呢, 别急")
       Server.ASIA, Server.HK, Server.KR, Server.GLOBAL, Server.US -> sendMessage("没数据源")
-      Server.JP -> CommandManager.executeCommand(this, PlainText("/攻略 日服大决战档线"))
+      Server.JP -> CommandManager.executeCommand(this, PlainText("/攻略 日服大决战档线")).await()
     }
   }
 }

@@ -474,9 +474,15 @@ class CoffeeInviteCommand : AbstractCommand(
           coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(20, DateTimeUnit.HOUR).toDateTime())
           coffee.updateTime(CoffeeDocument::lastInviteStudent.name, student)
           if (configure.touchAfterInvite) {
-            CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅 摸头 $student"))
+            CommandManager.executeCommand(
+              this@invite,
+              PlainText("/${KivotosCommand.primaryName} 咖啡厅 摸头 $student")
+            ).await()
           } else {
-            CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅"))
+            CommandManager.executeCommand(
+              this@invite,
+              PlainText("/${KivotosCommand.primaryName} 咖啡厅")
+            ).await()
           }
         }
       }
@@ -489,9 +495,15 @@ class CoffeeInviteCommand : AbstractCommand(
       coffee.updateTime(CoffeeDocument::lastInviteStudent.name, student)
       coffee.updateTime(CoffeeDocument::nextInviteTime.name, now().plus(20, DateTimeUnit.HOUR).toDateTime())
       if (configure.touchAfterInvite) {
-        CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅 摸头 $student"))
+        CommandManager.executeCommand(
+          this@invite,
+          PlainText("/${KivotosCommand.primaryName} 咖啡厅 摸头 $student")
+        ).await()
       } else {
-        CommandManager.executeCommand(this@invite, PlainText("/${KivotosCommand.primaryName} 咖啡厅"))
+        CommandManager.executeCommand(
+          this@invite,
+          PlainText("/${KivotosCommand.primaryName} 咖啡厅")
+        ).await()
       }
     }
   }

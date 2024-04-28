@@ -75,7 +75,7 @@ enum class TrainerOverrideType {
 }
 
 @Suppress("unused")
-class TrainerCommand : AbstractCommand(
+object TrainerCommand : AbstractCommand(
   Arona,
   "攻略",
   description = "提供各种攻略",

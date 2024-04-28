@@ -15,12 +15,13 @@ import com.github.ajalt.clikt.core.UsageError
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
+@Suppress("unused")
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
     id = "com.diyigemt.arona.chat.command",
     name = "chat-command",
     author = "diyigemt",
-    version = "0.1.5",
+    version = "0.1.6",
     description = "chat-command"
   )
 ) {
@@ -39,7 +40,7 @@ object PluginMain : AronaPlugin(
       }.getOrNull() ?: return@subscribeAlways
       // TODO exception print
       PluginMain.launch {
-        when (val result = CommandManager.executeCommand(commandSender, it.message)) {
+        when (val result = CommandManager.executeCommand(commandSender, it.message).await()) {
           is CommandExecuteResult.Success -> {
 
           }

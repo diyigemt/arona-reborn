@@ -114,13 +114,12 @@ internal class DynamicStaticCommandExecutor(
     caller: CommandSender,
     checkPermission: Boolean,
   ): Deferred<CommandExecuteResult> {
-    runningCounter.incrementAndGet()
     if (checkPermission && !hasCommandPermission(caller, args)) {
       return async {
-        runningCounter.decrementAndGet()
         CommandExecuteResult.PermissionDenied(worker)
       }
     }
+    runningCounter.incrementAndGet()
     return async {
       val result = lock.withLock {
         worker.execute(
@@ -128,7 +127,9 @@ internal class DynamicStaticCommandExecutor(
           parentSignature,
           args,
           suspend = true
-        )
+        ).also {
+          worker.context2 {  }
+        }
       }
       runningCounter.decrementAndGet()
       result

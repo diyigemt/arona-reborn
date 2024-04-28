@@ -144,13 +144,14 @@ abstract class AbstractCommand(
     val caller = caller
     val signature = signature
     val suspend = suspend
-    val currentContext = currentContext
+    val endCommand = currentContext.invokedSubcommand == null
     val fn = signature.childrenMap[this@AbstractCommand::class]!!
     if (!caller.kType.isSubtypeOf(fn.parameters[1].type)) {
       return
     }
-    if (suspend && currentContext.invokedSubcommand == null) {
+    if (suspend && endCommand) {
       caller.launch {
+        fn.callSuspend(this@AbstractCommand, caller)
       }
     } else {
       runBlocking(caller.coroutineContext) {

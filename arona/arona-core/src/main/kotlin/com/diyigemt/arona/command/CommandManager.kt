@@ -68,14 +68,18 @@ internal fun buildDynamicExecutor(root: CommandSignature, current: CommandSignat
 internal fun initExecutorMap() {
   commandMap.forEach { (_, u) ->
     val primaryName = u.primaryName
-    ExecutorMap[primaryName] = DynamicContextualCommandExecutor(listOf(u.primaryName), primaryName, u)
+    if (u.clazz.objectInstance != null) {
+      ExecutorMap[primaryName] = DynamicStaticCommandExecutor(listOf(u.primaryName), primaryName, u)
+    } else {
+      ExecutorMap[primaryName] = DynamicContextualCommandExecutor(listOf(u.primaryName), primaryName, u)
+    }
     u.children.forEach {
       buildDynamicExecutor(u, it, listOf(u.primaryName))
     }
   }
 }
 
-internal val ExecutorMap: MutableMap<String, DynamicContextualCommandExecutor> = mutableMapOf()
+internal val ExecutorMap: MutableMap<String, DynamicCommandExecutor> = mutableMapOf()
 
 internal fun CommandSignature.matchChildPath(path: List<String>): List<String> {
   if (path.isEmpty()) return listOf(primaryName)

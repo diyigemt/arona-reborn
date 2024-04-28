@@ -6,6 +6,7 @@ import com.diyigemt.arona.permission.Permission
 import com.diyigemt.arona.permission.PermissionService
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.requireObject
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -132,6 +133,7 @@ abstract class AbstractCommand(
 ) : CliktCommand(name = primaryName, help = help, epilog = description, invokeWithoutSubcommand = true), Command {
   private val caller by requireObject<AbstractCommandSender>("caller")
   private val signature by requireObject<CommandSignature>("signature")
+  private val suspend by requireObject<Boolean>("suspend")
 
   init {
     Command.checkCommandName(primaryName)
@@ -143,8 +145,13 @@ abstract class AbstractCommand(
     if (!caller.kType.isSubtypeOf(fn.parameters[1].type)) {
       return
     }
-    runBlocking(caller.coroutineContext) {
-      fn.callSuspend(this@AbstractCommand, caller)
+    if (suspend && currentContext.invokedSubcommand == null) {
+      caller.launch {
+      }
+    } else {
+      runBlocking(caller.coroutineContext) {
+        fn.callSuspend(this@AbstractCommand, caller)
+      }
     }
   }
 

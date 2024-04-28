@@ -15,6 +15,9 @@ import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.util.logging.*
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -33,8 +36,11 @@ internal data class CommandSignature(
   val targetExtensionFunction: KFunction<*>,
 )
 
+@Suppress("NOTHING_TO_INLINE")
+inline fun <T :Any> KClass<T>.createObjectOrInstance() = objectInstance ?: createInstance()
+
 internal fun CommandSignature.createInstance(): AbstractCommand {
-  val instance = clazz.createInstance()
+  val instance = clazz.createObjectOrInstance()
   children.forEach {
     it.createInstance(instance)
   }
@@ -42,7 +48,7 @@ internal fun CommandSignature.createInstance(): AbstractCommand {
 }
 
 internal fun CommandSignature.createInstance(parent: AbstractCommand): AbstractCommand {
-  val instance = clazz.createInstance()
+  val instance = clazz.createObjectOrInstance()
   parent.subcommands(instance)
   children.forEach {
     it.createInstance(instance)
@@ -53,7 +59,7 @@ internal fun CommandSignature.createInstance(parent: AbstractCommand): AbstractC
 internal fun buildDynamicExecutor(root: CommandSignature, current: CommandSignature, path: List<String>) {
   val newPath = path + listOf(current.primaryName)
   val primaryName = newPath.joinToString(",")
-  ExecutorMap[primaryName] = DynamicCommandExecutor(newPath, primaryName, root)
+  ExecutorMap[primaryName] = DynamicContextualCommandExecutor(newPath, primaryName, root)
   current.children.forEach {
     buildDynamicExecutor(root, it, newPath)
   }
@@ -62,14 +68,14 @@ internal fun buildDynamicExecutor(root: CommandSignature, current: CommandSignat
 internal fun initExecutorMap() {
   commandMap.forEach { (_, u) ->
     val primaryName = u.primaryName
-    ExecutorMap[primaryName] = DynamicCommandExecutor(listOf(u.primaryName), primaryName, u)
+    ExecutorMap[primaryName] = DynamicContextualCommandExecutor(listOf(u.primaryName), primaryName, u)
     u.children.forEach {
       buildDynamicExecutor(u, it, listOf(u.primaryName))
     }
   }
 }
 
-internal val ExecutorMap: MutableMap<String, DynamicCommandExecutor> = mutableMapOf()
+internal val ExecutorMap: MutableMap<String, DynamicContextualCommandExecutor> = mutableMapOf()
 
 internal fun CommandSignature.matchChildPath(path: List<String>): List<String> {
   if (path.isEmpty()) return listOf(primaryName)
@@ -77,7 +83,7 @@ internal fun CommandSignature.matchChildPath(path: List<String>): List<String> {
     return if (this.children.any { it.primaryName == path[0] })
       listOf(primaryName) + path
     else
-      listOf (primaryName)
+      listOf(primaryName)
   }
   val result = mutableListOf(primaryName)
   var parentSignature = this
@@ -102,7 +108,7 @@ internal fun CommandSignature.flat(): Map<KClass<out AbstractCommand>, KFunction
 
 internal fun KClass<out AbstractCommand>.createSignature(): CommandSignature {
   return kotlin.run {
-    val instance = createInstance()
+    val instance = createObjectOrInstance()
     val reflector = CommandReflector(this)
     val subCommands = reflector.findSubCommand().map { it.createSignature() }.toMutableList()
     val map = mutableMapOf(this to reflector.findTargetExtensionFunction())
@@ -163,7 +169,7 @@ object CommandManager {
 
   internal fun registerCommandSignature(command: KClass<out AbstractCommand>, override: Boolean): Boolean {
     return kotlin.runCatching {
-      val instance = command.createInstance()
+      val instance = command.createObjectOrInstance()
       if (!override && findDuplicateCommand(instance) != null) {
         return false
       }
@@ -191,7 +197,7 @@ object CommandManager {
     caller: CommandSender,
     message: Message,
     checkPermission: Boolean = true,
-  ): CommandExecuteResult {
+  ): Deferred<CommandExecuteResult> {
     return executeCommandImpl(message, caller, checkPermission)
   }
 
@@ -275,16 +281,33 @@ internal suspend fun executeCommandImpl(
   message: Message,
   caller: CommandSender,
   checkPermission: Boolean,
-): CommandExecuteResult {
+): Deferred<CommandExecuteResult> {
 
   val call = message.toMessageChain()
-  val messageString =
-    call.filterIsInstance<PlainText>().firstOrNull()?.toString() ?: return CommandExecuteResult.UnresolvedCommand()
-  val commandStr =
-    messageString.split(" ").toMutableList().removeFirstOrNull() ?: return CommandExecuteResult.UnresolvedCommand()
-  val commandSignature =
-    CommandManager.matchCommandSignature(commandStr.replaceFirst("/", "")) ?: return CommandExecuteResult
-      .UnresolvedCommand()
+
+  val messageString = call
+    .filterIsInstance<PlainText>()
+    .firstOrNull()?.toString() ?: return coroutineScope {
+    async {
+      CommandExecuteResult.UnresolvedCommand()
+    }
+  }
+  val commandStr = messageString
+    .split(" ")
+    .toMutableList()
+    .removeFirstOrNull() ?: return coroutineScope {
+    async {
+      CommandExecuteResult.UnresolvedCommand()
+    }
+  }
+  val commandSignature = CommandManager
+    .matchCommandSignature(
+      commandStr.replaceFirst("/", "")
+    ) ?: return coroutineScope {
+    async {
+      CommandExecuteResult.UnresolvedCommand()
+    }
+  }
   val arg = call.toString()
   val parseArg = arg
     .split(" ")
@@ -303,7 +326,11 @@ internal suspend fun executeCommandImpl(
   // 过滤参数
 
   val primaryName = commandSignature.matchChildPath(parseArg).joinToString(",")
-  val executor = ExecutorMap[primaryName] ?: return CommandExecuteResult.UnresolvedCommand()
+  val executor = ExecutorMap[primaryName] ?: return coroutineScope {
+    async {
+      CommandExecuteResult.UnresolvedCommand()
+    }
+  }
   return executor.execute(parseArg, caller, checkPermission)
 }
 

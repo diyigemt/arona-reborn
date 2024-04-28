@@ -100,11 +100,11 @@ class MonitorCommand : CommandLineSubCommand, CliktCommand(name = "monitor", hel
     ExecutorMap
       .entries
       .filter {
-        it.value.runningCounter.value > 0 || it.value.capacity != 8
+        it.value.runningCounter.value > 0
       }
       .sortedBy { it.key.length }
       .forEach {
-      echo("${it.key} -> ${it.value.runningCounter.value}-${it.value.idleWorkers}/${it.value.capacity}")
+      echo("${it.key} -> ${it.value.runningCounter.value}-${it.value.idleWorkers}/${it.value.pendingTasks}")
     }
   }
 }

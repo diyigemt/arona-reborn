@@ -5,8 +5,8 @@ import com.diyigemt.arona.communication.contact.Contact.Companion.toContactDocum
 import com.diyigemt.arona.communication.contact.User.Companion.toUserDocumentOrNull
 import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
+import com.diyigemt.arona.permission.Permission
 import com.diyigemt.arona.permission.Permission.Companion.testPermission
-import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.currentTime
@@ -18,20 +18,13 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.collections.ArrayDeque
-import kotlin.math.max
 import kotlin.reflect.full.createInstance
 
-internal class DynamicCommandExecutor(
+internal sealed class DynamicCommandExecutor(
   val path: List<String>,
   private val primaryName: String,
-  private val parentSignature: CommandSignature,
-  var capacity: Int = 8,
-  private val workerIdleTimeout: Int = 120, // 扩容120s后若低于负载, 恢复初始容量
+  protected val parentSignature: CommandSignature,
 ) : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName(primaryName)) {
-  private val rawCapacity = capacity
-  private var decrementJob: Job? = null
-  private var capacityIncrementCounter = atomic(0)
   val runningCounter = atomic(0)
   private val minimumSignature: List<CommandSignature> = run {
     var ps = parentSignature
@@ -46,120 +39,211 @@ internal class DynamicCommandExecutor(
     }
     result
   }
-  private val capacityModifyLock = Mutex()
-  private val poolModifyLock = Mutex()
-  private val pool = ArrayDeque<AbstractCommand>(16)
-  val idleWorkers
-    get() = pool.size
 
-  private fun createCommandInstance() = parentSignature.clazz.createInstance().also {
-    var c = it
-    for (child in minimumSignature) {
-      val tmp = child.clazz.createInstance()
-      c.subcommands(tmp)
-      c = tmp
-    }
-  }
-
-  private fun shouldIncreaseCapacity() {
-    if (capacityModifyLock.isLocked) {
-      return
-    }
-    // 快速增长临时扩容
-    if (runningCounter.value >= 2 * capacity) {
-      if (!capacityModifyLock.tryLock()) {
-        return
+  protected fun createCommandInstance() = when (this) {
+    is DynamicStaticCommandExecutor -> parentSignature.createInstance()
+    is DynamicContextualCommandExecutor -> parentSignature.clazz.createObjectOrInstance().also {
+      var c = it
+      for (child in minimumSignature) {
+        val tmp = child.clazz.createObjectOrInstance()
+        c.subcommands(tmp)
+        c = tmp
       }
-      decrementJob?.cancel()
-      capacity *= 2
-      capacityIncrementCounter.incrementAndGet()
-      decrementJob = launch {
-        while (true) {
-          delay(workerIdleTimeout * 1000L)
-          if (idleWorkers >= capacity / 2) {
-            capacityModifyLock.withLock {
-              capacity = max(rawCapacity, capacity / 2)
-            }
-            commandLineLogger.debug("trigger decrement, target=$primaryName, capacity=$capacity")
-            if (capacityIncrementCounter.decrementAndGet() <= 0) {
-              break
-            }
-          }
-        }
-      }
-      capacityModifyLock.unlock()
-      commandLineLogger.debug("trigger increment, target=$primaryName, capacity=$capacity")
     }
-    commandLineLogger.debug("pop, target=$primaryName, current=${runningCounter.value}")
   }
 
-  private fun shouldDecreaseCapacity() {
-    runningCounter.decrementAndGet()
-    commandLineLogger.debug("push, target=$primaryName, current=${runningCounter.value}")
+  protected suspend fun hasCommandPermission(
+    caller: CommandSender,
+    args: List<String>,
+  ): Boolean {
+    val document = caller.subject?.toContactDocumentOrNull()
+    val user = caller.user?.toUserDocumentOrNull()
+    return if (document != null) {
+      val u = document.findContactMemberOrNull(user?.id ?: "") ?: ContactMember(
+        "",
+        "",
+        listOf(DEFAULT_MEMBER_CONTACT_ROLE_ID)
+      )
+      val environment = mapOf(
+        "time" to currentTime().substringBeforeLast(":"),
+        "date" to currentDate(),
+        "datetime" to currentDateTime(),
+        "param1" to (args.getOrNull(0) ?: ""),
+        "param2" to (args.getOrNull(1) ?: "")
+      )
+      return permission.testPermission(u, document.policies, environment)
+    } else {
+      true
+    }
   }
 
-  suspend fun execute(args: List<String>, caller: CommandSender, checkPermission: Boolean):
-    CommandExecuteResult {
-    var worker = poolModifyLock.withLock {
-      pool.removeFirstOrNull()
+  abstract val runningWorkers: Int
+  abstract val idleWorkers: Int
+  abstract val pendingTasks: Int
+  abstract val permission: Permission
+
+  abstract suspend fun execute(
+    args: List<String>,
+    caller: CommandSender,
+    checkPermission: Boolean,
+  ): Deferred<CommandExecuteResult>
+}
+
+internal class DynamicStaticCommandExecutor(
+  path: List<String>,
+  primaryName: String,
+  parentSignature: CommandSignature,
+) : DynamicCommandExecutor(
+  path,
+  primaryName,
+  parentSignature,
+) {
+  override val idleWorkers
+    get() = 1 - runningWorkers
+  override val pendingTasks = 0
+  override val runningWorkers = runningCounter.value
+  private val worker = run {
+    assert(parentSignature.clazz.objectInstance != null)
+    createCommandInstance()
+  }
+  override val permission = worker.permission
+  private val lock = Mutex()
+
+  override suspend fun execute(
+    args: List<String>,
+    caller: CommandSender,
+    checkPermission: Boolean,
+  ): Deferred<CommandExecuteResult> {
+    runningCounter.incrementAndGet()
+    if (checkPermission && !hasCommandPermission(caller, args)) {
+      return async {
+        runningCounter.decrementAndGet()
+        CommandExecuteResult.PermissionDenied(worker)
+      }
+    }
+    return async {
+      val result = lock.withLock {
+        worker.execute(
+          caller,
+          parentSignature,
+          args,
+          suspend = true
+        )
+      }
+      runningCounter.decrementAndGet()
+      result
+    }
+  }
+}
+
+@Suppress("NOTHING_TO_INLINE")
+internal inline fun AbstractCommand.execute(
+  caller: CommandSender,
+  signature: CommandSignature,
+  args: List<String>,
+  suspend: Boolean = false
+): CommandExecuteResult {
+  return runCatching {
+    context2 {
+      obj = mutableMapOf(
+        "caller" to caller,
+        "signature" to signature,
+        "suspend" to suspend,
+      )
+      terminal = commandTerminal
+      localization = crsiveLocalization
+    }
+    parse(args)
+    CommandExecuteResult.Success(this)
+  }.getOrElse {
+    when (it) {
+      is MissingArgument -> CommandExecuteResult.UnmatchedSignature(it, this)
+      is TimeoutCancellationException -> CommandExecuteResult.Success(this)
+      is PrintHelpMessage -> CommandExecuteResult.UnmatchedSignature(it, this)
+      else -> CommandExecuteResult.ExecutionFailed(it, this)
+    }
+  }
+}
+
+internal class DynamicContextualCommandExecutor(
+  path: List<String>,
+  primaryName: String,
+  parentSignature: CommandSignature,
+  initCapacity: Int = Runtime.getRuntime().availableProcessors() * 2,
+) : DynamicCommandExecutor(
+  path,
+  primaryName,
+  parentSignature,
+) {
+  private val workerPoolCapacity = initCapacity * 2
+  private val workerPoolModifyLock = Mutex()
+  private val workerPool = ArrayDeque(
+    (0 until workerPoolCapacity).map {
+      createCommandInstance()
+    }
+  )
+  private val taskPoolModifyLock = Mutex()
+  private val taskPool = ArrayDeque<Deferred<CommandExecuteResult>>(workerPoolCapacity)
+  override val idleWorkers
+    get() = workerPool.size
+  override val pendingTasks = 0
+  override val runningWorkers = runningCounter.value
+  override val permission = workerPool.first().permission
+
+  override suspend fun execute(
+    args: List<String>,
+    caller: CommandSender,
+    checkPermission: Boolean,
+  ): Deferred<CommandExecuteResult> {
+    if (checkPermission && !hasCommandPermission(caller, args)) {
+      return async {
+        CommandExecuteResult.PermissionDenied(
+          workerPool.firstOrNull() ?: createCommandInstance(),
+        )
+      }
+    }
+    val worker = workerPoolModifyLock.withLock {
+      workerPool.removeFirstOrNull()
     }
     if (worker == null) {
-      worker = createCommandInstance()
-    }
-    runningCounter.incrementAndGet()
-    shouldIncreaseCapacity()
-    if (checkPermission) {
-      val document = caller.subject?.toContactDocumentOrNull()
-      val user = caller.user?.toUserDocumentOrNull()
-      if (document != null) {
-        val u = document.findContactMemberOrNull(user?.id ?: "") ?: ContactMember(
-          "",
-          "",
-          listOf(DEFAULT_MEMBER_CONTACT_ROLE_ID)
-        )
-        val environment = mapOf(
-          "time" to currentTime().substringBeforeLast(":"),
-          "date" to currentDate(),
-          "datetime" to currentDateTime(),
-          "param1" to (args.getOrNull(0) ?: ""),
-          "param2" to (args.getOrNull(1) ?: "")
-        )
-        if (!worker.permission.testPermission(u, document.policies, environment)) {
-          commitWorker(worker)
-          return CommandExecuteResult.PermissionDenied(worker)
+      return async(start = CoroutineStart.LAZY) {
+        val w = workerPoolModifyLock.withLock {
+          workerPool.removeFirst()
         }
+        runningCounter.incrementAndGet()
+        val result = w.execute(
+          caller,
+          parentSignature,
+          args
+        )
+        commitWorker(w)
+        result
       }
     }
-    return runCatching {
-      worker.context2 {
-        obj = mutableMapOf(
-          "caller" to caller,
-          "signature" to parentSignature
-        )
-        terminal = commandTerminal
-        localization = crsiveLocalization
-      }
-      worker.parse(args)
+    return async {
+      runningCounter.incrementAndGet()
+      val result = worker.execute(
+        caller,
+        parentSignature,
+        args
+      )
       commitWorker(worker)
-      CommandExecuteResult.Success(worker)
-    }.getOrElse {
-      commitWorker(worker)
-      when (it) {
-        is MissingArgument -> CommandExecuteResult.UnmatchedSignature(it, worker)
-        is TimeoutCancellationException -> CommandExecuteResult.Success(worker)
-        is PrintHelpMessage -> CommandExecuteResult.UnmatchedSignature(it, worker)
-        else -> CommandExecuteResult.ExecutionFailed(it, worker)
-      }
+      result
     }
   }
 
   private suspend fun commitWorker(command: AbstractCommand) {
     // 清除多余的引用
     command.context2 { }
-    shouldDecreaseCapacity()
-    if (pool.size < capacity) {
-      poolModifyLock.withLock {
-        pool.addLast(command)
+    runningCounter.decrementAndGet()
+    workerPoolModifyLock.withLock {
+      if (workerPool.size < workerPoolCapacity) {
+        workerPool.addLast(command)
+      }
+    }
+    launch {
+      taskPoolModifyLock.withLock {
+        taskPool.removeFirstOrNull()?.start()
       }
     }
   }

@@ -156,6 +156,29 @@ internal object TencentWebsocketFriendAddBotHandler :
   }
 }
 
+internal object TencentWebsocketGroupDeleteBotHandler :
+  TencentWebsocketDispatchEventHandler<TencentBotGroupEventRaw>() {
+  override val type = TencentWebsocketEventType.GROUP_DEL_ROBOT
+  override val decoder = TencentBotGroupEventRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotGroupEventRaw, eventId: String) {
+    val group = bot.groups.getOrCreate(payload.id)
+    val member = group.members.getOrCreate(payload.opMemberId)
+    TencentGroupDeleteEvent(member, eventId).broadcast()
+  }
+}
+
+internal object TencentWebsocketFriendDeleteBotHandler :
+  TencentWebsocketDispatchEventHandler<TencentBotFriendEventRaw>() {
+  override val type = TencentWebsocketEventType.FRIEND_DEL
+  override val decoder = TencentBotFriendEventRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotFriendEventRaw, eventId: String) {
+    val friend = bot.friends.getOrCreate(payload.id)
+    TencentFriendDeleteEvent(friend, eventId).broadcast()
+  }
+}
+
 internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatchEventHandler<TencentWebsocketCallbackButtonResp>() {
   override val type = TencentWebsocketEventType.INTERACTION_CREATE
   override val decoder = TencentWebsocketCallbackButtonResp.serializer()

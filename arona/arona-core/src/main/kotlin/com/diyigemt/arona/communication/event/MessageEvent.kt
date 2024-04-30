@@ -84,6 +84,9 @@ class TencentFriendAddEvent internal constructor(
   override val user get() = friend
   override val subject get() = friend
   override val bot get() = user.bot
+  override fun toString(): String {
+    return "TencentFriendAddEvent(user=${user.id}"
+  }
 }
 
 class TencentFriendDeleteEvent internal constructor(
@@ -93,6 +96,9 @@ class TencentFriendDeleteEvent internal constructor(
   override val user get() = friend
   override val subject get() = friend
   override val bot get() = user.bot
+  override fun toString(): String {
+    return "TencentFriendAddEvent(user=${user.id}"
+  }
 }
 
 class TencentGroupAddEvent internal constructor(
@@ -114,6 +120,9 @@ class TencentGroupDeleteEvent internal constructor(
   override val group get() = user.group
   override val subject get() = group
   override val bot get() = user.bot
+  override fun toString(): String {
+    return "TencentGroupDeleteEvent(group=${group.id}, user=${user.id})"
+  }
 }
 
 class TencentGuildAddEvent internal constructor(

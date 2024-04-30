@@ -98,7 +98,7 @@ data class ContactGachaConfig(
 }
 
 @Suppress("unused")
-object GachaCommand : AbstractCommand(
+class GachaCommand : AbstractCommand(
   Arona,
   "十连",
   description = "抽一发十连",

@@ -282,8 +282,8 @@ function pickups(id: number[]) {
   return students_(students.value.filter((it) => id.includes(it.id)));
 }
 function rates(r: GachaRate) {
-  if (!r || !r.sr) {
-    if (r.r) {
+  if (!r || (!r.sr && r.sr !== 0)) {
+    if (r.r || r.r === 0) {
       r = {
         r: 78.5,
         sr: 18.5,

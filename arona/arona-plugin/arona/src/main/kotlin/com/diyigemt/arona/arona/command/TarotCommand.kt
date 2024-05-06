@@ -186,14 +186,14 @@ object TarotCommand : AbstractCommand(
     if (mdConfig.enable) { // TODO remove旧版塔罗牌
       val dayOne = readPluginConfigOrDefault(Arona, default = TarotConfig()).dayOne
       val im = when {
-        roll == 2 -> 416 to 640
+        roll == 2 -> 208 to 320
         type == TarotCardType.A -> {
-          416 to 817
+          208 to 409
         }
         roll == 1 || type == TarotCardType.B -> {
-          990 to 1700
+          248 to 425
         }
-        else -> { 416 to 640 }
+        else -> { 208 to 320 }
       }
       val md = tencentCustomMarkdown {
         at()

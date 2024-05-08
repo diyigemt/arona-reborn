@@ -18,7 +18,6 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.reflect.full.createInstance
 
 internal sealed class DynamicCommandExecutor(
   val path: List<String>,
@@ -207,7 +206,7 @@ internal class DynamicContextualCommandExecutor(
       workerPool.removeFirstOrNull()
     }
     if (worker == null) {
-      return async(start = CoroutineStart.LAZY) {
+      val task = async(start = CoroutineStart.LAZY) {
         val w = workerPoolModifyLock.withLock {
           workerPool.removeFirst()
         }
@@ -220,6 +219,10 @@ internal class DynamicContextualCommandExecutor(
         commitWorker(w)
         result
       }
+      taskPoolModifyLock.withLock {
+        taskPool.addLast(task)
+      }
+      return task
     }
     return async {
       runningCounter.incrementAndGet()

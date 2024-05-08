@@ -3,12 +3,28 @@ package com.diyigemt.kivotos.inventory
 import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
 import com.diyigemt.kivotos.tools.database.idFilter
 import com.diyigemt.kivotos.tools.database.withCollection
+import com.mongodb.client.model.Filters
+import com.mongodb.client.model.Updates
 import com.mongodb.client.result.InsertOneResult
-import kotlinx.coroutines.flow.first
+import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
-import java.rmi.server.UID
+
+/**
+ * 物品id规则
+ *
+ * UInt max: 2^32 = 4,294,967,296
+ *
+ * type id: 1,000,000
+ *
+ * subtype id: x,000,001
+ *
+ * 主类型 4,294种
+ *
+ * 子类型 999,999种
+ */
+private const val InventoryCategoryBase = 1000000u
 
 private val currencyList = listOf(
   InventoryCategory.COMMON_CURRENCY.toId(0u), // 信用點
@@ -16,31 +32,48 @@ private val currencyList = listOf(
   InventoryCategory.COMMON_CURRENCY.toId(2u), // AP
 )
 
-enum class InventoryCategory(val id: Int) {
-  COMMON_CURRENCY(0); //通用货币 0 信用点 1 清辉石 2 体力
+enum class InventoryCategory(val id: UInt) {
+  COMMON_CURRENCY(1u); //通用货币 0 信用点 1 清辉石 2 体力
 
-  fun toId(subCategory: UInt) = (id.toUInt() shl 20) and (subCategory and 0xFFFFF.toUInt())
+  fun toId(subCategory: UInt) = id * InventoryCategoryBase + subCategory
 
   companion object {
     private val map = entries.associateBy { it.id }
-    fun fromId(id: Int) = checkNotNull(map[id])
+
+    /**
+     * 根据全限定id
+     */
+    fun fromId(id: UInt) = checkNotNull(map[id / InventoryCategoryBase])
+    fun toSubCategory(id: UInt) = id % InventoryCategoryBase
   }
 }
 
 sealed interface Inventory {
+  /**
+   * 物品的全限定id, 全局唯一
+   *
+   * 规则与[InventoryCategoryBase]保持一致
+   */
   val id: UInt
+
+  /**
+   * 物品的主类别
+   */
   val category: InventoryCategory
+
+  /**
+   * 物品的子类别
+   */
   val subCategory: UInt
 }
 
 @Serializable
 data class InventoryDocument(
   /**
-   * kotlin 32 bit
+   * [InventoryCategoryBase]为类别id
    *
-   * high 12bit type
+   * 剩余6位为子类递增id
    *
-   * low 20bit growth subtype
    */
   @BsonId
   override val id: UInt,
@@ -49,8 +82,8 @@ data class InventoryDocument(
 ) : Inventory {
   constructor(id: UInt) : this(
     id,
-    InventoryCategory.fromId((id shr 20).toInt()),
-    id and 0xFFFFF.toUInt()
+    InventoryCategory.fromId(id),
+    InventoryCategory.toSubCategory(id)
   )
 
   companion object : DocumentCompanionObject {
@@ -60,14 +93,24 @@ data class InventoryDocument(
 
 @Serializable
 data class UserInventoryItem(
+  /**
+   * 物品的全限定id, 全局唯一, 与[InventoryDocument.id]保持一致
+   */
   override val id: UInt,
+  /**
+   * 用户uid
+   */
   val uid: String,
+  /**
+   * 保有数量
+   */
+  val count: Int = 0,
 ) : Inventory {
   override val category by lazy {
-    InventoryCategory.fromId((id shr 20).toInt())
+    InventoryCategory.fromId(id)
   }
   override val subCategory by lazy {
-    id and 0xFFFFF.toUInt()
+    InventoryCategory.toSubCategory(id)
   }
 
 }
@@ -84,6 +127,31 @@ data class UserInventoryDocument(
   }.toMutableList(),
   val storage: MutableList<UserInventoryItem> = mutableListOf(),
 ) {
+  suspend fun increaseInventory(item: UserInventoryItem, delta: Int): Boolean {
+    withCollection<UserInventoryDocument, UpdateResult> {
+      updateOne(
+        filter = Filters.and(
+          idFilter(id),
+          Filters.eq("${UserInventoryDocument::currencyStorage::name}._id", item.id)
+        ),
+        update = Updates.inc(
+          "${UserInventoryDocument::currencyStorage::name}.$.${UserInventoryItem::count.name}",
+          delta
+        ),
+      )
+      updateOne(
+        filter = Filters.and(
+          idFilter(id),
+          Filters.eq("${UserInventoryDocument::storage::name}._id", item.id)
+        ),
+        update = Updates.inc(
+          "${UserInventoryDocument::storage::name}.$.${UserInventoryItem::count.name}",
+          delta
+        ),
+      )
+    }
+    return true
+  }
   companion object : DocumentCompanionObject {
     override val documentName = "UserInventoryDocument"
     private suspend fun createUserInventoryDocument(uid: String): UserInventoryDocument {

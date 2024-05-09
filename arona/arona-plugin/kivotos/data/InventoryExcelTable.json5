@@ -1,0 +1,490 @@
+[
+  // 货币1开头
+  // 装备5开头
+  {
+    "_id": "1000000", // 物品id 类别id*1000000+子类id
+    "category": "1", // 类别id
+    "subCategory": "0", // 子类id
+    "name": "信用点",
+    "icon": "Currency_Icon_Gold",
+    "rarity": "R",
+    "desc": "老师持有的信用卡的积分。在特定情况下，信用积分可以当作现金自由使用。",
+  },
+  {
+    "_id": "1000001",
+    "category": "1",
+    "subCategory": "1",
+    "name": "清辉石",
+    "icon": "Currency_Icon_Gem",
+    "rarity": "R",
+    "desc": "能用大人的卡购买的神秘宝石。可以用来交易各种商品。"
+  },
+  {
+    "_id": "1000002", // AP
+    "category": "1",
+    "subCategory": "2",
+    "name": "AP",
+    "icon": "Currency_Icon_AP",
+    "rarity": "R",
+    "desc": "老师的活力值。进行各种活动时都会消耗活力值。"
+  },
+  {
+    "_id": "5000000",
+    "category": "5",
+    "subCategory": "0",
+    "name": "波浪猫枕头",
+    "icon": "item_icon_favor_0",
+    "rarity": "SR",
+    "desc": "超火的MomoFriends联名商品第7弹！\\n年度床上用品人气排名第3的波浪猫枕头。"
+  },
+  {
+    "_id": "5000001",
+    "category": "5",
+    "subCategory": "1",
+    "name": "佩洛洛健腹轮",
+    "icon": "item_icon_favor_1",
+    "rarity": "SR",
+    "desc": "超火的MomoFriends联名商品第9弹！\\n 年度运动器材人气排名第1的佩洛洛健腹轮。"
+  },
+  {
+    "_id": "5000002",
+    "category": "5",
+    "subCategory": "2",
+    "name": "埃帕蓝牙耳机",
+    "icon": "item_icon_favor_2",
+    "rarity": "SR",
+    "desc": "最近在基沃托斯女生之中非常流行的无线耳机。 只靠零花钱买的话实在太贵了。大概要打工3个月才能买到。"
+  },
+  {
+    "_id": "5000003",
+    "category": "5",
+    "subCategory": "3",
+    "name": "无法实现的爱恋\\n~正因为是不被世间容许的爱，才更令人流连忘返~",
+    "icon": "item_icon_favor_3",
+    "rarity": "SR",
+    "desc": "超人气言情小说作家“恋之鲤”的最新作品！\\n描述一段无法实现的爱情，是一部紧扣心弦的爱情小说！"
+  },
+  {
+    "_id": "5000004",
+    "category": "5",
+    "subCategory": "4",
+    "name": "游戏杂志《HIT GIRLS》",
+    "icon": "item_icon_favor_4",
+    "rarity": "SR",
+    "desc": "绝不错过任何一个情报。\\n杂志里不仅有基沃托斯最新游戏发售消息，还有经典游戏攻略和游戏周边发售等消息。"
+  },
+  {
+    "_id": "5000005",
+    "category": "5",
+    "subCategory": "5",
+    "name": "樱桃唇彩",
+    "icon": "item_icon_favor_5",
+    "rarity": "SR",
+    "desc": "可爱与艳丽兼具的唇彩。\\n在喜欢打扮的女性中人气爆棚的时尚单品。"
+  },
+  {
+    "_id": "5000006",
+    "category": "5",
+    "subCategory": "6",
+    "name": "让皮肤更加白皙透亮的护肤霜",
+    "icon": "item_icon_favor_6",
+    "rarity": "SR",
+    "desc": "高档化妆品品牌“萨穆埃拉”推出的热卖产品。\\n让皮肤变得非常白皙透明，能更加自然地贴合皮肤，营造出健康的肤色。"
+  },
+  {
+    "_id": "5000007",
+    "category": "5",
+    "subCategory": "7",
+    "name": "迷彩伪装用粉底液3件套",
+    "icon": "item_icon_favor_7",
+    "rarity": "SR",
+    "desc": "高档化妆品品牌“萨穆埃拉”推出的热卖产品。\\n渗入肌肤的舒适感！需要时可随时随地进行伪装！快来体验一下属于自己的伪装吧！"
+  },
+  {
+    "_id": "5000008",
+    "category": "5",
+    "subCategory": "8",
+    "name": "高级曲奇礼盒套装",
+    "icon": "item_icon_favor_8",
+    "rarity": "SR",
+    "desc": "清淡香甜、口味一流的薛定谔的高级曲奇礼盒套装。\\n有50%概率会发现里面装的不是曲奇，而是别的东西。"
+  },
+  {
+    "_id": "5000009",
+    "category": "5",
+    "subCategory": "9",
+    "name": "《枪、可爱、青春》",
+    "icon": "item_icon_favor_9",
+    "rarity": "SR",
+    "desc": "枪、可爱，以及青春。\\n追溯基沃托斯大众文化的起源并对其进行分析的今年最佳畅销书。"
+  },
+  {
+    "_id": "5000010",
+    "category": "5",
+    "subCategory": "10",
+    "name": "天体望远镜",
+    "icon": "item_icon_favor_10",
+    "rarity": "SR",
+    "desc": "基沃托斯官方天文观测协会选为标准观测用兴趣装备的天体望远镜。"
+  },
+  {
+    "_id": "5000011",
+    "category": "5",
+    "subCategory": "11",
+    "name": "Game Girl Color复刻版",
+    "icon": "item_icon_favor_11",
+    "rarity": "SR",
+    "desc": "“为你的休闲时刻增添魅力！”\\n曾经风靡一时的经典游戏机“Game Girl Color”的复刻版！"
+  },
+  {
+    "_id": "5000012",
+    "category": "5",
+    "subCategory": "12",
+    "name": "MX-野外战口粮 C型 甜品风味",
+    "icon": "item_icon_favor_12",
+    "rarity": "SR",
+    "desc": "卡路里才是战斗力！"
+  },
+  {
+    "_id": "5000013",
+    "category": "5",
+    "subCategory": "13",
+    "name": "抹茶味弹珠汽水",
+    "icon": "item_icon_favor_13",
+    "rarity": "SR",
+    "desc": "具有独特风味的抹茶味碳酸饮料。\\n来品尝一下绿色的清爽吧！"
+  },
+  {
+    "_id": "5000014",
+    "category": "5",
+    "subCategory": "14",
+    "name": "果冻抱枕",
+    "icon": "item_icon_favor_14",
+    "rarity": "SR",
+    "desc": "老牌游戏“果冻”系列的主人公终于出周边了！\\n连相同颜色的果冻能互相吃掉的细节也完美重现！"
+  },
+  {
+    "_id": "5000015",
+    "category": "5",
+    "subCategory": "15",
+    "name": "跳跃侦探兔\\n~由大雾引发的温泉滑倒事件~",
+    "icon": "item_icon_favor_15",
+    "rarity": "SR",
+    "desc": "高高竖起纯白色的兔耳朵，从不放过任何一个线索！\\n跳跃侦探兔系列第3篇！\\n这次故事的舞台是温泉哦！"
+  },
+  {
+    "_id": "5000016",
+    "category": "5",
+    "subCategory": "16",
+    "name": "健身圈",
+    "icon": "item_icon_favor_16",
+    "rarity": "SR",
+    "desc": "“玩游戏也能愉快地运动！”\\n有了健身圈，在家中即可享受运动乐趣。\\n增肌、减脂，无所不能哦！"
+  },
+  {
+    "_id": "5000017",
+    "category": "5",
+    "subCategory": "17",
+    "name": "藏宝图",
+    "icon": "item_icon_favor_17",
+    "rarity": "SR",
+    "desc": "去寻找吧！我坚信宝藏一定就在那里！\\n标记了基沃托斯3大藏宝地点的地图。"
+  },
+  {
+    "_id": "5000018",
+    "category": "5",
+    "subCategory": "18",
+    "name": "装扮用圈圈眼镜",
+    "icon": "item_icon_favor_18",
+    "rarity": "SR",
+    "desc": "戴上这个你也可以成为天才！\\n只要戴上就能成为天才的眼镜（仅限外表）。\\n※注意：佩戴眼镜并不能提高智商。"
+  },
+  {
+    "_id": "5000019",
+    "category": "5",
+    "subCategory": "19",
+    "name": "世界上最没用的机器",
+    "icon": "item_icon_favor_19",
+    "rarity": "SR",
+    "desc": "没任何用处，但非常可爱！可是真的毫无用处！但可爱就好啦！最适合在特别的日子当作礼物赠送的玩具排行榜中名列前5的热门玩具。"
+  },
+  {
+    "_id": "5000020",
+    "category": "5",
+    "subCategory": "20",
+    "name": "蝴蝶结玩具熊",
+    "icon": "item_icon_favor_20",
+    "rarity": "SR",
+    "desc": "看起来有点普通但其实很可爱的玩具熊。\\n在喜欢可爱东西的学员之中比较受欢迎。"
+  },
+  {
+    "_id": "5000021",
+    "category": "5",
+    "subCategory": "21",
+    "name": "电影预售票",
+    "icon": "item_icon_favor_21",
+    "rarity": "SR",
+    "desc": "“有意义的电影就要和亲近的人一起看。”\\n在任何电影院都可以使用的电影预售票，只要有这一张票，就可以两个人一起看电影！"
+  },
+  {
+    "_id": "5000022",
+    "category": "5",
+    "subCategory": "22",
+    "name": "绘画颜料30色套装",
+    "icon": "item_icon_favor_22",
+    "rarity": "SR",
+    "desc": "装有30种不同颜色的专业级颜料套装。\\n用这套颜料来画出整个世界吧！"
+  },
+  {
+    "_id": "5000023",
+    "category": "5",
+    "subCategory": "23",
+    "name": "古典诗集",
+    "icon": "item_icon_favor_23",
+    "rarity": "SR",
+    "desc": "古色古香的古典诗集。\\n将古典文学的之乎者也收入你的囊中。"
+  },
+  {
+    "_id": "5000024",
+    "category": "5",
+    "subCategory": "24",
+    "name": "可爱的餐具套装",
+    "icon": "item_icon_favor_24",
+    "rarity": "SR",
+    "desc": "印有可爱吉祥物的餐具套装。\\n每年都能跻入基沃托斯餐具销售排行榜前10的经典款。"
+  },
+  {
+    "_id": "5000025",
+    "category": "5",
+    "subCategory": "25",
+    "name": "益智魔方",
+    "icon": "item_icon_favor_25",
+    "rarity": "SR",
+    "desc": "“只有解开这个，才算得上真正的千禧年人！”\\n千禧年科技学院公认的高难度魔方。"
+  },
+  {
+    "_id": "5000026",
+    "category": "5",
+    "subCategory": "26",
+    "name": "大型蛋糕",
+    "icon": "item_icon_favor_26",
+    "rarity": "SR",
+    "desc": "就算只用眼睛看看也能使人心满意足的超大蛋糕。\\n在背面悄咪咪地标记着卡路里……"
+  },
+  {
+    "_id": "5000027",
+    "category": "5",
+    "subCategory": "27",
+    "name": "高档自助餐招待券",
+    "icon": "item_icon_favor_27",
+    "rarity": "SR",
+    "desc": "高档自助餐厅的招待券。凭它就可以享用基沃托斯首屈一指的厨师制作的高档料理了。\\n要是私下购买的话，真的很贵很贵。"
+  },
+  {
+    "_id": "5000028",
+    "category": "5",
+    "subCategory": "28",
+    "name": "食虫植物盆栽",
+    "icon": "item_icon_favor_28",
+    "rarity": "SR",
+    "desc": "少数有着特殊喜好的人喜欢的食虫植物盆栽。\\n他们认为食虫植物捕食昆虫的样子非常可爱。"
+  },
+  {
+    "_id": "5000029",
+    "category": "5",
+    "subCategory": "29",
+    "name": "看似昂贵的贪婪之坛",
+    "icon": "item_icon_favor_29",
+    "rarity": "SR",
+    "desc": "一看就觉得非常昂贵的贴金坛子。\\n谨防假冒产品！"
+  },
+  {
+    "_id": "5000030",
+    "category": "5",
+    "subCategory": "30",
+    "name": "发条音乐盒",
+    "icon": "item_icon_favor_30",
+    "rarity": "SR",
+    "desc": "看起来比较高级的发条音乐盒，用原木营造出了一种复古的感觉。在收藏家们之间比较出名。"
+  },
+  {
+    "_id": "5000031",
+    "category": "5",
+    "subCategory": "31",
+    "name": "刺绣手绢",
+    "icon": "item_icon_favor_31",
+    "rarity": "SR",
+    "desc": "装饰着刺绣的手绢，朴素的刺绣散发着端庄的美丽。"
+  },
+  {
+    "_id": "5000032",
+    "category": "5",
+    "subCategory": "32",
+    "name": "百科全书",
+    "icon": "item_icon_favor_32",
+    "rarity": "SR",
+    "desc": "从为什么会打雷下雨，到为什么有冬天夏天。\\n你所好奇的一切都可以在这里找到答案。"
+  },
+  {
+    "_id": "5000033",
+    "category": "5",
+    "subCategory": "33",
+    "name": "营养补充剂",
+    "icon": "item_icon_favor_33",
+    "rarity": "SR",
+    "desc": "吃一口就能活力满满！\\n很适合送给珍爱的人的健康食品。"
+  },
+  {
+    "_id": "5000034",
+    "category": "5",
+    "subCategory": "34",
+    "name": "夏日泳圈",
+    "icon": "item_icon_favor_34",
+    "rarity": "SR",
+    "desc": "夏天来啦！去海边吧！\\n不管你是游泳新手，还是游泳高手，为了你的安全，请务必带上这款戏水必备品。时尚安全的同时，更为你增添一份可爱！"
+  },
+  {
+    "_id": "5000100",
+    "category": "5",
+    "subCategory": "100",
+    "name": "蕾丝枕头",
+    "icon": "item_icon_favor_lv2_0",
+    "rarity": "SSR",
+    "desc": "使用豪华原料制成的蕾丝枕头。虽说一眼看上去设计很简单，但正如其名，枕头里承载着少女们的梦想。"
+  },
+  {
+    "_id": "5000101",
+    "category": "5",
+    "subCategory": "101",
+    "name": "混混之街 卷1",
+    "icon": "item_icon_favor_lv2_1",
+    "rarity": "SSR",
+    "desc": "因「我们除了情义和胆子以外一无所有！」的台词而出名的话题作，混混之街系列的第1卷。与外表不同，主角意外的很可爱，也因此全系列正好评销售中。"
+  },
+  {
+    "_id": "5000102",
+    "category": "5",
+    "subCategory": "102",
+    "name": "莎缪艾菈「彼岸」",
+    "icon": "item_icon_favor_lv2_2",
+    "rarity": "SSR",
+    "desc": "高级化妆品厂商「莎缪艾菈」发售的最高级香水。\\n是以「试一次，让可爱萦绕此身」的广告词而爆火的产品，也是旷世奇才调香师「彼岸」调制的12杰作之一。"
+  },
+  {
+    "_id": "5000103",
+    "category": "5",
+    "subCategory": "103",
+    "name": "复古蛋形工艺品",
+    "icon": "item_icon_favor_lv2_3",
+    "rarity": "SSR",
+    "desc": "在卵形的主体上镶有美丽宝石并精心装饰了几何图案的工艺品。当然，拿去孵也不会蹦出小鸡来。"
+  },
+  {
+    "_id": "5000104",
+    "category": "5",
+    "subCategory": "104",
+    "name": "正宗千层芭菲",
+    "icon": "item_icon_favor_lv2_4",
+    "rarity": "SSR",
+    "desc": "在三一的著名甜品店，咖啡厅千层出售的芭菲。在柔软的冰激凌上层层堆叠的点心、糖浆、鲜奶油、水果和谐地融为了一体，果然正宗！"
+  },
+  {
+    "_id": "5000105",
+    "category": "5",
+    "subCategory": "105",
+    "name": "A～Book Rare",
+    "icon": "item_icon_favor_lv2_5",
+    "rarity": "SSR",
+    "desc": "排入了「基沃托斯的学生最想要的电子产品Top3」的著名笔记本电脑。相当高级的产品。好想要！可是真的好贵呀！"
+  },
+  {
+    "_id": "5000106",
+    "category": "5",
+    "subCategory": "106",
+    "name": "时髦梳子",
+    "icon": "item_icon_favor_lv2_6",
+    "rarity": "SSR",
+    "desc": "设计时髦，充满高级感的便携梳子。作为礼物很受欢迎。"
+  },
+  {
+    "_id": "5000107",
+    "category": "5",
+    "subCategory": "107",
+    "name": "营养满满的综合维生素软糖",
+    "icon": "item_icon_favor_lv2_7",
+    "rarity": "SSR",
+    "desc": "含有多种维生素的营养软糖。拥有多种水果口味，吃起来别有一番滋味。不过需要注意别吃着吃着罐子空了！"
+  },
+  {
+    "_id": "5000108",
+    "category": "5",
+    "subCategory": "108",
+    "name": "最高级枫树盆栽",
+    "icon": "item_icon_favor_lv2_8",
+    "rarity": "SSR",
+    "desc": "只要看着就能让内心平静下来的最高级枫树盆栽。树叶如同换季更衣一样随四季流转自在变化，散发着风雅的气息。"
+  },
+  {
+    "_id": "5000109",
+    "category": "5",
+    "subCategory": "109",
+    "name": "针线包",
+    "icon": "item_icon_favor_lv2_9",
+    "rarity": "SSR",
+    "desc": "为了应对所有情况而挑选了必要道具的专业针线包。只要有了它无论是衣服破了还是袜子开洞，都不在话下！"
+  },
+  {
+    "_id": "5000110",
+    "category": "5",
+    "subCategory": "110",
+    "name": "音乐演奏会入场券",
+    "icon": "item_icon_favor_lv2_10",
+    "rarity": "SSR",
+    "desc": "在基沃托斯定期举办的演奏会的入场券。从古典乐到最近的流行曲，对不论种类喜欢各种音乐的人来说是最合适的礼物。"
+  },
+  {
+    "_id": "5000111",
+    "category": "5",
+    "subCategory": "111",
+    "name": "一日三次哑铃套装",
+    "icon": "item_icon_favor_lv2_11",
+    "rarity": "SSR",
+    "desc": "放有多个各种重量的哑铃的套装商品。一日三次，早中晚周而复始地锻炼，打造出出色的肌肉吧！"
+  },
+  {
+    "_id": "5000112",
+    "category": "5",
+    "subCategory": "112",
+    "name": "桌游「人生」",
+    "icon": "item_icon_favor_lv2_12",
+    "rarity": "SSR",
+    "desc": "找到工作、中彩票、甚至宇宙旅行都能实现的有趣桌游。每次游玩都不知道下一步轮盘赌与骰子的结果，简直就是人生啊。"
+  },
+  {
+    "_id": "5000997",
+    "category": "5",
+    "subCategory": "997",
+    "name": "绚丽花束",
+    "icon": "item_icon_favor_lv2_package",
+    "rarity": "SSR",
+    "desc": "送给重要之人的花束，由红宝石制成。\\n绚丽的红色花瓣，抓住对方的心。"
+  },
+  {
+    "_id": "5000998",
+    "category": "5",
+    "subCategory": "998",
+    "name": "初音未来的拍立得",
+    "icon": "item_icon_favor_ssr_2",
+    "rarity": "SSR",
+    "desc": "在初音未来的“特别演出in基沃托斯”上分发的特制拍立得。由于演出的空前盛况，它已经成为每个初音未来粉丝都想拥有的稀有周边。"
+  },
+  {
+    "_id": "5000999",
+    "category": "5",
+    "subCategory": "999",
+    "name": "闪烁的花束",
+    "icon": "item_icon_favor_ssr_1",
+    "rarity": "SSR",
+    "desc": "为特别的人送去值得纪念的礼物，用水晶制成的花束。\\n当灯光照上去时，花束会像万花筒一样闪耀。"
+  }
+]

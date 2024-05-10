@@ -31,7 +31,7 @@ object GachaTool {
   val GachaResourcePath by lazy {
     Arona.dataFolder("gacha")
   }
-  private val bg = Image.fromGachaPath("Gacha_BG_R.png")
+  private val bg = Image.fromGachaPath("Gacha_BG.png")
   private val star = Image.fromGachaPath("Common_Icon_Formation_Star.png")
   private val bgTriangle = Image.fromGachaPath("UITex_BGPoliLight_3.png")
   private val newIm = Image.fromGachaPath("Gacha_New.png")
@@ -81,10 +81,10 @@ object GachaTool {
     val canvas = surface.canvas
     // 底色
     canvas.drawImageRect(bg, Rect(0f, 0f, 2340f, 1080f))
-    // 三角形
-    canvas.drawImageRect(bgTriangle, Rect(-1168f, -1001f, 2260f, 2848f), Paint().apply {
-      alpha = 100
-    })
+//    // 三角形
+//    canvas.drawImageRect(bgTriangle, Rect(-1168f, -1001f, 2260f, 2848f), Paint().apply {
+//      alpha = 100
+//    })
 
     // 确认按钮
     val confirmBtn = Surface.makeRasterN32Premul(424, 130).also {

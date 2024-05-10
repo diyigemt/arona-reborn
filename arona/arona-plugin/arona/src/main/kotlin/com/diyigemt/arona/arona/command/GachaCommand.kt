@@ -3,6 +3,7 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
+import com.diyigemt.arona.arona.config.CustomPool
 import com.diyigemt.arona.arona.config.GachaConfig
 import com.diyigemt.arona.arona.config.GachaPickupRate
 import com.diyigemt.arona.arona.config.GachaRate
@@ -18,7 +19,6 @@ import com.diyigemt.arona.arona.tools.GachaResult
 import com.diyigemt.arona.arona.tools.GachaResultItem
 import com.diyigemt.arona.arona.tools.GachaTool
 import com.diyigemt.arona.arona.tools.GachaTool.GachaResourcePath
-import com.diyigemt.arona.arona.tools.GachaTool.NormalPool
 import com.diyigemt.arona.arona.tools.GachaTool.NormalRStudent
 import com.diyigemt.arona.arona.tools.GachaTool.NormalSRStudent
 import com.diyigemt.arona.arona.tools.GachaTool.NormalSSRStudent
@@ -33,6 +33,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender.Companion.upda
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.console.confirm
+import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentLocalDateTime
 import com.diyigemt.arona.utils.runSuspend
 import com.diyigemt.arona.utils.uuid
@@ -42,16 +43,19 @@ import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.mordant.terminal.ConversionResult
 import kotlinx.coroutines.delay
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import net.coobird.thumbnailator.Thumbnails
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
+import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery as redis
 
 @Serializable
 data class UserGachaRecordItem(
@@ -97,6 +101,9 @@ data class ContactGachaConfig(
   override fun check() {}
 }
 
+private const val GachaPoolBridgeRedisKey = "com.diyigemt.arona.gacha.bridge"
+private fun generateNumber(): String = (1..6).map { "0123456789".random() }.joinToString("")
+
 @Suppress("unused")
 class GachaCommand : AbstractCommand(
   Arona,
@@ -112,6 +119,7 @@ class GachaCommand : AbstractCommand(
   }.content
 ) {
   private val targetPoolName by argument(name = "要抽的池子", help = "对指定的池子抽一次十连").optional()
+  private val bridge by option("-b", "--bridge", help = "桥接用户代码")
 
   suspend fun UserCommandSender.gacha() {
     if (!targetPoolName.isNullOrBlank()) {
@@ -120,30 +128,45 @@ class GachaCommand : AbstractCommand(
         gachaHistory(0)
         return
       }
-      // 抽指定的卡池
-      val poolConfig = contactDocument().readPluginConfigOrDefault(Arona, GachaConfig()).also {
-        it.pools.addAll(userDocument().readPluginConfigOrDefault(Arona, GachaConfig()).pools)
-      }
-      val pool = poolConfig.pools.firstOrNull { it.name == targetPoolName }
-      if (pool == null) {
-        if (readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown.enable) {
-          val md = tencentCustomMarkdown {
-            h1("卡池选择")
-            +"池子不存在!"
-            +"仅能抽取管理员预定义的和自己配置的"
-          }
-          val kb = tencentCustomKeyboard {
-            poolConfig.pools.windowed(2, 2, true).forEach { r ->
-              row {
-                r.forEach { c ->
-                  button(c.name, "/十连 ${c.name}")
-                }
+      suspend fun sendPoolChoice(poolConfig: List<CustomPool>, tip: String) {
+        val md = tencentCustomMarkdown {
+          h1("卡池选择")
+          +tip
+          +"仅能抽取群管理员预定义的和自己配置的"
+        }
+        val kb = tencentCustomKeyboard {
+          poolConfig.windowed(2, 2, true).forEach { r ->
+            row {
+              r.forEach { c ->
+                button(c.name, "/十连 ${c.name}")
               }
             }
           }
-          sendMessage(md + kb)
+        }
+        sendMessage(md + kb)
+      }
+      val contactConfig = contactDocument().readPluginConfigOrDefault(Arona, GachaConfig())
+      val userConfig = userDocument().readPluginConfigOrDefault(Arona, GachaConfig()).pools
+      val selfConfig = contactConfig.pools + userConfig
+      // 抽指定的卡池
+      val bridgeConfig: List<CustomPool> = if (bridge != null) {
+        val key = "$GachaPoolBridgeRedisKey.$bridge"
+        redis {
+          get(key)
+        }?.let {
+          JsonIgnoreUnknownKeys.decodeFromString<List<CustomPool>>(it)
+        } ?: return sendPoolChoice(selfConfig, "临时代码已过期")
+      } else {
+        listOf()
+      }
+
+      val poolConfig = selfConfig + bridgeConfig
+      val pool = poolConfig.firstOrNull { it.name == targetPoolName }
+      if (pool == null) {
+        if (readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown.enable) {
+          return sendPoolChoice(poolConfig, "池子不存在!")
         } else {
-          sendMessage("池子不存在!, 可选:\n${poolConfig.pools.joinToString("\n") { it.name }}")
+          sendMessage("池子不存在!, 可选:\n${poolConfig.joinToString("\n") { it.name }}")
         }
         return
       }
@@ -152,8 +175,22 @@ class GachaCommand : AbstractCommand(
         return
       }
       val result = doGacha(pool.toGachaPool(), pool.rate, pool.pickupRate)
-      sendResult(pool.name, 10, result, true)
-      return
+      // 如果直接通过桥接抽卡并且抽的不是自己的池子, 则不生成二次桥接
+      return if (bridge != null && bridgeConfig.any { it.name == targetPoolName }) {
+        sendResult(pool.name, 10, result, bridge)
+      } else {
+        // 如果通过桥接抽卡但是抽的是自己的池子, 或者没有通过桥接抽, 则生成新的桥接
+        val code = generateNumber()
+        val key = "$GachaPoolBridgeRedisKey.$code"
+        redis {
+          set(
+            key,
+            JsonIgnoreUnknownKeys.encodeToString(selfConfig)
+          )
+          expire(key, (10u * 60u).toULong())
+        }
+        sendResult(pool.name, 10, result, code)
+      }
     }
 
     val pickupPool = GachaTool.CurrentPickupPool
@@ -176,14 +213,14 @@ class GachaCommand : AbstractCommand(
     updateUserPluginConfig(Arona, recordMap)
 
     // 发送图片
-    sendResult(pool.name, record.point, result, false)
+    sendResult(pool.name, record.point, result, null)
   }
 
   private suspend fun UserCommandSender.sendResult(
     poolName: String,
     point: Int,
     result: List<GachaResultItem>,
-    isCustom: Boolean,
+    bridgeCode: String?,
   ) {
     val randomFileName = "${uuid()}.jpg"
     val randomFile = Arona.dataFolder("gacha_result", randomFileName).toFile()
@@ -199,7 +236,7 @@ class GachaCommand : AbstractCommand(
           Thumbnails
             .of(input)
             .scale(1.0)
-            .outputQuality(0.5)
+            .outputQuality(0.6)
             .outputFormat("jpg")
             .toFile(randomFile)
         }
@@ -223,20 +260,22 @@ class GachaCommand : AbstractCommand(
               label = "再来一次"
             }
             action {
-              data = "/十连 " + if (isCustom) {
-                poolName
+              data = "/十连 " + if (bridgeCode != null) {
+                "$poolName -b $bridgeCode"
               } else {
                 ""
               }
+              enter = true
             }
           }
-          if (!isCustom) {
+          if (bridgeCode == null) {
             button(2) {
               render {
                 label = "查看历史记录"
               }
               action {
                 data = "/十连 历史"
+                enter = true
               }
             }
           }

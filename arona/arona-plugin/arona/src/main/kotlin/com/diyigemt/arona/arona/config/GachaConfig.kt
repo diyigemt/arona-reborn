@@ -1,4 +1,6 @@
-@file:OptIn(ExperimentalSerializationApi::class, ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalSerializationApi::class,
+  ExperimentalSerializationApi::class
+)
 
 package com.diyigemt.arona.arona.config
 

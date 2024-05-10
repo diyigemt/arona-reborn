@@ -59,8 +59,8 @@ private fun checkStudentUpdate(last0: String): Boolean {
   val afternoon = "${currentDate()} $AFTERNOON_TIME"
   // 超过12小时 肯定需要更新
   return (now - last).inWholeHours >= 12L ||
-    morning in last0..nowDatetime ||
-    afternoon in last0..nowDatetime
+    morning in last0.rangeUntil(nowDatetime) ||
+    afternoon in last0.rangeUntil(nowDatetime)
 }
 
 // 检查学生摸头刷新时间 从第一次摸开始算起3小时刷新

@@ -318,6 +318,8 @@ private constructor(private val config: TencentBotConfig) : TencentBot, Coroutin
         bodyTmp = resp.bodyAsText()
         if (bodyTmp.contains("\"code\":22009")) {
           throw ImageFailedException(resp.status, bodyTmp)
+        } else if (bodyTmp.contains("\"code\":40054005")) {
+          throw MessageDuplicationException(resp.status, bodyTmp)
         }
         throw HttpNotOkException(
           resp.status,
@@ -436,4 +438,10 @@ class ImageDownloadFailedException(status: HttpStatusCode, body: String) : Tence
   status, JsonIgnoreUnknownKeys.decodeFromString(body)
 ) {
   override val message: String = "image download failed, $source"
+}
+
+class MessageDuplicationException(status: HttpStatusCode, body: String) : TencentApiErrorException(
+  status, JsonIgnoreUnknownKeys.decodeFromString(body)
+) {
+  override val message: String = "message duplicated, ${source.message}"
 }

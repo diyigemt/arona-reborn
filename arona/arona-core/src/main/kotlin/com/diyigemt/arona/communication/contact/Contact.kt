@@ -1,5 +1,6 @@
 package com.diyigemt.arona.communication.contact
 
+import com.diyigemt.arona.communication.MessageDuplicationException
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
@@ -92,37 +93,16 @@ internal abstract class AbstractContact(
     }.onFailure {
       commandLineLogger.error(it)
     }.getOrNull()?.message?.toMessageChain() ?: return null
-    val builder = TencentMessageBuilder(messageSequence = messageSequence).append(chain)
-    val result = if (this is Group || this is FriendUser) {
-      bot.callOpenapi(
-        endpoint,
-        MessageReceiptImpl.serializer(),
-        urlPlaceHolder
-      ) {
-        method = HttpMethod.Post
-        // TODO 支持其他类型消息
-        contentType(ContentType.Application.Json)
-        setBody(
-          bot.json.encodeToString(
-            builder.build(this@AbstractContact is GuildMember)
-          )
-        )
-      }
-    } else {
-      bot.callOpenapi(
-        endpoint,
-        MessageReceiptImpl.serializer(),
-        urlPlaceHolder
-      ) {
-        method = HttpMethod.Post
-        // TODO 支持其他类型消息
-        // 包含本地图片 改用 form-data 发送
-        if (chain.any { it is TencentGuildLocalImage }) {
-          contentType(ContentType.MultiPart.FormData)
-          setBody(
-            builder.buildMultipart()
-          )
-        } else {
+    suspend fun send(messageSequence: Int): Result<MessageReceiptImpl> {
+      val builder = TencentMessageBuilder(messageSequence = messageSequence).append(chain)
+      return if (this is Group || this is FriendUser) {
+        bot.callOpenapi(
+          endpoint,
+          MessageReceiptImpl.serializer(),
+          urlPlaceHolder
+        ) {
+          method = HttpMethod.Post
+          // TODO 支持其他类型消息
           contentType(ContentType.Application.Json)
           setBody(
             bot.json.encodeToString(
@@ -130,7 +110,35 @@ internal abstract class AbstractContact(
             )
           )
         }
+      } else {
+        bot.callOpenapi(
+          endpoint,
+          MessageReceiptImpl.serializer(),
+          urlPlaceHolder
+        ) {
+          method = HttpMethod.Post
+          // TODO 支持其他类型消息
+          // 包含本地图片 改用 form-data 发送
+          if (chain.any { it is TencentGuildLocalImage }) {
+            contentType(ContentType.MultiPart.FormData)
+            setBody(
+              builder.buildMultipart()
+            )
+          } else {
+            contentType(ContentType.Application.Json)
+            setBody(
+              bot.json.encodeToString(
+                builder.build(this@AbstractContact is GuildMember)
+              )
+            )
+          }
+        }
       }
+    }
+    var result = send(messageSequence)
+    if (result.exceptionOrNull() is MessageDuplicationException) {
+      // 重放一次
+      result = send(messageSequence + (100 .. 1000).random())
     }
     val res = result.getOrNull()?.toMessageReceipt() as MessageReceipt<C>?
     postSendEventConstructor(
@@ -658,8 +666,8 @@ abstract class ContactList<out C : Contact>(
 
   abstract val generator: (id: String) -> C
 
-  // TODO 恢复保存功能
-  fun getOrCreate(id: String): C = get(id) ?: generator(id).also { delegate.add(it) }
+  // TODO 采用map解决大量缓存的情况下get导致的性能问题
+  fun getOrCreate(id: String): C = get(id) ?: generator(id)
 
   fun getOrFail(id: String): C = get(id) ?: throw NoSuchElementException("Contact $id not found.")
 

@@ -68,12 +68,7 @@ function onRowAdd() {
   });
 }
 function onRowUpdate(row: CustomMenuRow, index: number) {
-  if (row.buttons.length === 0) {
-    menu.value.rows.splice(index, 1);
-    forceUpdate();
-  } else {
-    menu.value.rows.splice(index, 1, row);
-  }
+  forceUpdate();
 }
 function update() {
   emit("update:data", {

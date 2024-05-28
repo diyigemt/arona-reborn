@@ -14,14 +14,6 @@ export const CustomButton = defineComponent({
   emits: ["update:button", "delete"],
   setup(prop, { emit }) {
     const data = ref(prop.button);
-    const visibleIndex = inject("visibleIndex", ref(-1));
-    watch(
-      () => data.value,
-      () => {
-        emit("update:button", data.value);
-      },
-      { deep: true },
-    );
     function onDeleteButton() {
       emit("delete");
     }

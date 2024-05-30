@@ -11,9 +11,7 @@ import kotlinx.serialization.Serializable
 data class BaseConfig(
   @EncodeDefault
   val markdown: MarkdownCompatiblyConfig = MarkdownCompatiblyConfig()
-) : PluginWebuiConfig() {
-  override fun check() {}
-}
+) : PluginWebuiConfig()
 
 @Serializable
 data class MarkdownCompatiblyConfig(

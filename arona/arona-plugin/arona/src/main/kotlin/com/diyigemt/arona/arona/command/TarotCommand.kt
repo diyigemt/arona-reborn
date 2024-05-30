@@ -43,9 +43,7 @@ data class TarotConfig(
   val dayOne: Boolean = true, // 每天最多抽一次?
   @EncodeDefault
   val cardType: TarotCardType = TarotCardType.A, // 卡面类型
-) : PluginWebuiConfig() {
-  override fun check() {}
-}
+) : PluginWebuiConfig()
 
 private val kb by lazy {
   tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {

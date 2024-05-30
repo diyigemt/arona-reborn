@@ -11,10 +11,20 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
+sealed class PluginConfigCheckResult {
+  abstract val message: String?
+  class PluginConfigCheckAccept: PluginConfigCheckResult() {
+    override val message = null
+  }
+  class PluginConfigCheckReject(
+    override val message: String
+  ) : PluginConfigCheckResult()
+}
+
 @Serializable
 abstract class PluginWebuiConfig {
   // 更新用户提交的信息, 防止注入
-  abstract fun check()
+  open fun check(): PluginConfigCheckResult = PluginConfigCheckResult.PluginConfigCheckAccept()
 }
 
 object PluginWebuiConfigRecorder {
@@ -43,7 +53,10 @@ object PluginWebuiConfigRecorder {
     val serializer = getSerializer(obj.id, obj.key) ?: return null
     return kotlin.runCatching {
       val decode = JsonIgnoreUnknownKeys.decodeFromString(serializer, obj.value) as PluginWebuiConfig
-      decode.check()
+      when (decode.check()) {
+        is PluginConfigCheckResult.PluginConfigCheckReject -> return null
+        else -> {}
+      }
       JsonIgnoreUnknownKeys.encodeToString(serializer as KSerializer<PluginWebuiConfig>, decode)
     }.onFailure {
       commandLineLogger.error("deserialize ${serializer.descriptor.serialName} failed.")

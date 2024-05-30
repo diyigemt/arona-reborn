@@ -12,8 +12,4 @@ data class CoffeeConfig(
   var inviteDoubleCheck: Boolean = true,
   @EncodeDefault
   var touchAfterInvite: Boolean = true,
-) : PluginWebuiConfig() {
-  override fun check() {
-    TODO("Not yet implemented")
-  }
-}
+) : PluginWebuiConfig()

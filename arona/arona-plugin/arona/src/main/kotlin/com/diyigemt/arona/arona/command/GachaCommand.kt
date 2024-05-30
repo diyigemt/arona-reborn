@@ -70,9 +70,7 @@ data class UserGachaRecordItem(
 @Serializable
 data class UserGachaRecord(
   val map: MutableMap<Int, UserGachaRecordItem> = mutableMapOf(),
-) : PluginWebuiConfig() {
-  override fun check() {}
-}
+) : PluginWebuiConfig()
 
 @Serializable
 data class ContactGachaLimitItem(
@@ -89,17 +87,12 @@ data class ContactGachaLimitItem(
 data class ContactGachaLimitRecord(
   @EncodeDefault
   val map: MutableMap<String, MutableMap<Int, ContactGachaLimitItem>> = mutableMapOf(),
-) : PluginWebuiConfig() {
-  override fun check() {}
-}
-
+) : PluginWebuiConfig()
 @Serializable
 data class ContactGachaConfig(
   @EncodeDefault
   val limit: Int = 0,
-) : PluginWebuiConfig() {
-  override fun check() {}
-}
+) : PluginWebuiConfig()
 
 private const val GachaPoolBridgeRedisKey = "com.diyigemt.arona.gacha.bridge"
 private fun generateNumber(): String = (1..6).map { "0123456789".random() }.joinToString("")

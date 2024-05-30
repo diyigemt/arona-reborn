@@ -11,7 +11,7 @@ object Kivotos : AronaPlugin(
     id = "com.diyigemt.kivotos",
     name = "kivotos",
     author = "diyigemt",
-    version = "0.1.14",
+    version = "0.1.15",
     description = "hello world"
   )
 ) {

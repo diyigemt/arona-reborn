@@ -8,6 +8,7 @@ import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.gacha.GachaPool
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.arona.database.student.StudentTable
+import com.diyigemt.arona.webui.pluginconfig.PluginConfigCheckResult
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -49,9 +50,10 @@ data class GachaConfig(
   @EncodeDefault
   val pools: MutableList<CustomPool> = mutableListOf()
 ) : PluginWebuiConfig() {
-  override fun check() {
+  override fun check(): PluginConfigCheckResult {
     while (pools.size > 5) {
       pools.removeLast()
     }
+    return PluginConfigCheckResult.PluginConfigCheckAccept()
   }
 }

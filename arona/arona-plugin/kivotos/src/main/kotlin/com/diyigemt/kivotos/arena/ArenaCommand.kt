@@ -96,6 +96,4 @@ class ArenaRankCommand : AbstractCommand(
 data class ArenaConfig(
   @EncodeDefault
   val limit: Boolean = true, // 是否限制同一时间只能有一个战局
-) : PluginWebuiConfig() {
-  override fun check() {}
-}
+) : PluginWebuiConfig()

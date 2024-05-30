@@ -34,9 +34,7 @@ data class TotalAssaultConfig(
   val defaultTotalAssault: Server = Server.JP, // 总力战档线默认数据
   @EncodeDefault
   val defaultTotalAssaultEx: Server = Server.JP, // 大决战档线默认数据
-) : PluginWebuiConfig() {
-  override fun check() {}
-}
+) : PluginWebuiConfig()
 
 @Suppress("unused")
 class TotalAssaultCommand : AbstractCommand(

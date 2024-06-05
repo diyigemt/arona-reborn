@@ -408,7 +408,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
   private class UpdateStudent : CliktCommand(name = "i", help = "更新一个学生信息") {
     override fun run() {
       val studentName = terminal.prompt("请输入学生名称", null) as String
-      val schema = dbQuery { StudentSchema.find { StudentTable.name eq studentName }.firstOrNull() }?.also {
+      var schema = dbQuery { StudentSchema.find { StudentTable.name eq studentName }.firstOrNull() }?.also {
         echo("将更新学生信息: $this")
       }
       val name = terminal.prompt("请输入学生名称", default = studentName) as String
@@ -437,7 +437,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
         )
       ) {
         if (schema == null) {
-          val create = dbQuery {
+          schema = dbQuery {
             StudentSchema.new {
               this@new.name = name
               this@new.limit = limit
@@ -447,7 +447,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
           }
           dbQuery {
             GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().also {
-              it.students += listOf(create.id.value)
+              it.students += listOf(schema.id.value)
             }
           }
         } else {
@@ -456,6 +456,20 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
             schema.limit = limit
             schema.rarity = rarity
             schema.headFileName = head
+          }
+        }
+        dbQuery {
+          GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().also {
+            it.students = it.students
+              .toMutableSet()
+              .apply {
+                if (limit == StudentLimitType.Permanent) {
+                  add(schema.id.value)
+                } else {
+                  remove(schema.id.value)
+                }
+              }
+              .toMutableList()
           }
         }
         echo("成功")

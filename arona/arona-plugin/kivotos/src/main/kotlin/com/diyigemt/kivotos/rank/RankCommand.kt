@@ -124,23 +124,8 @@ class RankFavorCommand : AbstractCommand(
     ranks: List<FavorRankData>,
     self: FavorRankData? = null,
     showSelfPosition: Boolean = true,
-  ){
-    // copy by @UserCommandSender.sendRank
-    val ids = (ranks.map { it.uid } + listOf(self?.uid ?: userDocument().id))
-    // 根据uid反查botId
-    val usernames = SimplifiedUserDocument.querySimplifiedUser(ids).let {
-      it.values.associateBy {
-        ids.first { s -> s == it.id }
-      }
-    }
-    val students = StudentSchema.StudentCache
-      .filter { it.key in (ranks.map { r -> r.sid } + listOf(self?.sid)) }
-      .values
-    val studentNames = (ranks.map { it.sid } + listOf(self?.sid))
-      .associateWith {
-        students
-          .firstOrNull { s -> s.id.value == it }
-      }
+  ) {
+    val (usernames, studentNames) = getStudentAndUsername(ranks, self)
     val randomFileName = "${uuid()}.jpg"
     val randomFile = Arona.dataFolder("gacha_result", randomFileName).toFile()
     FavorRankTool.generateFavorRankImage(
@@ -188,33 +173,19 @@ class RankFavorCommand : AbstractCommand(
       randomFile.delete()
     }
   }
+
   private suspend fun UserCommandSender.sendRank(
     title: String,
     ranks: List<FavorRankData>,
     self: FavorRankData? = null,
     showSelfPosition: Boolean = true,
   ) {
-    val ids = (ranks.map { it.uid } + listOf(self?.uid ?: userDocument().id))
-    // 根据uid反查botId
-    val usernames = SimplifiedUserDocument.querySimplifiedUser(ids).let {
-      it.values.associateBy {
-        ids.first { s -> s == it.id }
-      }
-    }
-    val students = StudentSchema.StudentCache
-      .filter { it.key in (ranks.map { r -> r.sid } + listOf(self?.sid)) }
-      .values
-    val studentNames = (ranks.map { it.sid } + listOf(self?.sid))
-      .associateWith {
-        students
-          .firstOrNull { s -> s.id.value == it }
-      }
-
+    val (usernames, studentNames) = getStudentAndUsername(ranks, self)
     fun toString(data: FavorRankData) = "${studentNames[data.sid]?.name ?: "-"}(${data.favor.first}级/${
       data.favor
         .second
     })" +
-      "\t" + usernames[data.uid]?.username
+        "\t" + usernames[data.uid]?.username
     ranks.let {
       tencentCustomMarkdown {
         h1(title)
@@ -240,6 +211,28 @@ class RankFavorCommand : AbstractCommand(
     }.also {
       sendMessage(it)
     }
+  }
+
+  private suspend fun UserCommandSender.getStudentAndUsername(
+    ranks: List<FavorRankData>,
+    self: FavorRankData? = null,
+  ): Pair<Map<String, SimplifiedUserDocument>, Map<Int?, StudentSchema?>> {
+    val ids = (ranks.map { it.uid } + listOf(self?.uid ?: userDocument().id))
+    // 根据uid反查botId
+    val usernames = SimplifiedUserDocument.querySimplifiedUser(ids).let {
+      it.values.associateBy {
+        ids.first { s -> s == it.id }
+      }
+    }
+    val students = StudentSchema.StudentCache
+      .filter { it.key in (ranks.map { r -> r.sid } + listOf(self?.sid)) }
+      .values
+    val studentNames = (ranks.map { it.sid } + listOf(self?.sid))
+      .associateWith {
+        students
+          .firstOrNull { s -> s.id.value == it }
+      }
+    return usernames to studentNames
   }
 
   companion object {

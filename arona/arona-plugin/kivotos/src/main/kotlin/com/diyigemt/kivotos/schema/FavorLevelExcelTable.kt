@@ -43,6 +43,7 @@ data class FavorLevelExcelTable(
           .first()
       }
     }
+
     suspend fun deleteRecord(uid: String): Boolean {
       return withCollection<FavorLevelExcelTable, DeleteResult> {
         deleteOne(

@@ -20,9 +20,9 @@ dependencies {
   compileOnly("io.ktor:ktor-client-core")
   compileOnly("io.ktor:ktor-client-content-negotiation")
   compileOnly("io.ktor:ktor-serialization-kotlinx-json-jvm")
-  implementation("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.7.9")
-  implementation("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.7.9")
-  implementation("net.coobird:thumbnailator:0.4.20")
+  api("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.7.9")
+  api("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.7.9")
+  api("net.coobird:thumbnailator:0.4.20")
   testImplementation(kotlin("test"))
 }
 

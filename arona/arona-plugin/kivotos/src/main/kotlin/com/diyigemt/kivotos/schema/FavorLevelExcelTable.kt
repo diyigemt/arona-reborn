@@ -30,6 +30,19 @@ data class FavorLevelExcelTable(
           .first()
       }
     }
+
+    /**
+     * 根据等级查询下一级所需的
+     */
+    suspend fun findLevel2Next(level: Int): FavorLevelExcelTable {
+      return withCollection<FavorLevelExcelTable, FavorLevelExcelTable> {
+        find(
+          filter = Filters.eq(FavorLevelExcelTable::level.name, level)
+        )
+          .limit(1)
+          .first()
+      }
+    }
     suspend fun deleteRecord(uid: String): Boolean {
       return withCollection<FavorLevelExcelTable, DeleteResult> {
         deleteOne(

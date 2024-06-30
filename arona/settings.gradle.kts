@@ -1,6 +1,7 @@
 rootProject.name = "arona"
 include("arona-core")
 include("arona-plugin:test")
+include("arona-plugin:magic")
 include("arona-plugin:arona")
 include("arona-plugin:kivotos")
 include("arona-plugin:example")

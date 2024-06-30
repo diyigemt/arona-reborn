@@ -207,6 +207,7 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
     }
     TencentCallbackButtonEvent(
       id = payload.id,
+      internalId = eventId,
       appId = payload.applicationId,
       buttonId = payload.data.resolved.buttonId,
       buttonData = payload.data.resolved.buttonData ?: "",

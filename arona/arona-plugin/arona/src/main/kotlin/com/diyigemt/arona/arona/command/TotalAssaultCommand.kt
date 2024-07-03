@@ -42,10 +42,10 @@ class TotalAssaultCommand : AbstractCommand(
   "总力档线",
   description = "提供当期总力档线",
   help = """
-    /总力档线 日服|官服|B服
+    /总力档线 日服|官服|B服|港澳台服
   """.trimIndent()
 ) {
-  private val server by argument(name = "服务器", help = "可选值: 官服 B服 日服").enum<Server> { it.tag }
+  private val server by argument(name = "服务器", help = "可选值: 官服 B服 日服 港澳台服").enum<Server> { it.tag }
     .optional()
 
   suspend fun UserCommandSender.totalAssault() {
@@ -54,6 +54,7 @@ class TotalAssaultCommand : AbstractCommand(
       Server.B -> "国服B服总力战档线"
       Server.CN -> "国服官服总力战档线"
       Server.JP -> "日服总力战档线"
+      Server.HK -> "港澳台服总力战档线"
       else -> {
         sendMessage("没数据源")
         return

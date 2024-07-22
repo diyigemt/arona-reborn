@@ -37,7 +37,7 @@ internal data class CommandSignature(
 )
 
 @Suppress("NOTHING_TO_INLINE")
-inline fun <T :Any> KClass<T>.createObjectOrInstance() = objectInstance ?: createInstance()
+inline fun <T : Any> KClass<T>.createObjectOrInstance() = objectInstance ?: createInstance()
 
 internal fun CommandSignature.createInstance(): AbstractCommand {
   val instance = clazz.createObjectOrInstance()
@@ -389,6 +389,23 @@ suspend fun GroupCommandSender.nextMessage(
   }
 }
 
+suspend fun FriendUserCommandSender.nextMessage(
+  timeoutMillis: Long = -1,
+  intercept: Boolean = false,
+  filter: suspend FriendUserCommandSender.(TencentFriendMessageEvent) -> Boolean = { true },
+): TencentFriendMessageEvent {
+  val mapper = createMapper<FriendUserCommandSender, TencentFriendMessageEvent>(filter)
+  return (if (timeoutMillis == -1L) {
+    GlobalEventChannel.syncFromEvent<TencentFriendMessageEvent, TencentFriendMessageEvent>(mapper)
+  } else {
+    withTimeout(timeoutMillis) {
+      GlobalEventChannel.syncFromEvent<TencentFriendMessageEvent, TencentFriendMessageEvent>(mapper)
+    }
+  }).also {
+    setSourceId(it.message.sourceId)
+  }
+}
+
 suspend inline fun <reified C : UserCommandSender> C.nextButtonInteraction(
   timeoutMillis: Long = -1,
   intercept: Boolean = false,
@@ -415,7 +432,15 @@ suspend inline fun <reified C : UserCommandSender> C.nextMessage(
   noinline filter: suspend C.(TencentMessageEvent) -> Boolean = { true },
 ): TencentMessageEvent {
   return when (this) {
-    is FriendUserCommandSender -> TODO()
+
+    is FriendUserCommandSender -> {
+      nextMessage(
+        timeoutMillis,
+        intercept,
+        filter as (suspend FriendUserCommandSender.(TencentFriendMessageEvent) -> Boolean)
+      )
+    }
+
     is GroupCommandSender -> {
       nextMessage(
         timeoutMillis,

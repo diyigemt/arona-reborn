@@ -5,6 +5,8 @@ package com.diyigemt.arona.communication.event
 import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.TencentBotAuthEndpointResp
 import com.diyigemt.arona.communication.TencentWebsocketEventType
+import com.diyigemt.arona.communication.contact.*
+import com.diyigemt.arona.communication.contact.EmptyFriendUserImpl
 import com.diyigemt.arona.communication.contact.EmptyMockGroupImpl
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
@@ -118,6 +120,20 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGroupMessageRaw, eventId: String) {
     val member = bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
     TencentGroupMessageEvent(payload.toMessageChain(), eventId, member).broadcast()
+  }
+}
+
+internal object TencentWebsocketC2CMessageCreateHandler :
+  TencentWebsocketDispatchEventHandler<TencentFriendMessageRaw>() {
+  override val type = TencentWebsocketEventType.C2C_MESSAGE_CREATE
+  override val decoder = TencentFriendMessageRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentFriendMessageRaw, eventId: String) {
+    TencentFriendMessageEvent(
+      payload.toMessageChain(),
+      eventId,
+      bot.friends.getOrCreate(payload.author.id)
+    ).broadcast()
   }
 }
 

@@ -392,7 +392,7 @@ internal data class TencentChannelMessageRaw(
 internal typealias TencentGuildPrivateMessageRaw = TencentChannelMessageRaw
 
 @Serializable
-internal data class TencentPrivateMessageAuthorRaw(
+internal data class TencentFriendMessageAuthorRaw(
   @SerialName("user_openid")
   val userOpenid: String,
 ) : ContactRaw {
@@ -410,9 +410,9 @@ internal data class TencentGroupMessageAuthorRaw(
 }
 
 @Serializable
-internal data class TencentPrivateMessageRaw(
+internal data class TencentFriendMessageRaw(
   override val id: String,
-  override val author: TencentPrivateMessageAuthorRaw,
+  override val author: TencentFriendMessageAuthorRaw,
   override val content: String,
   override val timestamp: String,
   override val attachments: List<TencentMessageAttachmentRaw>? = null,

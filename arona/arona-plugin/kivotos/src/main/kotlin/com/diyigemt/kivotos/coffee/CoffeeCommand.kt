@@ -10,9 +10,11 @@ import com.diyigemt.arona.command.nextButtonInteraction
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.message.*
+import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery as redis
 import com.diyigemt.arona.utils.*
 import com.diyigemt.kivotos.Kivotos
 import com.diyigemt.kivotos.KivotosCommand
+import com.diyigemt.kivotos.coffee.CoffeeTouchCommand.Companion
 import com.diyigemt.kivotos.schema.ErrorDocument
 import com.diyigemt.kivotos.schema.UserDocument
 import com.diyigemt.kivotos.subButton
@@ -25,6 +27,7 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
+import io.github.crackthecodeabhi.kreds.args.SetOption
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -246,6 +249,9 @@ class CoffeeTouchCommand : AbstractCommand(
       /${KivotosCommand.primaryName} 咖啡厅 摸头 日奈
     """.trimIndent()
 ) {
+  companion object {
+    const val LOCK_PREFIX = "kivotos.coffee-touch-once"
+  }
   private val md by requireObject<TencentCustomMarkdown>()
   private val kb by requireObject<TencentCustomKeyboard>()
   private val visitedStudents by requireObject<List<StudentSchema>>()
@@ -254,6 +260,16 @@ class CoffeeTouchCommand : AbstractCommand(
   private val kivotosUser by requireObject<UserDocument>()
   private val studentName by argument("学生名")
   suspend fun UserCommandSender.coffeeTouch() {
+    val key = "$LOCK_PREFIX.${user.unionOpenidOrId}"
+    redis {
+      get(key)
+    }?.run {
+      sendMessage("摸太快啦, 学生的毛都要被你薅没了")
+      return
+    }
+    redis {
+      set(key, "1", SetOption.Builder(exSeconds = 3u).build())
+    }
     val targetStudent = StudentSchema.StudentCache.filter {
       it.value.name == studentName
     }.values.firstOrNull()
@@ -310,6 +326,16 @@ class CoffeeTouchAllCommand : AbstractCommand(
   private val coffee by requireObject<CoffeeDocument>()
   private val kivotosUser by requireObject<UserDocument>()
   suspend fun UserCommandSender.coffeeTouch() {
+    val key = "${CoffeeTouchCommand.LOCK_PREFIX}.${user.unionOpenidOrId}"
+    redis {
+      get(key)
+    }?.run {
+      sendMessage("摸太快啦, 学生的毛都要被你薅没了")
+      return
+    }
+    redis {
+      set(key, "1", SetOption.Builder(exSeconds = 3u).build())
+    }
     md append tencentCustomMarkdown {
       +"你分别摸了摸学生们"
     }

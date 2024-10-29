@@ -74,7 +74,7 @@ dependencies {
   api("org.jetbrains.kotlin:kotlin-scripting-jvm-host")
   api("org.jetbrains.kotlin:kotlin-scripting-dependencies")
   api("org.apache.ivy:ivy:2.5.2")
-
+  
   implementation("io.ktor:ktor-server-cors")
   implementation("io.ktor:ktor-server-core-jvm")
   implementation("io.ktor:ktor-server-netty-jvm")

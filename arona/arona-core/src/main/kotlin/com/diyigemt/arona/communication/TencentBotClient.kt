@@ -1,5 +1,6 @@
 package com.diyigemt.arona.communication
 
+import com.diyigemt.arona.communication.WebhookBot
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
@@ -53,7 +54,8 @@ interface TencentBot : Closeable, Contact, CoroutineScope {
 }
 
 internal class TencentBotClient
-private constructor(private val config: TencentBotConfig) : TencentBot, CoroutineScope {
+private constructor(private val config: TencentBotConfig) : 
+  WebhookBot(config.secret), TencentBot, CoroutineScope {
   override val id = config.id
   override val json = Json {
     ignoreUnknownKeys = true

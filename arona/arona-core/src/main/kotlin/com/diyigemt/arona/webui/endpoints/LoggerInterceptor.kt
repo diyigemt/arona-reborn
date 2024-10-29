@@ -56,7 +56,7 @@ object LoggerInterceptor {
       // 将admin访问交由adminAccessInterceptor处理
       return
     }
-    if (path.endsWith("/login")) {
+    if (path.endsWith("/login") || path.endsWith("/webhook")) {
       return
     }
     this.authorization?.let {

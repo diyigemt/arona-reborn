@@ -10,6 +10,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.header
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
+import io.ktor.util.hex
 import io.ktor.util.pipeline.PipelineContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -79,23 +80,29 @@ object WebhookEndpoint {
   private val json = Json {
     ignoreUnknownKeys = true
   }
+  private fun hexStringToByteArray(hex: String): ByteArray {
+    val len = hex.length
+    val data = ByteArray(len / 2)
+    for (i in 0 until len step 2) {
+      data[i / 2] = ((Character.digit(hex[i], 16) shl 4) + Character.digit(hex[i + 1], 16)).toByte()
+    }
+    return data
+  }
   @OptIn(ExperimentalStdlibApi::class)
   @AronaBackendEndpointPost("")
   suspend fun PipelineContext<Unit, ApplicationCall>.webhook() {
     val sign = request.header("x-signature-ed25519") ?: "" // 服务器传入的sign
     val ts = request.header("x-signature-timestamp") ?: "" // 服务器传入的ts
     val body = context.receiveText()
-    apiLogger.info("recv webhook, data: $body")
     val verify = (BotManager.getBot() as TencentBotClient)
-      .webHookVerify((ts + body).toByteArray(), sign.toByteArray())
+      .webHookVerify((ts + body).toByteArray(), hexStringToByteArray(sign))
     if (!verify) {
-      apiLogger.error("webhook data verify failed.")
+      apiLogger.warn("webhook data verify failed.")
       return badRequest()
     }
     val preData = json.decodeFromString<TencentWebhookPayload0>(body)
     if (preData.operation == TencentWebhookOperationType.WebhookVerify) {
       val data = json.decodeFromString<TencentWebhookPayload<TencentWebhookVerifyReq>>(body)
-      apiLogger.info("recv webhook verify, data: $data")
       return context.respond(
         TencentWebhookVerifyResp(
           data.data.plainToken,
@@ -105,6 +112,8 @@ object WebhookEndpoint {
         )
       )
     }
+    // 处理消息
+    (BotManager.getBot() as TencentBotClient).dispatchWebhookEvent(body)
     return success()
   }
 }

@@ -2,7 +2,9 @@ package com.diyigemt.arona.hello
 
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.communication.command.GuildChannelCommandSender
+import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
+import com.diyigemt.arona.communication.event.TencentMessageEvent
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
@@ -16,7 +18,7 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
   description = "hello world"
 )) {
   override fun onLoad() {
-    pluginEventChannel().subscribeAlways<TencentGuildMessageEvent> {
+    pluginEventChannel().subscribeAlways<TencentMessageEvent> {
       it.subject.sendMessage(MessageChainBuilder(it.message.sourceId).append("hello world!").build())
     }
   }
@@ -27,7 +29,7 @@ class TestCommand : AbstractCommand(
   "测试"
 ) {
   private val arg by argument("参数1")
-  suspend fun GuildChannelCommandSender.test() {
+  suspend fun UserCommandSender.test() {
     sendMessage("这是通过指令触发的消息, 参数是 $arg")
   }
 }

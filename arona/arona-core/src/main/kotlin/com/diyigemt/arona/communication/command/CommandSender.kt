@@ -6,10 +6,7 @@ import com.diyigemt.arona.AronaApplication
 import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.contact.*
-import com.diyigemt.arona.communication.event.TencentGroupMessageEvent
-import com.diyigemt.arona.communication.event.TencentGuildMessageEvent
-import com.diyigemt.arona.communication.event.TencentGuildPrivateMessageEvent
-import com.diyigemt.arona.communication.event.TencentMessageEvent
+import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.database.permission.*
 import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
@@ -41,10 +38,12 @@ interface CommandSender : CoroutineScope {
     fun TencentGuildMessageEvent.toCommandSender() = GuildChannelCommandSender(sender, message.sourceId)
     fun TencentGuildPrivateMessageEvent.toCommandSender() = GuildUserCommandSender(sender, message.sourceId)
     fun TencentGroupMessageEvent.toCommandSender() = GroupCommandSender(sender, message.sourceId)
+    fun TencentFriendMessageEvent.toCommandSender() = FriendUserCommandSender(sender, message.sourceId)
     fun <T : TencentMessageEvent> T.toCommandSender() = when (this) {
       is TencentGuildMessageEvent -> toCommandSender()
       is TencentGuildPrivateMessageEvent -> toCommandSender()
       is TencentGroupMessageEvent -> toCommandSender()
+      is TencentFriendMessageEvent -> toCommandSender()
       else -> throw IllegalArgumentException("Unsupported MessageEvent: ${this::class.qualifiedNameOrTip}")
     }
 

@@ -1,5 +1,6 @@
 package com.diyigemt.arona.communication.message
 
+import com.diyigemt.arona.communication.command.FriendUserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender
 import io.ktor.http.*
 import kotlin.coroutines.AbstractCoroutineContextElement
@@ -259,6 +260,9 @@ fun Markdown.at(target: String) {
 
 context(UserCommandSender)
 fun Markdown.at() {
+  if (this@UserCommandSender is FriendUserCommandSender) {
+    return
+  }
   children.add(AtElement(user.id))
 }
 

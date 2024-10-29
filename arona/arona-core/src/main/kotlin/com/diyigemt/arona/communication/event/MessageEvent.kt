@@ -57,6 +57,9 @@ class TencentFriendMessageEvent internal constructor(
 ) : TencentFriendEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender
   override val friend get() = sender
+  override fun toString(): String {
+    return "[Friend(${subject.id})] ${sender.id} -> $message"
+  }
 }
 
 class TencentGroupMessageEvent internal constructor(

@@ -624,7 +624,14 @@ internal class EmptyFriendUserImpl(
 ) : FriendUser, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<FriendUser>? {
-    TODO("Not yet implemented")
+    return callMessageOpenApi(
+      TencentEndpoint.PostFriendMessage,
+      mapOf("openid" to id),
+      message,
+      messageSequence,
+      ::FriendMessagePreSendEvent,
+      ::FriendMessagePostSendEvent
+    )
   }
 }
 

@@ -38,6 +38,7 @@ enum class TencentCallbackButtonEventResult(val code: Int) {
 
 data class TencentCallbackButtonEvent(
   val id: String, // 事件id
+  val internalId: String, // websocket消息id 用于消息回复?
   val appId: String, // botAppId
   val buttonId: String,
   val buttonData: String,
@@ -48,7 +49,7 @@ data class TencentCallbackButtonEvent(
   override val bot: TencentBot,
 ) : TencentBotEvent, TencentEvent() {
   override val eventId
-    get() = id
+    get() = internalId
 
   suspend fun accept() {
     reject(TencentCallbackButtonEventResult.Success)
@@ -57,7 +58,7 @@ data class TencentCallbackButtonEvent(
   suspend fun reject(reason: TencentCallbackButtonEventResult = TencentCallbackButtonEventResult.Failed) {
     bot.callOpenapi(
       TencentEndpoint.Interactions,
-      urlPlaceHolder = mapOf("interaction_id" to eventId)
+      urlPlaceHolder = mapOf("interaction_id" to id)
     ) {
       method = HttpMethod.Put
       setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(reason)))

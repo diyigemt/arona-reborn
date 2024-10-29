@@ -5,10 +5,11 @@ package com.diyigemt.arona.arona.command
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
+import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrNull
-import com.diyigemt.arona.communication.message.PlainText
+import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
@@ -42,10 +43,25 @@ class TotalAssaultCommand : AbstractCommand(
   "总力档线",
   description = "提供当期总力档线",
   help = """
-    /总力档线 日服|官服|B服
+    /总力档线 日服|官服|B服|港澳台服
   """.trimIndent()
 ) {
-  private val server by argument(name = "服务器", help = "可选值: 官服 B服 日服").enum<Server> { it.tag }
+  private val availableButton by lazy {
+    tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+      row {
+        button("B服", "/总力档线 B服", true)
+        button("官服", "/总力档线 官服", true)
+      }
+      row {
+        button("日服", "/总力档线 日服", true)
+        button("港澳台", "/总力档线 港澳台", true)
+      }
+    }
+  }
+  private val noSourceMd = tencentCustomMarkdown {
+    h1("没数据源")
+  }
+  private val server by argument(name = "服务器", help = "可选值: 官服 B服 日服 港澳台服").enum<Server> { it.tag }
     .optional()
 
   suspend fun UserCommandSender.totalAssault() {
@@ -54,8 +70,9 @@ class TotalAssaultCommand : AbstractCommand(
       Server.B -> "国服B服总力战档线"
       Server.CN -> "国服官服总力战档线"
       Server.JP -> "日服总力战档线"
+      Server.HK -> "港澳台服总力战档线"
       else -> {
-        sendMessage("没数据源")
+        sendMessage(noSourceMd + availableButton)
         return
       }
     }
@@ -75,6 +92,16 @@ class TotalAssaultExCommand : AbstractCommand(
     /大决战档线 日服
   """.trimIndent()
 ) {
+  private val availableButton by lazy {
+    tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+      row {
+        button("日服", "/大决战档线 日服", true)
+      }
+    }
+  }
+  private val noSourceMd = tencentCustomMarkdown {
+    h1("没数据源")
+  }
   private val server by argument(name = "服务器", help = "可选值: 官服 B服 日服").enum<Server> { it.tag }
     .optional()
 
@@ -83,7 +110,7 @@ class TotalAssaultExCommand : AbstractCommand(
     when (server ?: config.defaultTotalAssaultEx) {
       Server.B,
       Server.CN -> sendMessage("还没开呢, 别急")
-      Server.ASIA, Server.HK, Server.KR, Server.GLOBAL, Server.US -> sendMessage("没数据源")
+      Server.ASIA, Server.HK, Server.KR, Server.GLOBAL, Server.US -> sendMessage(noSourceMd + availableButton)
       Server.JP -> CommandManager.executeCommand(this, PlainText("/攻略 日服大决战档线")).await()
     }
   }

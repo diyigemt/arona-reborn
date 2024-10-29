@@ -5,6 +5,8 @@ package com.diyigemt.arona.communication.event
 import com.diyigemt.arona.communication.*
 import com.diyigemt.arona.communication.TencentBotAuthEndpointResp
 import com.diyigemt.arona.communication.TencentWebsocketEventType
+import com.diyigemt.arona.communication.contact.*
+import com.diyigemt.arona.communication.contact.EmptyFriendUserImpl
 import com.diyigemt.arona.communication.contact.EmptyMockGroupImpl
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
@@ -121,6 +123,20 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
   }
 }
 
+internal object TencentWebsocketC2CMessageCreateHandler :
+  TencentWebsocketDispatchEventHandler<TencentFriendMessageRaw>() {
+  override val type = TencentWebsocketEventType.C2C_MESSAGE_CREATE
+  override val decoder = TencentFriendMessageRaw.serializer()
+
+  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentFriendMessageRaw, eventId: String) {
+    TencentFriendMessageEvent(
+      payload.toMessageChain(),
+      eventId,
+      bot.friends.getOrCreate(payload.author.id)
+    ).broadcast()
+  }
+}
+
 internal object TencentWebsocketGuildCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentGuildRaw>() {
   override val type = TencentWebsocketEventType.GUILD_CREATE
@@ -207,6 +223,7 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
     }
     TencentCallbackButtonEvent(
       id = payload.id,
+      internalId = eventId,
       appId = payload.applicationId,
       buttonId = payload.data.resolved.buttonId,
       buttonData = payload.data.resolved.buttonData ?: "",

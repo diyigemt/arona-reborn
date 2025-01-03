@@ -221,6 +221,8 @@ private constructor(private val config: TencentBotConfig) :
           throw ImageFailedException(resp.status, bodyTmp)
         } else if (bodyTmp.contains("\"code\":40054005")) {
           throw MessageDuplicationException(resp.status, bodyTmp)
+        } else if (bodyTmp.contains("\"code\":11244")) {
+          throw ApiTokenExpiredException(resp.status, bodyTmp)
         }
         throw HttpNotOkException(
           resp.status,
@@ -233,7 +235,7 @@ private constructor(private val config: TencentBotConfig) :
       when (it) {
         is MissingFieldException -> {
           logger.error(
-            "call endpoint failed, endpoint: {}, placeHolder: {}, body: {}",
+            "call endpoint failed, missing file, endpoint: {}, placeHolder: {}, body: {}",
             endpoint, urlPlaceHolder, bodyTmp
           )
         }
@@ -250,6 +252,10 @@ private constructor(private val config: TencentBotConfig) :
             "call endpoint failed, endpoint: {}, placeHolder: {}, cause: msg limit exceed",
             endpoint, urlPlaceHolder
           )
+        }
+        
+        is ApiTokenExpiredException -> {
+          updateAccessToken()
         }
 
         else -> logger.error(it)
@@ -275,23 +281,6 @@ private constructor(private val config: TencentBotConfig) :
 
   override suspend fun uploadImage(data: ByteArray): TencentImage {
     TODO("Not yet implemented")
-  }
-
-  private fun TencentBotClientWebSocketSession.startWebsocketHeartbeat() {
-    websocketHeartbeatTask?.cancel("timeout")
-    websocketHeartbeatTask = launch(SupervisorJob()) {
-      while (true) {
-        sendApiData(
-          TencentWebsocketPayload(
-            operation = TencentWebsocketOperationType.Heartbeat,
-            serialNumber = 0,
-            type = TencentWebsocketEventType.NULL,
-            data = if (serialNumber == 0L) null else serialNumber
-          )
-        )
-        delay(heartbeatInterval)
-      }
-    }
   }
 
   override fun toString() = "TencentBot($appId)"
@@ -345,4 +334,10 @@ class MessageDuplicationException(status: HttpStatusCode, body: String) : Tencen
   status, JsonIgnoreUnknownKeys.decodeFromString(body)
 ) {
   override val message: String = "message duplicated, ${source.message}"
+}
+
+class ApiTokenExpiredException(status: HttpStatusCode, body: String) : TencentApiErrorException(
+  status, JsonIgnoreUnknownKeys.decodeFromString(body)
+) {
+  override val message: String = "token has expired, ${source.message}"
 }

@@ -563,7 +563,7 @@ data class TencentTemplateMarkdown(
 }
 
 @Serializable
-data class TencentMarkdownParam(
+  data class TencentMarkdownParam(
   val key: String,
   val values: List<String>,
 ) {

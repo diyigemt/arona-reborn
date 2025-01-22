@@ -92,7 +92,7 @@
         target="_blank"
         class="text-xl!"
         :class="{ 'color-black!': pvSelector === 0, 'color-white!': pvSelector !== 0 }"
-        >桂ICP备2022008499 号-2</ElLink
+        >桂ICP备2022008499号-2</ElLink
       >
     </div>
   </VideoBackground>

@@ -240,9 +240,9 @@ class GachaCommand : AbstractCommand(
       val md = tencentCustomMarkdown {
         h1(poolName)
         image {
-          href = "https://arona.diyigemt.com/image/gacha_result/$randomFileName"
-          w = 2340
-          h = 1080
+          href = "https://arona.diyigemt.cn/image/gacha_result/$randomFileName"
+          w = 1170
+          h = 540
         }
         at()
       }
@@ -276,7 +276,7 @@ class GachaCommand : AbstractCommand(
       }
       MessageChainBuilder().append(md).append(kb).also { sendMessage(it.build()) }
     } else {
-      subject.uploadImage("https://arona.diyigemt.com/image/gacha_result/$randomFileName").also {
+      subject.uploadImage("https://arona.diyigemt.cn/image/gacha_result/$randomFileName").also {
         sendMessage(it)
       }
     }

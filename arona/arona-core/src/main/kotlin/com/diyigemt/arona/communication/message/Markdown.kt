@@ -124,10 +124,10 @@ data class ImageElement(
   var href: String = "",
   var h: Int = 0,
   var w: Int = 0,
-  var placeholder: String = "",
+  var placeholder: String = "img",
 ) : MarkdownElement() {
   override fun build(): String {
-    return "![$placeholder #$w #$h]($href)"
+    return "![$placeholder #${w}px #${h}px]($href)"
   }
 }
 

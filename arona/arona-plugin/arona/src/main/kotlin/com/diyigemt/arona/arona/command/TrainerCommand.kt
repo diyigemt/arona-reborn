@@ -3,7 +3,6 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
 import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
 import com.diyigemt.arona.arona.database.image.contactType
@@ -92,6 +91,7 @@ class TrainerCommand : AbstractCommand(
   private suspend fun getImage(name: String): ServerResponse<List<ImageQueryData>> {
     return NetworkTool.request<List<ImageQueryData>>(BackendEndpoint.QueryImage) {
       parameter("name", name)
+      parameter("method", 3)
     }.getOrThrow()
   }
 
@@ -133,20 +133,24 @@ class TrainerCommand : AbstractCommand(
     getImage(match).run {
       data?.run r1@{
         if (code != 200) {
+          val d = filterIndexed { index, _ -> index < 8 }.sortedBy { it.name.length }
           val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
           if (mdConfig.enable) {
             val md = tencentCustomMarkdown {
               h1("没有找到与 \"${match}\" 有关的信息")
               +"是否想要查询:"
+              indexedList { 
+                d.forEach { 
+                  +it.name
+                }
+              }
             }
             val btn = tencentCustomKeyboard {
-              filterIndexed { index, _ -> index < 4 }
-                .sortedBy { it.name.length }
-                .forEachIndexed { idx, stu ->
+              d.forEachIndexed { idx, stu ->
                   row {
                     button(idx) {
                       render {
-                        label = stu.name
+                        label = (idx + 1).toString()
                       }
                       action {
                         data = "/攻略 ${stu.name}"
@@ -154,12 +158,11 @@ class TrainerCommand : AbstractCommand(
                     }
                   }
                 }
-            }
+            }.windowed(4)
             sendMessage(MessageChainBuilder().append(md).append(btn).build())
           } else {
             sendMessage("没有与${match}对应的信息, 是否想要输入:\n${
-              filterIndexed { index, _ -> index < 4 }
-                .mapIndexed { index, it -> "${index + 1}. /攻略 ${it.name}" }
+              d.mapIndexed { index, it -> "${index + 1}. /攻略 ${it.name}" }
                 .joinToString("\n")
             }")
           }

@@ -7,7 +7,7 @@ plugins {
 }
 
 val projectMainClass = "com.diyigemt.arona.arona.Arona"
-version = "1.3.19"
+version = "1.3.20"
 kotlin {
   compilerOptions {
     freeCompilerArgs.add("-Xcontext-receivers")

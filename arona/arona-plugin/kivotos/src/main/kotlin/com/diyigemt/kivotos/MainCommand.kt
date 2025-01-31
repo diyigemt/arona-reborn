@@ -26,9 +26,7 @@ private val playerMainMenu by lazy {
       subButton("设置", enter = true)
       subButton("删号")
     }
-  }.also {
-    it.windowed()
-  }
+  }.windowed()
 }
 
 private val playerMainMenuWithTitle by lazy {

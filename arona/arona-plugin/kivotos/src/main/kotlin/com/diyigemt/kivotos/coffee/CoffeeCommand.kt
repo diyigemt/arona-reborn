@@ -581,7 +581,7 @@ class CoffeeStudentTendencyCommand : AbstractCommand(
           "添加学生", "/${KivotosCommand.primaryName} 咖啡厅 来访倾向 添加 "
         )
       }
-    }).also { it.windowed() }
+    }).windowed()
     currentContext.setObject("kb", kb)
     currentContext.setObject("md", md)
     if (currentContext.invokedSubcommand == null) {
@@ -774,7 +774,5 @@ private fun UserCommandSender.buildTouchButton(
           }
         }
       }
-  }.also {
-    it.windowed()
-  }
+  }.windowed()
 }

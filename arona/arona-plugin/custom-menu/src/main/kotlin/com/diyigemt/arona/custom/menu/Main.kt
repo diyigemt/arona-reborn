@@ -184,7 +184,7 @@ object CustomCommandCommand : AbstractCommand(
               button(it.key, it.value.trim(), true)
             }
           }
-        }.also { it.windowed() }
+        }.windowed()
         sendMessage(md + kb)
       } else {
         sendMessage(md)

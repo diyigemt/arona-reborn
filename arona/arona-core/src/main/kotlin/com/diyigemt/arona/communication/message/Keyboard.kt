@@ -28,12 +28,13 @@ data class TencentCustomKeyboard(
   val content: TencentCustomKeyboard0,
 ) : Message, TencentKeyboard() {
 
-  fun windowed(size: Int = 2) {
+  fun windowed(size: Int = 2): TencentCustomKeyboard {
     val buttons = content.rows.flatMap { it.buttons }
     content.rows.clear()
     content.rows.addAll(buttons.windowed(size, size, true).map {
       TencentCustomKeyboardRow(it.toMutableList())
     })
+    return this
   }
 
   infix fun append(other: TencentCustomKeyboard) {

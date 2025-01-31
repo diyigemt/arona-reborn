@@ -6,7 +6,7 @@ plugins {
 
 allprojects {
   group = "com.diyigemt.arona"
-  version = "1.2.0"
+  version = "1.3.6"
 //  gradle.taskGraph.whenReady {
 //    tasks.forEach { task ->
 //      if (task.name.contains("test")) {

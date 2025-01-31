@@ -116,7 +116,7 @@ data class AtElement(
 ) : MarkdownElement() {
 
   override fun build(): String {
-    return "<@$target>"
+    return "<qqbot-at-user id=\"$target\" />"
   }
 }
 

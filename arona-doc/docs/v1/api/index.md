@@ -4,6 +4,10 @@
 
 具体效果可以看站里的[功能介绍](/v1/command/manual#%E5%AD%A6%E7%94%9F%E4%B8%8E%E4%B8%BB%E7%BA%BF%E5%9C%B0%E5%9B%BE%E6%94%BB%E7%95%A5%E7%B3%BB%E5%88%97)
 
+## 2025-01-31更新
+
+更新了模糊匹配的算法, 更新了接口参数, 提供3种模糊搜索方式选择, 在模糊搜索情况下返回值也会带上结果数据了
+
 ## 2023-11-23更新
 
 由于之前用 node 写的后端扛不住了，所以新写了一个，新后端的api基址已经改为 https://arona.diyigemt.com/api/v2
@@ -59,9 +63,12 @@ GET https://arona.diyigemt.com/api/v2/image
 
 请求参数
 
-| 参数名  | 数据类型   | 是否必须 | 说明       |
-|------|--------|------|----------|
-| name | string | 是    | 要查找的攻略名称 |
+| 参数名    | 数据类型   | 是否必须 | 默认值      | 说明                                          |
+|--------|--------|------|----------|---------------------------------------------|
+| name   | string | 是    |          | 要查找的攻略名称                                    |
+| size   | Int    | 否    | 8        | 返回数据长度, 不一定严格遵守, 但数据不会超过这个值 1 <= size <= 20 |
+| method | Int    | 否    | 1        | 模糊搜索方法选择, 具体可看[下面](#模糊搜索方法)                 |
+| rate   | Int    | 否    | size / 2 | 当method选择混合时, 方法一返回结果数在总返回结果数的中的数量          |
 
 返回值
 
@@ -96,7 +103,7 @@ ResultList
 
 当`name`没有精确对应结果时, 接口会返回模糊查询结果, 此时`code`必定为101, `data`有两种可能,`list`或者`null`
 - 为`null`表明连模糊查询结果都没有
-- 为`list`时,`list`的`len`为 1 <= `len` <= 4
+- 为`list`时,`list`的`len`为 1 <= `len` <= size(default: 8)
 
 可以通过`data`存在与否以及`list`的`len`判断结果类型
 
@@ -130,7 +137,7 @@ GET https://arona.diyigemt.com/api/v2/image?name=国际服未来视
 模糊查询结果示例
 
 ```bash
-GET https://arona.diyigemt.com/api/v2/image?name=国际服
+GET https://arona.diyigemt.com/api/v2/image?name=国际服&size=4
 ```
 
 模糊查询返回示例
@@ -138,43 +145,76 @@ GET https://arona.diyigemt.com/api/v2/image?name=国际服
 ```json
 {
   "code": 101,
-  "message": "OK",
+  "message": "Fuzzy Search",
   "data": [
     {
       "name": "国际服人权",
-      "hash": "",
-      "content": "",
-      "type": "null"
+      "hash": "8c28e093cb184555bd4a094be5aa5bdf",
+      "content": "/some/日服人权.png",
+      "type": "file"
     },
     {
       "name": "国际服未来视",
-      "hash": "",
-      "content": "",
-      "type": "null"
+      "hash": "b6cd713afdb29e8249cbea66441de63e",
+      "content": "/some/国际服未来视.png",
+      "type": "file"
+    },
+    {
+      "name": "国际服竞技场-1",
+      "hash": "2fce6f88fbc106751c02a0224ea77edc",
+      "content": "/some/国际服竞技场-1.png",
+      "type": "file"
     },
     {
       "name": "国际服火力演习",
-      "hash": "",
-      "content": "",
-      "type": "null"
-    },
-    {
-      "name": "国际服室外寿司",
-      "hash": "",
-      "content": "",
-      "type": "null"
+      "hash": "251baad47b9d8ce1a044fceab94766e5",
+      "content": "/some/国际服火力演习.png",
+      "type": "file"
     }
   ]
 }
 ```
-
-此时可通过`item`字段让用户选择具体的内容后再次通过接口获取精确结果
 
 ::: danger
 
 如你所见, 文件资源是部署在cdn上的, 所以希望你能读完下面的话
 
 :::
+
+### 模糊搜索方法
+
+| 类型   | 入参       |
+|------|----------|
+| jech | method=1 |
+| 暴力匹配 | method=2 |
+| 混合   | method=3 |
+
+#### jech
+
+基于[JustEnoughCharacters](https://github.com/Towdium/JustEnoughCharacters)中的[PinIn库](https://github.com/Towdium/PinIn)
+来进行匹配
+
+mc玩家对此应该并不陌生, 算法优点是在字音顺序严格正确的情况下具有良好的匹配度, 缺点是在间隔情况下匹配结果不佳
+
+#### 暴力匹配
+
+遍历输入和目标的每个字以及拼音, 根据匹配数量得到加权值并排序
+
+#### 混合
+
+综合以上两种算法的结果, 选出匹配程度最高的值合并返回
+
+#### 性能测试结果
+
+在给定的100个经常进入模糊匹配的查询中, 三种方法的匹配准确度如下
+
+| 类型   | 匹配数量 |
+|------|------|
+| jech | 68   |
+| 暴力匹配 | 75   |
+| 混合   | 89   |
+
+看起来是混合模式匹配最佳, 但是没有长期测试过, 所谓的`100个经常`也不一定真的是`经常`, 具体要怎么调用就看各位开发者了
 
 ### cdn的使用
 
@@ -200,11 +240,7 @@ GET https://arona.diyigemt.com/api/v2/image?name=国际服
 | 日服大决战     | 始终指向日服当期大决战     |
 | 日服火力演习    | 始终指向日服当期火力演习    |
 | 日服活动      | 始终指向日服当期活动      |
-| 杂图        | 指向所有不好记的名称的图片汇总 |
-| 日服大决战档线   | 指向日服当期大决战档线     |
-| 日服总力战档线   | 指向日服当期总力战档线     |
-| 国服B服总力战档线 | 指向国服B服当期总力战档线   |
-| 国服官服总力战档线 | 指向国服官服当期总力战档线   |
+
 ::: warning
 
 再次强调, 所有图片都是人工整理, 难免会有错漏和更新不及时的情况, 请见谅

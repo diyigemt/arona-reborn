@@ -33,6 +33,12 @@ data class Markdown(
         is InlineCommandElement -> it.build()
         else -> it.build() + "\n"
       }
+    }.let {
+      if (it.lastOrNull() == '\n') {
+        it.substring(0, it.length - 1)
+      } else {
+        it
+      }
     }
   }
 }
@@ -166,7 +172,7 @@ data class ListElement(
   override fun build(): String {
     return content.mapIndexed { idx, it ->
       "${
-        if (hasIndex) "$idx." else "-"
+        if (hasIndex) "${idx + 1}." else "-"
       } ${it.build()}"
     }.joinToString("\n")
   }

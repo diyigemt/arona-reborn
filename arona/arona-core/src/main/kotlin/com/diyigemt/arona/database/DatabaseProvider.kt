@@ -1,6 +1,5 @@
 package com.diyigemt.arona.database
 
-import com.diyigemt.arona.database.DatabaseProvider.noSqlDbQuerySuspended
 import com.diyigemt.arona.utils.MongoConfig.Companion.toConnectionString
 import com.diyigemt.arona.utils.ReflectionUtil
 import com.diyigemt.arona.utils.aronaConfig
@@ -45,6 +44,10 @@ object DatabaseProvider {
     }
     database
   }
+  /**
+   * Arona 主库. 仅 core 默认 [DocumentCompanionObject] 使用; 其它模块 (例如 kivotos) 若连接到同一 Mongo 实例的不同 db,
+   * 应通过 override [DocumentCompanionObject.database] 指向自己的 [MongoDatabase].
+   */
   private val noSqlDatabase: MongoDatabase by lazy {
     val serverApi = ServerApi
       .builder()
@@ -81,9 +84,11 @@ object DatabaseProvider {
     newSuspendedTransaction(currentCoroutineContext(), sqlDatabase, isolationLevel) { block() }
 
 
-  internal fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
-  @PublishedApi
-  internal suspend fun <T> noSqlDbQuerySuspended(block: suspend MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
+  /**
+   * 默认 MongoDatabase (arona 主库) 的公开入口, 供 [DocumentCompanionObject.database] 默认 getter 使用.
+   * 不直接暴露底层 lazy 属性, 避免把存储细节固化为硬 ABI.
+   */
+  val defaultMongoDatabase: MongoDatabase get() = noSqlDatabase
 
   /** 幂等地为 Mongo 集合建立索引; 已存在的同名索引由 driver 静默跳过, 失败仅 log warn. */
   suspend fun ensureMongoIndexes() = MongoIndexes.ensure(noSqlDatabase)
@@ -107,13 +112,17 @@ internal enum class RedisPrefixKey(val prefix: String) {
 
 interface DocumentCompanionObject {
   val documentName: String
+
+  /**
+   * 该 document 所属的 [MongoDatabase]. 默认指向 arona 主库;
+   * 如果模块需要连接到同一 Mongo 实例上的其他 db (如 kivotos 的独立数据库),
+   * 可在 companion object 中 override 本字段指向自己的 [MongoDatabase].
+   */
+  val database: MongoDatabase get() = DatabaseProvider.defaultMongoDatabase
 }
 
 suspend inline fun <reified T : Any, R> DocumentCompanionObject.withCollection(
   crossinline block: suspend MongoCollection<T>.() -> R,
-): R =
-  noSqlDbQuerySuspended {
-    block(getCollection(documentName))
-  }
+): R = block(database.getCollection(documentName))
 
 fun <T : Any> MongoCollection<T>.idFilter(id: String) = Filters.eq("_id", id)

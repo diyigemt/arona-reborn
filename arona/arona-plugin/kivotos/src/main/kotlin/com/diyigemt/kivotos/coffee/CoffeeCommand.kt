@@ -21,6 +21,7 @@ import com.diyigemt.kivotos.subButton
 import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.withCollection
+import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import com.diyigemt.kivotos.tools.normalizeStudentName
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -236,6 +237,7 @@ data class CoffeeDocument(
 
   companion object : DocumentCompanionObject {
     override val documentName = "CoffeeTouch"
+    override val database get() = KivotosMongoDatabase.instance
   }
 }
 

@@ -8,6 +8,7 @@ import com.diyigemt.arona.database.deletedOne
 import com.diyigemt.arona.database.dot
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.withCollection
+import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.DeleteResult
 import com.mongodb.client.result.UpdateResult
@@ -75,6 +76,7 @@ data class UserDocument(
 
   companion object : DocumentCompanionObject {
     override val documentName = "User"
+    override val database get() = KivotosMongoDatabase.instance
     suspend fun findUserOrCreate(uid: String): UserDocument {
       return withCollection<UserDocument, UserDocument?> {
         find(

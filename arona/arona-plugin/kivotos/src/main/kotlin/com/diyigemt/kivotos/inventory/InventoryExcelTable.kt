@@ -4,6 +4,7 @@ import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.dot
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.withCollection
+import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.InsertOneResult
@@ -33,6 +34,7 @@ data class InventoryExcelTable(
 
   companion object : DocumentCompanionObject {
     override val documentName = "InventoryDocument"
+    override val database get() = KivotosMongoDatabase.instance
   }
 }
 
@@ -102,6 +104,7 @@ data class UserInventoryDocument(
   }
   companion object : DocumentCompanionObject {
     override val documentName = "UserInventoryDocument"
+    override val database get() = KivotosMongoDatabase.instance
     private suspend fun createUserInventoryDocument(uid: String): UserInventoryDocument {
       return UserInventoryDocument(uid).also {
         withCollection<UserInventoryDocument, InsertOneResult> {

@@ -1,6 +1,7 @@
 package com.diyigemt.kivotos.schema
 
 import com.diyigemt.arona.database.DocumentCompanionObject
+import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 
@@ -11,5 +12,6 @@ data class DailyLoginExcelTable(
 ) {
   companion object : DocumentCompanionObject {
     override val documentName = "DailyLoginExcelTable"
+    override val database get() = KivotosMongoDatabase.instance
   }
 }

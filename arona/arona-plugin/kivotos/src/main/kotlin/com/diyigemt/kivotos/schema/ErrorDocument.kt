@@ -4,6 +4,7 @@ import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
 import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.withCollection
+import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import com.mongodb.client.result.InsertOneResult
 import org.bson.codecs.pojo.annotations.BsonId
 
@@ -16,6 +17,7 @@ data class ErrorDocument(
 ) {
   companion object : DocumentCompanionObject {
     override val documentName = "ErrorDocument"
+    override val database get() = KivotosMongoDatabase.instance
     suspend fun createError(code: Int, message: String): ErrorDocument {
       return ErrorDocument(
         uuid(),

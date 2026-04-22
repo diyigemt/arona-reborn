@@ -4,6 +4,7 @@ import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.deletedOne
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.withCollection
+import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Sorts
 import com.mongodb.client.result.DeleteResult
@@ -21,6 +22,7 @@ data class FavorLevelExcelTable(
 
   companion object : DocumentCompanionObject {
     override val documentName = "FavorLevelExcelTable"
+    override val database get() = KivotosMongoDatabase.instance
     suspend fun findLevel(current: Int): FavorLevelExcelTable {
       return withCollection<FavorLevelExcelTable, FavorLevelExcelTable> {
         find(

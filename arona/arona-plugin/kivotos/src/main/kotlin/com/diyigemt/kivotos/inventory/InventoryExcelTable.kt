@@ -1,8 +1,9 @@
 package com.diyigemt.kivotos.inventory
 
-import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
-import com.diyigemt.kivotos.tools.database.idFilter
-import com.diyigemt.kivotos.tools.database.withCollection
+import com.diyigemt.arona.database.DocumentCompanionObject
+import com.diyigemt.arona.database.dot
+import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.withCollection
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.InsertOneResult
@@ -61,20 +62,20 @@ data class UserInventoryItem(
       updateOne(
         filter = Filters.and(
           idFilter(uid),
-          Filters.eq("${UserInventoryDocument::currencyStorage::name}._id", id)
+          Filters.eq(UserInventoryDocument::currencyStorage.dot("_id"), id)
         ),
         update = Updates.inc(
-          "${UserInventoryDocument::currencyStorage::name}.$.${UserInventoryItem::count.name}",
+          UserInventoryDocument::currencyStorage.dot("\$", UserInventoryItem::count.name),
           delta
         ),
       )
       updateOne(
         filter = Filters.and(
           idFilter(uid),
-          Filters.eq("${UserInventoryDocument::storage::name}._id", id)
+          Filters.eq(UserInventoryDocument::storage.dot("_id"), id)
         ),
         update = Updates.inc(
-          "${UserInventoryDocument::storage::name}.$.${UserInventoryItem::count.name}",
+          UserInventoryDocument::storage.dot("\$", UserInventoryItem::count.name),
           delta
         ),
       )

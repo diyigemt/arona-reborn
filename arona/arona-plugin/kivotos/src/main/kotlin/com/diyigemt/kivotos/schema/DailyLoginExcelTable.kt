@@ -1,6 +1,6 @@
 package com.diyigemt.kivotos.schema
 
-import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
+import com.diyigemt.arona.database.DocumentCompanionObject
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 

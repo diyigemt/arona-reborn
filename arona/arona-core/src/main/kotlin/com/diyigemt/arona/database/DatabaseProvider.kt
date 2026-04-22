@@ -77,9 +77,16 @@ object DatabaseProvider {
   suspend fun <T> sqlDbQueryReadUncommited(block: suspend () -> T): T =
     newSuspendedTransaction(currentCoroutineContext(), sqlDatabase, Connection.TRANSACTION_READ_UNCOMMITTED) { block() }
 
+  suspend fun <T> sqlDbQueryWithIsolation(isolationLevel: Int, block: suspend () -> T): T =
+    newSuspendedTransaction(currentCoroutineContext(), sqlDatabase, isolationLevel) { block() }
+
 
   internal fun <T> noSqlDbQuery(block: MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
+  @PublishedApi
   internal suspend fun <T> noSqlDbQuerySuspended(block: suspend MongoDatabase.() -> T): T = block.invoke(noSqlDatabase)
+
+  /** 幂等地为 Mongo 集合建立索引; 已存在的同名索引由 driver 静默跳过, 失败仅 log warn. */
+  suspend fun ensureMongoIndexes() = MongoIndexes.ensure(noSqlDatabase)
 
   suspend fun <T> redisDbQuery(block: suspend KredsClient.() -> T) = block.invoke(redisDatabase)
 
@@ -98,15 +105,15 @@ internal enum class RedisPrefixKey(val prefix: String) {
   }
 }
 
-internal interface DocumentCompanionObject {
+interface DocumentCompanionObject {
   val documentName: String
 }
 
-internal suspend inline fun <reified T : Any, R> DocumentCompanionObject.withCollection(
+suspend inline fun <reified T : Any, R> DocumentCompanionObject.withCollection(
   crossinline block: suspend MongoCollection<T>.() -> R,
 ): R =
   noSqlDbQuerySuspended {
     block(getCollection(documentName))
   }
 
-internal fun <T : Any> MongoCollection<T>.idFilter(id: String) = Filters.eq("_id", id)
+fun <T : Any> MongoCollection<T>.idFilter(id: String) = Filters.eq("_id", id)

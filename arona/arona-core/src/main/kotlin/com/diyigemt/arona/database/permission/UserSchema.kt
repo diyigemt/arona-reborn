@@ -4,13 +4,16 @@ import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.database.*
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQueryReadUncommited
+import com.diyigemt.arona.database.pluginConfigPath
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.name
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
+import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.Projections
+import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
@@ -24,25 +27,63 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.id.IdTable
 import org.jetbrains.exposed.sql.Column
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private const val BASE_ID_KEY = "BASE_ID"
-private val BASE_ID: String
-  @Synchronized
-  get() {
-    return sqlDbQuery {
-      val id = SystemPropertiesSchema.findById(BASE_ID_KEY)
-      return@sqlDbQuery if (id == null) {
-        SystemPropertiesSchema.new(BASE_ID_KEY) {
-          value = (1000000L + 1).toString()
-        }.value
-      } else {
-        (id.value.toLong() + 1).let {
-          id.value = it.toString()
-          id.value
-        }
-      }
+// 旧逻辑首发号是 1_000_001 ((1_000_000L + 1).toString()); 新实现 inc 后输出, 因此 seed=1_000_000.
+private const val BASE_ID_DEFAULT_SEED = 1_000_000L
+
+@Serializable
+private data class BaseIdSequence(
+  @BsonId
+  val id: String,
+  val seq: Long,
+)
+
+private object BaseIdSequenceCompanion : DocumentCompanionObject {
+  override val documentName = "SystemSequence"
+}
+
+// 仅首个并发请求执行 setOnInsert 播种; 其他请求阻塞在 mutex 直到播种完成, 避免 $inc 抢先创建出 seq=1 的文档.
+private val seedMutex = Mutex()
+@Volatile
+private var baseIdSeeded = false
+
+private suspend fun ensureBaseIdSeeded() {
+  if (baseIdSeeded) return
+  seedMutex.withLock {
+    if (baseIdSeeded) return
+    val legacySeed = sqlDbQuery {
+      SystemPropertiesSchema.findById(BASE_ID_KEY)?.value?.toLongOrNull() ?: BASE_ID_DEFAULT_SEED
     }
+    // setOnInsert 仅在文档不存在时生效, 已迁移过的实例不会被覆盖回旧值.
+    BaseIdSequenceCompanion.withCollection<BaseIdSequence, BaseIdSequence?> {
+      findOneAndUpdate(
+        Filters.eq("_id", BASE_ID_KEY),
+        Updates.setOnInsert(BaseIdSequence::seq.name, legacySeed),
+        FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER),
+      )
+    }
+    baseIdSeeded = true
   }
+}
+
+/**
+ * Mongo 单文档原子序列, 替代原 SQL `@Synchronized` JVM 锁; 多实例并发下也能正确发号.
+ * 已部署实例首次调用时会读 SQL 旧值播种, 避免 ID 回退.
+ */
+internal suspend fun nextBaseId(): String {
+  ensureBaseIdSeeded()
+  val updated = BaseIdSequenceCompanion.withCollection<BaseIdSequence, BaseIdSequence?> {
+    findOneAndUpdate(
+      Filters.eq("_id", BASE_ID_KEY),
+      Updates.inc(BaseIdSequence::seq.name, 1L),
+      FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER),
+    )
+  } ?: error("BASE_ID sequence allocation returned null")
+  return updated.seq.toString()
+}
 
 @AronaDatabase
 internal object UserTable : IdTable<String>(name = "User") {
@@ -190,7 +231,7 @@ internal data class UserDocument(
       updateOne(
         filter = idFilter(id),
         update = Updates.set(
-          "${UserDocument::config.name}.${pluginId.toMongodbKey()}.$key",
+          pluginConfigPath(UserDocument::config, pluginId, key),
           JsonIgnoreUnknownKeys.encodeToString(value)
         )
       )
@@ -205,7 +246,7 @@ internal data class UserDocument(
     withCollection<UserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
-        update = Updates.set("${UserDocument::config.name}.${pluginId.toMongodbKey()}.$key", value)
+        update = Updates.set(pluginConfigPath(UserDocument::config, pluginId, key), value)
       )
     }
   }
@@ -221,35 +262,6 @@ internal data class UserDocument(
 
   companion object : DocumentCompanionObject, ExposedUserDocument {
     override val documentName = "User"
-    suspend fun createUserDocument(uid: String, contactId: String): UserDocument {
-      val ud = UserDocument(
-        BASE_ID,
-        uid = mutableListOf(uid),
-        contacts = mutableListOf(contactId)
-      )
-      withCollection {
-        insertOne(ud)
-      }
-      sqlDbQueryReadUncommited {
-        when (val saveUser = UserSchema.findById(uid)) {
-          is UserSchema -> {
-            saveUser.uid = ud.id
-          }
-
-          else -> {
-            UserSchema.new(uid) {
-              this@new.from = contactId
-              this@new.uid = ud.id
-            }.also { newUser ->
-              if (newUser.id.value !in ud.uid) {
-                ud.updateUserContact(contactId)
-              }
-            }
-          }
-        }
-      }
-      return ud
-    }
 
     suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? {
       val u = sqlDbQueryReadUncommited {

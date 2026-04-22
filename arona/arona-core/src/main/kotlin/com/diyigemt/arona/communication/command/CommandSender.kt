@@ -9,8 +9,9 @@ import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.database.permission.*
-import com.diyigemt.arona.database.permission.UserDocument.Companion.createUserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByUidOrNull
+import com.diyigemt.arona.database.service.ContactService
+import com.diyigemt.arona.database.service.UserService
 import com.diyigemt.arona.utils.childScope
 import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
@@ -75,14 +76,14 @@ sealed class AbstractUserCommandSender(sourceId: String) : UserCommandSender, Ab
   override suspend fun sendMessage(message: Message): MessageReceipt<Contact>? = user.sendMessage(message)
   override suspend fun userDocument(): PluginUserDocument {
     if (_userDocument == null) {
-      _userDocument = findUserDocumentByUidOrNull(user.id) ?: createUserDocument(user.id, subject.id)
+      _userDocument = findUserDocumentByUidOrNull(user.id) ?: UserService.createUser(user.id, subject.id)
     }
     return _userDocument!!
   }
 
   override suspend fun contactDocument(): PluginContactDocument {
     if (_contactDocument == null) {
-      ContactDocument.createContactAndUser(subject, user, ContactRole.DEFAULT_MEMBER_CONTACT_ROLE_ID)
+      ContactService.createContactAndUser(subject, user, ContactRole.DEFAULT_MEMBER_CONTACT_ROLE_ID)
       _contactDocument = ContactDocument.findContactDocumentByIdOrNull(subject.fatherSubjectIdOrSelf)
     }
     return _contactDocument!!

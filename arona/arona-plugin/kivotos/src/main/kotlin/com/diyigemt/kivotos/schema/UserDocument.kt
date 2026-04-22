@@ -3,9 +3,11 @@ package com.diyigemt.kivotos.schema
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.kivotos.coffee.CoffeeDocument
 import com.diyigemt.kivotos.rank.RankManager
-import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
-import com.diyigemt.kivotos.tools.database.idFilter
-import com.diyigemt.kivotos.tools.database.withCollection
+import com.diyigemt.arona.database.DocumentCompanionObject
+import com.diyigemt.arona.database.deletedOne
+import com.diyigemt.arona.database.dot
+import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.withCollection
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.DeleteResult
 import com.mongodb.client.result.UpdateResult
@@ -40,7 +42,7 @@ data class UserDocument(
       deleteOne(
         filter = idFilter(id)
       )
-    }.deletedCount == 1L
+    }.deletedOne()
   }
   /**
    * 更新学生好感等级, 返回 是否升级, 当前等级, 累计好感值
@@ -50,7 +52,7 @@ data class UserDocument(
       withCollection<UserDocument, UpdateResult> {
         updateOne(
           filter = idFilter(this@UserDocument.id),
-          update = Updates.set("${UserDocument::student.name}.$id", it)
+          update = Updates.set(UserDocument::student.dot(id.toString()), it)
         )
       }
     }
@@ -59,7 +61,7 @@ data class UserDocument(
     withCollection<UserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(this@UserDocument.id),
-        update = Updates.set("${UserDocument::student.name}.$id.${Student::favor.name}", listOf(favor.level, current))
+        update = Updates.set(UserDocument::student.dot(id.toString(), Student::favor.name), listOf(favor.level, current))
       )
     }
     // 更新redis好感度

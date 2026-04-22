@@ -2,8 +2,14 @@
 
 package com.diyigemt.arona.webui.endpoints.contact
 
-import com.diyigemt.arona.communication.event.broadcast
+import com.diyigemt.arona.database.MongoWriteOutcome
+import com.diyigemt.arona.database.classify
+import com.diyigemt.arona.database.dot
 import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.matchedOne
+import com.diyigemt.arona.database.memberPositional
+import com.diyigemt.arona.database.membersIdPath
+import com.diyigemt.arona.database.modifiedOne
 import com.diyigemt.arona.database.permission.*
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
@@ -13,13 +19,11 @@ import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
-import com.diyigemt.arona.webui.event.ContentAuditEvent
+import com.diyigemt.arona.webui.event.auditOrAllow
 import com.diyigemt.arona.webui.event.isBlock
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
-import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
-import com.mongodb.client.model.Projections
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import io.ktor.http.*
@@ -27,7 +31,6 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
-import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import org.bson.Document
 import org.bson.codecs.pojo.annotations.BsonId
@@ -48,7 +51,8 @@ internal data class UserContactDocument(
   val contactType: ContactType = ContactType.Group,
   val members: List<UserContactMemberDocument> = listOf(),
   val roles: List<ContactRole> = listOf(),
-  val config: Map<String, Map<String, String>> = mapOf(),
+  // 仅 /contact?id= 完整接口才填充; 列表接口 /contacts 与 /manage-contacts 不下发, 防止群级插件配置外泄.
+  val config: Map<String, Map<String, String>>? = null,
 )
 
 @Serializable
@@ -77,11 +81,7 @@ internal data class ContactRoleCreateReq(
 
 @AronaBackendEndpoint("/contact")
 internal object ContactEndpoint {
-  private val NoRequestContactIdPath = listOf("/contacts", "/manage-contacts")
-  private val RequestContactAdminPath = listOf(
-    "/contact", "/contact-basic", "/roles", "/members", "/policies",
-    "/role", "/policy", "/preference"
-  )
+  private val NoRequestContactIdPath = setOf("/contacts", "/manage-contacts")
   private val PipelineContext<Unit, ApplicationCall>.contactId
     get() = request.queryParameters["id"] ?: context.parameters["id"]!!
 
@@ -114,7 +114,7 @@ internal object ContactEndpoint {
     }?.run {
       _contact = this
     }
-    if (RequestContactAdminPath.any { path.endsWith(it) }) {
+    if (requiresContactAdmin(path)) {
       if (_contact != null) {
         if (!contact.checkAdminPermission(aronaUser.id)) {
           errorPermissionDeniedMessage()
@@ -144,48 +144,8 @@ internal object ContactEndpoint {
     return success(getContacts())
   }
 
-  suspend fun PipelineContext<Unit, ApplicationCall>.getContacts(): List<UserContactDocument> {
-    val filter = Aggregates.match(Filters.eq("${ContactDocument::members.name}._id", aronaUser.id))
-    val firstProjection = Aggregates.project(
-      Projections.fields(
-        Document("_id", 1),
-        Document(ContactDocument::contactName.name, 1),
-        Document(ContactDocument::contactType.name, 1),
-        Document(ContactDocument::roles.name, 1),
-        Document(ContactDocument::config.name, 1),
-        Document(
-          ContactDocument::members.name,
-          Document(
-            "\$filter",
-            Document(
-              mapOf(
-                "input" to "\$${ContactDocument::members.name}",
-                "as" to "mem",
-                "cond" to Document(
-                  "\$eq", listOf("\$\$mem._id", aronaUser.id)
-                )
-              )
-            )
-          )
-        ),
-      )
-    )
-    val secondProjection = Aggregates.project(
-      Projections.fields(
-        Document("_id", 1),
-        Document(ContactDocument::contactName.name, 1),
-        Document(ContactDocument::contactType.name, 1),
-        Document(ContactDocument::roles.name, 1),
-        Document(ContactDocument::config.name, 1),
-        Document("${ContactDocument::members.name}._id", 1),
-        Document("${ContactDocument::members.name}.${ContactMember::name.name}", 1),
-        Document("${ContactDocument::members.name}.${ContactMember::roles.name}", 1),
-      )
-    )
-    return ContactDocument.withCollection<ContactDocument, List<UserContactDocument>> {
-      aggregate<UserContactDocument>(listOf(filter, firstProjection, secondProjection)).toList()
-    }
-  }
+  suspend fun PipelineContext<Unit, ApplicationCall>.getContacts(): List<UserContactDocument> =
+    ContactDocument.findVisibleToUser(aronaUser.id)
 
   /**
    * 根据id获取一个contact的所有信息(仅管理员
@@ -253,32 +213,37 @@ internal object ContactEndpoint {
   }
 
   /**
-   * 更新用户信息
+   * 更新成员信息.
+   * 普通成员只能改自己的 name; 仅管理员可改 roles. 任何分支都不允许写入 super 角色.
+   * 见 [resolveMemberUpdate] 的决策表.
    */
   @AronaBackendEndpointPut("/{id}/member")
   suspend fun PipelineContext<Unit, ApplicationCall>.updateMember() {
     val data = context.receiveJsonOrNull<ContactMemberUpdateReq>() ?: return badRequest()
-    // 检查权限 只能更新自己的或者自己管理的他人的
-    val permit = data.id == aronaUser.id || contact.checkAdminPermission(aronaUser.id)
-    if (permit) {
-      return if (
-        ContactDocument.withCollection<ContactDocument, UpdateResult> {
-          updateOne(
-            filter = Filters.and(
-              idFilter(contact.id),
-              Filters.eq("${ContactDocument::members.name}._id", data.id)
-            ),
-            update = Updates.combine(
-              Updates.set("${ContactDocument::members.name}.$.${ContactMember::name.name}", data.name),
-              Updates.set("${ContactDocument::members.name}.$.${ContactMember::roles.name}", data.roles),
-            )
-          )
-        }.modifiedCount == 1L
-      ) success()
-      else internalServerError()
-    } else {
-      return errorPermissionDeniedMessage()
+    val target = contact.findContactMemberOrNull(data.id)
+    val decision = resolveMemberUpdate(contact, aronaUser.id, target, data)
+    val updateRoles = when (decision) {
+      MemberUpdateDecision.Deny -> return errorPermissionDeniedMessage()
+      is MemberUpdateDecision.Allow -> decision.updateRoles
     }
+    val update = if (updateRoles) {
+      Updates.combine(
+        Updates.set(memberPositional(ContactMember::name), data.name),
+        Updates.set(memberPositional(ContactMember::roles), data.roles),
+      )
+    } else {
+      Updates.set(memberPositional(ContactMember::name), data.name)
+    }
+    val matched = ContactDocument.withCollection<ContactDocument, UpdateResult> {
+      updateOne(
+        filter = Filters.and(
+          idFilter(contact.id),
+          Filters.eq(membersIdPath(), data.id),
+        ),
+        update = update,
+      )
+    }.matchedOne()
+    return if (matched) success() else internalServerError()
   }
 
   /**
@@ -296,7 +261,7 @@ internal object ContactEndpoint {
             ContactRole.createRole(data.name)
           )
         )
-      }.modifiedCount == 1L
+      }.modifiedOne()
     ) success()
     else internalServerError()
   }
@@ -331,11 +296,11 @@ internal object ContactEndpoint {
         updateOne(
           filter = Filters.and(
             idFilter(contact.id),
-            Filters.eq("${ContactDocument::roles.name}._id", data.id)
+            Filters.eq(ContactDocument::roles.dot("_id"), data.id)
           ),
-          update = Updates.set("${ContactDocument::roles.name}.$.${ContactRole::name.name}", data.name),
+          update = Updates.set(ContactDocument::roles.dot("\$", ContactRole::name.name), data.name),
         )
-      }.modifiedCount == 1L
+      }.classify() != MongoWriteOutcome.NotMatched
     ) success()
     else internalServerError()
   }
@@ -370,11 +335,11 @@ internal object ContactEndpoint {
         updateOne(
           filter = Filters.and(
             idFilter(contact.id),
-            Filters.eq("${ContactDocument::policies.name}._id", policy.id)
+            Filters.eq(ContactDocument::policies.dot("_id"), policy.id)
           ),
-          update = Updates.set("${ContactDocument::policies.name}.$", policy)
+          update = Updates.set(ContactDocument::policies.dot("\$"), policy)
         )
-      }.modifiedCount == 1L
+      }.classify() != MongoWriteOutcome.NotMatched
     ) success(policy.id)
     else internalServerError()
   }
@@ -401,7 +366,7 @@ internal object ContactEndpoint {
           filter = idFilter(contact.id),
           update = Updates.push(ContactDocument::policies.name, policy)
         )
-      }.modifiedCount == 1L
+      }.modifiedOne()
     ) success(policy.id)
     else internalServerError()
   }
@@ -427,7 +392,7 @@ internal object ContactEndpoint {
             )
           )
         )
-      }.modifiedCount == 1L
+      }.modifiedOne()
     ) success()
     else internalServerError()
   }
@@ -443,8 +408,8 @@ internal object ContactEndpoint {
       return badRequest()
     }.getOrThrow()
     val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
-    val ev = ContentAuditEvent(value).broadcast()
-    if (ev.isBlock) return errorMessage("内容审核失败: ${ev.message}")
+    val ev = auditOrAllow(value)
+    if (ev?.isBlock == true) return errorMessage("内容审核失败: ${ev.message}")
     contact.updatePluginConfig(
       obj.id,
       obj.key,
@@ -474,8 +439,8 @@ internal object ContactEndpoint {
   suspend fun PipelineContext<Unit, ApplicationCall>.saveMemberPreference() {
     val obj = kotlin.runCatching { context.receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
     val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
-    val ev = ContentAuditEvent(value).broadcast()
-    if (ev.isBlock) return errorMessage("内容审核失败: ${ev.message}")
+    val ev = auditOrAllow(value)
+    if (ev?.isBlock == true) return errorMessage("内容审核失败: ${ev.message}")
     contact.findContactMemberOrNull(aronaUser.id)?.also {
       it.updatePluginConfig(
         obj.id,

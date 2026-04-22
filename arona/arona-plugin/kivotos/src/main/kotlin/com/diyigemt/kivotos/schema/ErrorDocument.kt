@@ -2,8 +2,8 @@ package com.diyigemt.kivotos.schema
 
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
-import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
-import com.diyigemt.kivotos.tools.database.withCollection
+import com.diyigemt.arona.database.DocumentCompanionObject
+import com.diyigemt.arona.database.withCollection
 import com.mongodb.client.result.InsertOneResult
 import org.bson.codecs.pojo.annotations.BsonId
 

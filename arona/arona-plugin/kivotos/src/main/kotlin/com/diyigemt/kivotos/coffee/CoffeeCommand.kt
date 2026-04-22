@@ -18,9 +18,9 @@ import com.diyigemt.kivotos.coffee.CoffeeTouchCommand.Companion
 import com.diyigemt.kivotos.schema.ErrorDocument
 import com.diyigemt.kivotos.schema.UserDocument
 import com.diyigemt.kivotos.subButton
-import com.diyigemt.kivotos.tools.database.DocumentCompanionObject
-import com.diyigemt.kivotos.tools.database.idFilter
-import com.diyigemt.kivotos.tools.database.withCollection
+import com.diyigemt.arona.database.DocumentCompanionObject
+import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.withCollection
 import com.diyigemt.kivotos.tools.normalizeStudentName
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.parameters.arguments.argument

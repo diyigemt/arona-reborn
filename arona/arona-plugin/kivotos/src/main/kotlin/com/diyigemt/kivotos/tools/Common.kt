@@ -2,6 +2,7 @@ package com.diyigemt.kivotos.tools
 
 import com.diyigemt.arona.arona.command.ImageQueryData
 import com.diyigemt.arona.arona.database.student.StudentSchema
+import com.diyigemt.arona.utils.BusinessCode
 import com.diyigemt.arona.utils.ServerResponse
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -33,7 +34,7 @@ suspend fun normalizeStudentName(name: String): String? {
         val tmp = it.bodyAsText().let {
           json.decodeFromString<ServerResponse<List<ImageQueryData>>>(it)
         }
-        return@runCatching if (tmp.code == HttpStatusCode.OK) {
+        return@runCatching if (tmp.code == BusinessCode.OK.code) {
           tmp.data?.firstOrNull()?.content?.substringAfterLast("/")?.substringBefore(".")
         } else {
           null

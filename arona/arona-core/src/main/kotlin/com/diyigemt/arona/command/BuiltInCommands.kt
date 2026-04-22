@@ -10,10 +10,10 @@ import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.config.AutoSavePluginDataHolder
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
 import com.diyigemt.arona.database.RedisPrefixKey
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.createContactAndUser
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
+import com.diyigemt.arona.database.service.ContactService
 import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -73,7 +73,7 @@ object BuiltInCommands : AutoSavePluginDataHolder {
     suspend fun UserCommandSender.login() {
       val tokenKey = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_LOGIN, token)
       if (redisDbQuery { get(tokenKey) } == "1") {
-        val documentUser = createContactAndUser(subject, user, DEFAULT_MEMBER_CONTACT_ROLE_ID)
+        val documentUser = ContactService.createContactAndUser(subject, user, DEFAULT_MEMBER_CONTACT_ROLE_ID)
         redisDbQuery {
           set(tokenKey, documentUser.id)
           expire(tokenKey, 100u)
@@ -141,7 +141,7 @@ object BuiltInCommands : AutoSavePluginDataHolder {
         }
         if (auth != null) {
           auth.accept()
-          createContactAndUser(subject, user, DEFAULT_ADMIN_CONTACT_ROLE_ID)
+          ContactService.createContactAndUser(subject, user, DEFAULT_ADMIN_CONTACT_ROLE_ID)
           sendMessage("认证成功")
         }
       }
@@ -247,7 +247,7 @@ object BuiltInCommands : AutoSavePluginDataHolder {
     GlobalEventChannel.subscribeAlways<TencentBotUserChangeEvent> {
       when (it) {
         is TencentFriendAddEvent, is TencentGroupAddEvent, is TencentGuildAddEvent -> {
-          createContactAndUser(it.subject, it.user, DEFAULT_ADMIN_CONTACT_ROLE_ID)
+          ContactService.createContactAndUser(it.subject, it.user, DEFAULT_ADMIN_CONTACT_ROLE_ID)
         }
 
         else -> {

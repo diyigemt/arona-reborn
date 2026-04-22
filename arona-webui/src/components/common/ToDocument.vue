@@ -14,7 +14,11 @@ const props = withDefaults(
 );
 const basePath = "https://doc.arona.diyigemt.com/v2/webui";
 function onClick() {
-  window.open(`${basePath}${props.path}`, "_blank");
+  // 第三参数中显式声明 noopener noreferrer; 部分浏览器仍可能透传 opener, 显式置 null 兜底.
+  const target = window.open(`${basePath}${props.path}`, "_blank", "noopener,noreferrer");
+  if (target) {
+    target.opener = null;
+  }
 }
 </script>
 

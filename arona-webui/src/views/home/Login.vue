@@ -78,7 +78,7 @@
         <div v-if="respErrorMessage">{{ respErrorMessage }}</div>
         <el-text class="mt-4"
           >不会使用?
-          <el-link type="primary" href="https://doc.arona.diyigemt.com/v2/manual/webui" target="_blank"
+          <el-link type="primary" href="https://doc.arona.diyigemt.com/v2/manual/webui" target="_blank" rel="noopener noreferrer"
             >访问arona在线文档</el-link
           ></el-text
         >
@@ -89,7 +89,7 @@
     <div class="absolute bottom-16px w-full text-center">
       <ElLink
         href="https://beian.miit.gov.cn/"
-        target="_blank"
+        target="_blank" rel="noopener noreferrer"
         class="text-xl!"
         :class="{ 'color-black!': pvSelector === 0, 'color-white!': pvSelector !== 0 }"
         >桂ICP备2022008499号-2</ElLink
@@ -128,56 +128,109 @@ const baseStore = useBaseStore();
 const userId = computed(() => baseStore.userId);
 let loginStateCheckHandler = 0;
 let codeCountDownHandler = 0;
+const BASE_POLL_DELAY = 3000;
+const MAX_POLL_DELAY = 30000;
+let pollDelay = BASE_POLL_DELAY;
+
 function onClickThirdPartLogin() {
   infoMessage("没做");
 }
-function startCheckLoginState() {
-  loginStateCheckHandler = window.setInterval(() => {
-    if (isSuccess.value) {
-      return;
-    }
-    UserApi.fetchLoginState(code.value).then((data) => {
+
+function clearLoginStateCheck() {
+  window.clearTimeout(loginStateCheckHandler);
+  loginStateCheckHandler = 0;
+}
+function clearCodeCountDown() {
+  window.clearInterval(codeCountDownHandler);
+  codeCountDownHandler = 0;
+}
+function scheduleNextCheck(delay = pollDelay) {
+  clearLoginStateCheck();
+  loginStateCheckHandler = window.setTimeout(checkLoginStateOnce, delay);
+}
+function checkLoginStateOnce() {
+  if (isSuccess.value) {
+    clearLoginStateCheck();
+    return;
+  }
+  // 页面被隐藏时不打 API, 但仍排下一次, 避免回前台后还要等很久.
+  if (document.visibilityState === "hidden") {
+    scheduleNextCheck();
+    return;
+  }
+  UserApi.fetchLoginState(code.value)
+    .then((data) => {
+      pollDelay = BASE_POLL_DELAY;
       switch (data.status) {
         case 0: {
-          clearInterval(loginStateCheckHandler);
+          clearLoginStateCheck();
+          clearCodeCountDown();
           code.value = "XXXXXX";
           respErrorMessage.value = "验证码已过期, 请重新获取";
           break;
         }
         case 1: {
+          scheduleNextCheck();
           break;
         }
         case 2: {
+          clearLoginStateCheck();
+          clearCodeCountDown();
           baseStore.setToken(data.token);
-          UserApi.fetchUserProfile().then((user) => {
-            baseStore.setUser(user);
-            successMessage("登录成功");
-            playLoginVoice();
-            moveToNextState();
-          });
+          UserApi.fetchUserProfile()
+            .then((user) => {
+              baseStore.setUser(user);
+              successMessage("登录成功");
+              playLoginVoice();
+              moveToNextState();
+            })
+            .catch(() => {
+              // 拉取用户资料失败时回滚 token, 避免卡在"已发 token 但用户态未填充"的半登录状态.
+              baseStore.setToken("");
+              respErrorMessage.value = "登录确认成功但用户信息加载失败, 请重新获取验证码";
+              code.value = "XXXXXX";
+            });
           break;
         }
         default: {
-          /* empty */
+          scheduleNextCheck();
         }
       }
+    })
+    .catch(() => {
+      // 网络瞬断时指数退避, 避免雪崩.
+      pollDelay = Math.min(pollDelay * 2, MAX_POLL_DELAY);
+      respErrorMessage.value = "网络异常, 正在重试";
+      scheduleNextCheck(pollDelay);
     });
-  }, 3000);
+}
+function startCheckLoginState() {
+  pollDelay = BASE_POLL_DELAY;
+  scheduleNextCheck();
 }
 function onClickGetCode() {
-  UserApi.login().then((res) => {
-    code.value = res;
-    respErrorMessage.value = "验证码十分钟内有效";
-    countDown.value = 59;
-    startCheckLoginState();
-    codeCountDownHandler = window.setInterval(() => {
-      countDown.value--;
-      if (countDown.value < 1) {
-        clearInterval(codeCountDownHandler);
-        countDown.value = 0;
-      }
-    }, 1000);
-  });
+  // 防止用户多次点击叠加 interval 导致前一轮的轮询继续打 API.
+  clearLoginStateCheck();
+  clearCodeCountDown();
+  UserApi.login()
+    .then((res) => {
+      code.value = res;
+      respErrorMessage.value = "验证码十分钟内有效";
+      countDown.value = 59;
+      startCheckLoginState();
+      codeCountDownHandler = window.setInterval(() => {
+        countDown.value--;
+        if (countDown.value < 1) {
+          clearInterval(codeCountDownHandler);
+          countDown.value = 0;
+        }
+      }, 1000);
+    })
+    .catch(() => {
+      code.value = "XXXXXX";
+      countDown.value = 0;
+      respErrorMessage.value = "验证码获取失败, 请稍后重试";
+    });
 }
 function onClickAronaLogin() {
   onClickGetCode();
@@ -225,8 +278,8 @@ function onEnded() {
   }, 1000);
 }
 onUnmounted(() => {
-  clearInterval(loginStateCheckHandler);
-  clearInterval(codeCountDownHandler);
+  clearLoginStateCheck();
+  clearCodeCountDown();
 });
 </script>
 

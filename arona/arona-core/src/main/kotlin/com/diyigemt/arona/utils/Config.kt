@@ -36,7 +36,15 @@ data class MariaDBConfig(
 
 @Serializable
 data class WebConfig(
-  val port: Int
+  val port: Int,
+  /**
+   * CORS 白名单 (host, 不含 scheme). 空表示任意 host (开发期), 启动时会打 warn.
+   */
+  val allowedOrigins: List<String> = emptyList(),
+  /**
+   * 仅在确实部署在反向代理之后时打开. 打开后才信任 X-Forwarded-* / X-Real-IP.
+   */
+  val behindProxy: Boolean = false,
 )
 
 @Serializable

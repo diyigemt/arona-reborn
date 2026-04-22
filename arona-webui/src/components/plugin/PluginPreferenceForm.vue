@@ -89,7 +89,7 @@ watch(
         break;
       }
       case "manage-contact": {
-        const tmp = contact.value?.config[props.pId];
+        const tmp = contact.value?.config?.[props.pId];
         emits("update:form", tmp && tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
         break;
       }
@@ -118,7 +118,7 @@ watch(
         });
       }
     } else if (editType.value.type === "manage-contact") {
-      const tmp = contact.value?.config[props.pId];
+      const tmp = contact.value?.config?.[props.pId];
       emits("update:form", tmp && tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
     }
   },
@@ -155,7 +155,7 @@ function onConfirm() {
     case "manage-contact": {
       ContactApi.updatePluginPreference(editType.value.id, props.pId, props.pKey, data)
         .then(() => {
-          const tmp = contact.value?.config[props.pId];
+          const tmp = contact.value?.config?.[props.pId];
           if (tmp) {
             tmp[props.pKey] = JSON.stringify(props.form);
           }
@@ -189,7 +189,7 @@ function onConfirmImport() {
         });
       }
     } else {
-      const tmp = contact.value?.config[props.pId];
+      const tmp = contact.value?.config?.[props.pId];
       if (tmp) {
         emits("update:form", tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
       }

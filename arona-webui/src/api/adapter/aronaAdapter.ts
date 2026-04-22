@@ -10,14 +10,10 @@ const BASE_PREFIX = import.meta.env.VITE_API_BASEURL;
 
 // 创建实例
 const axiosInstance: AxiosInstance = axios.create({
-  // 前缀
   baseURL: BASE_PREFIX,
-  // 超时
   timeout: 1000 * 30,
-  // 请求头
   headers: {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
   },
 });
 
@@ -25,7 +21,13 @@ const axiosInstance: AxiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   // @ts-ignore
   (config: IRequestConfig) => {
-    Reflect.set(config.headers || {}, "Authorization", useBaseStore().token);
+    config.headers = config.headers ?? {};
+    const { token } = useBaseStore();
+    if (token) {
+      Reflect.set(config.headers, "Authorization", `Bearer ${token}`);
+    } else {
+      Reflect.deleteProperty(config.headers, "Authorization");
+    }
     config.showResponseError = config.showResponseError ?? true;
     config.showServerResponseError = config.showServerResponseError ?? true;
     return config;
@@ -44,8 +46,10 @@ axiosInstance.interceptors.response.use(
     }
     if (response.status === HTTP_OK) {
       const resp = response.data as ServerResponse<unknown>;
-      if (resp && resp.code !== HTTP_OK && resp.message && response.config.showServerResponseError) {
-        warningMessage(resp.message);
+      if (resp && resp.code !== HTTP_OK && response.config.showServerResponseError) {
+        // 不再原样回显后端 message, 避免异常细节泄漏; 业务码映射到本地化文案.
+        // 如调用方需要原始 message (例如内容审核拒绝原因), 可关闭 showServerResponseError 自行处理.
+        warningMessage(showCodeMessage(resp.code));
       }
       return response.data;
     }

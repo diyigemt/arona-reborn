@@ -1,6 +1,6 @@
 package com.diyigemt.arona.webui.plugins
 
-import com.diyigemt.arona.database.DatabaseProvider.sqlDbQueryReadUncommited
+import com.diyigemt.arona.database.DatabaseProvider.sqlDbQueryWithIsolation
 import com.diyigemt.arona.utils.ReflectionUtil
 import com.diyigemt.arona.webui.endpoints.*
 import io.ktor.http.*
@@ -10,6 +10,7 @@ import io.ktor.util.pipeline.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspend
+import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.hasAnnotation
 
@@ -32,6 +33,12 @@ fun Application.configureRouting() {
         it to method
       }
   }.flatten().sortedBy { (_, method) -> method.findAnnotation<AronaBackendAdminRouteInterceptor>()!!.priority }
+  // 启动期断言: 存在管理端点却没有任何管理拦截器, 等同于裸奔, 立即失败而不是上线后被发现.
+  if (hasAdminEndpoint(endpoints) && adminCallInterceptors.isEmpty()) {
+    throw IllegalStateException(
+      "No @AronaBackendAdminRouteInterceptor registered while admin endpoints exist; refuse to start."
+    )
+  }
   val commonCallInterceptors =
     endpoints.map {
       it::class.findAnnotation<AronaBackendEndpoint>()!!.path to ReflectionUtil
@@ -93,15 +100,38 @@ fun Application.configureRouting() {
   }
 }
 
+private val HttpEndpointAnnotations: Set<KClass<out Annotation>> = setOf(
+  AronaBackendEndpointGet::class,
+  AronaBackendEndpointPost::class,
+  AronaBackendEndpointPut::class,
+  AronaBackendEndpointDelete::class,
+)
+
+private fun hasAdminEndpoint(endpoints: List<Any>): Boolean = endpoints.any { endpoint ->
+  if (endpoint::class.hasAnnotation<AronaBackendAdminEndpoint>()) return@any true
+  endpoint::class.declaredFunctions.any { fn ->
+    val isHttp = fn.annotations.any { ann -> ann.annotationClass in HttpEndpointAnnotations }
+    isHttp && fn.hasAnnotation<AronaBackendAdminEndpoint>()
+  }
+}
+
 fun withoutTransaction(clazz: KClass<*>, fn: KFunction<*>) = clazz
   .findAnnotation<AronaBackendEndpoint>()?.withoutTransaction
   ?: fn.findAnnotation<AronaBackendRouteInterceptor>()?.withoutTransaction ?: false
+
+/**
+ * 解析事务隔离级别: 拦截器注解 > 端点注解 > 默认 READ_COMMITTED.
+ */
+fun resolveIsolationLevel(clazz: KClass<*>, fn: KFunction<*>): TxLevel =
+  fn.findAnnotation<AronaBackendRouteInterceptor>()?.isolationLevel
+    ?: clazz.findAnnotation<AronaBackendEndpoint>()?.isolationLevel
+    ?: TxLevel.READ_COMMITTED
 
 suspend fun PipelineContext<Unit, ApplicationCall>.checkTransaction(clazz: Any, fn: KFunction<*>) {
   if (withoutTransaction(clazz::class, fn)) {
     fn.callSuspend(clazz, this)
   } else {
-    sqlDbQueryReadUncommited {
+    sqlDbQueryWithIsolation(resolveIsolationLevel(clazz::class, fn).jdbcLevel) {
       fn.callSuspend(clazz, this)
     }
   }

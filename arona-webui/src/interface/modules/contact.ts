@@ -14,11 +14,12 @@ export interface Contact {
   id: string;
   contactName: string;
   contactType: ContactType;
-  policies: Policy[];
+  // 仅 /contact?id= 完整接口才返回; 列表接口 /contacts /manage-contacts 不下发, 故标 optional.
+  policies?: Policy[];
   roles: ContactRole[];
   members: ContactMember[];
-  registerTime: string;
-  config: Record<string, Record<string, string>>;
+  registerTime?: string;
+  config?: Record<string, Record<string, string>>;
 }
 export interface EditableContactRole extends ContactRole {
   edit: boolean;

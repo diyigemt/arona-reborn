@@ -17,6 +17,8 @@ import io.ktor.server.response.*
 import io.ktor.util.*
 import io.ktor.util.logging.*
 import io.ktor.util.pipeline.*
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 
 val PipelineContext<Unit, ApplicationCall>.version: String?
   get() = request.header(HttpHeaders.AronaInstanceVersion)
@@ -28,7 +30,12 @@ val PipelineContext<Unit, ApplicationCall>.authorization: String?
   get() = request.header(HttpHeaders.Authorization)
 
 val PipelineContext<Unit, ApplicationCall>.ip: String
-  get() = request.header(HttpHeaders.XRealIp) ?: request.origin.remoteAddress
+  // 仅在确实部署在反向代理之后时才信任 X-Real-IP, 否则取 socket 远端地址.
+  get() = if (aronaConfig.web.behindProxy) {
+    request.header(HttpHeaders.XRealIp) ?: request.origin.remoteAddress
+  } else {
+    request.origin.remoteAddress
+  }
 
 val PipelineContext<Unit, ApplicationCall>.request: ApplicationRequest
   get() = context.request
@@ -42,6 +49,32 @@ internal var PipelineContext<Unit, ApplicationCall>._aronaUser: UserDocument?
 internal val PipelineContext<Unit, ApplicationCall>.aronaUser: UserDocument
   get() = context.attributes[ContextUserAttrKey]
 
+/**
+ * 解析 RFC 6750 Bearer 令牌.
+ * 按 RFC 7235 规定 auth-scheme 不区分大小写, token 自身禁止包含空白字符.
+ */
+internal fun parseBearer(header: String?): String? {
+  val trimmed = header?.trim().orEmpty()
+  val schemeEnd = trimmed.indexOf(' ')
+  if (schemeEnd <= 0) return null
+  val scheme = trimmed.substring(0, schemeEnd)
+  if (!scheme.equals("Bearer", ignoreCase = true)) return null
+  val token = trimmed.substring(schemeEnd + 1).trim()
+  if (token.isEmpty() || token.any { it.isWhitespace() }) return null
+  return token
+}
+
+/**
+ * 常量时间比较 admin token, 避免基于响应耗时的侧信道枚举.
+ * expected 为空视为禁用 admin 接口, 任何 token 均拒绝.
+ */
+internal fun verifyAdminToken(actual: String?, expected: String): Boolean {
+  if (expected.isBlank() || actual.isNullOrEmpty()) return false
+  return MessageDigest.isEqual(
+    actual.toByteArray(StandardCharsets.UTF_8),
+    expected.toByteArray(StandardCharsets.UTF_8),
+  )
+}
 
 @Suppress("unused")
 @AronaBackendEndpoint("")
@@ -50,31 +83,31 @@ object LoggerInterceptor {
 
   @AronaBackendRouteInterceptor
   suspend fun PipelineContext<Unit, ApplicationCall>.accessLogging() {
-    val method = context.request.httpMethod.value
     val path = context.request.path()
     if (AdminAccessRegexp.matches(path)) {
-      // 将admin访问交由adminAccessInterceptor处理
+      // 将 admin 访问交由 adminAccessLogging 处理
       return
     }
     if (path.endsWith("/login") || path.endsWith("/webhook")) {
       return
     }
-    this.authorization?.let {
-      val transfer = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, it)
-      DatabaseProvider.redisDbQuery {
-        expire(transfer, 3600u)
-        get(transfer)
-      } ?: return@let null
-    }?.also {
-      this._aronaUser = findUserDocumentByIdOrNull(it)
-    }
-    if (this.authorization == null || _aronaUser == null) {
+    val token = parseBearer(this.authorization) ?: run {
       unauthorized()
       return finish()
     }
-    val query = when (context.request.httpMethod) {
-      HttpMethod.Get -> context.request.queryString()
-      else -> if (isJsonPost) context.receiveText() else "post blob data"
+    val userId = DatabaseProvider.redisDbQuery {
+      val key = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, token)
+      expire(key, 3600u)
+      get(key)
+    }
+    if (userId == null) {
+      unauthorized()
+      return finish()
+    }
+    this._aronaUser = findUserDocumentByIdOrNull(userId)
+    if (_aronaUser == null) {
+      unauthorized()
+      return finish()
     }
   }
 }
@@ -86,30 +119,19 @@ object AdminLoggerInterceptor {
 
   @AronaBackendAdminRouteInterceptor
   suspend fun PipelineContext<Unit, ApplicationCall>.adminAccessLogging() {
-    // TODO
-    return
     val method = context.request.httpMethod.value
-    val query = when (context.request.httpMethod) {
-      HttpMethod.Get -> context.request.queryString()
-      else -> if (isJsonPost) context.receiveText() else "post blob data"
-    }
     val path = context.request.path()
-    when (val token = this.token) {
-      is String -> {
-        if (token != adminToken) {
-          adminLogger.warn("failed authorized access: $method: $path with $query by $ip")
-          forbidden()
-          return finish()
-        } else {
-          adminLogger.info("admin access: $method: $path with $query by $ip")
-        }
-      }
-
-      else -> {
-        adminLogger.warn("unauthorized admin access: $method: $path with $query by $ip")
-        badRequest()
-        return finish()
-      }
+    val token = this.token
+    if (token == null) {
+      adminLogger.warn("unauthorized admin access: $method: $path by $ip")
+      forbidden()
+      return finish()
     }
+    if (!verifyAdminToken(token, adminToken)) {
+      adminLogger.warn("failed authorized access: $method: $path by $ip")
+      forbidden()
+      return finish()
+    }
+    adminLogger.info("admin access: $method: $path by $ip")
   }
 }

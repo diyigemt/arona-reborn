@@ -24,5 +24,9 @@ mongodb:
   db: ""
 web:
   port: 12355
+  # CORS 白名单 host (不带 scheme), 例如 ["arona.example.com"]. 留空表示允许任意 host (仅开发期使用).
+  allowedOrigins: []
+  # 仅在确实部署在 nginx 等反向代理之后时设为 true, 否则 X-Forwarded-* / X-Real-IP 会被任意伪造.
+  behindProxy: false
 superAdminUid: []
 debug: false

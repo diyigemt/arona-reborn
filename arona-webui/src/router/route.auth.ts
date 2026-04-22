@@ -1,8 +1,8 @@
-// 需要鉴权的业务路由
+// 需要鉴权的业务路由 (走 router.beforeEach 守卫拦截).
 import { RouteRecordRaw } from "vue-router";
 import ConfigRoutes from "@/router/config";
 
-const asyncRoutes: Array<RouteRecordRaw> = [
+const authRoutes: Array<RouteRecordRaw> = [
   {
     path: "/",
     redirect: "/login",
@@ -19,4 +19,4 @@ const asyncRoutes: Array<RouteRecordRaw> = [
   ...ConfigRoutes,
 ];
 
-export default asyncRoutes;
+export default authRoutes;

@@ -7,7 +7,8 @@ import io.ktor.server.request.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 import kotlinx.serialization.json.Json
@@ -60,14 +61,18 @@ fun String.toInstant() =
   replace(" ", "T").toLocalDateTime().toInstant(TimeZone.currentSystemDefault())
 
 
-private val cpuPool = CoroutineScope(Job() + Dispatchers.Default)
-private val ioPool = CoroutineScope(Job() + Dispatchers.IO)
-fun runCpuSuspend(block: suspend () -> Unit) = cpuPool.launch {
-  block()
-}
+// 用 SupervisorJob 让单个子协程异常不会牵连整个池;
+// 进程退出时由 [closeAronaPools] 显式取消, 避免长生命周期下的协程泄漏.
+private val cpuPool = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+private val ioPool = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-fun runSuspend(block: suspend () -> Unit) = ioPool.launch {
-  block()
+fun runCpuSuspend(block: suspend () -> Unit) = cpuPool.launch { block() }
+
+fun runSuspend(block: suspend () -> Unit) = ioPool.launch { block() }
+
+fun closeAronaPools() {
+  cpuPool.cancel("ApplicationStopping")
+  ioPool.cancel("ApplicationStopping")
 }
 
 val PipelineContext<Unit, ApplicationCall>.isJsonPost

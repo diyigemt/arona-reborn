@@ -26,8 +26,10 @@ const useBaseStore = defineStore({
       this.user = user;
     },
   },
+  // 仅持久化 user 字段; token 留在内存, 页面刷新后必须重新登录, 避免 XSS 通过 localStorage 拿走 token.
   persist: {
     key: "base",
+    paths: ["user"],
   },
 });
 export default useBaseStore;

@@ -26,7 +26,9 @@ export interface IResponse<T = any, D = any> extends AxiosResponse<T, D> {
 export interface ServerResponse<T> {
   code: number;
   message: string;
-  data: T;
+  data: T | null;
+  // 仅服务异常时下发, 用于追踪日志.
+  traceId?: string | null;
 }
 export interface ApiServiceAdapter {
   upload(url: string, file: FormData | File): Promise<ServerResponse<string>>;

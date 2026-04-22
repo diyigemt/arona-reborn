@@ -1,14 +1,15 @@
 import { createRouter, createWebHistory, Router, RouteRecordRaw } from "vue-router";
 import NProgress from "nprogress";
 import exceptionRoutes from "@/router/route.exception";
-import asyncRoutes from "@/router/route.async";
+import authRoutes from "@/router/route.auth";
 import commonRoutes from "@/router/route.common";
+import useBaseStore from "@/store/base";
 
 const routes: Array<RouteRecordRaw> = [
   // 无鉴权的业务路由 ex:登录
   ...commonRoutes,
   // 带鉴权的业务路由
-  ...asyncRoutes,
+  ...authRoutes,
   // 异常页必须放在路由匹配规则的最后
   ...exceptionRoutes,
 ];
@@ -19,19 +20,22 @@ const router: Router = createRouter({
   routes,
 });
 
+const publicPathSet = new Set(commonRoutes.map((route) => route.path));
+
 /**
- * @description: 全局路由前置守卫，在进入路由前触发，导航在所有守卫 resolve 完之前一直处于等待中。
- * @param { RouteLocationNormalized } to  即将要进入的目标
- * @param { RouteLocationNormalizedLoaded } from  当前导航正在离开的路由
- * @return {*}
+ * 全局路由前置守卫: 设页面标题 + 鉴权重定向.
+ * 未持有 token 且访问的不是公共路径时, 直接跳转到 /login, 避免后端 401 才发现.
  */
-router.beforeEach((to, from) => {
-  // console.log("全局路由前置守卫：to,from\n", to, from);
-  // 设置页面标题
+router.beforeEach((to) => {
   document.title = (to.meta.title as string) || import.meta.env.VITE_APP_TITLE;
   if (!NProgress.isStarted()) {
     NProgress.start();
   }
+  if (!publicPathSet.has(to.path) && !useBaseStore().token) {
+    NProgress.done();
+    return { path: "/login" };
+  }
+  return true;
 });
 
 router.afterEach((to, from) => {

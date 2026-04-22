@@ -23,7 +23,6 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.declaredFunctions
 
@@ -68,7 +67,9 @@ private constructor(private val config: TencentBotConfig) :
   override val logger = KtorSimpleLogger("Bot.$id")
   override val eventChannel =
     GlobalEventChannel.filterIsInstance<TencentBotEvent>().filter { it.bot === this@TencentBotClient }
-  override val coroutineContext: CoroutineContext = EmptyCoroutineContext + CoroutineName("Bot.${config.appId}")
+  // SupervisorJob 让 token 刷新等子任务异常不会传染整个 bot; bot.close() 通过 cancel() 收尾.
+  override val coroutineContext: CoroutineContext =
+    SupervisorJob() + Dispatchers.IO + CoroutineName("Bot.${config.appId}")
   override val guilds: ContactList<Guild> = GuildContactList { EmptyGuildImpl(this, it) }
   override val groups: ContactList<Group> = GroupContactList { EmptyGroupImpl(this, it) }
   override val friends: ContactList<FriendUser> = SingleUserContactList { EmptyFriendUserImpl(this, it) }
@@ -131,24 +132,30 @@ private constructor(private val config: TencentBotConfig) :
 
   private fun updateAccessToken() {
     accessTokenHeartbeatTask?.cancel("timeout")
-    accessTokenHeartbeatTask = launch(SupervisorJob()) {
+    accessTokenHeartbeatTask = launch(CoroutineName("BotTokenRefresh")) {
+      // 失败连续 3 次后真正退出循环并 close 整个 bot, 避免无限 delay 浪费协程.
+      // 失败间隔走指数退避, 防止瞬间打爆腾讯接口.
+      val retryBackoff = longArrayOf(5_000L, 15_000L, 45_000L)
       var retryCount = 0
       while (true) {
-        if (retryCount >= 3) {
-          logger.error("get access token failed after 3 retry. abort bot.")
+        if (retryCount >= retryBackoff.size) {
+          logger.error("get access token failed after ${retryBackoff.size} retries, aborting bot.")
           this@TencentBotClient.close()
+          return@launch
         }
         val data = getAccessToken()
         if (data == null) {
+          delay(retryBackoff[retryCount])
           retryCount++
-        } else {
-          accessTokenLock.withLock {
-            accessToken = data.accessToken
-          }
-          TencentBotAuthSuccessEvent(this@TencentBotClient, data).broadcast()
+          continue
         }
-        // 快过期的60s内申请会刷新token
-        delay(((data?.expiresIn?.minus(30)) ?: 1) * 1000L)
+        retryCount = 0
+        accessTokenLock.withLock {
+          accessToken = data.accessToken
+        }
+        TencentBotAuthSuccessEvent(this@TencentBotClient, data).broadcast()
+        // 快过期的 60s 内申请会刷新 token; 距离过期至少留 30s 缓冲.
+        delay((data.expiresIn - 30).coerceAtLeast(1) * 1000L)
       }
     }
   }
@@ -290,6 +297,8 @@ private constructor(private val config: TencentBotConfig) :
     websocketHeartbeatTask?.cancel()
     accessTokenHeartbeatTask?.cancel()
     client.close()
+    // 同步取消整个 bot scope, 防止 close 后仍有人 launch 出新的子任务.
+    coroutineContext.cancel()
   }
 }
 

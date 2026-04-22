@@ -6,7 +6,9 @@ import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.utils.apiLogger
 import com.diyigemt.arona.utils.badRequest
 import com.diyigemt.arona.utils.success
+import com.diyigemt.arona.utils.unauthorized
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.request.contentLength
 import io.ktor.server.request.header
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
@@ -74,31 +76,48 @@ internal data class TencentWebhookVerifyResp(
   val signature: String,
 )
 
+internal const val MaxWebhookBodyBytes = 64L * 1024L
+
+/**
+ * 严格 hex 解析: 奇数长度或包含非十六进制字符返回 null. 空串返回空数组 (验签必失败).
+ */
+internal fun parseHexOrNull(hex: String): ByteArray? {
+  if (hex.length % 2 != 0) return null
+  val data = ByteArray(hex.length / 2)
+  for (i in hex.indices step 2) {
+    val high = Character.digit(hex[i], 16)
+    val low = Character.digit(hex[i + 1], 16)
+    if (high < 0 || low < 0) return null
+    data[i / 2] = ((high shl 4) + low).toByte()
+  }
+  return data
+}
+
 @AronaBackendEndpoint("/webhook")
 @Suppress("unused")
 object WebhookEndpoint {
   private val json = Json {
     ignoreUnknownKeys = true
   }
-  private fun hexStringToByteArray(hex: String): ByteArray {
-    val len = hex.length
-    val data = ByteArray(len / 2)
-    for (i in 0 until len step 2) {
-      data[i / 2] = ((Character.digit(hex[i], 16) shl 4) + Character.digit(hex[i + 1], 16)).toByte()
-    }
-    return data
-  }
+
   @OptIn(ExperimentalStdlibApi::class)
   @AronaBackendEndpointPost("")
   suspend fun PipelineContext<Unit, ApplicationCall>.webhook() {
-    val sign = request.header("x-signature-ed25519") ?: "" // 服务器传入的sign
-    val ts = request.header("x-signature-timestamp") ?: "" // 服务器传入的ts
+    val sign = request.header("x-signature-ed25519") ?: return unauthorized()
+    val ts = request.header("x-signature-timestamp") ?: return unauthorized()
+    // 强制 Content-Length, 拒绝 chunked: 否则攻击者可绕过预检直接占用内存.
+    val declared = request.contentLength() ?: return badRequest()
+    if (declared <= 0L || declared > MaxWebhookBodyBytes) return badRequest()
+    val signBytes = parseHexOrNull(sign) ?: return badRequest()
     val body = context.receiveText()
-    val verify = (BotManager.getBot() as TencentBotClient)
-      .webHookVerify((ts + body).toByteArray(), hexStringToByteArray(sign))
-    if (!verify) {
-      apiLogger.warn("webhook data verify failed.")
+    if (body.toByteArray(Charsets.UTF_8).size > MaxWebhookBodyBytes) {
       return badRequest()
+    }
+    val verify = (BotManager.getBot() as TencentBotClient)
+      .webHookVerify((ts + body).toByteArray(Charsets.UTF_8), signBytes)
+    if (!verify) {
+      apiLogger.warn("webhook signature verify failed.")
+      return unauthorized()
     }
     val preData = json.decodeFromString<TencentWebhookPayload0>(body)
     if (preData.operation == TencentWebhookOperationType.WebhookVerify) {
@@ -107,12 +126,11 @@ object WebhookEndpoint {
         TencentWebhookVerifyResp(
           data.data.plainToken,
           (BotManager.getBot() as TencentBotClient).webHookSign(
-            (data.data.eventTs + data.data.plainToken).toByteArray()
+            (data.data.eventTs + data.data.plainToken).toByteArray(Charsets.UTF_8)
           ).toHexString()
         )
       )
     }
-    // 处理消息
     (BotManager.getBot() as TencentBotClient).dispatchWebhookEvent(body)
     return success()
   }

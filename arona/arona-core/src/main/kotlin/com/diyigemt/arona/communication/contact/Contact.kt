@@ -29,6 +29,18 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.random.Random
+
+/**
+ * 命中 [com.diyigemt.arona.communication.MessageDuplicationException] 后计算重放用的 messageSequence.
+ *
+ * 只偏移 `current + 1..4`——腾讯 msg_seq 空间较小, 大跨度偏移会落到合法序列之外直接报错, 或撞上同 sender
+ * 已经分配出去的下一条消息的序号. 这是一个止血方案; 要做到并发下严格不冲突, 需要把 sender 的原子序号分配器
+ * 沿调用链透传给 retry 路径.
+ *
+ * 独立成函数以便单测其边界 (反证: 回退到 `current + (100..1000).random()` 时测试必失败).
+ */
+internal fun computeMessageDuplicationRetrySequence(current: Int): Int = current + Random.nextInt(1, 5)
 
 interface Contact : CoroutineScope {
   val bot: TencentBot // 与之关联的bot
@@ -156,8 +168,9 @@ internal abstract class AbstractContact(
     }
     var result = send(messageSequence)
     if (result.exceptionOrNull() is MessageDuplicationException) {
-      // 重放一次
-      result = send(messageSequence + (100 .. 1000).random())
+      // 止血式重放: 腾讯 msg_seq 空间较小, 旧实现的 +100..1000 偏移极易越界或撞到别的合法序列.
+      // 真正避免与同 sender 的并发序列冲突, 要把 retry 序列分配器从上层透传下来 (待后续任务).
+      result = send(computeMessageDuplicationRetrySequence(messageSequence))
     }
     val res = result.getOrNull()?.toMessageReceipt() as MessageReceipt<C>?
     // 成功与失败统一 broadcast post-send; 广播自身异常仅记录, 不污染 send 主语义的返回值; 取消例外透传.

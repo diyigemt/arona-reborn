@@ -18,6 +18,7 @@ import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.qualifiedNameOrTip
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import kotlinx.coroutines.CoroutineScope
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -30,7 +31,19 @@ interface CommandSender : CoroutineScope {
   val user: User?
   val sourceId: String
   val eventId: String?
-  var messageSequence: Int // 消息序列, 回复同一条sourceId时自增, 从1开始
+  /**
+   * 消息序列, 回复同一条 sourceId 时自增, 从 1 开始.
+   *
+   * 仅保留 getter/setter 以避免已编译插件的 ABI 断裂; 内部发送路径请改走 [nextSequence] 获取原子递增值.
+   * 直接写 `messageSequence++` 仍然是 read-modify-write, 无法避免并发 lost update.
+   */
+  var messageSequence: Int
+
+  /**
+   * 原子地取得当前序号并自增, 返回值就是本次发送应使用的 messageSequence.
+   * 替代旧写法 `.sendMessage(..., messageSequence).also { messageSequence++ }` 中易丢增量的组合.
+   */
+  fun nextSequence(): Int
 
   suspend fun sendMessage(message: String) = sendMessage(PlainText(message))
   suspend fun sendMessage(message: Message): MessageReceipt<Contact>?
@@ -60,6 +73,18 @@ sealed class AbstractCommandSender() : CommandSender {
   override val sourceId: String
     get() = _sourceId
   internal val kType = this::class.starProjectedType
+
+  /**
+   * 真正的序列计数器, 由子类提供独立实例——各 sender 之间互不干扰, 同 sender 内用 atomic 保证并发正确.
+   */
+  protected abstract val messageSequenceRef: AtomicInteger
+  final override var messageSequence: Int
+    get() = messageSequenceRef.get()
+    set(value) {
+      messageSequenceRef.set(value)
+    }
+  final override fun nextSequence(): Int = messageSequenceRef.getAndIncrement()
+
   internal fun setSourceId(n: String) {
     _sourceId = n
   }
@@ -159,13 +184,11 @@ class FriendUserCommandSender internal constructor(
   override val eventId: String? = null,
 ) : AbstractUserCommandSender(sourceId), CoroutineScope by user.childScope("FriendUserCommandSender") {
   override val subject get() = user
-  override var messageSequence: Int = 1
+  override val messageSequenceRef: AtomicInteger = AtomicInteger(1)
 
   @Suppress("unchecked_cast")
   override suspend fun sendMessage(message: Message): MessageReceipt<FriendUser>? =
-    user
-      .sendMessage(message.toMessageChain(sourceId, eventId), messageSequence)
-      .also { messageSequence++ } as MessageReceipt<FriendUser>?
+    user.sendMessage(message.toMessageChain(sourceId, eventId), nextSequence()) as MessageReceipt<FriendUser>?
 }
 
 /**
@@ -178,12 +201,11 @@ class GroupCommandSender internal constructor(
 ) : AbstractUserCommandSender(sourceId), CoroutineScope by user.childScope("GroupCommandSender") {
   override val subject get() = user.group
   val group get() = user.group
-  override var messageSequence: Int = 1
+  override val messageSequenceRef: AtomicInteger = AtomicInteger(1)
+
   @Suppress("unchecked_cast")
   override suspend fun sendMessage(message: Message): MessageReceipt<Group>? =
-    subject
-      .sendMessage(message.toMessageChain(sourceId, eventId), messageSequence)
-      .also { messageSequence++ } as MessageReceipt<Group>?
+    subject.sendMessage(message.toMessageChain(sourceId, eventId), nextSequence()) as MessageReceipt<Group>?
 }
 
 /**
@@ -197,12 +219,11 @@ class GuildChannelCommandSender internal constructor(
   override val subject get() = user.channel
   val channel get() = user.channel
   val guild get() = user.guild
-  override var messageSequence: Int = 1
+  override val messageSequenceRef: AtomicInteger = AtomicInteger(1)
+
   @Suppress("unchecked_cast")
   override suspend fun sendMessage(message: Message): MessageReceipt<Channel>? =
-    subject
-      .sendMessage(message.toMessageChain(sourceId, eventId), messageSequence)
-      .also { messageSequence++ } as MessageReceipt<Channel>?
+    subject.sendMessage(message.toMessageChain(sourceId, eventId), nextSequence()) as MessageReceipt<Channel>?
 }
 
 /**
@@ -215,12 +236,11 @@ class GuildUserCommandSender internal constructor(
 ) : AbstractUserCommandSender(sourceId), CoroutineScope by user.childScope("GuildUserCommandSender") {
   override val subject get() = user.guild
   val guild get() = user.guild
-  override var messageSequence: Int = 1
+  override val messageSequenceRef: AtomicInteger = AtomicInteger(1)
+
   @Suppress("unchecked_cast")
   override suspend fun sendMessage(message: Message): MessageReceipt<GuildMember>? =
-    user
-      .sendMessage(message.toMessageChain(sourceId, eventId), messageSequence)
-      .also { messageSequence++ } as MessageReceipt<GuildMember>?
+    user.sendMessage(message.toMessageChain(sourceId, eventId), nextSequence()) as MessageReceipt<GuildMember>?
 }
 
 object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
@@ -230,7 +250,7 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
   override val user: User? = null
   override val eventId: String? = null
 
-  override var messageSequence: Int = 1
+  override val messageSequenceRef: AtomicInteger = AtomicInteger(1)
   override suspend fun sendMessage(message: Message): MessageReceipt<Contact>? {
     commandLineLogger.info(message.serialization())
     TODO()

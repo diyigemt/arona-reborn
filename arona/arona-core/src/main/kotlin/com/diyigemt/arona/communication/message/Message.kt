@@ -11,9 +11,11 @@ import io.ktor.http.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
 import java.util.concurrent.ConcurrentLinkedQueue
 
 internal class TencentMessageIntentsBuilder {
@@ -497,6 +499,15 @@ interface TencentResource {
 @Serializable
 sealed class TencentMarkdown
 
+// Sprint 2.3: markdown 序列化走 bracket + JSON 格式. 把内容/结构交给 kotlinx.serialization 转义,
+// 避免自己发明一套会跟 markdown 语法 (`\n`, `]`, `:`) 撞车的小语法.
+// 约定与 MessageChainAsStringSerializer 的 lossy 契约一致: 反序列化可读, 不保证还原结构类型.
+private val TencentMarkdownSerializationJson = Json {
+  encodeDefaults = true
+}
+private const val TencentCustomMarkdownSerializationPrefix = "[tencent:markdown:custom:"
+private const val TencentTemplateMarkdownSerializationPrefix = "[tencent:markdown:template:"
+
 @Serializable
 data class TencentCustomMarkdown(
   var content: String,
@@ -538,7 +549,8 @@ data class TencentCustomMarkdown(
   }
 
   override fun serialization(): String {
-    TODO("Not yet implemented")
+    val escaped = TencentMarkdownSerializationJson.encodeToString(String.serializer(), content)
+    return "$TencentCustomMarkdownSerializationPrefix$escaped]"
   }
 
   companion object {
@@ -557,7 +569,8 @@ data class TencentTemplateMarkdown(
       this(id, TencentMarkdownParam.Companion.TencentMarkdownParamBuilder().apply(block).build())
 
   override fun serialization(): String {
-    TODO("Not yet implemented")
+    val encoded = TencentMarkdownSerializationJson.encodeToString(serializer(), this)
+    return "$TencentTemplateMarkdownSerializationPrefix$encoded]"
   }
 }
 
@@ -769,6 +782,28 @@ data class TencentRichMessage @OptIn(ExperimentalSerializationApi::class) constr
 
 private val lfSimplified = Regex("^\n\n")
 
+// Sprint 2.3: 反向映射 TencentMessage → Message 元素的共享 helper. TencentMessageBuilder 和
+// MessageChainBuilder 都需要把收到的 TencentMessage 展开成链上的结构消息, 逻辑重复, 抽成 helper.
+// 选型说明: 图片反向用 TencentGuildImage——和 TencentMessageBuilder.build() 的正向分派契约对齐
+// (TencentGuildImage → IMAGE type, url 字段), 再 build 能 round-trip 回等价 TencentGroupMessage.
+// TencentOfflineImage / TencentGuildLocalImage 依赖文件上传状态, 无法从 url 字段复原.
+private fun MutableList<Message>.appendTencentImageFromUrl(url: String?) {
+  if (!url.isNullOrBlank()) add(TencentGuildImage(url))
+}
+
+private fun MutableList<Message>.appendTencentMarkdown(markdown: TencentMarkdown?) {
+  // TencentMarkdown 自身非 Message, 但两个具体子类都实现 Message. 用 smart cast 分支 add.
+  when (markdown) {
+    is TencentCustomMarkdown -> add(markdown)
+    is TencentTemplateMarkdown -> add(markdown)
+    null -> Unit
+  }
+}
+
+// 注意: keyboard 反向映射暂不实现——TencentTempleKeyboard / TencentCustomKeyboard 的 serialization()
+// 仍是 TODO(), 若把 keyboard 吸收进链再调 chain.serialization() 会立即炸. 反向映射等下一轮和
+// keyboard.serialization 补齐一起做.
+
 class TencentMessageBuilder private constructor(
   private val container: MutableList<Message>,
   private val messageSequence: Int = 1,
@@ -804,37 +839,49 @@ class TencentMessageBuilder private constructor(
     container.addAll(element)
   }
 
+  private fun absorbSource(message: TencentMessage) {
+    sourceMessageId = message.messageId ?: sourceMessageId
+    eventId = message.eventId ?: eventId
+  }
+
   fun append(message: TencentGroupMessage) = this.apply {
+    absorbSource(message)
+    if (message.content.isNotBlank()) container.add(PlainText(message.content))
     when (message.messageType) {
-      TencentMessageType.PLAIN_TEXT -> {
-        append(PlainText(message.content))
+      TencentMessageType.PLAIN_TEXT -> Unit // content 已追加
+      TencentMessageType.IMAGE -> container.appendTencentImageFromUrl(message.image)
+      TencentMessageType.MARKDOWN -> {
+        container.appendTencentMarkdown(message.markdown)
       }
-
-      TencentMessageType.IMAGE -> {
-        if (message.image != null) {
-          append(TencentOfflineImage("", "", 0L, message.image!!))
-        }
-      }
-
-      else -> {}
+      // FILE 只带 media.fileInfo, 没有可逆的 URL 或文件字节表达, 当前 Message 层也没有对应的结构类型;
+      // 伪造 image/offlineImage 会让后续 build() 误当 IMAGE 发出, 故直接 skip.
+      TencentMessageType.FILE -> Unit
+      // ARK / EMBED 当前 Message 层无对应结构消息, 待后续扩展.
+      TencentMessageType.ARK, TencentMessageType.EMBED -> Unit
     }
   }
 
   fun append(message: TencentGuildMessage) = this.apply {
-    // TODO
+    // Guild 消息没有 msg_type 枚举, 所有字段并列可同时出现. 逐字段展开即可.
+    absorbSource(message)
+    if (message.content.isNotBlank()) container.add(PlainText(message.content))
+    container.appendTencentImageFromUrl(message.image)
+    container.appendTencentMarkdown(message.markdown)
   }
 
   fun append(message: TencentMessage) = this.apply {
+    // 分派到具体子类版本; 两个子类各自 absorbSource + 按字段展开, 此处不再重复 absorb.
     when (message) {
       is TencentGuildMessage -> append(message)
       is TencentGroupMessage -> append(message)
     }
-    // TODO
   }
 
-  // TODO
   fun append(other: TencentMessageBuilder) = this.apply {
-    other.build().also { append(it) }
+    // other 的 build() 可能丢失尚未落地的 source/eventId 上下文, 故直接沿用 other 已积累的容器元素.
+    container.addAll(other.container)
+    sourceMessageId = other.sourceMessageId ?: sourceMessageId
+    eventId = other.eventId ?: eventId
   }
 
   // TODO build其他类型消息
@@ -962,12 +1009,30 @@ class MessageChainBuilder private constructor(
   }
 
   fun append(message: TencentMessage) = this.apply {
-    //TODO
+    sourceMessageId = message.messageId ?: sourceMessageId
+    eventId = message.eventId ?: eventId
+    if (message.content.isNotBlank()) container.add(PlainText(message.content))
+    when (message) {
+      is TencentGuildMessage -> {
+        container.appendTencentImageFromUrl(message.image)
+        container.appendTencentMarkdown(message.markdown)
+      }
+      is TencentGroupMessage -> when (message.messageType) {
+        TencentMessageType.PLAIN_TEXT -> Unit
+        TencentMessageType.IMAGE -> container.appendTencentImageFromUrl(message.image)
+        TencentMessageType.MARKDOWN -> {
+          container.appendTencentMarkdown(message.markdown)
+        }
+        // FILE / ARK / EMBED 在当前 Message 层无对应结构, 与 TencentMessageBuilder 保持一致不追加.
+        TencentMessageType.FILE, TencentMessageType.ARK, TencentMessageType.EMBED -> Unit
+      }
+    }
   }
 
-  // TODO
   fun append(other: TencentMessageBuilder) = this.apply {
-//    other.build().also { append(it) }
+    // TencentMessageBuilder 的内部 container 属 private, 跨类不可直取. 反向展开走 build() 产出的
+    // TencentMessage 再按类型分派即可——append(TencentMessage) 内部已做 absorbSource + 字段展开.
+    append(other.build())
   }
 
   operator fun plus(other: Message) = this.append(other)

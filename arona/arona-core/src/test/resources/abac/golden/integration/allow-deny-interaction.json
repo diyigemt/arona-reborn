@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "allow_match_no_deny_allow",
+      "description": "allow 命中, deny 不命中 -> Permit",
+      "policies": [
+        {
+          "id": "allow.p", "name": "allow", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ] }
+          ]
+        },
+        {
+          "id": "deny.p", "name": "deny", "effect": "DENY",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "Equal", "key": "id", "value": "r.blocked" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u1" }, "action": {}, "resource": { "id": "r.ok" }, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "allow_match_deny_match_deny",
+      "description": "allow 和 deny 同时命中 -> deny 优先",
+      "policies": [
+        {
+          "id": "allow.p", "name": "allow", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ] }
+          ]
+        },
+        {
+          "id": "deny.p", "name": "deny", "effect": "DENY",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "Equal", "key": "id", "value": "r.blocked" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u1" }, "action": {}, "resource": { "id": "r.blocked" }, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "no_allow_deny",
+      "description": "allow 未命中 -> deny (NotAuthorizedException)",
+      "policies": [
+        {
+          "id": "allow.p", "name": "allow", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u99" }, "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "multi_allow_second_matches",
+      "description": "多条 allow policy 第二条命中即可",
+      "policies": [
+        {
+          "id": "allow.a", "name": "allow a", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u0" } ] }
+          ]
+        },
+        {
+          "id": "allow.b", "name": "allow b", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u1" }, "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    }
+  ]
+}

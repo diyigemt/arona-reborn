@@ -28,6 +28,16 @@ tasks.withType<Tar> {
 }
 tasks.withType<Test> {
   workingDir = projectDir.resolve("sandbox")
+  doFirst {
+    workingDir.mkdirs()
+    val configFile = workingDir.resolve("config.yaml")
+    if (!configFile.exists()) {
+      configFile.writeText(
+        projectDir.resolve("config_template.yaml").readText(Charsets.UTF_8),
+        Charsets.UTF_8,
+      )
+    }
+  }
 }
 tasks.withType<Zip> {
   duplicatesStrategy = DuplicatesStrategy.WARN

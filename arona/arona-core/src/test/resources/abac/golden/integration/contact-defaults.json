@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "contact_admin_any_resource_allow",
+      "description": "管理员角色 (role.admin) 对任意资源 -> allow",
+      "policies": [
+        {
+          "id": "policy.admin", "name": "管理员权限", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.admin" },
+                { "type": "Resource", "operator": "IsChild", "key": "id", "value": "*" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u.admin", "roles": ["role.admin"] },
+        "action": { "type": "effect" },
+        "resource": { "id": "buildIn.owner:manage.user" },
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "contact_member_owner_resource_deny",
+      "description": "普通成员访问 buildIn.owner:* 资源 -> deny policy 命中 -> deny",
+      "policies": [
+        {
+          "id": "policy.default.allow", "name": "成员允许", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.default" },
+                { "type": "Resource", "operator": "IsChild", "key": "id", "value": "*" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "policy.default.deny", "name": "成员禁止 owner", "effect": "DENY",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.owner:*" }
+              ],
+              "children": [
+                {
+                  "groupType": "NOT_ALL",
+                  "rule": [
+                    { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.admin" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u.member", "roles": ["role.default"] },
+        "action": { "type": "effect" },
+        "resource": { "id": "buildIn.owner:admin" },
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "contact_member_regular_resource_allow",
+      "description": "普通成员访问 com.diyigemt.arona:* 资源 -> allow 匹配, deny 未命中",
+      "policies": [
+        {
+          "id": "policy.default.allow", "name": "成员允许", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.default" },
+                { "type": "Resource", "operator": "IsChild", "key": "id", "value": "*" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "policy.default.deny", "name": "成员禁止 owner", "effect": "DENY",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.owner:*" }
+              ],
+              "children": [
+                {
+                  "groupType": "NOT_ALL",
+                  "rule": [
+                    { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.admin" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u.member", "roles": ["role.default"] },
+        "action": { "type": "effect" },
+        "resource": { "id": "com.diyigemt.arona:command.call_me" },
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "contact_admin_owner_resource_allow",
+      "description": "admin 角色访问 owner 资源: deny 规则的 NOT_ALL(含 admin) -> false, 整条 deny 不命中 -> allow",
+      "policies": [
+        {
+          "id": "policy.admin", "name": "管理员权限", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.admin" },
+                { "type": "Resource", "operator": "IsChild", "key": "id", "value": "*" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "policy.default.deny", "name": "成员禁止 owner", "effect": "DENY",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.owner:*" }
+              ],
+              "children": [
+                {
+                  "groupType": "NOT_ALL",
+                  "rule": [
+                    { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.admin" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u.admin", "roles": ["role.admin"] },
+        "action": { "type": "effect" },
+        "resource": { "id": "buildIn.owner:admin" },
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "contact_no_role_resource_deny",
+      "description": "subject 没有任何角色 -> allow 未命中 -> deny",
+      "policies": [
+        {
+          "id": "policy.default.allow", "name": "成员允许", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.default" },
+                { "type": "Resource", "operator": "IsChild", "key": "id", "value": "*" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "ghost", "roles": [] },
+        "action": { "type": "effect" },
+        "resource": { "id": "com.diyigemt.arona:command.call_me" },
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    }
+  ]
+}

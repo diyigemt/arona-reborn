@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "ischild_same_length_exact_mismatch_deny",
+      "description": "'a.b' vs 'a.c', 无通配, 段数相同 -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a.b" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "a.c" }, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_left_longer_no_wildcard_deny",
+      "description": "'a' vs 'a.b': 左值更长但右值无通配 -> 按当前 warden 语义 false",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "a.b" }, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_right_wildcard_left_shorter_deny",
+      "description": "'a.b.*' 右值段数 > 左值段数 -> false",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a.b.*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "a" }, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_right_wildcard_left_equal_prefix_allow",
+      "description": "'a.*' 右值最后为通配 -> 匹配前缀 'a'",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a.*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "a.b.c" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_colon_wildcard_ns_allow",
+      "description": "'x.y:*' 主段等宽, 第二段为 '*' -> 匹配同命名空间",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "x.y:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "x.y:anything" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_colon_wildcard_ns_other_deny",
+      "description": "'x.y:*' 不匹配 'x.z:anything'",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "x.y:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "x.z:anything" }, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_two_colon_sections_allow",
+      "description": "双冒号: 'a:b:*' 匹配 'a:b:any'",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a:b:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "a:b:cmd" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    }
+  ]
+}

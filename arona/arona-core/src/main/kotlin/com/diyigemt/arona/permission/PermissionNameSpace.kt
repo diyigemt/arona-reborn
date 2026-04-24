@@ -1,15 +1,16 @@
 package com.diyigemt.arona.permission
 
-import codes.laurence.warden.AccessRequest
-import codes.laurence.warden.atts.HasAtts
-import codes.laurence.warden.enforce.EnforcementPointDefault
 import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactMember.Companion.toPermissionSubject
 import com.diyigemt.arona.database.permission.Policy
-import com.diyigemt.arona.database.permission.Policy.Companion.BuildInAllowPolicy
-import com.diyigemt.arona.database.permission.Policy.Companion.BuildInDenyPolicy
-import com.diyigemt.arona.database.permission.Policy.Companion.build
+import com.diyigemt.arona.database.permission.Policy.Companion.BuildInDenyPolicySchema
 import com.diyigemt.arona.database.permission.PolicyNodeEffect
+import com.diyigemt.arona.permission.abac.AbacRequest
+import com.diyigemt.arona.permission.abac.Decision
+import com.diyigemt.arona.permission.abac.cache.PolicyCompileCache
+import com.diyigemt.arona.permission.abac.eval.PolicyEvaluator
+import com.diyigemt.arona.permission.abac.extract.toAttrs
+import com.diyigemt.arona.utils.commandLineLogger
 
 interface PermissionNameSpace {
   fun permissionId(name: String): PermissionId
@@ -30,7 +31,7 @@ interface Permission {
   companion object {
     data class Resource(
       val id: String,
-    ) : HasAtts()
+    )
 
     val RootPermission = PermissionImpl(PermissionId("*", "*"), "The root permission").also { it.parent = it }
     fun Permission.fullPermissionId(): String {
@@ -54,34 +55,33 @@ interface Permission {
       policies: List<Policy>,
       environment: Map<String, Any?> = mapOf(),
     ): Boolean {
+      val permissionId = fullPermissionId()
       val allow = policies
         .filter { it.effect == PolicyNodeEffect.ALLOW }
-        .map { it.build() }
-        .flatten()
-        .toMutableList()
-        .apply {
-//          add(BuildInAllowPolicy)
-        }
-      // 添加常驻禁止策略
+        .flatMap { PolicyCompileCache.getOrCompile(it) }
       val deny = policies
         .filter { it.effect == PolicyNodeEffect.DENY }
-        .map { it.build() }
-        .flatten()
+        .flatMap { PolicyCompileCache.getOrCompile(it) }
         .toMutableList()
-        .apply {
-          add(BuildInDenyPolicy)
-        }
-      return runCatching {
-        EnforcementPointDefault(allow, deny).enforceAuthorization(
-          AccessRequest(
-            subject = subject.toPermissionSubject().atts(),
-            action = mapOf("type" to "effect"),
-            resource = Resource(fullPermissionId()).atts(),
-            environment = environment
+        .apply { addAll(PolicyCompileCache.getOrCompile(BuildInDenyPolicySchema)) }
+
+      val req = AbacRequest(
+        subject = subject.toPermissionSubject().toAttrs(),
+        action = mapOf("type" to "effect"),
+        resource = Resource(permissionId).toAttrs(),
+        environment = environment,
+      )
+      return when (val decision = PolicyEvaluator.evaluate(allow, deny, req)) {
+        is Decision.Permit -> true
+        is Decision.Deny -> {
+          commandLineLogger.info(
+            "abac ${decision.kind} subjectId=${subject.id} " +
+                "roles=${subject.roles.joinToString(",")} permission=$permissionId " +
+                "reason=${decision.reason}"
           )
-        )
-        true
-      }.getOrDefault(false)
+          false
+        }
+      }
     }
   }
 }

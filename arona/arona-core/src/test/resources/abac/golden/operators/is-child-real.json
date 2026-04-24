@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "ischild_arona_command_hit",
+      "description": "真实场景: com.diyigemt.arona:* 匹配 call_me 命令",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "com.diyigemt.arona:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "com.diyigemt.arona:command.call_me" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_arona_subcommand_hit",
+      "description": "com.diyigemt.arona:* 匹配深层子命令",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "com.diyigemt.arona:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "com.diyigemt.arona:command.call_me.sub" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_kivotos_plugin_miss",
+      "description": "com.diyigemt.arona:* 不匹配 kivotos 命名空间",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "com.diyigemt.arona:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "com.diyigemt.kivotos:command.list" }, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_buildin_owner_match",
+      "description": "buildIn.owner:* 匹配 buildIn.owner:admin",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.owner:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "buildIn.owner:admin" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_buildin_owner_subcmd_match",
+      "description": "buildIn.owner:* 匹配 buildIn.owner:manage.user",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.owner:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "buildIn.owner:manage.user" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_buildin_different_section_miss",
+      "description": "buildIn.owner:* 不匹配 buildIn.admin:... (点号段不同)",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.owner:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "buildIn.admin:foo" }, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_three_dots_wildcard_match",
+      "description": "a.b.c.* 匹配 a.b.c.x",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a.b.c.*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "a.b.c.x" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_three_dots_wildcard_prefix_mismatch",
+      "description": "a.b.c.* 不匹配 a.b.d.x",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a.b.c.*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "a.b.d.x" }, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_super_match_exact",
+      "description": "buildIn.super:* 匹配 buildIn.super:admin",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.super:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "buildIn.super:admin" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_super_miss_owner",
+      "description": "buildIn.super:* 不匹配 buildIn.owner (第一段 'buildIn.super' vs 'buildIn.owner')",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.super:*" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": { "id": "buildIn.owner:anything" }, "environment": {} },
+      "expected": { "outcome": "deny" }
+    }
+  ]
+}

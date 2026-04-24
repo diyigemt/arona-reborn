@@ -1,5 +1,5 @@
 import service, { simplifiedApiService } from "@/api/http";
-import { Policy, PolicyResource } from "@/interface";
+import { Policy, PolicyPreviewReq, PolicyPreviewResp, PolicyResource } from "@/interface";
 
 function splitAndSort(data: string[]): string[] {
   const groupedData = data.reduce(
@@ -40,5 +40,14 @@ export const PolicyApi = {
       map.splice(0, 0, "*");
       return map;
     });
+  },
+  previewPolicy(req: PolicyPreviewReq) {
+    return simplifiedApiService(
+      service.raw<PolicyPreviewResp>({
+        url: "/policy/preview",
+        method: "POST",
+        data: req,
+      }),
+    );
   },
 };

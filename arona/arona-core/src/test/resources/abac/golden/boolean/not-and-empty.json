@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "empty_all_of_deny",
+      "description": "空 AllOf 在 warden 下 reduce 空集合会抛异常 -> error (BadExpressionException? 实际调用 reduceOrNull 或直接让 AllOf 组合器处理); 当前行为取决于 warden; 先占位为 deny, 实际跑后按基线调整",
+      "policies": [
+        {
+          "id": "policy.empty.all",
+          "name": "empty all",
+          "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL"
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {},
+        "action": {},
+        "resource": {},
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "not_any_of_empty_allow",
+      "description": "Not(AnyOf(empty)) 在 warden 下评估为 allow (空 AnyOf=false, Not 后为 true)",
+      "policies": [
+        {
+          "id": "policy.not.any.empty",
+          "name": "not any empty",
+          "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "NOT_ANY"
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {},
+        "action": {},
+        "resource": {},
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "nested_not_all_of_match_blocks_deny",
+      "description": "Not(AllOf(Subject.id==blocked)): subject 为 blocked 时内层 AllOf=true, Not 后为 false -> 外层 AllOf=false -> deny",
+      "policies": [
+        {
+          "id": "policy.nested.not.all.block",
+          "name": "nested not-all blocks",
+          "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "children": [
+                {
+                  "groupType": "NOT_ALL",
+                  "children": [
+                    {
+                      "groupType": "ALL",
+                      "rule": [
+                        {
+                          "type": "Subject",
+                          "operator": "Equal",
+                          "key": "id",
+                          "value": "user.blocked"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "user.blocked" },
+        "action": {},
+        "resource": {},
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "nested_not_all_of_miss_allow",
+      "description": "Not(AllOf(Subject.id==blocked)): subject 非 blocked 时内层=false, Not 后=true -> 外层 AllOf=true -> allow",
+      "policies": [
+        {
+          "id": "policy.nested.not.all.miss",
+          "name": "nested not-all misses",
+          "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "children": [
+                {
+                  "groupType": "NOT_ALL",
+                  "children": [
+                    {
+                      "groupType": "ALL",
+                      "rule": [
+                        {
+                          "type": "Subject",
+                          "operator": "Equal",
+                          "key": "id",
+                          "value": "user.blocked"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "user.normal" },
+        "action": {},
+        "resource": {},
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    }
+  ]
+}

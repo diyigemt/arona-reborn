@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "equal_resource_id_allow",
+      "description": "Resource.id Equal",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "Equal", "key": "id", "value": "cmd.a" } ] } ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": { "id": "cmd.a" }, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "equal_action_type_deny",
+      "description": "Action.type Equal 不命中",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Action", "operator": "Equal", "key": "type", "value": "delete" } ] } ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": { "type": "effect" }, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "equal_env_string_allow",
+      "description": "Environment.date Equal 命中",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "Equal", "key": "date", "value": "2026-04-24" } ] } ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {}, "environment": { "date": "2026-04-24" }
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "equal_long_vs_string_deny",
+      "description": "Equal 中 Long 与 String 不等 -> deny (warden == 比较, 不同类型不相等)",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "Equal", "key": "n", "value": "42" } ] } ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {}, "environment": { "n": 42 }
+      },
+      "expected": { "outcome": "deny" }
+    }
+  ]
+}

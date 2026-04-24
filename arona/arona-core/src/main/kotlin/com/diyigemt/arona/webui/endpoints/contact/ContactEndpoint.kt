@@ -16,6 +16,7 @@ import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMI
 import com.diyigemt.arona.database.permission.ContactRole.Companion.PROTECTED_ROLE_ID
 import com.diyigemt.arona.database.permission.Policy.Companion.PROTECTED_POLICY_ID
 import com.diyigemt.arona.database.withCollection
+import com.diyigemt.arona.permission.abac.cache.PolicyCompileCache
 import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
@@ -340,7 +341,10 @@ internal object ContactEndpoint {
           update = Updates.set(ContactDocument::policies.dot("\$"), policy)
         )
       }.classify() != MongoWriteOutcome.NotMatched
-    ) success(policy.id)
+    ) {
+      PolicyCompileCache.invalidateById(policy.id)
+      success(policy.id)
+    }
     else internalServerError()
   }
 
@@ -393,7 +397,10 @@ internal object ContactEndpoint {
           )
         )
       }.modifiedOne()
-    ) success()
+    ) {
+      PolicyCompileCache.invalidateById(id)
+      success()
+    }
     else internalServerError()
   }
 

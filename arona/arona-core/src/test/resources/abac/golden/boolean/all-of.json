@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "all_of_all_match_allow",
+      "description": "AllOf 全命中 -> allow",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" },
+                { "type": "Action", "operator": "Equal", "key": "type", "value": "effect" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u1" }, "action": { "type": "effect" }, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "all_of_one_miss_deny",
+      "description": "AllOf 其中一条未命中 -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" },
+                { "type": "Action", "operator": "Equal", "key": "type", "value": "delete" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u1" }, "action": { "type": "effect" }, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "all_of_nested_mixed_allow",
+      "description": "AllOf 嵌套 AllOf(子集命中) + AnyOf(任一命中) -> allow",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "children": [
+                {
+                  "groupType": "ALL",
+                  "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ]
+                },
+                {
+                  "groupType": "ANY",
+                  "rule": [
+                    { "type": "Resource", "operator": "Equal", "key": "id", "value": "r1" },
+                    { "type": "Resource", "operator": "Equal", "key": "id", "value": "r2" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u1" }, "action": {}, "resource": { "id": "r2" }, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    }
+  ]
+}

@@ -31,3 +31,21 @@ export interface PolicyRule {
   value: string;
 }
 export type PolicyResource = string;
+
+// --- 策略预览 API (POST /policy/preview) 的请求/响应结构 ---
+// 前端在策略编辑器上的 "测试" 按钮通过该 API 调后端 evaluator 拿 allow/deny 判定.
+export type PolicyPreviewDecision = "allow" | "deny";
+
+export interface PolicyPreviewReq {
+  policies: Policy[];
+  subject: Record<string, string>;
+  action: Record<string, string>;
+  resource: Record<string, string>;
+  environment: Record<string, string>;
+}
+
+export interface PolicyPreviewResp {
+  decision: PolicyPreviewDecision;
+  hitPolicyId: string | null;
+  reason: string;
+}

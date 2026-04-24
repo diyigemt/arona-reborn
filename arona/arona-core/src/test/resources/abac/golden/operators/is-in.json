@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "isin_allow",
+      "description": "Subject.id IsIn [a,b,c] 命中 a",
+      "policies": [
+        {
+          "id": "policy.isin.allow", "name": "isin", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "IsIn", "key": "id", "value": "user.a,user.b,user.c" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "user.a" },
+        "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "isin_deny",
+      "description": "Subject.id IsIn 不命中",
+      "policies": [
+        {
+          "id": "policy.isin.allow", "name": "isin", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "IsIn", "key": "id", "value": "user.a,user.b" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "user.z" },
+        "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "isin_missing_attribute_deny",
+      "description": "IsIn 缺 subject.id -> deny",
+      "policies": [
+        {
+          "id": "policy.isin.allow", "name": "isin", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "IsIn", "key": "id", "value": "user.a" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "isin_single_value_allow",
+      "description": "IsIn 右值只有一项也是 list (by comma split) - 命中",
+      "policies": [
+        {
+          "id": "policy.isin.allow", "name": "isin", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "IsIn", "key": "id", "value": "u1" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u1" },
+        "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "isin_comma_in_value_allow",
+      "description": "IsIn 切分以 ',' 为分隔, 空串不会命中",
+      "policies": [
+        {
+          "id": "policy.isin.allow", "name": "isin", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "IsIn", "key": "id", "value": "a,b,c" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "c" },
+        "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "isin_subject_role_list_by_first_elem_deny",
+      "description": "IsIn 当 subject.roles 为 list, left=整个 list, right=切分后 list; collection 相等比较不命中 -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "IsIn", "key": "roles", "value": "a,b,c" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "roles": ["a"] },
+        "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "isin_env_string_match_allow",
+      "description": "IsIn Environment attribute 命中",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "IsIn", "key": "region", "value": "cn,us,jp" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {}, "environment": { "region": "jp" }
+      },
+      "expected": { "outcome": "allow" }
+    }
+  ]
+}

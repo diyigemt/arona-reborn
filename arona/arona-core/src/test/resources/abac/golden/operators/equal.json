@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "equal_subject_id_allow",
+      "description": "subject.id Equal 命中时应 allow",
+      "policies": [
+        {
+          "id": "policy.equal.allow",
+          "name": "equal subject id",
+          "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                {
+                  "type": "Subject",
+                  "operator": "Equal",
+                  "key": "id",
+                  "value": "user.admin"
+                },
+                {
+                  "type": "Action",
+                  "operator": "Equal",
+                  "key": "type",
+                  "value": "effect"
+                },
+                {
+                  "type": "Resource",
+                  "operator": "Equal",
+                  "key": "id",
+                  "value": "com.diyigemt.arona:command.call_me"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "user.admin" },
+        "action": { "type": "effect" },
+        "resource": { "id": "com.diyigemt.arona:command.call_me" },
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "equal_subject_id_deny",
+      "description": "subject.id Equal 不匹配时应 deny",
+      "policies": [
+        {
+          "id": "policy.equal.allow",
+          "name": "equal subject id",
+          "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                {
+                  "type": "Subject",
+                  "operator": "Equal",
+                  "key": "id",
+                  "value": "user.admin"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "user.member" },
+        "action": { "type": "effect" },
+        "resource": { "id": "com.diyigemt.arona:command.call_me" },
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "equal_subject_id_missing_attribute_deny",
+      "description": "request 缺少 subject.id, warden 将 NoSuchAttributeException 转为 deny",
+      "policies": [
+        {
+          "id": "policy.equal.allow",
+          "name": "equal subject id",
+          "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                {
+                  "type": "Subject",
+                  "operator": "Equal",
+                  "key": "id",
+                  "value": "user.admin"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {},
+        "action": { "type": "effect" },
+        "resource": { "id": "com.diyigemt.arona:command.call_me" },
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    }
+  ]
+}

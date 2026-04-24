@@ -1,6 +1,5 @@
 package com.diyigemt.arona.database.permission
 
-import codes.laurence.warden.atts.HasAtts
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.database.idFilter
@@ -131,7 +130,7 @@ data class ContactMember(
     data class ContactMemberPermissionSubject(
       val id: String,
       val roles: List<String>,
-    ) : HasAtts()
+    )
 
     internal fun ContactMember.toPermissionSubject() = ContactMemberPermissionSubject(
       id,

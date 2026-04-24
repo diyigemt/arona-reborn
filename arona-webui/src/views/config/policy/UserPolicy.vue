@@ -143,10 +143,8 @@ import {
   GraphPolicyRoot,
   mapGraphToPolicy,
   mapPolicyToGraph,
-  PolicyNodeTestResult,
   PolicyRuleFormRule,
   PolicyTestInput,
-  testPolicy,
 } from "@/views/config/policy/util";
 import PolicyTestDataBuilder from "@/views/config/policy/component/PolicyTestDataBuilder.vue";
 
@@ -507,19 +505,33 @@ function onDelete() {
 
 function doTest() {
   const testData = testDataBuilder.value?.build();
-  if (testData) {
-    const testResult = testPolicy(graphData, testData);
-    updateItemByResult(testResult);
+  if (!testData) {
+    return;
   }
-}
-
-function updateItemByResult(result: PolicyNodeTestResult) {
-  graph.updateItem(result.id, {
-    status: result.stats,
+  const current = mapGraphToPolicy(graphData);
+  PolicyApi.previewPolicy({
+    policies: [current],
+    subject: {
+      id: testData.Subject.id,
+      roles: testData.Subject.roles.join(","),
+    },
+    action: { type: testData.Action.action || "effect" },
+    resource: { id: testData.Resource.id },
+    environment: {
+      time: testData.Environment.time,
+      date: testData.Environment.date,
+      datetime: testData.Environment.datetime,
+      param1: testData.Environment.param1,
+      param2: testData.Environment.param2,
+    },
+  }).then((resp) => {
+    graph.updateItem(graphData.id, { status: resp.decision });
+    if (resp.decision === "allow") {
+      successMessage(`allow: 命中 ${resp.hitPolicyId || "-"}`);
+    } else {
+      errorMessage(`deny: ${resp.reason}`);
+    }
   });
-  if (result.children) {
-    result.children.forEach((it) => updateItemByResult(it as PolicyNodeTestResult));
-  }
 }
 
 function fetchData() {

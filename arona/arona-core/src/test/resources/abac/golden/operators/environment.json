@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "env_time_exact_eq_allow",
+      "description": "Environment.time Equal 命中",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "Equal", "key": "time", "value": "16:00" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": {}, "environment": { "time": "16:00" } },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "env_time_lex_gt_allow",
+      "description": "Environment.time 按字典序比较 '16:01' > '16:00'",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "GreaterThan", "key": "time", "value": "16:00" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": {}, "environment": { "time": "16:01" } },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "env_date_gte_allow",
+      "description": "Environment.date GreaterThanEqual",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "GreaterThanEqual", "key": "date", "value": "2026-04-01" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": {}, "environment": { "date": "2026-04-24" } },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "env_param1_equal_allow",
+      "description": "Environment.param1 Equal",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "Equal", "key": "param1", "value": "hello" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": {}, "environment": { "param1": "hello" } },
+      "expected": { "outcome": "allow" }
+    }
+  ]
+}

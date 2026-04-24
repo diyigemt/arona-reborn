@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "gt_string_allow",
+      "description": "GreaterThan 字符串比较命中",
+      "policies": [
+        {
+          "id": "policy.gt.allow",
+          "name": "gt",
+          "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "rule": [
+                { "type": "Environment", "operator": "GreaterThan", "key": "time", "value": "16:00" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {},
+        "environment": { "time": "16:15" }
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "gt_string_deny",
+      "description": "GreaterThan 字符串比较不命中",
+      "policies": [
+        {
+          "id": "policy.gt.allow", "name": "gt", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "GreaterThan", "key": "time", "value": "16:00" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {},
+        "environment": { "time": "15:00" }
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "gte_string_eq_allow",
+      "description": "GreaterThanEqual 相等值命中",
+      "policies": [
+        {
+          "id": "policy.gte.allow", "name": "gte", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "GreaterThanEqual", "key": "time", "value": "16:00" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {},
+        "environment": { "time": "16:00" }
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "lt_string_allow",
+      "description": "LessThan 字符串比较命中",
+      "policies": [
+        {
+          "id": "policy.lt.allow", "name": "lt", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "LessThan", "key": "time", "value": "16:00" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {},
+        "environment": { "time": "15:00" }
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "lt_string_deny",
+      "description": "LessThan 不命中 (equal)",
+      "policies": [
+        {
+          "id": "policy.lt.allow", "name": "lt", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "LessThan", "key": "time", "value": "16:00" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {},
+        "environment": { "time": "16:00" }
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "lte_string_eq_allow",
+      "description": "LessThanEqual 相等命中",
+      "policies": [
+        {
+          "id": "policy.lte.allow", "name": "lte", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "LessThanEqual", "key": "time", "value": "16:00" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {},
+        "environment": { "time": "16:00" }
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "gt_missing_attribute_deny",
+      "description": "GreaterThan 缺属性应 deny (NoSuchAttributeException 被 ExpressionPolicy 吞掉)",
+      "policies": [
+        {
+          "id": "policy.gt.allow", "name": "gt", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "GreaterThan", "key": "time", "value": "16:00" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {},
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "gt_type_mismatch_error",
+      "description": "GreaterThan Long vs String 不可比较, warden 抛 BadExpressionException",
+      "policies": [
+        {
+          "id": "policy.gt.allow", "name": "gt", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "GreaterThan", "key": "time", "value": "16:00" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {},
+        "environment": { "time": 1600 }
+      },
+      "expected": { "outcome": "error", "errorType": "BadExpressionException" }
+    }
+  ]
+}

@@ -1,211 +1,78 @@
 package com.diyigemt.utils
 
-import codes.laurence.warden.AccessRequest
-import codes.laurence.warden.atts.HasAtts
-import codes.laurence.warden.enforce.EnforcementPointDefault
-import codes.laurence.warden.enforce.NotAuthorizedException
-import codes.laurence.warden.policy.bool.allOf
-import com.diyigemt.arona.database.permission.*
-import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
+import com.diyigemt.arona.database.permission.ContactDocument
+import com.diyigemt.arona.database.permission.ContactMember
+import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
-import com.diyigemt.arona.database.permission.Policy.Companion.build
+import com.diyigemt.arona.database.permission.ContactRole.Companion.createBaseAdminRole
+import com.diyigemt.arona.database.permission.ContactRole.Companion.createBaseMemberRole
+import com.diyigemt.arona.database.permission.Policy.Companion.createBaseContactAdminPolicy
+import com.diyigemt.arona.database.permission.Policy.Companion.createBaseMemberPolicy
 import com.diyigemt.arona.permission.Permission.Companion.RootPermission
 import com.diyigemt.arona.permission.Permission.Companion.fullPermissionId
 import com.diyigemt.arona.permission.Permission.Companion.testPermission
 import com.diyigemt.arona.permission.PermissionId
 import com.diyigemt.arona.permission.PermissionImpl
 import kotlinx.coroutines.runBlocking
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
-data class User(
-  val id: String,
-  val type: String,
-  val role: List<String> = listOf()
-) : HasAtts()
-
-data class Resource(
-  val id: String,
-) : HasAtts()
-
+/**
+ * 端到端验证 `Permission.testPermission` 在自研 evaluator 下的行为. 使用内存 fixture 避免 Mongo 依赖.
+ */
 class ABACTest {
-  fun testBase() {
-    runBlocking {
-      val policies = listOf(
-        allOf {
-          resource("id") equalTo "com.diyigemt.arona:command.call_me"
-          action("type") equalTo "effect"
-          subject("type") equalTo "member"
-          environment("time") greaterThan "15:19"
-        },
-        allOf {
-          resource("id") equalTo "com.diyigemt.arona:command.call_me"
-          action("type") equalTo "effect"
-          subject("type") equalTo "admin"
-        }
-      )
-      val p = listOf(
-        allOf {
-          allOf {
-            resource("id") isChild "com.diyigemt.arona:*"
-          }
-          allOf {
-            subject("type") equalTo "admin"
-          }
-        }
-      )
-      runCatching {
-        EnforcementPointDefault(p).enforceAuthorization(
-          AccessRequest(
-            subject = User("", "member").atts(),
-            action = mapOf("type" to "effect"),
-            resource = Resource("com.diyigemt.arona:command.call_me").atts(),
-            environment = mapOf("time" to "15:15")
-          )
-        )
-      }.onSuccess {
-        println("success")
-      }
-        .onFailure {
-          if (it is NotAuthorizedException) {
-            println(it.message)
-          }
-        }
-    }
-  }
 
-  fun testGeneratePolicy() {
-    val rule1 = PolicyRule(
-      PolicyRuleType.Resource,
-      PolicyRuleOperator.IsChild,
-      "id",
-      "com.diyigemt.arona:*"
-    )
-    val rule2 = PolicyRule(
-      PolicyRuleType.Subject,
-      PolicyRuleOperator.Equal,
-      "type",
-      "member"
-    )
-    val rule3 = PolicyRule(
-      PolicyRuleType.Environment,
-      PolicyRuleOperator.GreaterThan,
-      "time",
-      "16:00"
-    )
-    val root = PolicyRoot(
-      PolicyNodeGroupType.ALL,
-      children = listOf(
-        PolicyNode(
-          PolicyNodeGroupType.ALL,
-          listOf(rule1)
-        ), PolicyNode(
-          PolicyNodeGroupType.ALL,
-          children = listOf(
-            PolicyNode(
-              PolicyNodeGroupType.ALL,
-              listOf(rule2)
-            ),
-            PolicyNode(
-              PolicyNodeGroupType.ALL,
-              listOf(rule3)
-            )
-          )
-        )
-      )
-    )
-    val rule = Policy("1", "1", PolicyNodeEffect.ALLOW, listOf(root)).build()
-    runBlocking {
-      runCatching {
-        EnforcementPointDefault(rule).enforceAuthorization(
-          AccessRequest(
-            subject = User("", "member").atts(),
-            action = mapOf("type" to "effect"),
-            resource = Resource("com.diyigemt.arona:command.call_me").atts(),
-            environment = mapOf("time" to "16:15")
-          )
-        )
-      }.onSuccess {
-        println("success")
-      }.onFailure {
-        println("failed")
-      }
-    }
-  }
+  private fun buildContactFixture(member: ContactMember) = ContactDocument(
+    id = "contact.test",
+    roles = listOf(createBaseAdminRole(), createBaseMemberRole()),
+    policies = mutableListOf(createBaseContactAdminPolicy()).apply {
+      addAll(createBaseMemberPolicy())
+    },
+    members = listOf(member),
+  )
+
+  @Test
   fun testContactBaseAdminPolicy() {
     runBlocking {
-      val contact = findContactDocumentByIdOrNull("") ?: return@runBlocking
-      val allow = contact.policies.filter { it.effect == PolicyNodeEffect.ALLOW }.map { it.build() }.flatten()
-      val deny = contact.policies.filter { it.effect == PolicyNodeEffect.DENY }.map { it.build() }.flatten()
-      runCatching {
-
-        EnforcementPointDefault(allow, deny).enforceAuthorization(
-          AccessRequest(
-            subject = User("", "member", listOf(contact.roles[0].id)).atts(),
-            action = mapOf("type" to "effect"),
-            resource = Resource("com.diyigemt.arona:command.call_me").atts(),
-            environment = mapOf("time" to "16:15")
-          )
-        )
-      }.onSuccess {
-        println("success")
-      }.onFailure {
-        println("failed")
-      }
+      val admin = ContactMember("u.admin", "管理员", listOf(DEFAULT_ADMIN_CONTACT_ROLE_ID))
+      val contact = buildContactFixture(admin)
+      val permission = PermissionImpl(PermissionId("com.diyigemt.arona", "*"), "", RootPermission)
+      assertTrue(
+        permission.testPermission(admin, contact.policies),
+        "admin 角色应允许任意资源"
+      )
     }
   }
+
+  @Test
   fun testPermissionFather() {
     val root = PermissionImpl(PermissionId("buildIn", "*"), "root permission", RootPermission)
     val firstChild = PermissionImpl(PermissionId("command.bind", "*"), "第一个子代", root)
     val secondChild = PermissionImpl(PermissionId("bind_a", "*"), "第二个子代", firstChild)
-    println(root.fullPermissionId())
-    println(firstChild.fullPermissionId())
-    println(secondChild.fullPermissionId())
-  }
-  fun testCheckPermission() {
-    runBlocking {
-      val contact = findContactDocumentByIdOrNull("") ?: return@runBlocking
-      val member = ContactMember("id", "成员", listOf(DEFAULT_MEMBER_CONTACT_ROLE_ID))
-      val permission = PermissionImpl(PermissionId("buildIn.owner", "admin"), "", RootPermission)
-      val permission2 = PermissionImpl(PermissionId("com.diyigemt.arona", "*"), "", RootPermission)
-      println(permission.testPermission(member, contact.policies))
-      println(permission2.testPermission(member, contact.policies))
-    }
 
+    assertEquals("buildIn:*", root.fullPermissionId())
+    assertEquals("buildIn:*", firstChild.fullPermissionId())
+    assertEquals("buildIn:command.bind:*", secondChild.fullPermissionId())
   }
-  fun testPermissionIdMatch() {
-    val r = "buildIn.*"
-    val l = "buildIn.owner:min.action:test.m"
-    if (r == "*") {
-      println("t")
-      return
+
+  @Test
+  fun testMemberDeniedFromOwnerResource() {
+    runBlocking {
+      val member = ContactMember("u.member", "成员", listOf(DEFAULT_MEMBER_CONTACT_ROLE_ID))
+      val contact = buildContactFixture(member)
+      val permissionOwner = PermissionImpl(PermissionId("buildIn.owner", "admin"), "", RootPermission)
+      val permissionArona = PermissionImpl(PermissionId("com.diyigemt.arona", "*"), "", RootPermission)
+
+      assertFalse(
+        permissionOwner.testPermission(member, contact.policies),
+        "member 访问 buildIn.owner 资源应被 deny"
+      )
+      assertTrue(
+        permissionArona.testPermission(member, contact.policies),
+        "member 访问 com.diyigemt.arona 资源应允许"
+      )
     }
-    val rL = r.split(":")
-    val lL = l.split(":")
-    fun test(right: String, left: String): Boolean {
-      return if (right.endsWith("*")) {
-        if (right == "*") true
-        else {
-          val leftList = left.split(".")
-          val rightList = right.split(".")
-          if (leftList.size < rightList.size) false
-          else if (leftList.size == rightList.size && rightList.last() != "*") left == right
-          else {
-            rightList.mapIndexed { i, v ->
-              leftList[i] == v
-            }.toMutableList().also {
-              it.removeLast()
-            }.reduce { acc, b -> acc && b } && rightList.last() == "*"
-          }
-        }
-      } else {
-        right == left
-      }
-    }
-    val b = if (rL.size > lL.size) false else {
-      rL.mapIndexed { i, v ->
-        test(v, lL[i])
-      }.reduceOrNull { acc, b -> acc && b } ?: false
-    }
-    println(b)
   }
 }

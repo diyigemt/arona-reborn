@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "not_all_of_single_rule_inverted",
+      "description": "NOT_ALL 单规则命中 -> 内层 Allof=allow, Not 后=deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "NOT_ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ] }
+          ]
+        }
+      ],
+      "request": { "subject": { "id": "u1" }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "not_all_of_single_rule_miss",
+      "description": "NOT_ALL 单规则不命中 -> 内层 AllOf=deny, Not 后=allow",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "NOT_ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ] }
+          ]
+        }
+      ],
+      "request": { "subject": { "id": "u2" }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "not_any_of_one_match",
+      "description": "NOT_ANY 中一条命中 -> 内层 AnyOf=allow, Not=deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "NOT_ANY",
+              "rule": [
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" },
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u2" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": { "subject": { "id": "u1" }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "double_negation_not_all_of_not_all",
+      "description": "ALL(NOT_ALL(NOT_ALL(rule))) ≈ rule 命中才 allow",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "children": [
+                {
+                  "groupType": "NOT_ALL",
+                  "children": [
+                    {
+                      "groupType": "NOT_ALL",
+                      "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": { "subject": { "id": "u1" }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "not_all_of_empty_allow",
+      "description": "空 NOT_ALL = Not(AllOf(空)) = Not(deny) = allow",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "NOT_ALL" } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "allow" }
+    }
+  ]
+}

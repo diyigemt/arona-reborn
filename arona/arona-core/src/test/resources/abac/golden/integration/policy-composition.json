@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "multi_policy_first_deny_wins",
+      "description": "allow 命中后, deny 也命中 -> 最终 deny",
+      "policies": [
+        {
+          "id": "a1", "name": "a", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u" } ] } ]
+        },
+        {
+          "id": "d1", "name": "d", "effect": "DENY",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Action", "operator": "Equal", "key": "type", "value": "delete" } ] } ]
+        }
+      ],
+      "request": { "subject": { "id": "u" }, "action": { "type": "delete" }, "resource": {}, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "multi_policy_allow_action_mismatch",
+      "description": "allow 命中, deny 未命中 -> allow",
+      "policies": [
+        {
+          "id": "a1", "name": "a", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u" } ] } ]
+        },
+        {
+          "id": "d1", "name": "d", "effect": "DENY",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Action", "operator": "Equal", "key": "type", "value": "delete" } ] } ]
+        }
+      ],
+      "request": { "subject": { "id": "u" }, "action": { "type": "effect" }, "resource": {}, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "nested_policies_mixed_ok",
+      "description": "嵌套策略: AllOf(AllOf(rule1), AnyOf(ruleA, ruleB)) 中 ruleB 命中",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ALL",
+              "children": [
+                { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u" } ] },
+                {
+                  "groupType": "ANY",
+                  "rule": [
+                    { "type": "Resource", "operator": "Equal", "key": "id", "value": "r1" },
+                    { "type": "Resource", "operator": "Equal", "key": "id", "value": "r2" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": { "subject": { "id": "u" }, "action": {}, "resource": { "id": "r2" }, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "three_allow_none_match_deny",
+      "description": "三条独立的 ALLOW 都不命中 -> deny",
+      "policies": [
+        { "id": "a1", "name": "a1", "effect": "ALLOW", "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "x1" } ] } ] },
+        { "id": "a2", "name": "a2", "effect": "ALLOW", "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "x2" } ] } ] },
+        { "id": "a3", "name": "a3", "effect": "ALLOW", "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "x3" } ] } ] }
+      ],
+      "request": { "subject": { "id": "y" }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "deny" }
+    }
+  ]
+}

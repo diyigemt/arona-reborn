@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "subject_id_equal_allow",
+      "description": "Subject.id Equal 命中",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" } ] } ]
+        }
+      ],
+      "request": { "subject": { "id": "u1" }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "subject_id_is_in_list_allow",
+      "description": "Subject.id IsIn [u1,u2] 命中 u2",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "IsIn", "key": "id", "value": "u1,u2" } ] } ]
+        }
+      ],
+      "request": { "subject": { "id": "u2" }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "subject_roles_contains_any_allow",
+      "description": "Subject.roles ContainsAny 命中",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "ContainsAny", "key": "roles", "value": "role.admin,role.super" } ] } ]
+        }
+      ],
+      "request": { "subject": { "roles": ["role.admin"] }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "subject_roles_contains_all_deny",
+      "description": "Subject.roles ContainsAll [a,b] 但只有 a -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "ContainsAll", "key": "roles", "value": "role.a,role.b" } ] } ]
+        }
+      ],
+      "request": { "subject": { "roles": ["role.a"] }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "subject_roles_empty_contains_deny",
+      "description": "Subject.roles=[] Contains role.admin -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.admin" } ] } ]
+        }
+      ],
+      "request": { "subject": { "roles": [] }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "subject_deep_nested_roles_allow",
+      "description": "多角色时 Contains 命中任一",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Contains", "key": "roles", "value": "role.owner" } ] } ]
+        }
+      ],
+      "request": { "subject": { "roles": ["role.a", "role.owner", "role.b"] }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "allow" }
+    }
+  ]
+}

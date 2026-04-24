@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "equal_boolean_vs_string_deny",
+      "description": "Equal 中 Boolean vs String 不相等 -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "Equal", "key": "flag", "value": "true" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": {}, "environment": { "flag": true } },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "equal_null_value_deny",
+      "description": "Environment 属性为 JsonNull -> Kotlin null; String value 不等于 null -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "Equal", "key": "k", "value": "v" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": {}, "environment": { "k": null } },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "contains_string_left_type_mismatch_error",
+      "description": "Contains 左值是 String (非 Collection) -> warden 抛 BadExpressionException",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Subject", "operator": "Contains", "key": "name", "value": "a" } ] } ]
+        }
+      ],
+      "request": { "subject": { "name": "abc" }, "action": {}, "resource": {}, "environment": {} },
+      "expected": { "outcome": "error", "errorType": "BadExpressionException" }
+    },
+    {
+      "id": "lte_mix_int_vs_string_error",
+      "description": "LessThanEqual Long vs String 不可比较 -> BadExpressionException",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ALL", "rule": [ { "type": "Environment", "operator": "LessThanEqual", "key": "n", "value": "50" } ] } ]
+        }
+      ],
+      "request": { "subject": {}, "action": {}, "resource": {}, "environment": { "n": 42 } },
+      "expected": { "outcome": "error", "errorType": "BadExpressionException" }
+    }
+  ]
+}

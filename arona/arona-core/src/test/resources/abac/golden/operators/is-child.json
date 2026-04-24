@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "ischild_wildcard_only_allow",
+      "description": "IsChild 右值为 '*' 匹配任意字符串",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "*" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": { "id": "com.diyigemt.arona:command.call_me" },
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_namespace_wildcard_allow",
+      "description": "IsChild 'com.diyigemt.arona:*' 匹配同命名空间子资源",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "com.diyigemt.arona:*" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": { "id": "com.diyigemt.arona:command.call_me" },
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_namespace_wildcard_miss_deny",
+      "description": "IsChild 'com.diyigemt.arona:*' 不匹配其他命名空间",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "com.diyigemt.arona:*" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": { "id": "com.other:command.foo" },
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_dot_wildcard_prefix_allow",
+      "description": "IsChild 'buildIn.owner.*' 作为段级前缀匹配 (warden 语义)",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.owner.*" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": { "id": "buildIn.owner.admin.sub" },
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_colon_segment_extra_deny",
+      "description": "IsChild 右值冒号段多于左值 -> false",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a:b:c" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": { "id": "a:b" },
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_exact_equal_allow",
+      "description": "IsChild 右值无通配且完全相等 -> allow",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "a:b" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": { "id": "a:b" },
+        "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "ischild_non_string_deny",
+      "description": "IsChild 左值为 Long 数字 -> warden 返回 false -> deny",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "*" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": { "id": 42 },
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_missing_attribute_deny",
+      "description": "IsChild 缺 resource.id -> NoSuchAttributeException -> deny",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "*" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": {},
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "ischild_super_wildcard_miss_deny",
+      "description": "IsChild 'buildIn.super:*' 不匹配 'buildIn.owner:admin'",
+      "policies": [
+        {
+          "id": "policy.ic.allow", "name": "ic", "effect": "ALLOW",
+          "rules": [
+            { "groupType": "ALL", "rule": [ { "type": "Resource", "operator": "IsChild", "key": "id", "value": "buildIn.super:*" } ] }
+          ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {},
+        "resource": { "id": "buildIn.owner:admin" },
+        "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    }
+  ]
+}

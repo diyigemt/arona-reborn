@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "any_of_first_match_allow",
+      "description": "AnyOf 首条命中 -> allow",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ANY",
+              "rule": [
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" },
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u2" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u1" }, "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "any_of_second_match_allow",
+      "description": "AnyOf 第二条命中 -> allow",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ANY",
+              "rule": [
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" },
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u2" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u2" }, "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "allow" }
+    },
+    {
+      "id": "any_of_none_match_deny",
+      "description": "AnyOf 全部未命中 -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [
+            {
+              "groupType": "ANY",
+              "rule": [
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u1" },
+                { "type": "Subject", "operator": "Equal", "key": "id", "value": "u2" }
+              ]
+            }
+          ]
+        }
+      ],
+      "request": {
+        "subject": { "id": "u3" }, "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    },
+    {
+      "id": "any_of_empty_deny",
+      "description": "空 AnyOf -> deny",
+      "policies": [
+        {
+          "id": "p", "name": "p", "effect": "ALLOW",
+          "rules": [ { "groupType": "ANY" } ]
+        }
+      ],
+      "request": {
+        "subject": {}, "action": {}, "resource": {}, "environment": {}
+      },
+      "expected": { "outcome": "deny" }
+    }
+  ]
+}

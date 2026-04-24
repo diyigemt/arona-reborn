@@ -44,14 +44,18 @@ internal typealias TencentWebhookEventType = TencentWebsocketEventType
 
 @Serializable
 internal data class TencentWebhookPayload0(
+  // 顶层 id: webhook dispatch / interaction 事件均带此字段, WebhookVerify 握手分支无 id.
+  // Sprint 2.2 用于构造 Redis 幂等 key; 其它分支不依赖.
+  val id: String? = null,
   @SerialName("op")
   val operation: TencentWebhookOperationType = TencentWebhookOperationType.Dispatch,
   @SerialName("t")
-  val type: TencentWebhookEventType = TencentWebhookEventType.NULL
+  val type: TencentWebhookEventType = TencentWebhookEventType.NULL,
 )
 
 @Serializable
 internal data class TencentWebhookPayload<T>(
+  val id: String? = null,
   @SerialName("op")
   val operation: TencentWebhookOperationType = TencentWebhookOperationType.Dispatch,
   @SerialName("t")
@@ -100,6 +104,10 @@ object WebhookEndpoint {
     ignoreUnknownKeys = true
   }
 
+  // Sprint 2.2: webhook 入站幂等. 单例即可, Redis 连接池由 DatabaseProvider 惰性初始化.
+  // handshake 阶段前后各异常不会牵动这里.
+  private val idempotencyStore = WebhookIdempotencyStore(RedisIdempotencyClaim)
+
   @OptIn(ExperimentalStdlibApi::class)
   @AronaBackendEndpointPost("")
   suspend fun PipelineContext<Unit, ApplicationCall>.webhook() {
@@ -113,25 +121,31 @@ object WebhookEndpoint {
     if (body.toByteArray(Charsets.UTF_8).size > MaxWebhookBodyBytes) {
       return badRequest()
     }
-    val verify = (BotManager.getBot() as TencentBotClient)
-      .webHookVerify((ts + body).toByteArray(Charsets.UTF_8), signBytes)
+    val bot = BotManager.getBot() as TencentBotClient
+    val verify = bot.webHookVerify((ts + body).toByteArray(Charsets.UTF_8), signBytes)
     if (!verify) {
       apiLogger.warn("webhook signature verify failed.")
       return unauthorized()
     }
     val preData = json.decodeFromString<TencentWebhookPayload0>(body)
     if (preData.operation == TencentWebhookOperationType.WebhookVerify) {
+      // 握手路径: 每次都必须算新签名响应, 不做幂等化.
       val data = json.decodeFromString<TencentWebhookPayload<TencentWebhookVerifyReq>>(body)
       return context.respond(
         TencentWebhookVerifyResp(
           data.data.plainToken,
-          (BotManager.getBot() as TencentBotClient).webHookSign(
+          bot.webHookSign(
             (data.data.eventTs + data.data.plainToken).toByteArray(Charsets.UTF_8)
           ).toHexString()
         )
       )
     }
-    (BotManager.getBot() as TencentBotClient).dispatchWebhookEvent(body)
+    // 幂等检查在验签之后、分派之前. 仅对带 id 的事件生效, 无 id 事件放行 (见 Store 注释).
+    if (!idempotencyStore.shouldDispatch(preData.id)) {
+      apiLogger.info("duplicate webhook ignored, payloadId={}, type={}", preData.id, preData.type)
+      return success()
+    }
+    bot.dispatchWebhookEvent(body)
     return success()
   }
 }

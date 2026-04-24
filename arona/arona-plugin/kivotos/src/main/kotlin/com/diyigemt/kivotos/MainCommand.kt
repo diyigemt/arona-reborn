@@ -22,6 +22,10 @@ private val playerMainMenu by lazy {
   tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
     row {
       subButton("咖啡厅", enter = true)
+      subButton("背包", enter = true)
+      subButton("装备", enter = true)
+    }
+    row {
       subButton("排行榜", enter = true)
       subButton("设置", enter = true)
       subButton("删号")

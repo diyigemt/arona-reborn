@@ -28,9 +28,7 @@ data class UserDocument(
   val id: String,
   val student: Map<String, Student> = mapOf(),
 ) {
-  val inventory by lazy {
-
-  }
+  suspend fun inventory() = com.diyigemt.kivotos.inventory.InventoryService.loadInventory(id)
   // 删除记录
   suspend fun deleteAccount(): Boolean {
     FavorLevelExcelTable.deleteRecord(id)

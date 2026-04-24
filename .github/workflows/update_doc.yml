@@ -25,9 +25,11 @@ jobs:
     - uses: actions/setup-node@main
       with:
         node-version: '18.x'
-    - uses: pnpm/action-setup@master
+    - uses: pnpm/action-setup@v6
+      name: Install pnpm
       with:
-        version: v8.15.7
+        version: 8
+        cache: true
     - name: Build
       run: |
         cd arona-doc

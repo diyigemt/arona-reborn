@@ -59,11 +59,21 @@ internal class EventListeners {
   }
 
   internal suspend fun <E : Event> callListeners(event: E) {
-    for (registry in container) {
-      if (!registry.type.isInstance(event)) continue
+    // 先 snapshot 本次广播要触达的监听器, 避免 ConcurrentLinkedQueue 弱一致迭代与并发调度叠加后
+    // 导致同一次广播对新增/移除 listener 的可见性漂移.
+    val matched = container.filter { it.type.isInstance(event) }
+    if (matched.isEmpty()) return
+    if (event is SerializedEvent) {
+      // 顺序敏感或依赖监听器对事件对象回写的事件, 维持注册顺序串行执行.
+      for (registry in matched) {
+        process(container, registry, registry.listener, event)
+      }
+    } else {
+      // 普通事件: 所有监听器并发 launch, supervisorScope 等所有子协程完成后返回,
+      // 单个 listener 异常被 SafeListener 内部的 runCatching 吃掉, 不会传染.
       supervisorScope {
-        launch {
-          process(container, registry, registry.listener, event)
+        for (registry in matched) {
+          launch { process(container, registry, registry.listener, event) }
         }
       }
     }

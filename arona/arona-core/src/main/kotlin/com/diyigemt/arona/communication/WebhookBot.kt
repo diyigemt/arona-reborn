@@ -12,10 +12,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter
-import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator
-import org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
-import java.security.SecureRandom
 import kotlin.coroutines.CoroutineContext
 
 internal class FakeWebsocket(
@@ -59,24 +56,26 @@ internal class FakeHttpClientCall(client: HttpClient) : HttpClientCall(client)
 internal open class WebhookBot {
   private val publicKey: AsymmetricKeyParameter
   private val privateKey: AsymmetricKeyParameter
-  private val signer: Ed25519Signer
-  private val verifier: Ed25519Signer
+
   constructor(secret: String) {
     val seed = secret.repeat(2).slice(0 .. 31).toByteArray()
     privateKey = Ed25519PrivateKeyParameters(seed)
     publicKey = privateKey.generatePublicKey()
-    signer = Ed25519Signer().apply {
-      init(true, privateKey)
-    }
-    verifier = Ed25519Signer().apply {
-      init(false, publicKey)
-    }
   }
+
+  // Ed25519Signer 的 update/generate/verify 共用内部 buffer, 共享实例在并发入口下会串 body.
+  // 因此每次按需构造一次性实例; BC 参数对象本身并发只读安全, 可长期复用.
+  private fun createSigner(): Ed25519Signer = Ed25519Signer().apply { init(true, privateKey) }
+  private fun createVerifier(): Ed25519Signer = Ed25519Signer().apply { init(false, publicKey) }
+
   fun webHookVerify(body: ByteArray, sign: ByteArray): Boolean {
+    val verifier = createVerifier()
     verifier.update(body, 0, body.size)
     return verifier.verifySignature(sign)
   }
+
   fun webHookSign(body: ByteArray): ByteArray {
+    val signer = createSigner()
     signer.update(body, 0, body.size)
     return signer.generateSignature()
   }

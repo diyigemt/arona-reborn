@@ -175,14 +175,8 @@ private constructor(private val config: TencentBotConfig) :
       contentType(ContentType.Application.Json)
     }.onSuccess {
       it.forEach { guild ->
-        if (guilds.delegate.none { exist -> exist.id == guild.id }) {
-          guilds.delegate.add(
-            GuildImpl(
-              this,
-              coroutineContext,
-              guild
-            )
-          )
+        guilds.getOrCreate(guild.id) {
+          GuildImpl(this, coroutineContext, guild)
         }
       }
     }

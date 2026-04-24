@@ -4,7 +4,7 @@ import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.message.Message
 
-sealed class MessagePreSendEvent : TencentBotEvent {
+sealed class MessagePreSendEvent : TencentBotEvent, SerializedEvent {
   abstract val target: Contact
   override val bot: TencentBot
     get() = target.bot

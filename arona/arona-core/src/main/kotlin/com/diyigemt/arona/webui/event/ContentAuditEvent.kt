@@ -1,6 +1,7 @@
 package com.diyigemt.arona.webui.event
 
 import com.diyigemt.arona.communication.event.Event
+import com.diyigemt.arona.communication.event.SerializedEvent
 import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.utils.commandLineLogger
 import kotlinx.coroutines.withTimeoutOrNull
@@ -10,7 +11,7 @@ data class ContentAuditEvent(
   var pass: Boolean = true,
   var message: String = "Normal",
   val level: Int? = null // 屏蔽等级 越低屏蔽越严格
-) : Event
+) : SerializedEvent
 
 inline val ContentAuditEvent.isBlock
   get() = !pass

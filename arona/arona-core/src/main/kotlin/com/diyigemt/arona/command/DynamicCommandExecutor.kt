@@ -16,6 +16,7 @@ import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.core.subcommands
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -99,8 +100,10 @@ internal class DynamicStaticCommandExecutor(
 ) {
   override val idleWorkers
     get() = 1 - runningWorkers
-  override val pendingTasks = 0
-  override val runningWorkers = runningCounter.value
+  override val pendingTasks
+    get() = 0
+  override val runningWorkers
+    get() = runningCounter.value
   private val worker = run {
     assert(parentSignature.clazz.objectInstance != null)
     createCommandInstance()
@@ -118,20 +121,21 @@ internal class DynamicStaticCommandExecutor(
         CommandExecuteResult.PermissionDenied(worker)
       }
     }
-    runningCounter.incrementAndGet()
     return async {
-      val result = lock.withLock {
-        worker.execute(
-          caller,
-          parentSignature,
-          args,
-          suspend = true
-        ).also {
-          worker.context2 {  }
+      runningCounter.incrementAndGet()
+      try {
+        // singleton worker, clikt 把 option/argument 绑定到 this, 并发 parse 会互相污染.
+        // 因此 Mutex 必须覆盖 "parse + 业务体" 整段, 不能只保护 parse.
+        lock.withLock {
+          try {
+            worker.execute(caller, parentSignature, args)
+          } finally {
+            worker.context2 { }
+          }
         }
+      } finally {
+        runningCounter.decrementAndGet()
       }
-      runningCounter.decrementAndGet()
-      result
     }
   }
 }
@@ -141,14 +145,12 @@ internal inline fun AbstractCommand.execute(
   caller: CommandSender,
   signature: CommandSignature,
   args: List<String>,
-  suspend: Boolean = false
 ): CommandExecuteResult {
   return runCatching {
     context2 {
       obj = mutableMapOf(
         "caller" to caller,
         "signature" to signature,
-        "suspend" to suspend,
       )
       terminal = commandTerminal
       localization = crsiveLocalization
@@ -176,19 +178,23 @@ internal class DynamicContextualCommandExecutor(
   parentSignature,
 ) {
   private val workerPoolCapacity = initCapacity * 2
-  private val workerPoolModifyLock = Mutex()
-  private val workerPool = ArrayDeque(
-    (0 until workerPoolCapacity).map {
-      createCommandInstance()
-    }
-  )
-  private val taskPoolModifyLock = Mutex()
-  private val taskPool = ArrayDeque<Deferred<CommandExecuteResult>>(workerPoolCapacity)
+
+  // Channel 同时承担"可复用 worker 资源池"和"等待队列"两个角色, 消除之前 ArrayDeque + lazy async
+  // 手工排队里 "归还 worker 后先 addLast 再 launch start" 的竞态窗口.
+  private val samples = List(workerPoolCapacity) { createCommandInstance() }
+  private val workerPool = Channel<AbstractCommand>(workerPoolCapacity).also { pool ->
+    samples.forEach { check(pool.trySend(it).isSuccess) { "failed to initialize worker pool" } }
+  }
+  private val idleCounter = atomic(workerPoolCapacity)
+  private val pendingCounter = atomic(0)
+
   override val idleWorkers
-    get() = workerPool.size
-  override val pendingTasks = 0
-  override val runningWorkers = runningCounter.value
-  override val permission = workerPool.first().permission
+    get() = idleCounter.value
+  override val pendingTasks
+    get() = pendingCounter.value
+  override val runningWorkers
+    get() = runningCounter.value
+  override val permission = samples.first().permission
 
   override suspend fun execute(
     args: List<String>,
@@ -197,58 +203,36 @@ internal class DynamicContextualCommandExecutor(
   ): Deferred<CommandExecuteResult> {
     if (checkPermission && !hasCommandPermission(caller, args)) {
       return async {
-        CommandExecuteResult.PermissionDenied(
-          workerPool.firstOrNull() ?: createCommandInstance(),
-        )
+        CommandExecuteResult.PermissionDenied(samples.first())
       }
-    }
-    val worker = workerPoolModifyLock.withLock {
-      workerPool.removeFirstOrNull()
-    }
-    if (worker == null) {
-      val task = async(start = CoroutineStart.LAZY) {
-        val w = workerPoolModifyLock.withLock {
-          workerPool.removeFirst()
-        }
-        runningCounter.incrementAndGet()
-        val result = w.execute(
-          caller,
-          parentSignature,
-          args
-        )
-        commitWorker(w)
-        result
-      }
-      taskPoolModifyLock.withLock {
-        taskPool.addLast(task)
-      }
-      return task
     }
     return async {
+      val worker = acquireWorker()
+      idleCounter.decrementAndGet()
       runningCounter.incrementAndGet()
-      val result = worker.execute(
-        caller,
-        parentSignature,
-        args
-      )
-      commitWorker(worker)
-      result
+      try {
+        worker.execute(caller, parentSignature, args)
+      } finally {
+        commitWorker(worker)
+      }
     }
   }
 
-  private suspend fun commitWorker(command: AbstractCommand) {
-    // 清除多余的引用
+  private suspend fun acquireWorker(): AbstractCommand {
+    pendingCounter.incrementAndGet()
+    return try {
+      workerPool.receive()
+    } finally {
+      pendingCounter.decrementAndGet()
+    }
+  }
+
+  // 非挂起归还: 在 try/finally 里如果用挂起的 send(), 外层被取消时可能再次挂起并被取消, worker 会丢.
+  // Channel 容量等于 workerPoolCapacity, 取走多少归还多少, trySend 必然成功.
+  private fun commitWorker(command: AbstractCommand) {
     command.context2 { }
     runningCounter.decrementAndGet()
-    workerPoolModifyLock.withLock {
-      if (workerPool.size < workerPoolCapacity) {
-        workerPool.addLast(command)
-      }
-    }
-    launch {
-      taskPoolModifyLock.withLock {
-        taskPool.removeFirstOrNull()?.start()
-      }
-    }
+    check(workerPool.trySend(command).isSuccess) { "worker pool overflow while returning worker" }
+    idleCounter.incrementAndGet()
   }
 }

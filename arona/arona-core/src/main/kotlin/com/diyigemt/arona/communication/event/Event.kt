@@ -105,9 +105,7 @@ internal object TencentWebsocketDirectMessageCreateHandler :
 
 suspend fun mockGroupMessage(gid: String, uid: String, content: String, eid: String = "") {
   val bot = BotManager.getBot()
-  val group = bot.groups[gid] ?: EmptyMockGroupImpl(bot, gid).also { group ->
-    bot.groups.delegate.add(group)
-  }
+  val group = bot.groups.getOrCreate(gid) { EmptyMockGroupImpl(bot, gid) }
   val member = group.members.getOrCreate(uid)
   TencentGroupMessageEvent(PlainText(content).toMessageChain(), eid, member).broadcast()
 }
@@ -265,6 +263,15 @@ internal object TencentWebsocketDispatchEventManager {
 }
 
 interface Event
+
+/**
+ * 标记事件需要串行广播: 多个监听器按注册顺序依次执行, 而非并发.
+ *
+ * 用于监听器之间靠事件对象 (如 [com.diyigemt.arona.communication.event.MessagePreSendEvent.message]
+ * 或 [com.diyigemt.arona.webui.event.ContentAuditEvent.pass]) 回传/改写结果的场景.
+ * 没实现此接口的事件默认走并发分派, 监听器之间无执行顺序, 也不应并发写入同一事件对象.
+ */
+interface SerializedEvent : Event
 
 abstract class AbstractEvent : Event
 

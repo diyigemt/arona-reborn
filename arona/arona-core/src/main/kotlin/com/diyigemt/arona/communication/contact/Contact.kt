@@ -19,11 +19,12 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import org.jetbrains.exposed.sql.and
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -342,15 +343,16 @@ internal class GuildImpl(
         parameters.append("limit", "400")
       }
     }.onSuccess {
-      members.delegate.addAll(
-        it.map { member ->
+      it.forEach { member ->
+        val memberId = member.user?.id ?: ""
+        members.getOrCreate(memberId) {
           GuildMemberImpl(
             this@GuildImpl,
-            findOrCreateMemberPrivateChannel(member.user?.id ?: ""),
+            findOrCreateMemberPrivateChannel(memberId),
             member
           )
         }
-      )
+      }
     }
   }
 
@@ -362,15 +364,15 @@ internal class GuildImpl(
     ) {
       method = HttpMethod.Get
     }.onSuccess {
-      channels.delegate.addAll(
-        it.map { ch ->
+      it.forEach { ch ->
+        channels.getOrCreate(ch.id) {
           ChannelImpl(
             bot,
             this@GuildImpl,
             ch
           )
         }
-      )
+      }
     }
   }
 }
@@ -665,24 +667,51 @@ internal class EmptyMockGroupImpl(
 }
 
 abstract class ContactList<out C : Contact>(
-  internal val delegate: MutableCollection<@UnsafeVariance C>,
-) : Collection<C> by delegate {
-  constructor() : this(ConcurrentLinkedQueue())
+  internal val delegate: ConcurrentHashMap<String, @UnsafeVariance C>,
+) : Collection<C> by delegate.values {
+  constructor() : this(ConcurrentHashMap())
 
-  operator fun get(id: String): C? = delegate.firstOrNull { it.id == id }
+  operator fun get(id: String): C? = delegate[id]
 
   abstract val generator: (id: String) -> C
 
-  // TODO 采用map解决大量缓存的情况下get导致的性能问题
-  fun getOrCreate(id: String): C = get(id) ?: generator(id)
+  fun getOrCreate(id: String): C = delegate.computeIfAbsent(id) { generator(it) }
 
-  fun getOrFail(id: String): C = get(id) ?: throw NoSuchElementException("Contact $id not found.")
+  /**
+   * 允许调用方传入富对象 factory 用来升级占位对象.
+   *
+   * 事件路径会先用默认 [generator] 缓存 [EmptyContact] 占位; 之后像 `fetchGuildList`
+   * 那种补全接口应通过此重载把缓存替换为富对象, 并取消被替换掉的占位 scope, 避免 Empty 永久占用.
+   * 已经是富对象的条目不会被重复替换.
+   */
+  fun getOrCreate(
+    id: String,
+    factory: (String) -> @UnsafeVariance C,
+  ): C = delegate.compute(id) { key, existing ->
+    when {
+      existing == null -> factory(key)
+      existing is EmptyContact -> {
+        existing.coroutineContext[Job]?.cancel()
+        factory(key)
+      }
+      else -> existing
+    }
+  }!!
 
-  fun remove(id: String): Boolean = delegate.removeAll { it.id == id }
+  fun getOrFail(id: String): C = delegate[id] ?: throw NoSuchElementException("Contact $id not found.")
 
-  operator fun contains(id: String): Boolean = get(id) != null
+  fun remove(id: String): Boolean {
+    val removed = delegate.remove(id) ?: return false
+    // 从列表移除即视为该 Contact 不再活跃, 主动取消其 SupervisorJob 防止 scope 泄漏.
+    removed.coroutineContext[Job]?.cancel()
+    return true
+  }
 
-  override fun toString(): String = delegate.joinToString(separator = ", ", prefix = "ContactList(", postfix = ")")
+  operator fun contains(id: String): Boolean = delegate.containsKey(id)
+
+  override fun toString(): String =
+    delegate.values.joinToString(separator = ", ", prefix = "ContactList(", postfix = ")")
+
   override fun equals(other: Any?): Boolean = other is ContactList<*> && delegate == other.delegate
   override fun hashCode(): Int = delegate.hashCode()
 }

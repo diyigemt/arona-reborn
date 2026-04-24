@@ -1,58 +1,11 @@
 package com.diyigemt.arona.communication
 
-import io.ktor.client.HttpClient
-import io.ktor.client.call.HttpClientCall
-import io.ktor.util.InternalAPI
-import io.ktor.websocket.CloseReason
-import io.ktor.websocket.DefaultWebSocketSession
-import io.ktor.websocket.Frame
-import io.ktor.websocket.WebSocketExtension
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.channels.SendChannel
-import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
-import kotlin.coroutines.CoroutineContext
+import org.bouncycastle.crypto.signers.Ed25519Signer
 
-internal class FakeWebsocket(
-  override val coroutineContext: CoroutineContext
-) : DefaultWebSocketSession {
-  override val closeReason: Deferred<CloseReason?>
-    get() = TODO("Not yet implemented")
-  override var pingIntervalMillis: Long
-    get() = TODO("Not yet implemented")
-    set(value) {}
-  override var timeoutMillis: Long
-    get() = TODO("Not yet implemented")
-    set(value) {}
-  @InternalAPI
-  override fun start(negotiatedExtensions: List<WebSocketExtension<*>>) {
-    TODO("Not yet implemented")
-  }
-  override val extensions: List<WebSocketExtension<*>>
-    get() = TODO("Not yet implemented")
-  override val incoming: ReceiveChannel<Frame>
-    get() = TODO("Not yet implemented")
-  override var masking: Boolean
-    get() = TODO("Not yet implemented")
-    set(value) {}
-  override var maxFrameSize: Long
-    get() = TODO("Not yet implemented")
-    set(value) {}
-  override val outgoing: SendChannel<Frame>
-    get() = TODO("Not yet implemented")
-  override suspend fun flush() {
-    TODO("Not yet implemented")
-  }
-  @Deprecated("")
-  override fun terminate() {
-    TODO("Not yet implemented")
-  }
-}
-
-internal class FakeHttpClientCall(client: HttpClient) : HttpClientCall(client)
-
+// Sprint 2.1 Part B: 删除 FakeWebsocket / FakeHttpClientCall (TencentBotClient 的 fake session 桥接随
+// WS op/session 层一起下线). WebhookBot 保留 Ed25519 签名能力, 其它附属 ktor/coroutine import 一并清除.
 internal open class WebhookBot {
   private val publicKey: AsymmetricKeyParameter
   private val privateKey: AsymmetricKeyParameter

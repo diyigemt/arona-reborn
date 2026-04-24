@@ -14,7 +14,6 @@ import com.diyigemt.arona.communication.contact.GuildMemberImpl
 import com.diyigemt.arona.communication.message.*
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.serializer
 
 // Sprint 2.1 清理: TencentWebsocketReadyHandler / TencentWebsocketResumedHandler 是 WebSocket 握手/恢复
 // 专属, webhook 下发不会走这两条, 且已无 wsJob 启动路径. 删除这两个 handler 以收敛 dispatch map.
@@ -354,30 +353,9 @@ internal data class TencentBotAuthSuccessEvent(
   override val eventId: String = ""
 }
 
-internal data class TencentBotWebsocketHandshakeSuccessEvent(
-  override val bot: TencentBot,
-) : TencentBotEvent, TencentEvent() {
-  override val eventId: String = ""
-}
-
-internal data class TencentBotWebsocketConnectionLostEvent(
-  override val bot: TencentBot,
-) : TencentBotEvent, TencentEvent() {
-  override val eventId: String = ""
-}
-
-internal data class TencentBotWebsocketConnectionResumeEvent(
-  override val bot: TencentBot,
-) : TencentBotEvent, TencentEvent() {
-  override val eventId: String = ""
-}
-
-internal data class TencentBotWebsocketAuthSuccessEvent(
-  override val bot: TencentBot,
-  val payload: TencentWebsocketIdentifyResp,
-) : TencentBotEvent, TencentEvent() {
-  override val eventId: String = ""
-}
+// Sprint 2.1 Part B: 4 个 TencentBotWebsocket* 生命周期事件 (Handshake/ConnectionLost/ConnectionResume/
+// AuthSuccess) 全仓库仅在已删的 WS op/session 层内部 broadcast, 无 subscriber, 随 WS 死代码一并下线.
+// TencentWebsocketIdentifyResp 对应的 DTO 也随之删除.
 
 data class TencentBotOnlineEvent(
   override val bot: TencentBot,

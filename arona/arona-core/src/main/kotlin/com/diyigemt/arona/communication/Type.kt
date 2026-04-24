@@ -35,28 +35,8 @@ internal data class TencentBotAuthEndpointResp(
   val expiresIn: Int,
 )
 
-@Serializable
-internal data class TencentWebsocketEndpointResp(
-  val url: String,
-)
-
-@Serializable
-internal data class TencentWebsocketShardEndpointResp(
-  val url: String,
-  val shards: Int,
-  @SerialName("session_start_limit")
-  val sessionStartLimit: TencentWebsocketShardSessionStartLimit
-)
-
-@Serializable
-internal data class TencentWebsocketShardSessionStartLimit(
-  val total: Int, // 每 24 小时可创建 Session 数
-  val remaining: Int, // 目前还可以创建的 Session 数
-  @SerialName("reset_after")
-  val resetAfter: Int, // 重置计数的剩余时间(ms)
-  @SerialName("max_concurrency")
-  val maxConcurrency: Int // 每 5s 可以创建的 Session 数
-)
+// Sprint 2.1 Part B: WS gateway endpoint DTO (TencentWebsocketEndpointResp / ShardEndpointResp /
+// ShardSessionStartLimit) 随 WS 死代码一并删除, 全仓库无引用.
 
 internal object TencentWebsocketEventTypeAsStringSerializer : KSerializer<TencentWebsocketEventType> {
   override val descriptor = PrimitiveSerialDescriptor("TencentWebsocketEventType", PrimitiveKind.STRING)
@@ -94,9 +74,9 @@ internal enum class TencentWebsocketEventType(val type: String) {
 }
 
 enum class TencentEndpoint(val path: String) {
-  WebSocket("/gateway"),
-  ShardWebSocket("/gateway/bot"),
-  Interactions("/interactions/{interaction_id}"), // 通知后台接收到websocket推送的消息
+  // Sprint 2.1 Part B: WebSocket / ShardWebSocket gateway endpoints 全仓库无引用, 删除;
+  // Interactions 仍被 callback ack 路径 (TencentWebsocketInteractionNotifyReq) 使用, 保留.
+  Interactions("/interactions/{interaction_id}"), // 通知后台接收到推送消息
   PostFriendMessage("/v2/users/{openid}/messages"), // 向用户发送私信消息
   PostFriendRichMessage("/v2/users/{openid}/files"), // 向用户发送私信消息
   PostGroupMessage("/v2/groups/{group_openid}/messages"), // 向群聊发送消息

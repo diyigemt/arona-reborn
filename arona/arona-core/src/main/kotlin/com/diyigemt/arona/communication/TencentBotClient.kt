@@ -7,13 +7,11 @@ import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.logging.*
-import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -22,6 +20,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
+import java.io.Closeable
 import kotlin.coroutines.CoroutineContext
 
 interface TencentBot : Closeable, Contact, CoroutineScope {
@@ -57,7 +56,6 @@ private constructor(private val config: TencentBotConfig) :
     ignoreUnknownKeys = true
   }
   override val client = HttpClient(CIO) {
-    install(WebSockets)
     install(ContentNegotiation) {
       json(json)
     }
@@ -76,8 +74,6 @@ private constructor(private val config: TencentBotConfig) :
   private val accessTokenLock = Mutex()
   private var accessToken: String = ""
   private var accessTokenHeartbeatTask: Job? = null
-  private var websocketHeartbeatTask: Job? = null
-  private var wsJob: Job? = null
   private val openapiSignHeader: HeadersBuilder.() -> Unit = {
     append("Authorization", botToken)
     append("X-Union-Appid", id)
@@ -85,9 +81,6 @@ private constructor(private val config: TencentBotConfig) :
   private val appId = config.appId
   private val botToken
     get() = "QQBot $accessToken"
-  private val fakeHttpClientCall = FakeHttpClientCall(client)
-  private val fakeWebsocket = FakeWebsocket(coroutineContext)
-  private val fakeWebSocketSession = toWebSocketSession(fakeHttpClientCall, fakeWebsocket)
 
   companion object {
     operator fun invoke(config: TencentBotConfig): TencentBotClient {
@@ -298,8 +291,8 @@ private constructor(private val config: TencentBotConfig) :
   override fun toString() = "TencentBot($appId)"
 
   override fun close() {
-    wsJob?.cancel()
-    websocketHeartbeatTask?.cancel()
+    // Sprint 2.1 Part B: WS lifecycle jobs (wsJob/websocketHeartbeatTask) 随 WS 死代码下线;
+    // webhook 路径只剩 access token 循环 + HTTP client + bot scope 需要清理.
     accessTokenHeartbeatTask?.cancel()
     client.close()
     // 同步取消整个 bot scope, 防止 close 后仍有人 launch 出新的子任务.

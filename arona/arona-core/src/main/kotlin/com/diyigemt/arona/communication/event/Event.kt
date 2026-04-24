@@ -200,21 +200,34 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
   override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketCallbackButtonResp, eventId: String) {
     logger.debug("websocket receive callback btn from server.")
     logger.debug(payload.toString())
+    payload.missingCallbackRouteField()?.let { field ->
+      // ContactList 现为真缓存 (Sprint 1.2), 用 id="" 的 Empty 占位会永久驻留并污染后续路由,
+      // 因此 payload 关键字段缺失直接短路, 不 broadcast, 也不触碰任何 ContactList.
+      logger.warn(
+        "skip callback button event: missing $field. " +
+            "chatType=${payload.chatType}, interactionId=${payload.id}, eventId=$eventId"
+      )
+      return
+    }
     val contact = when (payload.chatType) {
       TencentWebsocketCallbackButtonChatType.Guild -> {
-        bot.guilds.getOrCreate(payload.guildId ?: "").let {
-          it.channels.getOrCreate(payload.channelId ?: "").let { ch ->
-            ch to it.members.getOrCreate(payload.data.resolved.userId ?: "")
-          }
+        val guildId = payload.guildId!!
+        val channelId = payload.channelId!!
+        val userId = payload.data.resolved.userId!!
+        bot.guilds.getOrCreate(guildId).let {
+          it.channels.getOrCreate(channelId) to it.members.getOrCreate(userId)
         }
       }
       TencentWebsocketCallbackButtonChatType.Group -> {
-        bot.groups.getOrCreate(payload.groupOpenid ?: "").let {
-          it to it.members.getOrCreate(payload.groupMemberOpenid ?: "")
+        val groupOpenid = payload.groupOpenid!!
+        val groupMemberOpenid = payload.groupMemberOpenid!!
+        bot.groups.getOrCreate(groupOpenid).let {
+          it to it.members.getOrCreate(groupMemberOpenid)
         }
       }
       TencentWebsocketCallbackButtonChatType.Friend -> {
-        bot.friends.getOrCreate(payload.userOpenId ?: "").let {
+        val userOpenId = payload.userOpenId!!
+        bot.friends.getOrCreate(userOpenId).let {
           it to it
         }
       }
@@ -231,6 +244,32 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
       user = contact.second,
       bot = bot
     ).broadcast()
+  }
+}
+
+/**
+ * 返回 [payload] 在当前 [TencentWebsocketCallbackButtonResp.chatType] 下第一个缺失的必需字段名;
+ * 全部合法则返回 `null`.
+ *
+ * 独立出纯函数以便直接单测: handler 的 receiver 依赖 [TencentBotClientWebSocketSession],
+ * 在测试里构造重型且受内部可见性限制, 把路由校验抽到这里可以无依赖覆盖所有分支.
+ */
+internal fun TencentWebsocketCallbackButtonResp.missingCallbackRouteField(): String? = when (chatType) {
+  TencentWebsocketCallbackButtonChatType.Guild -> when {
+    guildId.isNullOrBlank() -> "guildId"
+    channelId.isNullOrBlank() -> "channelId"
+    // 事件模型 TencentCallbackButtonEvent.user: User 非空, 若用 id="" 兜底只会造 Empty 假 member 被 Sprint 1.2 的真缓存永久驻留.
+    data.resolved.userId.isNullOrBlank() -> "resolved.userId"
+    else -> null
+  }
+  TencentWebsocketCallbackButtonChatType.Group -> when {
+    groupOpenid.isNullOrBlank() -> "groupOpenid"
+    groupMemberOpenid.isNullOrBlank() -> "groupMemberOpenid"
+    else -> null
+  }
+  TencentWebsocketCallbackButtonChatType.Friend -> when {
+    userOpenId.isNullOrBlank() -> "userOpenId"
+    else -> null
   }
 }
 

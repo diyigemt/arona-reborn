@@ -18,6 +18,7 @@ import com.diyigemt.arona.utils.error
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -87,13 +88,30 @@ internal abstract class AbstractContact(
     preSendEventConstructor: (C, Message) -> MessagePreSendEvent,
     postSendEventConstructor: (C, MessageChain, Throwable?, MessageReceipt<C>?) -> MessagePostSendEvent<C>,
   ): MessageReceipt<C>? {
-    // 消息处理
+    val target = this as C
 
-    val chain = kotlin.runCatching {
-      preSendEventConstructor(this as C, body).broadcast()
+    // pre-send 分两步: 构造事件 + 广播. 构造或广播任一环节抛异常, 都要当作 "pre-send 阶段失败"
+    // 仍向下游补发一次 post-send, 保证 pre/post 成对语义 (破坏会让审计/限流/回执类 listener 感知不到失败).
+    val preResult = kotlin.runCatching {
+      preSendEventConstructor(target, body).broadcast()
     }.onFailure {
+      // 协作式取消必须向上透传, 否则调用方误以为发送正常结束继续走 post-send 并 return null.
+      if (it is CancellationException) throw it
       commandLineLogger.error(it)
-    }.getOrNull()?.message?.toMessageChain() ?: return null
+    }
+    val chain = preResult.getOrNull()?.message?.toMessageChain()
+    if (chain == null) {
+      // 失败分支: message 传原始 body (未被 listener 改写过的版本), exception 透传真实原因.
+      // post-send 本身再抛异常不应改变 pre-send 失败的主结果, 用 runCatching 兜底; 取消例外透传.
+      kotlin.runCatching {
+        postSendEventConstructor(target, body, preResult.exceptionOrNull(), null).broadcast()
+      }.onFailure {
+        if (it is CancellationException) throw it
+        commandLineLogger.error(it)
+      }
+      return null
+    }
+
     suspend fun send(messageSequence: Int): Result<MessageReceiptImpl> {
       val builder = TencentMessageBuilder(messageSequence = messageSequence).append(chain)
       return if (this is Group || this is FriendUser) {
@@ -142,14 +160,19 @@ internal abstract class AbstractContact(
       result = send(messageSequence + (100 .. 1000).random())
     }
     val res = result.getOrNull()?.toMessageReceipt() as MessageReceipt<C>?
-    postSendEventConstructor(
-      this as C,
-      chain,
-      result.exceptionOrNull(),
-      res
-    ).broadcast()
+    // 成功与失败统一 broadcast post-send; 广播自身异常仅记录, 不污染 send 主语义的返回值; 取消例外透传.
+    kotlin.runCatching {
+      postSendEventConstructor(
+        target,
+        chain,
+        result.exceptionOrNull(),
+        res
+      ).broadcast()
+    }.onFailure {
+      if (it is CancellationException) throw it
+      commandLineLogger.error(it)
+    }
 
-    // TODO 异常处理
     return res
   }
 

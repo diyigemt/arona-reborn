@@ -252,8 +252,9 @@ object ConsoleCommandSender : AbstractCommandSender(), CommandSender {
 
   override val messageSequenceRef: AtomicInteger = AtomicInteger(1)
   override suspend fun sendMessage(message: Message): MessageReceipt<Contact>? {
+    // Console 发送只是写日志; 没有远端消息实体也就没有 receipt, 返回 null 比造 dummy receipt 更诚实.
     commandLineLogger.info(message.serialization())
-    TODO()
+    return null
   }
 
   override val coroutineContext: CoroutineContext = AronaApplication.childScopeContext(NAME)

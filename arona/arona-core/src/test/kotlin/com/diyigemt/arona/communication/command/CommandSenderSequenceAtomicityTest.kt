@@ -1,5 +1,6 @@
 package com.diyigemt.arona.communication.command
 
+import com.diyigemt.arona.communication.message.PlainText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -7,6 +8,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 // 回归保护:
 // 旧实现 `var messageSequence: Int = 1` + `.also { messageSequence++ }` 是读改写组合, 并发发送时会 lost update;
@@ -33,6 +35,15 @@ class CommandSenderSequenceAtomicityTest {
     ConsoleCommandSender.messageSequence = 42
     assertEquals(42, ConsoleCommandSender.nextSequence())
     assertEquals(43, ConsoleCommandSender.nextSequence())
+  }
+
+  @Test
+  fun `ConsoleCommandSender sendMessage 返回 null 且不抛 NotImplementedError`() {
+    // Sprint 2.3 前这里是 TODO(), 任何尝试在 console 模式下发送都崩; 现在只 log + return null.
+    runBlocking {
+      val receipt = ConsoleCommandSender.sendMessage(PlainText("console msg"))
+      assertNull(receipt)
+    }
   }
 
   @Test

@@ -355,8 +355,8 @@ internal class GuildImpl(
   override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
   override val isPublic: Boolean = bot.isPublic
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Guild>? {
-    // 无法实现
-    TODO()
+    // Guild 本身不是消息接收方; 腾讯 API 要求发送到具体 Channel.
+    throw UnsupportedOperationException("Guild cannot send messages directly. Send via a concrete Channel instead.")
   }
 
   init {
@@ -517,9 +517,9 @@ internal class GroupMemberImpl(
   override val group: Group,
   override val unionOpenid: String? = null,
 ) : GroupMember, AbstractContact(group.bot, parentCoroutineContext) {
-  override fun asSingleUser(): FriendUser {
-    TODO("Not yet implemented")
-  }
+  // Sprint 1.2 后 ContactList 是真缓存, friends.getOrCreate(id) 同 id 稳定返回同一 FriendUser 实例,
+  // 重复调用不会重复创建或互相覆盖.
+  override fun asSingleUser(): FriendUser = bot.friends.getOrCreate(id)
 
   override suspend fun uploadImage(url: String) = asSingleUser().uploadImage(url)
 
@@ -624,7 +624,7 @@ internal class EmptyGuildImpl(
   override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
   override val isPublic: Boolean = bot.isPublic
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Guild>? {
-    TODO("Not yet implemented")
+    throw IllegalStateException("EmptyGuildImpl is a placeholder (id=$id) and cannot send messages. It should be replaced by a real Guild via getOrCreate(id, factory) before use.")
   }
 }
 
@@ -634,12 +634,11 @@ internal class EmptyGroupMemberImpl(
 ) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<GroupMember>? {
-    TODO("Not yet implemented")
+    throw IllegalStateException("EmptyGroupMemberImpl is a placeholder (id=$id) and cannot send messages.")
   }
 
-  override fun asSingleUser(): FriendUser {
-    TODO("Not yet implemented")
-  }
+  override fun asSingleUser(): FriendUser =
+    throw IllegalStateException("EmptyGroupMemberImpl is a placeholder (id=$id) and cannot resolve a single user.")
 }
 
 internal class EmptyMockGroupMemberImpl(
@@ -648,12 +647,11 @@ internal class EmptyMockGroupMemberImpl(
 ) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<GroupMember>? {
-    TODO("Not yet implemented")
+    throw IllegalStateException("EmptyMockGroupMemberImpl is a placeholder (id=$id) and cannot send messages.")
   }
 
-  override fun asSingleUser(): FriendUser {
-    TODO("Not yet implemented")
-  }
+  override fun asSingleUser(): FriendUser =
+    throw IllegalStateException("EmptyMockGroupMemberImpl is a placeholder (id=$id) and cannot resolve a single user.")
 }
 
 internal class EmptyFriendUserImpl(

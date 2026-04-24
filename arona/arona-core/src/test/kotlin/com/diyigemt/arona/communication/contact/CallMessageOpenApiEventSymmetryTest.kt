@@ -1,33 +1,15 @@
 package com.diyigemt.arona.communication.contact
 
-import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
-import com.diyigemt.arona.communication.event.EventChannel
 import com.diyigemt.arona.communication.event.GlobalEventChannel
 import com.diyigemt.arona.communication.event.GroupMessagePostSendEvent
 import com.diyigemt.arona.communication.event.GroupMessagePreSendEvent
-import com.diyigemt.arona.communication.event.TencentBotEvent
-import com.diyigemt.arona.communication.message.MessageChain
-import com.diyigemt.arona.communication.message.MessageReceipt
 import com.diyigemt.arona.communication.message.PlainText
-import com.diyigemt.arona.communication.message.TencentImage
 import com.diyigemt.arona.communication.message.toMessageChain
-import io.ktor.client.HttpClient
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
-import org.slf4j.Logger
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -173,47 +155,3 @@ class CallMessageOpenApiEventSymmetryTest {
   }
 }
 
-private class StubBot(
-  private val callOpenapiResult: Result<Any?> = Result.failure(IllegalStateException("callOpenapi not stubbed")),
-) : TencentBot, CoroutineScope {
-  override val id: String = "stub-bot"
-  override val unionOpenid: String? = null
-  override val bot: TencentBot
-    get() = this
-  // client/json 只用于实际 HTTP 调用; 在 2.5 覆盖的路径里 json 被 encodeToString 用到 (仅发送分支), 正常构造即可.
-  override val client: HttpClient
-    get() = error("StubBot.client must not be dereferenced in current test paths")
-  override val json: Json = Json { ignoreUnknownKeys = true }
-  override val logger: Logger = KtorSimpleLogger("stub-bot")
-  override val eventChannel: EventChannel<TencentBotEvent> =
-    GlobalEventChannel.filterIsInstance<TencentBotEvent>().filter { it.bot === this }
-  override val guilds: ContactList<Guild> = GuildContactList { error("stub: guilds[$it] not provided") }
-  override val groups: ContactList<Group> = GroupContactList { error("stub: groups[$it] not provided") }
-  override val friends: ContactList<FriendUser> = SingleUserContactList { error("stub: friends[$it] not provided") }
-  override val isPublic: Boolean = false
-  override val isDebug: Boolean = false
-  override val coroutineContext: CoroutineContext =
-    SupervisorJob() + Dispatchers.Default + CoroutineName("StubBot.$id")
-
-  @Suppress("UNCHECKED_CAST")
-  override suspend fun <T> callOpenapi(
-    endpoint: TencentEndpoint,
-    decoder: KSerializer<T>,
-    urlPlaceHolder: Map<String, String>,
-    block: HttpRequestBuilder.() -> Unit,
-  ): Result<T> = callOpenapiResult as Result<T>
-
-  override suspend fun callOpenapi(
-    endpoint: TencentEndpoint,
-    urlPlaceHolder: Map<String, String>,
-    block: HttpRequestBuilder.() -> Unit,
-  ): Result<Unit> = Result.failure(IllegalStateException("callOpenapi(Unit) not stubbed"))
-
-  override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Contact>? = null
-  override suspend fun uploadImage(url: String): TencentImage = error("unused")
-  override suspend fun uploadImage(data: ByteArray): TencentImage = error("unused")
-
-  override fun close() {
-    coroutineContext[Job]?.cancel()
-  }
-}

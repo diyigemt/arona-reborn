@@ -447,25 +447,24 @@ internal class MessageChainImpl(
 ) : MessageChain, Collection<Message> by delegate {
   constructor(sourceId: String, eventId: String? = null) : this(sourceId, eventId, ConcurrentLinkedQueue())
 
-  // TODO
   override fun toString() = delegate.joinToString(" ") { it.toString() }
 
-  // TODO
-  override fun serialization() = ""
+  // serialization 要求逐元素拼接, 不加分隔符——PlainText 本身保留空白, 结构消息 (At/image/markdown)
+  // 的 serialization 已自带语义边界, 再插空格会污染重解析.
+  override fun serialization() = delegate.joinToString("") { it.serialization() }
 }
 
 object MessageChainAsStringSerializer : KSerializer<MessageChain> {
   override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("MessageChain", PrimitiveKind.STRING)
 
-  override fun deserialize(decoder: Decoder): MessageChain {
-    TODO("Not yet implemented")
-
-  }
+  // 纯文本 (lossy) 串化: 结构消息 (At/image/markdown) 的 serialization() 仅保留文本表示形式, 反序列化
+  // 后只得到单元素 PlainText, 不保证还原为原先的结构类型. 调用方需明白这一约束.
+  override fun deserialize(decoder: Decoder): MessageChain =
+    PlainText(decoder.decodeString()).toMessageChain()
 
   override fun serialize(encoder: Encoder, value: MessageChain) {
-    TODO("Not yet implemented")
+    encoder.encodeString(value.serialization())
   }
-
 }
 
 interface Message {

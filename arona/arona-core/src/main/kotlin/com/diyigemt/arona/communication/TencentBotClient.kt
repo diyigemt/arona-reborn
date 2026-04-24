@@ -272,16 +272,18 @@ private constructor(private val config: TencentBotConfig) :
 
   override val bot: TencentBot = this
   override val unionOpenid: String = config.appId
+  // TencentBot 是 Guild/Group/Friend 的聚合体, 本身不是任何消息的真实接收方;
+  // 这三个 Contact 接口方法只是继承下来不得不实现的壳, 直接调用是 API 误用.
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<*>? {
-    TODO("Not yet implemented")
+    throw UnsupportedOperationException("TencentBot is not a message receiver. Send on a concrete Group/Friend/Channel contact instead.")
   }
 
   override suspend fun uploadImage(url: String): TencentImage {
-    TODO("Not yet implemented")
+    throw UnsupportedOperationException("TencentBot is not a message receiver. Upload image via a concrete Group/Friend contact instead.")
   }
 
   override suspend fun uploadImage(data: ByteArray): TencentImage {
-    TODO("Not yet implemented")
+    throw UnsupportedOperationException("TencentBot is not a message receiver. Upload image via a concrete Group/Friend contact instead.")
   }
 
   override fun toString() = "TencentBot($appId)"

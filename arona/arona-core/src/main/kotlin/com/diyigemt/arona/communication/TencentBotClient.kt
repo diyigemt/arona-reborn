@@ -23,8 +23,6 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import kotlin.coroutines.CoroutineContext
-import kotlin.reflect.full.callSuspend
-import kotlin.reflect.full.declaredFunctions
 
 interface TencentBot : Closeable, Contact, CoroutineScope {
   val client: HttpClient
@@ -162,7 +160,18 @@ private constructor(private val config: TencentBotConfig) :
 
   fun dispatchWebhookEvent(source: String) {
     this.launch {
-      TencentWebsocketDispatchHandler::class.declaredFunctions.firstOrNull()?.callSuspend(TencentWebsocketDispatchHandler, fakeWebSocketSession, null, source)
+      // Sprint 2.1: 不再通过 fakeWebSocketSession + 反射桥接, 直接解 Payload0 拿 event type, 走多态 dispatch.
+      val preData = runCatching {
+        json.decodeFromString<TencentWebsocketPayload0>(source)
+      }.getOrElse {
+        logger.error("failed to decode webhook payload envelope: $source", it)
+        return@launch
+      }
+      TencentWebsocketDispatchEventManager.handleTencentDispatchEvent(
+        TencentDispatchContext(this@TencentBotClient),
+        preData.type,
+        source,
+      )
     }
   }
 

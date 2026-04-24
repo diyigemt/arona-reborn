@@ -12,41 +12,20 @@ import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemb
 import com.diyigemt.arona.communication.contact.GuildChannelMemberImpl
 import com.diyigemt.arona.communication.contact.GuildMemberImpl
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.util.logging.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlin.reflect.full.callSuspend
-import kotlin.reflect.full.declaredFunctions
 
-internal object TencentWebsocketReadyHandler : TencentWebsocketDispatchEventHandler<TencentWebsocketIdentifyResp>() {
-  override val type = TencentWebsocketEventType.READY
-  override val decoder = TencentWebsocketIdentifyResp.serializer()
-
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketIdentifyResp, eventId: String) {
-    logger.info("websocket receive hello from server")
-    sessionId = payload.sessionId
-    TencentBotWebsocketAuthSuccessEvent(bot, payload).broadcast()
-  }
-}
-
-internal object TencentWebsocketResumedHandler : TencentWebsocketDispatchEventHandler<TencentWebsocketResumeResp>() {
-  override val type = TencentWebsocketEventType.RESUMED
-  override val decoder = TencentWebsocketResumeResp.serializer()
-
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketResumeResp, eventId: String) {
-    logger.info("websocket resumed.")
-    TencentBotWebsocketConnectionResumeEvent(bot).broadcast()
-  }
-}
+// Sprint 2.1 清理: TencentWebsocketReadyHandler / TencentWebsocketResumedHandler 是 WebSocket 握手/恢复
+// 专属, webhook 下发不会走这两条, 且已无 wsJob 启动路径. 删除这两个 handler 以收敛 dispatch map.
 
 internal object TencentWebsocketMessageCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentChannelMessageRaw>() {
   override val type = TencentWebsocketEventType.MESSAGE_CREATE
   override val decoder = TencentChannelMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw, eventId: String) {
-    val guild = bot.guilds.getOrCreate(payload.guildId)
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentChannelMessageRaw, eventId: String) {
+    val guild = ctx.bot.guilds.getOrCreate(payload.guildId)
     val tmp = GuildChannelMemberImpl(
       guild.channels.getOrCreate(payload.channelId),
       guild.members.getOrCreate(payload.author.id)
@@ -63,8 +42,8 @@ internal object TencentWebsocketAtMessageCreateHandler :
   override val type = TencentWebsocketEventType.AT_MESSAGE_CREATE
   override val decoder = TencentChannelMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw, eventId: String) {
-    val guild = bot.guilds.getOrCreate(payload.guildId)
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentChannelMessageRaw, eventId: String) {
+    val guild = ctx.bot.guilds.getOrCreate(payload.guildId)
     val tmp = GuildChannelMemberImpl(
       guild.channels.getOrCreate(payload.channelId),
       guild.members.getOrCreate(payload.author.id)
@@ -83,10 +62,10 @@ internal object TencentWebsocketDirectMessageCreateHandler :
   override val type = TencentWebsocketEventType.DIRECT_MESSAGE_CREATE
   override val decoder = TencentChannelMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentChannelMessageRaw, eventId: String) {
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentChannelMessageRaw, eventId: String) {
     val memberId = payload.author.id
     val guildId = payload.guildId
-    val guild = bot.guilds.getOrCreate(guildId)
+    val guild = ctx.bot.guilds.getOrCreate(guildId)
     if (payload.member.user == null) {
       payload.member.user = payload.author
     }
@@ -115,8 +94,8 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
   override val type = TencentWebsocketEventType.GROUP_AT_MESSAGE_CREATE
   override val decoder = TencentGroupMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGroupMessageRaw, eventId: String) {
-    val member = bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGroupMessageRaw, eventId: String) {
+    val member = ctx.bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
     TencentGroupMessageEvent(payload.toMessageChain(), eventId, member).broadcast()
   }
 }
@@ -126,11 +105,11 @@ internal object TencentWebsocketC2CMessageCreateHandler :
   override val type = TencentWebsocketEventType.C2C_MESSAGE_CREATE
   override val decoder = TencentFriendMessageRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentFriendMessageRaw, eventId: String) {
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentFriendMessageRaw, eventId: String) {
     TencentFriendMessageEvent(
       payload.toMessageChain(),
       eventId,
-      bot.friends.getOrCreate(payload.author.id)
+      ctx.bot.friends.getOrCreate(payload.author.id)
     ).broadcast()
   }
 }
@@ -140,8 +119,8 @@ internal object TencentWebsocketGuildCreateHandler :
   override val type = TencentWebsocketEventType.GUILD_CREATE
   override val decoder = TencentGuildRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentGuildRaw, eventId: String) {
-    val guild = bot.guilds.getOrCreate(payload.id)
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGuildRaw, eventId: String) {
+    val guild = ctx.bot.guilds.getOrCreate(payload.id)
     val member = guild.members.getOrCreate(payload.opUserId)
     TencentGuildAddEvent(member, eventId).broadcast()
   }
@@ -152,8 +131,8 @@ internal object TencentWebsocketGroupAddBotHandler :
   override val type = TencentWebsocketEventType.GROUP_ADD_ROBOT
   override val decoder = TencentBotGroupEventRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotGroupEventRaw, eventId: String) {
-    val group = bot.groups.getOrCreate(payload.id)
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotGroupEventRaw, eventId: String) {
+    val group = ctx.bot.groups.getOrCreate(payload.id)
     val member = group.members.getOrCreate(payload.opMemberId)
     TencentGroupAddEvent(member, eventId).broadcast()
   }
@@ -164,8 +143,8 @@ internal object TencentWebsocketFriendAddBotHandler :
   override val type = TencentWebsocketEventType.FRIEND_ADD
   override val decoder = TencentBotFriendEventRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotFriendEventRaw, eventId: String) {
-    val friend = bot.friends.getOrCreate(payload.id)
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotFriendEventRaw, eventId: String) {
+    val friend = ctx.bot.friends.getOrCreate(payload.id)
     TencentFriendAddEvent(friend, eventId).broadcast()
   }
 }
@@ -175,8 +154,8 @@ internal object TencentWebsocketGroupDeleteBotHandler :
   override val type = TencentWebsocketEventType.GROUP_DEL_ROBOT
   override val decoder = TencentBotGroupEventRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotGroupEventRaw, eventId: String) {
-    val group = bot.groups.getOrCreate(payload.id)
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotGroupEventRaw, eventId: String) {
+    val group = ctx.bot.groups.getOrCreate(payload.id)
     val member = group.members.getOrCreate(payload.opMemberId)
     TencentGroupDeleteEvent(member, eventId).broadcast()
   }
@@ -187,8 +166,8 @@ internal object TencentWebsocketFriendDeleteBotHandler :
   override val type = TencentWebsocketEventType.FRIEND_DEL
   override val decoder = TencentBotFriendEventRaw.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentBotFriendEventRaw, eventId: String) {
-    val friend = bot.friends.getOrCreate(payload.id)
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotFriendEventRaw, eventId: String) {
+    val friend = ctx.bot.friends.getOrCreate(payload.id)
     TencentFriendDeleteEvent(friend, eventId).broadcast()
   }
 }
@@ -197,13 +176,13 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
   override val type = TencentWebsocketEventType.INTERACTION_CREATE
   override val decoder = TencentWebsocketCallbackButtonResp.serializer()
 
-  override suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: TencentWebsocketCallbackButtonResp, eventId: String) {
-    logger.debug("websocket receive callback btn from server.")
-    logger.debug(payload.toString())
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentWebsocketCallbackButtonResp, eventId: String) {
+    ctx.logger.debug("webhook receive callback btn from server.")
+    ctx.logger.debug(payload.toString())
     payload.missingCallbackRouteField()?.let { field ->
       // ContactList 现为真缓存 (Sprint 1.2), 用 id="" 的 Empty 占位会永久驻留并污染后续路由,
       // 因此 payload 关键字段缺失直接短路, 不 broadcast, 也不触碰任何 ContactList.
-      logger.warn(
+      ctx.logger.warn(
         "skip callback button event: missing $field. " +
             "chatType=${payload.chatType}, interactionId=${payload.id}, eventId=$eventId"
       )
@@ -214,20 +193,20 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
         val guildId = payload.guildId!!
         val channelId = payload.channelId!!
         val userId = payload.data.resolved.userId!!
-        bot.guilds.getOrCreate(guildId).let {
+        ctx.bot.guilds.getOrCreate(guildId).let {
           it.channels.getOrCreate(channelId) to it.members.getOrCreate(userId)
         }
       }
       TencentWebsocketCallbackButtonChatType.Group -> {
         val groupOpenid = payload.groupOpenid!!
         val groupMemberOpenid = payload.groupMemberOpenid!!
-        bot.groups.getOrCreate(groupOpenid).let {
+        ctx.bot.groups.getOrCreate(groupOpenid).let {
           it to it.members.getOrCreate(groupMemberOpenid)
         }
       }
       TencentWebsocketCallbackButtonChatType.Friend -> {
         val userOpenId = payload.userOpenId!!
-        bot.friends.getOrCreate(userOpenId).let {
+        ctx.bot.friends.getOrCreate(userOpenId).let {
           it to it
         }
       }
@@ -242,7 +221,7 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
       chatType = payload.chatType,
       contact = contact.first,
       user = contact.second,
-      bot = bot
+      bot = ctx.bot
     ).broadcast()
   }
 }
@@ -251,8 +230,7 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
  * 返回 [payload] 在当前 [TencentWebsocketCallbackButtonResp.chatType] 下第一个缺失的必需字段名;
  * 全部合法则返回 `null`.
  *
- * 独立出纯函数以便直接单测: handler 的 receiver 依赖 [TencentBotClientWebSocketSession],
- * 在测试里构造重型且受内部可见性限制, 把路由校验抽到这里可以无依赖覆盖所有分支.
+ * 独立出纯函数以便直接单测, 无需构造 handler 依赖的完整 bot / dispatch context.
  */
 internal fun TencentWebsocketCallbackButtonResp.missingCallbackRouteField(): String? = when (chatType) {
   TencentWebsocketCallbackButtonChatType.Guild -> when {
@@ -273,30 +251,70 @@ internal fun TencentWebsocketCallbackButtonResp.missingCallbackRouteField(): Str
   }
 }
 
+/**
+ * dispatch handler 的轻量上下文: 替代旧 `TencentBotClientWebSocketSession` 作为 receiver,
+ * 只暴露 handler 真正依赖的 bot/logger/json, 切断 dispatch 路径与 WebSocket 会话的历史耦合.
+ *
+ * 形参是 [TencentBot] 接口而非具体 `TencentBotClient`, 让测试替身可以直接注入无需反射 backdoor.
+ */
+internal class TencentDispatchContext(val bot: TencentBot) {
+  val logger get() = bot.logger
+  val json get() = bot.json
+}
+
+/**
+ * 把 handler 从 receiver-bound `TencentBotClientWebSocketSession.handleDispatchEvent` 改成
+ * 普通参数方法, 消除 Sprint 3.2 前半的反射调用 (旧的 `handler::class.declaredFunctions...callSuspend`).
+ * 子类显式 override [handle] 即可, 无需再走反射扫描或 KCallable.
+ */
 internal abstract class TencentWebsocketDispatchEventHandler<T> {
   abstract val type: TencentWebsocketEventType
   abstract val decoder: KSerializer<T>
-  abstract suspend fun TencentBotClientWebSocketSession.handleDispatchEvent(payload: T, eventId: String = "")
+  abstract suspend fun handle(ctx: TencentDispatchContext, payload: T, eventId: String = "")
+
+  /**
+   * 类型擦除桥接层: manager 解到的 payload 类型是 `Any?`, 由本方法在基类内部做一次受控 cast 调到 [handle].
+   * cast 安全由 [decoder] 与 [T] 的一致性保证——`decoder: KSerializer<T>` 解出的结果必然是 T.
+   */
+  @Suppress("UNCHECKED_CAST")
+  internal suspend fun handleDecoded(ctx: TencentDispatchContext, payload: Any?, eventId: String) {
+    handle(ctx, payload as T, eventId)
+  }
 }
 
 internal object TencentWebsocketDispatchEventManager {
-  private val map by lazy {
-    ReflectionUtil.scanInterfacePetObjectInstance(TencentWebsocketDispatchEventHandler::class).associateBy { it.type }
-  }
+  // 显式列表: 失去"自动扫描"的便利, 换来 dispatch 路径完全不依赖反射, 新增 handler 需显式登记于此.
+  private val map: Map<TencentWebsocketEventType, TencentWebsocketDispatchEventHandler<*>> = listOf(
+    TencentWebsocketMessageCreateHandler,
+    TencentWebsocketAtMessageCreateHandler,
+    TencentWebsocketDirectMessageCreateHandler,
+    TencentWebsocketGroupAtMessageCreateHandler,
+    TencentWebsocketC2CMessageCreateHandler,
+    TencentWebsocketGuildCreateHandler,
+    TencentWebsocketGroupAddBotHandler,
+    TencentWebsocketFriendAddBotHandler,
+    TencentWebsocketGroupDeleteBotHandler,
+    TencentWebsocketFriendDeleteBotHandler,
+    TencentWebsocketCallbackButtonHandler,
+  ).associateBy { it.type }
 
-  internal suspend fun TencentBotClientWebSocketSession.handleTencentDispatchEvent(
+  /** 测试侧用于断言 registry 覆盖面, 避免"新增 handler 忘记登记"静默退化为 noop. */
+  internal fun registeredEventTypes(): Set<TencentWebsocketEventType> = map.keys
+
+  internal suspend fun handleTencentDispatchEvent(
+    ctx: TencentDispatchContext,
     event: TencentWebsocketEventType,
     source: String,
   ) {
     val handler = map[event] ?: return
-    logger.debug("recev dispatch event: {}, data: {}", event, source)
+    ctx.logger.debug("recev dispatch event: {}, data: {}", event, source)
     runCatching {
-      json.decodeFromString(TencentWebsocketPayload.serializer(handler.decoder), source)
+      ctx.json.decodeFromString(TencentWebsocketPayload.serializer(handler.decoder), source)
     }.onSuccess {
-      handler::class.declaredFunctions.firstOrNull()?.callSuspend(handler, this, it.data, it.id ?: "")
+      handler.handleDecoded(ctx, it.data, it.id ?: "")
     }.onFailure {
-      logger.error(it)
-      logger.error("decode dispatch event failed event: {}, data: {}", event, source)
+      ctx.logger.error(it)
+      ctx.logger.error("decode dispatch event failed event: {}, data: {}", event, source)
     }
   }
 }

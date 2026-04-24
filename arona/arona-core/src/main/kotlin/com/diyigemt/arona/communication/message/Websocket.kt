@@ -7,7 +7,8 @@ import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.communication.event.TencentBotWebsocketConnectionLostEvent
 import com.diyigemt.arona.communication.event.TencentBotWebsocketHandshakeSuccessEvent
 import com.diyigemt.arona.communication.event.TencentCallbackButtonEventResult
-import com.diyigemt.arona.communication.event.TencentWebsocketDispatchEventManager.handleTencentDispatchEvent
+import com.diyigemt.arona.communication.event.TencentDispatchContext
+import com.diyigemt.arona.communication.event.TencentWebsocketDispatchEventManager
 import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.client.call.*
@@ -223,7 +224,13 @@ internal object TencentWebsocketDispatchHandler : TencentWebsocketOperationHandl
     source: String,
   ) {
     val preData = json.decodeFromString<TencentWebsocketPayload0>(source)
-    handleTencentDispatchEvent(preData.type, source)
+    // dispatch 已不再耦合 WS session: Sprint 2.1 把 handler receiver 改成普通 Context, 这里只需
+    // 从会话里拿到 bot 构造 context 即可调业务层.
+    TencentWebsocketDispatchEventManager.handleTencentDispatchEvent(
+      TencentDispatchContext(bot),
+      preData.type,
+      source,
+    )
   }
 }
 

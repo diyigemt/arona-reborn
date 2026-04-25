@@ -13,8 +13,6 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.logging.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -71,7 +69,10 @@ private constructor(private val config: TencentBotConfig) :
   override val friends: ContactList<FriendUser> = SingleUserContactList { EmptyFriendUserImpl(this, it) }
   override val isPublic = config.public
   override val isDebug = config.debug
-  private val accessTokenLock = Mutex()
+  // Sprint 3.1: token 只是单读单写, 没有 CAS / 复合临界区需求. 用 @Volatile 直接保证可见性,
+  // 删掉 Mutex 后 callOpenapi 的 header 注入路径不再被无谓串行化, 也消掉 token refresh 循环里
+  // 旧 withLock 占位的多余 suspension point.
+  @Volatile
   private var accessToken: String = ""
   private var accessTokenHeartbeatTask: Job? = null
   private val openapiSignHeader: HeadersBuilder.() -> Unit = {
@@ -141,9 +142,7 @@ private constructor(private val config: TencentBotConfig) :
           continue
         }
         retryCount = 0
-        accessTokenLock.withLock {
-          accessToken = data.accessToken
-        }
+        accessToken = data.accessToken
         TencentBotAuthSuccessEvent(this@TencentBotClient, data).broadcast()
         // 快过期的 60s 内申请会刷新 token; 距离过期至少留 30s 缓冲.
         delay((data.expiresIn - 30).coerceAtLeast(1) * 1000L)
@@ -195,9 +194,7 @@ private constructor(private val config: TencentBotConfig) :
     var bodyTmp = ""
     return runCatching {
       val resp = client.request {
-        accessTokenLock.withLock {
-          headers(openapiSignHeader)
-        }
+        headers(openapiSignHeader)
         contentType(ContentType.Application.Json)
         url(
           "https://${if (isDebug) "sandbox." else ""}api.sgroup.qq.com${endpoint.path}".let {

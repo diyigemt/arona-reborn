@@ -19,8 +19,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.createInstance
@@ -66,20 +65,37 @@ internal fun buildDynamicExecutor(root: CommandSignature, current: CommandSignat
 }
 
 internal fun initExecutorMap() {
+  // register/unregister 现在已经实时维护 ExecutorMap, initExecutorMap 仅用于启动期一次性兜底,
+  // 重入时先清空避免老条目残留 (理论上启动期 idempotent, 但防御一下成本极低).
+  ExecutorMap.clear()
   commandMap.forEach { (_, u) ->
-    val primaryName = u.primaryName
-    if (u.clazz.objectInstance != null) {
-      ExecutorMap[primaryName] = DynamicStaticCommandExecutor(listOf(u.primaryName), primaryName, u)
-    } else {
-      ExecutorMap[primaryName] = DynamicContextualCommandExecutor(listOf(u.primaryName), primaryName, u)
-    }
-    u.children.forEach {
-      buildDynamicExecutor(u, it, listOf(u.primaryName))
-    }
+    registerExecutorsFor(u)
   }
 }
 
-internal val ExecutorMap: MutableMap<String, DynamicCommandExecutor> = mutableMapOf()
+private fun registerExecutorsFor(signature: CommandSignature) {
+  val primaryName = signature.primaryName
+  if (signature.clazz.objectInstance != null) {
+    ExecutorMap[primaryName] = DynamicStaticCommandExecutor(listOf(signature.primaryName), primaryName, signature)
+  } else {
+    ExecutorMap[primaryName] = DynamicContextualCommandExecutor(listOf(signature.primaryName), primaryName, signature)
+  }
+  signature.children.forEach {
+    buildDynamicExecutor(signature, it, listOf(signature.primaryName))
+  }
+}
+
+private fun unregisterExecutorsFor(signature: CommandSignature, path: List<String> = listOf(signature.primaryName)) {
+  ExecutorMap.remove(path.joinToString(","))
+  signature.children.forEach {
+    unregisterExecutorsFor(it, path + it.primaryName)
+  }
+}
+
+// Sprint 3.4: ExecutorMap 也换 CHM, 防止 register/unregister 与 execute 在容器层撞车;
+// 跨 commandMap + ExecutorMap 的复合原子性 (注册过程中第三方读到只见 signature 不见 executor 之类)
+// 不在本任务范围, 留作后续 sprint.
+internal val ExecutorMap: MutableMap<String, DynamicCommandExecutor> = ConcurrentHashMap()
 
 internal fun CommandSignature.matchChildPath(path: List<String>): List<String> {
   if (path.isEmpty()) return listOf(primaryName)
@@ -133,8 +149,12 @@ internal fun KClass<out AbstractCommand>.createSignature(): CommandSignature {
 
 object CommandManager {
   private val logger = KtorSimpleLogger("CommandManager")
-  private val modifyLock = ReentrantLock()
-  internal val commandMap: MutableMap<String, CommandSignature> = mutableMapOf()
+  // Sprint 3.4: commandMap 换成 CHM, 解决容器自身的并发读写安全. ReentrantLock 删除——以前的
+  // modifyLock 只裹了一个 put, 没真正保护 register 与 match 之间的可见性, 也无法跨 commandMap +
+  // ExecutorMap 做原子.
+  // key 沿用 instance.primaryName.lowercase(), 跟 match* 入口的 lowercase 一致, 修掉旧实现 register
+  // 写非 lower / match 读 lower 的不对称.
+  internal val commandMap: MutableMap<String, CommandSignature> = ConcurrentHashMap()
 
   fun matchCommand(commandName: String): Command? = commandMap[commandName.lowercase()]?.createInstance()
   fun matchCommandName(commandName: String): String? = commandMap[commandName.lowercase()]?.primaryName
@@ -174,25 +194,28 @@ object CommandManager {
   internal fun registerCommandSignature(command: KClass<out AbstractCommand>, override: Boolean): Boolean {
     return kotlin.runCatching {
       val instance = command.createObjectOrInstance()
-      if (!override && findDuplicateCommand(instance) != null) {
-        return false
-      }
       val signature = command.createSignature()
-      return@runCatching modifyLock.withLock {
-        val lowerCaseName = instance.primaryName
-        commandMap[lowerCaseName] = signature
-        true
+      val key = instance.primaryName.lowercase()
+      val replaced = if (override) {
+        commandMap.put(key, signature)
+      } else {
+        // putIfAbsent 在容器层就保证不会撞车; 旧实现 findDuplicate + put 是 TOCTOU.
+        commandMap.putIfAbsent(key, signature)?.let { return false }
+        null
       }
+      replaced?.let(::unregisterExecutorsFor)
+      registerExecutorsFor(signature)
+      true
     }.getOrThrow()
   }
 
-  fun findDuplicateCommand(command: Command): Command? = commandMap
-    .values
-    .firstOrNull { it.primaryName == command.primaryName }
-    ?.createInstance()
+  fun findDuplicateCommand(command: Command): Command? =
+    commandMap[command.primaryName.lowercase()]?.createInstance()
 
-  fun unregisterCommand(command: Command): Boolean = modifyLock.withLock {
-    commandMap.remove(command.primaryName) != null
+  fun unregisterCommand(command: Command): Boolean {
+    val removed = commandMap.remove(command.primaryName.lowercase()) ?: return false
+    unregisterExecutorsFor(removed)
+    return true
   }
 
   fun isCommandRegistered(command: Command): Boolean = matchCommandName(command.primaryName) != null

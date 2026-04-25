@@ -254,6 +254,13 @@ internal data class TencentBotFriendEventRaw(
   override val id get() = openid
 }
 
+// Sprint 3.5(b): Java 默认 \s 不覆盖 NBSP (U+00A0) 与全角空格 (U+3000), Kotlin Char.isWhitespace
+// 同样不吞 NBSP. 客户端常见把这两类粘进 @bot 消息, 旧实现 split(" ") 会把整段当 PlainText, at 解析失败.
+// 显式列出字符集, 既不依赖 UNICODE_CHARACTER_CLASS flag, 也不放进所有 unicode 空白避免误伤 ZWSP 之类.
+private val TencentMessageWhitespaceRegex = Regex("[\\s\\u00A0\\u3000]+")
+private fun Char.isTencentMessageWhitespace(): Boolean =
+  isWhitespace() || this == ' ' || this == '　'
+
 internal interface TencentMessageRaw : ContactRaw {
   /**
    * 消息创建者
@@ -276,16 +283,16 @@ internal interface TencentMessageRaw : ContactRaw {
   val attachments: List<TencentMessageAttachmentRaw>?
   fun toMessageChain(): MessageChain {
     val messageChain = MessageChainImpl(this.id)
-    with(this.content.trim()) {
+    with(this.content.trim { it.isTencentMessageWhitespace() }) {
       if (isNotBlank()) {
-        split(" ")
+        split(TencentMessageWhitespaceRegex)
           .takeIf { it.size >= 2 }
           ?.run {
             first().toSourceTencentAt()?.also { at ->
               messageChain.delegate.add(at)
               messageChain.delegate.add(PlainText(this.subList(1, this.size).joinToString(" ")))
             }
-          } ?: messageChain.delegate.add(PlainText(this.trim()))
+          } ?: messageChain.delegate.add(PlainText(this))
       }
     }
     if (this.attachments?.isNotEmpty() == true) {
@@ -1039,7 +1046,11 @@ class MessageChainBuilder private constructor(
 
   // TODO build其他类型消息
   fun build(): MessageChain {
-    return MessageChainImpl(sourceMessageId ?: EmptyMessageId, eventId, this)
+    // Sprint 3.5(a): 旧实现把 builder 自己 (其 container 委托) 当 chain 的 delegate, 调用 build() 后继续
+    // builder.append(...) 会污染已发出 chain. 这里改成快照, 修掉别名 bug. MessageChainImpl 自身仍保持
+    // 可变 delegate 不动, 因为内部构造路径 (TencentMessageRaw.toMessageChain 等) 还会直接写 delegate;
+    // 一步到位换不可变实现会放大改动面.
+    return MessageChainImpl(sourceMessageId ?: EmptyMessageId, eventId, container.toMutableList())
   }
 }
 

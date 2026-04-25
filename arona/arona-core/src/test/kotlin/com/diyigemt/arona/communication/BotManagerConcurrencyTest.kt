@@ -43,14 +43,9 @@ class BotManagerConcurrencyTest {
 
   @AfterTest
   fun cleanupRegistry() {
-    // BotManager 是 object, 跨测试共享. 直接 close() 不会清 map; 用反射干净掉两个内部字段.
-    val mapField = BotManager.javaClass.getDeclaredField("bots").apply { isAccessible = true }
-    @Suppress("UNCHECKED_CAST")
-    (mapField.get(BotManager) as MutableMap<String, TencentBot>).clear()
-    val firstField = BotManager.javaClass.getDeclaredField("firstBotId").apply { isAccessible = true }
-    val ref = firstField.get(BotManager) as java.util.concurrent.atomic.AtomicReference<*>
-    @Suppress("UNCHECKED_CAST")
-    (ref as java.util.concurrent.atomic.AtomicReference<String?>).set(null)
+    // BotManager 是 object, 跨测试共享. close() 现在顺手清 registry, 测试只关心是不是干净, 不关心
+    // 这次 close 是不是把 bot 实例真正关掉 (closeCounters 会被一起重置).
+    BotManager.close()
     closeCounters.clear()
   }
 

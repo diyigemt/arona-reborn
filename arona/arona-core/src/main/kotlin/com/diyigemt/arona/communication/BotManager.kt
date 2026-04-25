@@ -28,9 +28,13 @@ object BotManager {
     return bots[defaultId] ?: throw IllegalStateException("Default bot $defaultId no longer registered.")
   }
 
+  // close 不再只关 bot 实例, 还顺手清 registry. 旧实现关完不清, 调用方 close 后再 registerBot 同 id 会
+  // 因 putIfAbsent 命中残留 entry 而无声丢失. 测试场景下也省一次反射清状态.
   fun close() {
     bots.values.forEach {
       it.close()
     }
+    bots.clear()
+    firstBotId.set(null)
   }
 }

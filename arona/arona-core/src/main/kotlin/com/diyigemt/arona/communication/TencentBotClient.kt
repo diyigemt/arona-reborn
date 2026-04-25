@@ -255,6 +255,10 @@ private constructor(private val config: TencentBotConfig) :
         }
         
         is ApiTokenExpiredException -> {
+          // 已知 preexisting 缺陷, Sprint 3 未处理: 并发 401 时多个请求会各自走到这里同时调
+          // updateAccessToken(), 它内部 cancel 老 job 再 launch 新 job, 多次叠加在极端情况下
+          // 可能让最终 token 反而是过时值. 修复需要把 refresh 做成单飞 (single-flight) 合流, 留作下个
+          // sprint, 不在 3.1 (去 Mutex) 范围.
           updateAccessToken()
         }
 

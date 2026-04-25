@@ -1,17 +1,35 @@
 package com.diyigemt.arona.communication
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
+
+// Sprint 3.3: 仅升级存储并发安全 + 默认 bot 引用稳定化, 不在本轮引入真正的多 bot 路由.
+//  - 旧 mutableListOf + linear scan 不是线程安全的, 注册路径在 SupervisorJob 异步分派下会撞车.
+//  - 改 ConcurrentHashMap, key 沿用 bot.id (即 config.id, 不是 appId; appId 暴露在 unionOpenid).
+//  - 无参 getBot() 不能用 values.firstOrNull(), 因为 CHM 的迭代顺序对调用方不稳定. 单独追踪
+//    第一个被注册的 bot id, 多 bot 场景下行为可重现.
+//  - WebhookEndpoint / CommandMain / BuiltInCommands / Event.kt 仍然走 getBot() 拿默认 bot;
+//    多租户路由 (按 appId/path 分发) 是另一个 sprint.
 object BotManager {
-  private val bots = mutableListOf<TencentBot>()
+  private val bots = ConcurrentHashMap<String, TencentBot>()
+  private val firstBotId = AtomicReference<String?>(null)
+
   fun registerBot(bot: TencentBot) {
-    if (bots.none { it.id == bot.id }) {
-      bots.add(bot)
+    if (bots.putIfAbsent(bot.id, bot) == null) {
+      firstBotId.compareAndSet(null, bot.id)
     }
   }
 
-  fun getBot(id: String) = bots.first { it.id == id }
-  fun getBot() = bots.first()
+  fun getBot(id: String): TencentBot =
+    bots[id] ?: throw NoSuchElementException("Bot $id not found.")
+
+  fun getBot(): TencentBot {
+    val defaultId = firstBotId.get() ?: throw NoSuchElementException("No bot registered.")
+    return bots[defaultId] ?: throw IllegalStateException("Default bot $defaultId no longer registered.")
+  }
+
   fun close() {
-    bots.forEach {
+    bots.values.forEach {
       it.close()
     }
   }

@@ -21,7 +21,9 @@ import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.slf4j.Logger
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import org.jetbrains.exposed.sql.and
@@ -30,6 +32,42 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.random.Random
+
+// Sprint 3.5(c): 旧 GuildImpl.init 直接调 fetchMemberList()/fetchChannelList(), 这两个函数返回 Unit
+// 还吃掉了 callOpenapi 的 Result, init 协程一旦 fetch 失败 (常见于 Tencent API 5xx / 网络抖动) 就永久
+// 缺数据, 没有任何重试. 把 fetch* 改返回 Result 让失败信号显式化, init 走 retryInitFetch 做指数退避.
+//
+// 实现要点:
+//  - 总尝试 = 1 initial + 3 retry = 4 次, 间隔 1s/3s/9s. 中间失败静默 (callOpenapi 内部已 log onFailure),
+//    末次失败再 warn 一次, 不放大日志噪音.
+//  - CancellationException 必须直通: bot scope cancel 后 init 不能被 retry 兜住继续跑.
+//  - 一切非 CE 异常 (含 fetch lambda 内部 sqlDbQuery 抛) 都被转成 Result.failure, 进入下一轮 retry.
+internal val GuildInitFetchBackoff: LongArray = longArrayOf(1_000L, 3_000L, 9_000L)
+
+internal suspend fun <T> retryInitFetch(
+  logger: Logger,
+  label: String,
+  delays: LongArray = GuildInitFetchBackoff,
+  fetch: suspend () -> Result<T>,
+): Result<T> {
+  var lastFailure: Throwable? = null
+  for (attempt in 0..delays.size) {
+    val result = try {
+      fetch()
+    } catch (ce: CancellationException) {
+      throw ce
+    } catch (t: Throwable) {
+      Result.failure(t)
+    }
+    if (result.isSuccess) return result
+    lastFailure = result.exceptionOrNull()
+    if (attempt < delays.size) {
+      delay(delays[attempt])
+    }
+  }
+  logger.warn("init fetch failed after ${delays.size + 1} attempts, step=$label", lastFailure)
+  return Result.failure(lastFailure ?: IllegalStateException("init fetch failed without cause: $label"))
+}
 
 /**
  * 命中 [com.diyigemt.arona.communication.MessageDuplicationException] 后计算重放用的 messageSequence.
@@ -362,14 +400,14 @@ internal class GuildImpl(
   init {
     this.launch {
       if (!isPublic) {
-        fetchMemberList()
-        fetchChannelList()
+        retryInitFetch(bot.logger, "guild $id members") { fetchMemberList() }
+        retryInitFetch(bot.logger, "guild $id channels") { fetchChannelList() }
       }
     }
   }
 
-  private suspend fun fetchMemberList() {
-    bot.callOpenapi(
+  private suspend fun fetchMemberList(): Result<List<TencentGuildMemberRaw>> {
+    return bot.callOpenapi(
       TencentEndpoint.GetGuildMemberList,
       ListSerializer(TencentGuildMemberRaw.serializer()),
       mapOf("guild_id" to id)
@@ -392,8 +430,8 @@ internal class GuildImpl(
     }
   }
 
-  private suspend fun fetchChannelList() {
-    bot.callOpenapi(
+  private suspend fun fetchChannelList(): Result<List<TencentGuildChannelRaw>> {
+    return bot.callOpenapi(
       TencentEndpoint.GetGuildChannelList,
       ListSerializer(TencentGuildChannelRaw.serializer()),
       mapOf("guild_id" to id)

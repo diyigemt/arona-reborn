@@ -125,6 +125,26 @@ internal object TencentWebsocketGuildCreateHandler :
   }
 }
 
+/**
+ * 机器人被踢出频道 / 频道解散. 先广播让 listener 拿到完整 guild 上下文, 再 [ContactList.remove]
+ * 回收并连锁 cancel 整棵子树. broadcast 异常 / 取消路径下也必须清理, 故走 try/finally.
+ */
+internal object TencentWebsocketGuildDeleteHandler :
+  TencentWebsocketDispatchEventHandler<TencentGuildRaw>() {
+  override val type = TencentWebsocketEventType.GUILD_DELETE
+  override val decoder = TencentGuildRaw.serializer()
+
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGuildRaw, eventId: String) {
+    val guild = ctx.bot.guilds.getOrCreate(payload.id)
+    val member = guild.members.getOrCreate(payload.opUserId)
+    try {
+      TencentGuildDeleteEvent(member, eventId).broadcast()
+    } finally {
+      ctx.bot.guilds.remove(payload.id)
+    }
+  }
+}
+
 internal object TencentWebsocketGroupAddBotHandler :
   TencentWebsocketDispatchEventHandler<TencentBotGroupEventRaw>() {
   override val type = TencentWebsocketEventType.GROUP_ADD_ROBOT
@@ -148,6 +168,9 @@ internal object TencentWebsocketFriendAddBotHandler :
   }
 }
 
+/**
+ * 机器人被踢出群. 广播完再 remove, 取消路径走 finally 兜底, 避免缓存残留.
+ */
 internal object TencentWebsocketGroupDeleteBotHandler :
   TencentWebsocketDispatchEventHandler<TencentBotGroupEventRaw>() {
   override val type = TencentWebsocketEventType.GROUP_DEL_ROBOT
@@ -156,10 +179,17 @@ internal object TencentWebsocketGroupDeleteBotHandler :
   override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotGroupEventRaw, eventId: String) {
     val group = ctx.bot.groups.getOrCreate(payload.id)
     val member = group.members.getOrCreate(payload.opMemberId)
-    TencentGroupDeleteEvent(member, eventId).broadcast()
+    try {
+      TencentGroupDeleteEvent(member, eventId).broadcast()
+    } finally {
+      ctx.bot.groups.remove(payload.id)
+    }
   }
 }
 
+/**
+ * 用户解除好友. 广播完再 remove, 取消路径走 finally 兜底, 避免缓存残留.
+ */
 internal object TencentWebsocketFriendDeleteBotHandler :
   TencentWebsocketDispatchEventHandler<TencentBotFriendEventRaw>() {
   override val type = TencentWebsocketEventType.FRIEND_DEL
@@ -167,7 +197,11 @@ internal object TencentWebsocketFriendDeleteBotHandler :
 
   override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotFriendEventRaw, eventId: String) {
     val friend = ctx.bot.friends.getOrCreate(payload.id)
-    TencentFriendDeleteEvent(friend, eventId).broadcast()
+    try {
+      TencentFriendDeleteEvent(friend, eventId).broadcast()
+    } finally {
+      ctx.bot.friends.remove(payload.id)
+    }
   }
 }
 
@@ -290,6 +324,7 @@ internal object TencentWebsocketDispatchEventManager {
     TencentWebsocketGroupAtMessageCreateHandler,
     TencentWebsocketC2CMessageCreateHandler,
     TencentWebsocketGuildCreateHandler,
+    TencentWebsocketGuildDeleteHandler,
     TencentWebsocketGroupAddBotHandler,
     TencentWebsocketFriendAddBotHandler,
     TencentWebsocketGroupDeleteBotHandler,

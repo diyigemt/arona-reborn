@@ -8,6 +8,43 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
+/**
+ * 顶层 [com.diyigemt.arona.communication.contact.ContactList] 的有界缓存阈值.
+ *
+ * `maximumSize` 触发 Caffeine size-based eviction (window TinyLFU, 非严格 LRU);
+ * `expireAfterAccessSeconds` 触发空闲过期 (entry 在该秒数内未被访问即可被清).
+ * 默认值在 [TencentBotContactCacheConfig] 给, 按 6w DAU 量级估算: 见各 ContactList 字段说明.
+ */
+@Serializable
+data class ContactCacheTuning(
+  val maximumSize: Long,
+  val expireAfterAccessSeconds: Long,
+)
+
+/**
+ * 三个顶层 ContactList (`bot.guilds` / `bot.groups` / `bot.friends`) 的容量配置.
+ * inner ContactList (Guild/Group/Channel 内嵌的 members/channels) 当前仍走无界 ConcurrentHashMap,
+ * 跟随 outer 容器一并被 GC.
+ */
+@Serializable
+data class TencentBotContactCacheConfig(
+  // 频道一般每 bot 几十~几百个; 给 1k + 7d 提供大量余量.
+  val guilds: ContactCacheTuning = ContactCacheTuning(
+    maximumSize = 1_000,
+    expireAfterAccessSeconds = 7 * 24 * 60 * 60L,
+  ),
+  // 群上限以"机器人加入的群"为基数; 6w DAU 业务多在数千群级别.
+  val groups: ContactCacheTuning = ContactCacheTuning(
+    maximumSize = 10_000,
+    expireAfterAccessSeconds = 24 * 60 * 60L,
+  ),
+  // 好友/C2C 用户基数最大, 也是 cache miss 频率最高的; 上限设到 DAU 量级以上.
+  val friends: ContactCacheTuning = ContactCacheTuning(
+    maximumSize = 100_000,
+    expireAfterAccessSeconds = 24 * 60 * 60L,
+  ),
+)
+
 @Serializable
 data class TencentBotConfig(
   val id: String,
@@ -16,7 +53,8 @@ data class TencentBotConfig(
   val secret: String,
   val public: Boolean = false,
   val debug: Boolean = false,
-  val shard: List<Int> = listOf(0, 1) // [0,4] 分4片当前第0片, 默认[0,1]
+  val shard: List<Int> = listOf(0, 1), // [0,4] 分4片当前第0片, 默认[0,1]
+  val contactCache: TencentBotContactCacheConfig = TencentBotContactCacheConfig(),
 ) {
   fun toAuthConfig() = TencentBotAuthEndpointReq(appId, secret)
 }

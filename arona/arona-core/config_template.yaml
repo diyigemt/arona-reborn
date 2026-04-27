@@ -6,6 +6,26 @@ bot:
   public: false
   debug: false
   shard: [0, 1]
+  # 顶层 ContactList (bot.guilds / bot.groups / bot.friends) 的有界缓存阈值.
+  # maximumSize 触发 Caffeine size-based eviction (window TinyLFU, 非严格 LRU);
+  # expireAfterAccessSeconds 触发空闲过期, entry 在该秒数内未被访问即可被淘汰.
+  # 淘汰回调会 cancel 被驱逐 contact 自己的 SupervisorJob (借用父 scope 的 leaf member 不受影响),
+  # 进而连锁 cancel 它的 inner ContactList 内所有协程子任务. inner ContactList (Guild/Group/Channel
+  # 内嵌的 members/channels) 当前仍为无界 ConcurrentHashMap, 跟随 outer 容器一并被 GC.
+  # 默认值按 6w DAU 量级估算; 调小会让缓存命中率下降, 调大会增加 heap 占用. 整段可省略, 不写时按下面默认值生效.
+  contactCache:
+    # 频道一般每 bot 几十~几百个; 1k + 7d 给大量余量.
+    guilds:
+      maximumSize: 1000
+      expireAfterAccessSeconds: 604800   # 7d
+    # 群上限以"机器人加入的群"为基数; 6w DAU 业务多在数千群级别.
+    groups:
+      maximumSize: 10000
+      expireAfterAccessSeconds: 86400    # 24h
+    # 好友/C2C 用户基数最大, miss 频率最高; 上限设到 DAU 量级以上.
+    friends:
+      maximumSize: 100000
+      expireAfterAccessSeconds: 86400    # 24h
 adminToken: ""
 redis:
   host: "127.0.0.1"

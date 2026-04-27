@@ -3,6 +3,7 @@ package com.diyigemt.arona.communication.contact
 import com.diyigemt.arona.communication.MessageDuplicationException
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
+import com.diyigemt.arona.communication.contact.Guild.Companion.batchResolveMemberPrivateChannels
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
@@ -15,6 +16,8 @@ import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.error
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.RemovalListener
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -28,6 +31,8 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import org.jetbrains.exposed.sql.and
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -89,6 +94,22 @@ interface Contact : CoroutineScope {
   val fatherSubjectIdOrSelf
     get() = if (this is Channel) this.guild.id else id
 
+  /**
+   * 是否拥有独立的 [CoroutineScope] / [Job].
+   *
+   * `true` (默认): 该 Contact 在构造时通过 [com.diyigemt.arona.utils.childScopeContext] 派生出独立
+   * SupervisorJob, 释放时需主动 cancel——典型如 [GuildImpl] / [GroupImpl] / [FriendUserImpl] /
+   * [ChannelImpl] 这类容器型实体, 自身有 init 任务或承载 inner [ContactList].
+   *
+   * `false` (借用模式): 该 Contact 直接复用父 [CoroutineContext], **不**持有自己的 [Job]——典型如
+   * 频道消息/私聊路径上每条消息 new 出来的 leaf member (`GuildChannelMemberImpl` /
+   * `GuildMemberImpl` / `GroupMemberImpl` 及其 Empty 占位). 这些对象只是身份/转发视图, 没有需要
+   * 跟随实例独立 cancel 的副作用. 借用模式下 [ContactList.remove] 等回收路径必须避免误 cancel
+   * 父 scope, 否则会让一整棵 Guild/Group 的子任务一起死掉.
+   */
+  val ownsCoroutineScope: Boolean
+    get() = true
+
   suspend fun sendMessage(message: String, messageSequence: Int = 1) = sendMessage(PlainText(message), messageSequence)
 
   /**
@@ -126,8 +147,14 @@ interface Contact : CoroutineScope {
 internal abstract class AbstractContact(
   final override val bot: TencentBot,
   parentCoroutineContext: CoroutineContext,
+  ownsCoroutineScope: Boolean = true,
 ) : Contact {
-  final override val coroutineContext: CoroutineContext = parentCoroutineContext.childScopeContext()
+  final override val ownsCoroutineScope: Boolean = ownsCoroutineScope
+  // ownsCoroutineScope=true 时派生独立 SupervisorJob, false 时直接复用父 context.
+  // 借用模式必须不建新 Job, 否则父 children 链表会按实例数线性增长 (典型即每条消息泄漏的临时 sender).
+  final override val coroutineContext: CoroutineContext =
+    if (ownsCoroutineScope) parentCoroutineContext.childScopeContext()
+    else parentCoroutineContext
 
   @Suppress("UNCHECKED_CAST")
   suspend fun <C : Contact> callMessageOpenApi(
@@ -348,6 +375,25 @@ interface Guild : Contact {
   val isPublic: Boolean
 
   companion object {
+    /**
+     * 批量解析 [memberIds] 在当前 guild 下已有的私聊 channelId 映射 (单次 SQL `IN (...)` 查询).
+     *
+     * 仅查询不写入: [GuildImpl.fetchMemberList] 启动期预热成员表的路径默认 channelId="0", 不会触发
+     * `findOrCreateMemberPrivateChannel` 的 insert 分支, 因此整体批量化只需消除 N 次同步查询.
+     * 需要 insert 的懒路径仍走单条 [findOrCreateMemberPrivateChannel].
+     */
+    fun Guild.batchResolveMemberPrivateChannels(memberIds: Collection<String>): Map<String, String> {
+      val distinctIds = memberIds.asSequence().filter { it.isNotEmpty() }.distinct().toList()
+      if (distinctIds.isEmpty()) return emptyMap()
+      return sqlDbQuery {
+        GuildMemberSchema.find {
+          (GuildMemberTable.botId eq bot.id) and
+            (GuildMemberTable.guildId eq id) and
+            (GuildMemberTable.id inList distinctIds)
+        }.associate { it.id.value to it.channelId }
+      }
+    }
+
     fun Guild.findOrCreateMemberPrivateChannel(memberId: String, channelId: String = "0"): Channel {
       return when (val channel = sqlDbQuery {
         GuildMemberSchema.find {
@@ -416,13 +462,17 @@ internal class GuildImpl(
       url {
         parameters.append("limit", "400")
       }
-    }.onSuccess {
-      it.forEach { member ->
+    }.onSuccess { rawMembers ->
+      // 单次批量查询替代逐成员的 N 次同步 SQL (limit=400 → 原本启动期单 guild 400 次 sqlDbQuery).
+      val channelIdByMemberId = batchResolveMemberPrivateChannels(
+        rawMembers.mapNotNull { it.user?.id }
+      )
+      rawMembers.forEach { member ->
         val memberId = member.user?.id ?: ""
         members.getOrCreate(memberId) {
           GuildMemberImpl(
             this@GuildImpl,
-            findOrCreateMemberPrivateChannel(memberId),
+            channels.getOrCreate(channelIdByMemberId[memberId] ?: "0"),
             member
           )
         }
@@ -554,7 +604,7 @@ internal class GroupMemberImpl(
   override val id: String,
   override val group: Group,
   override val unionOpenid: String? = null,
-) : GroupMember, AbstractContact(group.bot, parentCoroutineContext) {
+) : GroupMember, AbstractContact(group.bot, parentCoroutineContext, ownsCoroutineScope = false) {
   // Sprint 1.2 后 ContactList 是真缓存, friends.getOrCreate(id) 同 id 稳定返回同一 FriendUser 实例,
   // 重复调用不会重复创建或互相覆盖.
   override fun asSingleUser(): FriendUser = bot.friends.getOrCreate(id)
@@ -569,7 +619,7 @@ internal class GroupMemberImpl(
 internal class GuildChannelMemberImpl(
   override val channel: Channel,
   private val internalMember: GuildMember,
-) : GuildChannelMember, AbstractContact(channel.bot, channel.coroutineContext) {
+) : GuildChannelMember, AbstractContact(channel.bot, channel.coroutineContext, ownsCoroutineScope = false) {
   override val id get() = internalMember.id
   override val guild get() = internalMember.guild
   override val unionOpenid: String? = null
@@ -586,7 +636,7 @@ internal class GuildMemberImpl(
   override val channel: Channel, // 私聊频道
   private val internalGuildUser: TencentGuildMemberRaw,
   override val unionOpenid: String? = null,
-) : GuildMember, AbstractContact(guild.bot, guild.coroutineContext) {
+) : GuildMember, AbstractContact(guild.bot, guild.coroutineContext, ownsCoroutineScope = false) {
   override val id get() = unionOpenid ?: internalGuildUser.user?.id ?: EmptyMessageId
 
   // 私聊使用另一个接口, 而不是频道接口
@@ -610,7 +660,7 @@ interface EmptyContact : Contact {
 internal class EmptyGuildMemberImpl(
   override val guild: Guild,
   override val id: String = EmptyMessageId,
-) : GuildMember, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext) {
+) : GuildMember, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext, ownsCoroutineScope = false) {
   override val unionOpenid = EmptyMessageId
   override val channel: Channel
     get() = guild.findOrCreateMemberPrivateChannel(id)
@@ -623,7 +673,7 @@ internal class EmptyGuildMemberImpl(
 internal class EmptyGuildChannelMemberImpl(
   override val channel: Channel, // 私聊频道
   override val id: String = EmptyMessageId,
-) : GuildChannelMember, EmptyContact, AbstractContact(channel.bot, channel.coroutineContext) {
+) : GuildChannelMember, EmptyContact, AbstractContact(channel.bot, channel.coroutineContext, ownsCoroutineScope = false) {
   override val guild: Guild = channel.guild
   override fun asGuildMember(): GuildMember = guild.members.getOrCreate(id)
   override val unionOpenid = EmptyMessageId
@@ -669,7 +719,7 @@ internal class EmptyGuildImpl(
 internal class EmptyGroupMemberImpl(
   override val group: Group,
   override val id: String = EmptyMessageId,
-) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
+) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext, ownsCoroutineScope = false) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<GroupMember>? {
     throw IllegalStateException("EmptyGroupMemberImpl is a placeholder (id=$id) and cannot send messages.")
@@ -682,7 +732,7 @@ internal class EmptyGroupMemberImpl(
 internal class EmptyMockGroupMemberImpl(
   override val group: Group,
   override val id: String = EmptyMessageId,
-) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext) {
+) : GroupMember, EmptyContact, AbstractContact(group.bot, group.coroutineContext, ownsCoroutineScope = false) {
   override val unionOpenid: String = EmptyMessageId
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<GroupMember>? {
     throw IllegalStateException("EmptyMockGroupMemberImpl is a placeholder (id=$id) and cannot send messages.")
@@ -738,14 +788,48 @@ internal class EmptyMockGroupImpl(
   }
 }
 
+/**
+ * Caffeine 后端 [ConcurrentMap], 用于顶层 [ContactList] 的有界缓存语义.
+ *
+ * 淘汰回调仅 cancel `ownsCoroutineScope == true` 的 Contact 自身 SupervisorJob; 借用父 scope 的
+ * leaf member 不能在这里 cancel, 否则会误伤父 Guild/Group/Channel 的 Job. 容器型 Contact (Guild/
+ * Group/Channel) 的 inner ContactList 会随 outer Job cancel + 强引用断开自然释放, 此处不显式 clear,
+ * 避免淘汰瞬间还在被 listener 路径访问引发并发歧义.
+ *
+ * `removalListener` 默认在 Caffeine executor (ForkJoinPool.commonPool) 异步执行, cancel SupervisorJob
+ * 是 cheap 操作可以接受异步语义; 改用 `evictionListener` (维护线程同步执行) 会阻塞 cache 维护路径,
+ * 不划算.
+ */
+internal fun <C : Contact> boundedContactMap(
+  maximumSize: Long,
+  expireAfterAccessSeconds: Long,
+): ConcurrentMap<String, C> {
+  val removalListener = RemovalListener<String, C> { _, contact, _ ->
+    if (contact?.ownsCoroutineScope == true) {
+      contact.coroutineContext[Job]?.cancel()
+    }
+  }
+  return Caffeine.newBuilder()
+    .maximumSize(maximumSize)
+    .expireAfterAccess(expireAfterAccessSeconds, TimeUnit.SECONDS)
+    .removalListener(removalListener)
+    .build<String, C>()
+    .asMap()
+}
+
 abstract class ContactList<out C : Contact>(
-  internal val delegate: ConcurrentHashMap<String, @UnsafeVariance C>,
+  internal val delegate: ConcurrentMap<String, @UnsafeVariance C>,
+  val generator: (id: String) -> @UnsafeVariance C,
 ) : Collection<C> by delegate.values {
-  constructor() : this(ConcurrentHashMap())
+  constructor(generator: (id: String) -> @UnsafeVariance C) : this(ConcurrentHashMap(), generator)
+
+  constructor(
+    maximumSize: Long,
+    expireAfterAccessSeconds: Long,
+    generator: (id: String) -> @UnsafeVariance C,
+  ) : this(boundedContactMap(maximumSize, expireAfterAccessSeconds), generator)
 
   operator fun get(id: String): C? = delegate[id]
-
-  abstract val generator: (id: String) -> C
 
   fun getOrCreate(id: String): C = delegate.computeIfAbsent(id) { generator(it) }
 
@@ -763,7 +847,10 @@ abstract class ContactList<out C : Contact>(
     when {
       existing == null -> factory(key)
       existing is EmptyContact -> {
-        existing.coroutineContext[Job]?.cancel()
+        // 借用父 scope 的占位 cancel 等于 cancel 父 Guild/Group, 必须跳过.
+        if (existing.ownsCoroutineScope) {
+          existing.coroutineContext[Job]?.cancel()
+        }
         factory(key)
       }
       else -> existing
@@ -774,8 +861,11 @@ abstract class ContactList<out C : Contact>(
 
   fun remove(id: String): Boolean {
     val removed = delegate.remove(id) ?: return false
-    // 从列表移除即视为该 Contact 不再活跃, 主动取消其 SupervisorJob 防止 scope 泄漏.
-    removed.coroutineContext[Job]?.cancel()
+    // 仅拥有独立 scope 的 Contact 需要主动 cancel; 借用父 scope 的实例直接 cancel 等于
+    // 把父 Guild/Group 杀掉, 引发整棵子树连锁 cancel, 不是这里的预期语义.
+    if (removed.ownsCoroutineScope) {
+      removed.coroutineContext[Job]?.cancel()
+    }
     return true
   }
 
@@ -789,30 +879,35 @@ abstract class ContactList<out C : Contact>(
 }
 
 internal class GuildMemberContactList(
-  override val generator: (id: String) -> GuildMember,
-) : ContactList<GuildMember>()
+  generator: (id: String) -> GuildMember,
+) : ContactList<GuildMember>(generator)
 
 internal class GuildChannelMemberContactList(
-  override val generator: (id: String) -> GuildChannelMember,
-) : ContactList<GuildChannelMember>()
+  generator: (id: String) -> GuildChannelMember,
+) : ContactList<GuildChannelMember>(generator)
 
 internal class ChannelContactList(
-  override val generator: (id: String) -> Channel,
-) : ContactList<Channel>()
+  generator: (id: String) -> Channel,
+) : ContactList<Channel>(generator)
 
-internal class GuildContactList(
-  override val generator: (id: String) -> Guild,
-) : ContactList<Guild>()
+internal class GuildContactList : ContactList<Guild> {
+  constructor(generator: (id: String) -> Guild) : super(generator)
+  constructor(maximumSize: Long, expireAfterAccessSeconds: Long, generator: (id: String) -> Guild) :
+    super(maximumSize, expireAfterAccessSeconds, generator)
+}
 
-internal class GroupContactList(
-  override val generator: (id: String) -> Group,
-) : ContactList<Group>()
-
+internal class GroupContactList : ContactList<Group> {
+  constructor(generator: (id: String) -> Group) : super(generator)
+  constructor(maximumSize: Long, expireAfterAccessSeconds: Long, generator: (id: String) -> Group) :
+    super(maximumSize, expireAfterAccessSeconds, generator)
+}
 
 internal class GroupMemberContactList(
-  override val generator: (id: String) -> GroupMember,
-) : ContactList<GroupMember>()
+  generator: (id: String) -> GroupMember,
+) : ContactList<GroupMember>(generator)
 
-internal class SingleUserContactList(
-  override val generator: (id: String) -> FriendUser,
-) : ContactList<FriendUser>()
+internal class SingleUserContactList : ContactList<FriendUser> {
+  constructor(generator: (id: String) -> FriendUser) : super(generator)
+  constructor(maximumSize: Long, expireAfterAccessSeconds: Long, generator: (id: String) -> FriendUser) :
+    super(maximumSize, expireAfterAccessSeconds, generator)
+}

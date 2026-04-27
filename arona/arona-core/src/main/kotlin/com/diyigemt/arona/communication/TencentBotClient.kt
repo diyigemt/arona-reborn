@@ -66,9 +66,18 @@ private constructor(private val config: TencentBotConfig) :
   // SupervisorJob 让 token 刷新等子任务异常不会传染整个 bot; bot.close() 通过 cancel() 收尾.
   override val coroutineContext: CoroutineContext =
     SupervisorJob() + Dispatchers.IO + CoroutineName("Bot.${config.appId}")
-  override val guilds: ContactList<Guild> = GuildContactList { EmptyGuildImpl(this, it) }
-  override val groups: ContactList<Group> = GroupContactList { EmptyGroupImpl(this, it) }
-  override val friends: ContactList<FriendUser> = SingleUserContactList { EmptyFriendUserImpl(this, it) }
+  override val guilds: ContactList<Guild> = GuildContactList(
+    maximumSize = config.contactCache.guilds.maximumSize,
+    expireAfterAccessSeconds = config.contactCache.guilds.expireAfterAccessSeconds,
+  ) { EmptyGuildImpl(this, it) }
+  override val groups: ContactList<Group> = GroupContactList(
+    maximumSize = config.contactCache.groups.maximumSize,
+    expireAfterAccessSeconds = config.contactCache.groups.expireAfterAccessSeconds,
+  ) { EmptyGroupImpl(this, it) }
+  override val friends: ContactList<FriendUser> = SingleUserContactList(
+    maximumSize = config.contactCache.friends.maximumSize,
+    expireAfterAccessSeconds = config.contactCache.friends.expireAfterAccessSeconds,
+  ) { EmptyFriendUserImpl(this, it) }
   override val isPublic = config.public
   override val isDebug = config.debug
   // Sprint 3 后续: token 刷新合流到 TokenRefresher, 它内部用 AtomicReference<Job?> 做 single-flight gate

@@ -44,9 +44,31 @@ class ContactListCacheTest {
 
   private class RichTestContact(id: String) : TestContact(id)
 
-  private class TestContactList(
-    override val generator: (id: String) -> TestContact,
-  ) : ContactList<TestContact>()
+  private class TestContactList : ContactList<TestContact> {
+    constructor(generator: (id: String) -> TestContact) : super(generator)
+    constructor(
+      maximumSize: Long,
+      expireAfterAccessSeconds: Long,
+      generator: (id: String) -> TestContact,
+    ) : super(maximumSize, expireAfterAccessSeconds, generator)
+  }
+
+  /** 借用父 scope 的 leaf contact 测试替身: 不持有独立 Job, ownsCoroutineScope = false. */
+  private class BorrowedTestContact(
+    id: String,
+    parentCoroutineContext: CoroutineContext,
+  ) : TestContact(id, parentCoroutineContext) {
+    override val ownsCoroutineScope: Boolean = false
+  }
+
+  /** 借用模式 + Empty 占位组合: 模拟 leaf member ContactList 默认 generator 的行为. */
+  private class BorrowedEmptyTestContact(
+    id: String,
+    parentCoroutineContext: CoroutineContext,
+  ) : TestContact(id, parentCoroutineContext), EmptyContact {
+    override val id: String = id
+    override val ownsCoroutineScope: Boolean = false
+  }
 
   @Test
   fun `同一 id 多次 getOrCreate 返回同一实例`() {
@@ -113,6 +135,89 @@ class ContactListCacheTest {
     assertSame(rich, list["same"])
     assertTrue(placeholder.coroutineContext[Job]?.isCancelled == true)
     assertFalse(rich.coroutineContext[Job]?.isCancelled == true)
+  }
+
+  @Test
+  fun `borrow 模式 contact 与父共享 Job 而非派生新 Job`() {
+    val parentJob = SupervisorJob()
+    val parentContext: CoroutineContext = Dispatchers.Default + parentJob
+    val borrowed = BorrowedTestContact("a", parentContext)
+
+    assertSame(parentJob, borrowed.coroutineContext[Job], "borrow 模式必须直接复用父 Job")
+    assertFalse(borrowed.ownsCoroutineScope)
+  }
+
+  @Test
+  fun `remove 借用模式 entry 不会取消父 Job`() {
+    val parentJob = SupervisorJob()
+    val parentContext: CoroutineContext = Dispatchers.Default + parentJob
+    val list = TestContactList { id -> BorrowedTestContact(id, parentContext) }
+
+    list.getOrCreate("leaf")
+    assertTrue(list.remove("leaf"))
+
+    assertFalse(parentJob.isCancelled, "ContactList.remove 不能 cancel borrow 模式 entry 的父 Job")
+    assertFalse(parentJob.isCompleted)
+  }
+
+  @Test
+  fun `富对象升级借用模式 Empty 占位时不会 cancel 父 Job`() {
+    val parentJob = SupervisorJob()
+    val parentContext: CoroutineContext = Dispatchers.Default + parentJob
+    val list = TestContactList { id -> BorrowedEmptyTestContact(id, parentContext) }
+
+    val placeholder = list.getOrCreate("a")
+    assertTrue(placeholder is EmptyContact)
+    assertFalse(placeholder.ownsCoroutineScope)
+
+    list.getOrCreate("a") { RichTestContact(it) }
+
+    assertFalse(parentJob.isCancelled, "borrow 模式 Empty 占位升级不应连锁 cancel 父 scope")
+  }
+
+  @Test
+  fun `有界 ContactList 写满后驱逐老条目并 cancel 其 Job`() {
+    val list = TestContactList(
+      maximumSize = 2L,
+      expireAfterAccessSeconds = 3600L,
+    ) { id -> RichTestContact(id) }
+
+    val a = list.getOrCreate("a")
+    val b = list.getOrCreate("b")
+    val c = list.getOrCreate("c")
+    // Caffeine size eviction 是异步的 (默认 ForkJoinPool); 主动触发 maintenance + 等到稳态.
+    val cache = list as ContactList<TestContact>
+    val deadline = System.currentTimeMillis() + 2000L
+    while (cache.size > 2 && System.currentTimeMillis() < deadline) {
+      Thread.sleep(20L)
+    }
+
+    assertEquals(2, cache.size, "maximumSize=2 触发后只应保留 2 条")
+    // 被驱逐那条的 Job 必然 cancel; a/b/c 哪条先被淘汰由 Caffeine 选, 我们只断言"至少有一条 owns Job 被 cancel".
+    val cancelledCount = listOf(a, b, c).count { it.coroutineContext[Job]?.isCancelled == true }
+    assertTrue(cancelledCount >= 1, "被驱逐 owns-scope contact 的 Job 必须被 cancel")
+  }
+
+  @Test
+  fun `有界 ContactList 驱逐借用模式 entry 时不会 cancel 父 Job`() {
+    val parentJob = SupervisorJob()
+    val parentContext: CoroutineContext = Dispatchers.Default + parentJob
+    val list = TestContactList(
+      maximumSize = 2L,
+      expireAfterAccessSeconds = 3600L,
+    ) { id -> BorrowedTestContact(id, parentContext) }
+
+    list.getOrCreate("a")
+    list.getOrCreate("b")
+    list.getOrCreate("c")
+
+    val deadline = System.currentTimeMillis() + 2000L
+    while (list.size > 2 && System.currentTimeMillis() < deadline) {
+      Thread.sleep(20L)
+    }
+
+    assertEquals(2, list.size)
+    assertFalse(parentJob.isCancelled, "驱逐 borrow 模式 entry 不能 cancel 父 Job")
   }
 
   @Test

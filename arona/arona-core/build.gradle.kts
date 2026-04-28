@@ -118,6 +118,7 @@ dependencies {
   implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
   implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf")
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
   //ABAC
   api(fileTree("lib"))
 

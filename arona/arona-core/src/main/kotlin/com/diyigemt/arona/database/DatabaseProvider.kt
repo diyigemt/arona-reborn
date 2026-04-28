@@ -60,6 +60,7 @@ object DatabaseProvider {
           aronaConfig.mongodb.toConnectionString()
         )
       )
+      .applyAronaCodecs()
       .serverApi(serverApi)
       .build()
     MongoClient.create(settings).getDatabase(aronaConfig.mongodb.db)

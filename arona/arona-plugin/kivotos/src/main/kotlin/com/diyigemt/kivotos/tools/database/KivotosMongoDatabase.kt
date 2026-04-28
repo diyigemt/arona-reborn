@@ -1,5 +1,6 @@
 package com.diyigemt.kivotos.tools.database
 
+import com.diyigemt.arona.database.applyAronaCodecs
 import com.diyigemt.kivotos.tools.config.MongoDbConfig
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
@@ -19,6 +20,7 @@ internal object KivotosMongoDatabase {
   val instance: MongoDatabase by lazy {
     val settings = MongoClientSettings.builder()
       .applyConnectionString(ConnectionString(MongoDbConfig.toConnectionString()))
+      .applyAronaCodecs()
       .serverApi(ServerApi.builder().version(ServerApiVersion.V1).build())
       .build()
     MongoClient.create(settings).getDatabase(MongoDbConfig.db)

@@ -15,7 +15,7 @@ import java.sql.Connection
 object DatabaseProvider {
   private val database: DB by lazy {
     val database = DB.connect(
-      "jdbc:mariadb://${DatabaseConfig.host}/${DatabaseConfig.db  }",
+      "jdbc:mariadb://${DatabaseConfig.host}/${DatabaseConfig.db}",
       "org.mariadb.jdbc.Driver",
       user = DatabaseConfig.user,
       password = DatabaseConfig.password,

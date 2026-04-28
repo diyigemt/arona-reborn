@@ -32,10 +32,7 @@ object PluginMain : AronaPlugin(
         logger.error(throwable)
       },
     ) {
-      if (Config.debugging && it.subject.id !in ignoreList) {
-        return@subscribeAlways
-      }
-      if (it.subject.id in ignoreList) {
+      if (Config.debugging != (it.subject.id in ignoreList)) {
         return@subscribeAlways
       }
       val commandSender = runCatching {

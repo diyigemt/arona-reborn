@@ -109,6 +109,9 @@ dependencies {
   api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
   api("org.jetbrains.exposed:exposed-json:$exposedVersion")
   api("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
+  // bson-kotlinx 提供 KotlinSerializerCodecProvider, 仅 host 自身构造 Mongo codec registry 时需要,
+  // 不必传递给下游 plugin 的编译 classpath, 故走 implementation.
+  implementation("org.mongodb:bson-kotlinx:4.11.1")
 
   api("io.github.crackthecodeabhi:kreds:0.9.1")
 

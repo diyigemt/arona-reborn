@@ -13,11 +13,11 @@ import kotlinx.coroutines.runBlocking
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
-    id = "com.diyigemt.arona.test.pressure",
-    name = "hello",
-    author = "diyigemt",
-    version = "0.1.0",
-    description = "test pressure"
+    id = BuildConfig.ID,
+    name = BuildConfig.NAME,
+    author = BuildConfig.AUTHOR,
+    version = BuildConfig.VERSION,
+    description = BuildConfig.DESCRIPTION
   )
 ) {
   override fun onLoad() {

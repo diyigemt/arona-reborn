@@ -21,11 +21,11 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @Suppress("unused")
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
-    id = "com.diyigemt.arona.content.audit",
-    name = "custom-menu",
-    author = "diyigemt",
-    version = "0.1.3",
-    description = "内容审核"
+    id = BuildConfig.ID,
+    name = BuildConfig.NAME,
+    author = BuildConfig.AUTHOR,
+    version = BuildConfig.VERSION,
+    description = BuildConfig.DESCRIPTION
   )
 ) {
   private val tencentClient by lazy {

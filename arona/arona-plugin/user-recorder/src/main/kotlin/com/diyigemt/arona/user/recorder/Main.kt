@@ -43,11 +43,11 @@ const val CommandKey = "dau.command"
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
-    id = "com.diyigemt.arona.user.recorder",
-    name = "user-recorder",
-    author = "diyigemt",
-    version = "1.2.12",
-    description = "record user data"
+    id = BuildConfig.ID,
+    name = BuildConfig.NAME,
+    author = BuildConfig.AUTHOR,
+    version = BuildConfig.VERSION,
+    description = BuildConfig.DESCRIPTION
   )
 ) {
   override fun onLoad() {

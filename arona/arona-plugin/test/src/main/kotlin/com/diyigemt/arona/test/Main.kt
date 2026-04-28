@@ -18,11 +18,11 @@ import kotlin.script.experimental.api.valueOrNull
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
-    id = "com.diyigemt.arona.test",
-    name = "hello",
-    author = "diyigemt",
-    version = "0.1.1",
-    description = "test interaction"
+    id = BuildConfig.ID,
+    name = BuildConfig.NAME,
+    author = BuildConfig.AUTHOR,
+    version = BuildConfig.VERSION,
+    description = BuildConfig.DESCRIPTION
   )
 ) {
   override fun onLoad() {

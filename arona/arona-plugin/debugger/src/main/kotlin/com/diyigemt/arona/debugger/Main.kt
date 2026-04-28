@@ -7,11 +7,11 @@ import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 
 object PluginMain : AronaPlugin(AronaPluginDescription(
-  id = "com.diyigemt.arona.debugger",
-  name = "debugger",
-  author = "diyigemt",
-  version = "0.2.1",
-  description = "debugger"
+  id = BuildConfig.ID,
+  name = BuildConfig.NAME,
+  author = BuildConfig.AUTHOR,
+  version = BuildConfig.VERSION,
+  description = BuildConfig.DESCRIPTION
 )) {
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<Event> {

@@ -20,11 +20,11 @@ import kotlinx.serialization.json.Json
 private var Open = false
 
 object PluginMain : AronaPlugin(AronaPluginDescription(
-  id = "com.diyigemt.arona.magic",
-  name = "magic",
-  author = "diyigemt",
-  version = "0.0.1",
-  description = "hello magic"
+  id = BuildConfig.ID,
+  name = BuildConfig.NAME,
+  author = BuildConfig.AUTHOR,
+  version = BuildConfig.VERSION,
+  description = BuildConfig.DESCRIPTION
 )) {
   private val json = Json {
     ignoreUnknownKeys = true

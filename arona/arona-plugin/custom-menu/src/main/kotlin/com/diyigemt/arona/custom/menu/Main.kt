@@ -23,11 +23,11 @@ import kotlinx.serialization.Serializable
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
-    id = "com.diyigemt.arona.custom.menu",
-    name = "custom-menu",
-    author = "diyigemt",
-    version = "0.4.0",
-    description = "快捷菜单"
+    id = BuildConfig.ID,
+    name = BuildConfig.NAME,
+    author = BuildConfig.AUTHOR,
+    version = BuildConfig.VERSION,
+    description = BuildConfig.DESCRIPTION
   )
 ) {
   override fun onLoad() {

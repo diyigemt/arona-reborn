@@ -11,11 +11,11 @@ import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.github.ajalt.clikt.parameters.arguments.argument
 
 object PluginMain : AronaPlugin(AronaPluginDescription(
-  id = "com.diyigemt.arona.hello",
-  name = "hello",
-  author = "diyigemt",
-  version = "2.3.3",
-  description = "hello world"
+  id = BuildConfig.ID,
+  name = BuildConfig.NAME,
+  author = BuildConfig.AUTHOR,
+  version = BuildConfig.VERSION,
+  description = BuildConfig.DESCRIPTION
 )) {
   override fun onLoad() {
     pluginEventChannel().subscribeAlways<TencentMessageEvent> {

@@ -18,11 +18,11 @@ import kotlinx.coroutines.launch
 @Suppress("unused")
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
-    id = "com.diyigemt.arona.chat.command",
-    name = "chat-command",
-    author = "diyigemt",
-    version = "0.1.6",
-    description = "chat-command"
+    id = BuildConfig.ID,
+    name = BuildConfig.NAME,
+    author = BuildConfig.AUTHOR,
+    version = BuildConfig.VERSION,
+    description = BuildConfig.DESCRIPTION
   )
 ) {
   override fun onLoad() {
@@ -32,6 +32,9 @@ object PluginMain : AronaPlugin(
         logger.error(throwable)
       },
     ) {
+      if (Config.debugging && it.subject.id !in ignoreList) {
+        return@subscribeAlways
+      }
       if (it.subject.id in ignoreList) {
         return@subscribeAlways
       }
@@ -84,4 +87,5 @@ object Config : AutoSavePluginData("config") {
   val ignoreGuild by value(listOf<String>())
   val ignoreGroup by value(listOf<String>())
   val ignoreUser by value(listOf<String>())
+  val debugging by value(false)
 }

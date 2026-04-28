@@ -14,11 +14,11 @@ import java.nio.file.Path
 
 object Arona : AronaPlugin(
   AronaPluginDescription(
-    id = "com.diyigemt.arona",
-    name = "arona",
-    author = "diyigemt",
-    version = "1.3.19",
-    description = "arona plugin"
+    id = BuildConfig.ID,
+    name = BuildConfig.NAME,
+    author = BuildConfig.AUTHOR,
+    version = BuildConfig.VERSION,
+    description = BuildConfig.DESCRIPTION
   )
 ) {
   private val json = Json {

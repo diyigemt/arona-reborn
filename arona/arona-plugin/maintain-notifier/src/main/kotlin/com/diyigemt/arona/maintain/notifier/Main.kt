@@ -16,11 +16,11 @@ import kotlinx.datetime.plus
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
-    id = "com.diyigemt.arona.maintain.notifier",
-    name = "maintain-notifier",
-    author = "diyigemt",
-    version = "0.1.1",
-    description = "维护通知器"
+    id = BuildConfig.ID,
+    name = BuildConfig.NAME,
+    author = BuildConfig.AUTHOR,
+    version = BuildConfig.VERSION,
+    description = BuildConfig.DESCRIPTION
   )
 ) {
   override fun onLoad() {

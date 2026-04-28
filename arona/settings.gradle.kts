@@ -1,3 +1,11 @@
+pluginManagement {
+  includeBuild("build-logic")
+  repositories {
+    gradlePluginPortal()
+    mavenCentral()
+  }
+}
+
 rootProject.name = "arona"
 include("arona-core")
 include("arona-plugin:test")

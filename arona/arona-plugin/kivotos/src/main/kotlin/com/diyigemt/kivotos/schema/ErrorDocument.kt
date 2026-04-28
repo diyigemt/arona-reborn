@@ -8,11 +8,9 @@ import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import com.mongodb.client.result.InsertOneResult
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
 @Serializable
 data class ErrorDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val code: Int,

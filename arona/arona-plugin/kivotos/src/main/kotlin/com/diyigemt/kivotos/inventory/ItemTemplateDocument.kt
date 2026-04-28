@@ -12,7 +12,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import org.bson.codecs.pojo.annotations.BsonId
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -26,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference
  */
 @Serializable
 data class ItemTemplateDocument(
-  @BsonId
   @SerialName("_id")
   override val id: UInt,
   override val category: InventoryCategory,

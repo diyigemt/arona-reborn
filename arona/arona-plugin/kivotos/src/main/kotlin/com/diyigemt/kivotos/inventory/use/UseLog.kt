@@ -7,7 +7,6 @@ import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
 /**
  * "使用道具" 的独立审计流水.
@@ -28,7 +27,6 @@ import org.bson.codecs.pojo.annotations.BsonId
  */
 @Serializable
 data class UseLog(
-  @BsonId
   @SerialName("_id")
   val id: String = uuid("inv.use"),
   val uid: String,

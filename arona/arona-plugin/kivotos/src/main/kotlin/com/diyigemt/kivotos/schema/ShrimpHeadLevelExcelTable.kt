@@ -11,11 +11,9 @@ import com.mongodb.client.result.DeleteResult
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
 @Serializable
 data class ShrimpHeadLevelExcelTable(
-  @BsonId
   @SerialName("_id")
   val level: Int, // 对应好感等级
   val sum: Int, // 累积值

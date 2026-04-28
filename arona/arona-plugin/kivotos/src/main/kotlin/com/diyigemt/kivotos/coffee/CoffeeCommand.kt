@@ -40,7 +40,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import org.bson.codecs.pojo.annotations.BsonId
 import kotlin.math.min
 
 
@@ -188,7 +187,6 @@ class CoffeeCommand : AbstractCommand(
 
 @Serializable
 data class CoffeeDocument(
-  @BsonId
   @SerialName("_id")
   val id: String, // 用户id userDocument().id
   val level: Int = 12,

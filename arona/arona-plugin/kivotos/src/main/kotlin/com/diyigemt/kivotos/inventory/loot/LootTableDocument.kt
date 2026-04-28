@@ -9,7 +9,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -39,7 +38,6 @@ data class DropEntry(
  */
 @Serializable
 data class LootTableDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val description: String = "",

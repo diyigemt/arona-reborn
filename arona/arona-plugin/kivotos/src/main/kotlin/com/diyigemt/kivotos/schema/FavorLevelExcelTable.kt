@@ -11,11 +11,9 @@ import com.mongodb.client.result.DeleteResult
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
 @Serializable
 data class FavorLevelExcelTable(
-  @BsonId
   @SerialName("_id")
   val level: Int,
   val sum: Int, // 累积值

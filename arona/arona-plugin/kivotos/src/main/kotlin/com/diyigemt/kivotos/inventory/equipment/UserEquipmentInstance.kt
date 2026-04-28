@@ -6,7 +6,6 @@ import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
 /**
  * 装备单件实例. 与模板 [com.diyigemt.kivotos.inventory.ItemTemplateDocument] (EQUIPMENT 类) 通过 [tplId] 关联.
@@ -16,11 +15,10 @@ import org.bson.codecs.pojo.annotations.BsonId
  *   - 均非 null  → 正被 [equippedBy] 穿在 [slot] 槽位
  *   不允许"一个 null 一个非 null"的混合态; 这由 EquipmentService 的写路径保证
  *
- * 采用 uuid String 作为 _id 跟随 kivotos 既有 `@BsonId val id: String` 风格, 避免为 ObjectId 引入自定义 codec.
+ * 采用 uuid String 作为 _id, 避免为 ObjectId 引入自定义 codec.
  */
 @Serializable
 data class UserEquipmentInstance(
-  @BsonId
   @SerialName("_id")
   val id: String = uuid("equip"),
   val uid: String,

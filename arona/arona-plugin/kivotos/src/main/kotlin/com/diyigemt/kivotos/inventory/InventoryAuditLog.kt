@@ -7,7 +7,6 @@ import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
 /**
  * 库存变更审计流水.
@@ -16,12 +15,10 @@ import org.bson.codecs.pojo.annotations.BsonId
  * 都可围绕 [traceId] / [idempotencyKey] 独立展开. [ts] 存字符串形式日期, Mongo TTL 仅对
  * BSON Date 生效, 故不在此处挂 TTL, 过期清理暂由运维脚本按月归档.
  *
- * _id 用 uuid 字符串而不是 ObjectId, 跟随 kivotos 既有 `@BsonId val id: String` 的风格,
- * 避免引入 kotlinx.serialization 对 ObjectId 的自定义 codec.
+ * _id 用 uuid 字符串而不是 ObjectId, 避免引入 kotlinx.serialization 对 ObjectId 的自定义 codec.
  */
 @Serializable
 data class InventoryAuditLog(
-  @BsonId
   @SerialName("_id")
   val id: String = uuid("inv.log"),
   val uid: String,

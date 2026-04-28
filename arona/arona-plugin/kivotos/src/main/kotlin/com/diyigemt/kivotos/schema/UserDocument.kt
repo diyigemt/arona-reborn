@@ -15,7 +15,6 @@ import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
 @Serializable
 data class Student(
@@ -25,7 +24,6 @@ data class Student(
 
 @Serializable
 data class UserDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val student: Map<String, Student> = mapOf(),

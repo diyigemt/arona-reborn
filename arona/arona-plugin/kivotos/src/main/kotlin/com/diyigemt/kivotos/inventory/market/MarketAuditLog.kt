@@ -5,6 +5,7 @@ import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 
@@ -41,6 +42,7 @@ enum class MarketAuditKind {
 @Serializable
 data class MarketAuditLog(
   @BsonId
+  @SerialName("_id")
   val id: String = uuid("market.log"),
   val uid: String,
   val listingId: String,

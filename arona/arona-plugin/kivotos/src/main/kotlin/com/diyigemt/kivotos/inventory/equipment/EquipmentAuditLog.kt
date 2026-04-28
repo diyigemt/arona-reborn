@@ -5,6 +5,7 @@ import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 
@@ -26,6 +27,7 @@ enum class EquipmentEventKind {
 @Serializable
 data class EquipmentAuditLog(
   @BsonId
+  @SerialName("_id")
   val id: String = uuid("equip.log"),
   val uid: String,
   val instanceId: String,

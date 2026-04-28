@@ -4,6 +4,7 @@ import com.diyigemt.arona.database.DocumentCompanionObject
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 
@@ -20,6 +21,7 @@ import org.bson.codecs.pojo.annotations.BsonId
 @Serializable
 data class UserEquipmentInstance(
   @BsonId
+  @SerialName("_id")
   val id: String = uuid("equip"),
   val uid: String,
   val tplId: UInt,

@@ -8,6 +8,7 @@ import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference
 @Serializable
 data class ItemTemplateDocument(
   @BsonId
+  @SerialName("_id")
   override val id: UInt,
   override val category: InventoryCategory,
   override val subCategory: UInt,

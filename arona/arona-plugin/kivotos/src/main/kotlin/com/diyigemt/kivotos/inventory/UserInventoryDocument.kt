@@ -8,6 +8,7 @@ import com.diyigemt.kivotos.tools.database.KivotosMongoDatabase
 import com.mongodb.ErrorCategory
 import com.mongodb.MongoWriteException
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 
@@ -38,6 +39,7 @@ data class ResourceState(
 @Serializable
 data class UserInventoryDocument(
   @BsonId
+  @SerialName("_id")
   val id: String,
   val currencies: Map<String, Long> = CurrencyList.associate { it.asItemKey() to 0L },
   val resources: Map<String, ResourceState> = emptyMap(),

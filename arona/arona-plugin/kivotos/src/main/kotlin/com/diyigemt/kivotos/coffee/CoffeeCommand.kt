@@ -37,6 +37,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.bson.codecs.pojo.annotations.BsonId
@@ -187,7 +188,9 @@ class CoffeeCommand : AbstractCommand(
 
 @Serializable
 data class CoffeeDocument(
-  @BsonId val id: String, // 用户id userDocument().id
+  @BsonId
+  @SerialName("_id")
+  val id: String, // 用户id userDocument().id
   val level: Int = 12,
   val students: List<Int> = listOf(), // 来访的学生
   val touchedStudents: List<Int> = listOf(), // 能摸的学生, 为什么不是摸过的学生呢, 因为有些来的学生你没有啊

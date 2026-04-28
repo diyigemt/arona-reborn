@@ -37,7 +37,7 @@ import org.bson.codecs.configuration.CodecRegistry
  *  - decode 仅接受 JSON 兼容 BSON 类型; DateTime / ObjectId / Binary / Decimal128 等一律拒绝,
  *    防止 effectPayload 在数据流向外泄漏成不可由 kotlinx 反序列化的非 JSON 值.
  */
-internal object KotlinxJsonElementCodecProvider : CodecProvider {
+object KotlinxJsonElementCodecProvider : CodecProvider {
   @Suppress("UNCHECKED_CAST")
   override fun <T : Any> get(clazz: Class<T>, registry: CodecRegistry): Codec<T>? =
     if (clazz == JsonElement::class.java) JsonElementCodec as Codec<T> else null

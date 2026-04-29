@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.2.21"
 ktor = "3.4.3"
-shadow = "8.3.10"
+shadow = "9.2.2"
 exposed = "1.2.0"
 mongodb = "5.6.4"
 kotlinx-coroutines = "1.10.2"

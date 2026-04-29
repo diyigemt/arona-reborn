@@ -1,12 +1,19 @@
 plugins {
   kotlin("jvm") version "1.9.22" apply false
   id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22" apply false
-  id("com.github.johnrengelman.shadow") version "8.1.1" apply true
+  id("com.gradleup.shadow") version "8.3.5" apply true
 }
 
 allprojects {
   group = "com.diyigemt.arona"
   version = "1.3.6"
+  buildscript {
+    configurations.classpath {
+      resolutionStrategy.capabilitiesResolution.withCapability("gradle.plugin.com.github.johnrengelman:shadow") {
+        selectHighestVersion()
+      }
+    }
+  }
 //  gradle.taskGraph.whenReady {
 //    tasks.forEach { task ->
 //      if (task.name.contains("test")) {

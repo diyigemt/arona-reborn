@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
 class AronaPluginConventionPlugin : Plugin<Project> {
   override fun apply(project: Project) {
     project.pluginManager.apply("org.jetbrains.kotlin.jvm")
-    project.pluginManager.apply("com.github.johnrengelman.shadow")
+    project.pluginManager.apply("com.gradleup.shadow")
 
     val arona = project.extensions.create("arona", AronaPluginExtension::class.java)
 

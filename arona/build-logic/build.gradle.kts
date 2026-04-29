@@ -9,7 +9,7 @@ repositories {
 
 dependencies {
   implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22")
-  implementation("com.github.johnrengelman.shadow:com.github.johnrengelman.shadow.gradle.plugin:8.1.1")
+  implementation("com.gradleup.shadow:com.gradleup.shadow.gradle.plugin:8.3.5")
 }
 
 gradlePlugin {

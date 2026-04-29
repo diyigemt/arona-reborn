@@ -42,24 +42,21 @@ tasks.withType<Test> {
 tasks.withType<Zip> {
   duplicatesStrategy = DuplicatesStrategy.WARN
 }
-task<Copy>("copyDep") {
+tasks.register<Copy>("copyDep") {
   val workingDir = projectDir.resolve("sandbox")
   duplicatesStrategy = DuplicatesStrategy.WARN
-  configurations.default.configure {
-    isCanBeResolved = true
-  }
   into("$workingDir/lib")
-  from(configurations.default)
+  from(configurations.runtimeClasspath)
   from("lib")
 }
 //tasks.withType<ShadowJar> {
 //  dependsOn("distTar", "distZip")
 //  archiveFileName.set("${project.name}-${project.version}.jar")
 //}
-task("copyToPlugins") {
+tasks.register("copyToPlugins") {
   doLast {
     val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox"
-    val buildJar = file(project.buildDir.path + "/libs")
+    val buildJar = project.layout.buildDirectory.dir("libs").get().asFile
       .listFiles { it -> it.isFile && it.name.contains(version.toString()) }
       ?.firstOrNull()
     if (buildJar == null) {
@@ -144,10 +141,9 @@ dependencies {
 }
 
 tasks.withType<Jar> {
-  configurations.default.configure {
-    isCanBeResolved = true
-  }
   manifest.attributes["Main-Class"] = "com.diyigemt.arona.ApplicationKt"
-  manifest.attributes["Class-Path"] = configurations.default.get().files.toList().joinToString(" ") { "lib/${it.name}" }
+  doFirst {
+    manifest.attributes["Class-Path"] = configurations.runtimeClasspath.get().files.toList().joinToString(" ") { "lib/${it.name}" }
+  }
   duplicatesStrategy = DuplicatesStrategy.WARN
 }

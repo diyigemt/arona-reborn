@@ -16,6 +16,9 @@ arona {
 kotlin {
   compilerOptions {
     freeCompilerArgs.add("-Xcontext-receivers")
+    // kivotos 跨多个文件用 kotlin.time.Clock / Instant (kotlinx-datetime 0.7.x 后迁回 stdlib),
+    // 模块级 opt-in 避免在每个使用文件各自 @file:OptIn.
+    optIn.add("kotlin.time.ExperimentalTime")
   }
 }
 

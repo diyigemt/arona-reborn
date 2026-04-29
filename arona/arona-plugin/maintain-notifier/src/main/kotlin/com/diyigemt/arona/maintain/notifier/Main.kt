@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.diyigemt.arona.maintain.notifier
 
 import com.diyigemt.arona.communication.event.TencentMessageEvent

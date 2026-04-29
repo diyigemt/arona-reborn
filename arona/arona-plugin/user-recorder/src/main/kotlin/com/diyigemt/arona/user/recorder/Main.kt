@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.diyigemt.arona.user.recorder
 
 import com.diyigemt.arona.command.AbstractCommand

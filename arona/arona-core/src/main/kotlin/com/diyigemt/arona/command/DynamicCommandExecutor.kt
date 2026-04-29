@@ -10,29 +10,15 @@ import com.diyigemt.arona.permission.Permission.Companion.testPermission
 import com.diyigemt.arona.utils.currentDate
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.currentTime
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.PrintHelpMessage
-import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.context2
 import com.github.ajalt.clikt.core.subcommands
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
-/**
- * 反射重置 Clikt 4.2.1 内部的 `_contextConfig`. fork 时代专门提供了 `context2 { ... }` 扩展做替换式重置;
- * 切回 Maven 后没有等价 API, 但内部字段仍存在. 在每次 [context] 之前调一次, 等价于 fork 的 context2 行为:
- * 让 _contextConfig 不再随调用次数线性叠加闭包, 避免单例 worker 跨次 parse 无限增长内存与构建开销.
- */
-private val contextConfigField: java.lang.reflect.Field by lazy {
-  CliktCommand::class.java.getDeclaredField("_contextConfig").apply { isAccessible = true }
-}
-@Suppress("UNCHECKED_CAST")
-private fun CliktCommand.resetClicktContext() {
-  contextConfigField.set(this, ({} as Context.Builder.() -> Unit))
-}
 
 internal sealed class DynamicCommandExecutor(
   val path: List<String>,
@@ -118,9 +104,6 @@ internal class DynamicStaticCommandExecutor(
     get() = 0
   override val runningWorkers
     get() = runningCounter.value
-  // Static 路径对应 Kotlin object 命令: createCommandInstance() 实际返回同一个 singleton.
-  // 因此并发 parse 必须串行 (Mutex), 且每次 parse 前用 resetClicktContext() 把 _contextConfig 清回空块,
-  // 避免在 singleton 的生命周期里闭包链无限累积.
   private val worker = run {
     assert(parentSignature.clazz.objectInstance != null)
     createCommandInstance()
@@ -141,13 +124,13 @@ internal class DynamicStaticCommandExecutor(
     return async {
       runningCounter.incrementAndGet()
       try {
-        // Mutex 必须覆盖 "parse + 业务体" 整段, 不能只保护 parse: clikt 把 option/argument 绑定到 this,
-        // 业务体(run() 子函数)读这些字段时仍然在用同一份 worker 状态.
+        // singleton worker, clikt 把 option/argument 绑定到 this, 并发 parse 会互相污染.
+        // 因此 Mutex 必须覆盖 "parse + 业务体" 整段, 不能只保护 parse.
         lock.withLock {
           try {
             worker.execute(caller, parentSignature, args)
           } finally {
-            worker.resetClicktContext()
+            worker.context2 { }
           }
         }
       } finally {
@@ -164,10 +147,7 @@ internal inline fun AbstractCommand.execute(
   args: List<String>,
 ): CommandExecuteResult {
   return runCatching {
-    // 在 context { } 之前先 reset, 等价于 fork 时代的 context2 替换式行为:
-    // 单例 worker 多次 parse 之间 _contextConfig 不会累积旧闭包, class 实例不复用时也无副作用.
-    resetClicktContext()
-    context {
+    context2 {
       obj = mutableMapOf(
         "caller" to caller,
         "signature" to signature,
@@ -191,21 +171,30 @@ internal class DynamicContextualCommandExecutor(
   path: List<String>,
   primaryName: String,
   parentSignature: CommandSignature,
+  initCapacity: Int = Runtime.getRuntime().availableProcessors() * 2,
 ) : DynamicCommandExecutor(
   path,
   primaryName,
   parentSignature,
 ) {
-  // Contextual 路径对应 class 命令: createCommandInstance() 每次返回新实例, 天然不存在
-  // 跨调用的状态污染. 因此既不需要 Mutex 也不需要 worker pool: 并发上限交给上层 Dispatcher,
-  // pendingTasks 永久为 0, idleWorkers 报 Int.MAX_VALUE 表示没有人为容量阻塞.
-  override val permission: Permission = createCommandInstance().permission
+  private val workerPoolCapacity = initCapacity * 2
+
+  // Channel 同时承担"可复用 worker 资源池"和"等待队列"两个角色, 消除之前 ArrayDeque + lazy async
+  // 手工排队里 "归还 worker 后先 addLast 再 launch start" 的竞态窗口.
+  private val samples = List(workerPoolCapacity) { createCommandInstance() }
+  private val workerPool = Channel<AbstractCommand>(workerPoolCapacity).also { pool ->
+    samples.forEach { check(pool.trySend(it).isSuccess) { "failed to initialize worker pool" } }
+  }
+  private val idleCounter = atomic(workerPoolCapacity)
+  private val pendingCounter = atomic(0)
+
   override val idleWorkers
-    get() = Int.MAX_VALUE
+    get() = idleCounter.value
   override val pendingTasks
-    get() = 0
+    get() = pendingCounter.value
   override val runningWorkers
     get() = runningCounter.value
+  override val permission = samples.first().permission
 
   override suspend fun execute(
     args: List<String>,
@@ -214,16 +203,36 @@ internal class DynamicContextualCommandExecutor(
   ): Deferred<CommandExecuteResult> {
     if (checkPermission && !hasCommandPermission(caller, args)) {
       return async {
-        CommandExecuteResult.PermissionDenied(createCommandInstance())
+        CommandExecuteResult.PermissionDenied(samples.first())
       }
     }
     return async {
+      val worker = acquireWorker()
+      idleCounter.decrementAndGet()
       runningCounter.incrementAndGet()
       try {
-        createCommandInstance().execute(caller, parentSignature, args)
+        worker.execute(caller, parentSignature, args)
       } finally {
-        runningCounter.decrementAndGet()
+        commitWorker(worker)
       }
     }
+  }
+
+  private suspend fun acquireWorker(): AbstractCommand {
+    pendingCounter.incrementAndGet()
+    return try {
+      workerPool.receive()
+    } finally {
+      pendingCounter.decrementAndGet()
+    }
+  }
+
+  // 非挂起归还: 在 try/finally 里如果用挂起的 send(), 外层被取消时可能再次挂起并被取消, worker 会丢.
+  // Channel 容量等于 workerPoolCapacity, 取走多少归还多少, trySend 必然成功.
+  private fun commitWorker(command: AbstractCommand) {
+    command.context2 { }
+    runningCounter.decrementAndGet()
+    check(workerPool.trySend(command).isSuccess) { "worker pool overflow while returning worker" }
+    idleCounter.incrementAndGet()
   }
 }

@@ -12,6 +12,7 @@ import org.bson.codecs.configuration.CodecProvider
 import org.bson.codecs.configuration.CodecRegistries.fromProviders
 import org.bson.codecs.configuration.CodecRegistries.fromRegistries
 import org.bson.codecs.configuration.CodecRegistry
+import org.bson.codecs.kotlinx.KotlinSerializerCodecProvider
 
 /**
  * 为 Kotlin unsigned 类型补齐 BSON codec.
@@ -48,10 +49,18 @@ object UnsignedKotlinCodecProvider : CodecProvider {
 /**
  * 统一给 [MongoClientSettings.Builder] 挂上 arona 项目级别的 codec 约定,
  * 防止各模块各自拼装 registry 出现漂移.
+ *
+ * 链顺序:
+ * - [KotlinSerializerCodecProvider] 接管 `@Serializable` Mongo wrapper 类型, 通过
+ *   `@SerialName("_id")` 把 domain 字段名映射到 BSON `_id`. 详见 `MongoSchemas.kt`.
+ * - [KotlinxJsonElementCodecProvider] / [UnsignedKotlinCodecProvider] 兜底, 容忍
+ *   未被 kotlinx serializer 接管的 JsonElement / unsigned 字段.
+ * - 默认 registry 处理 Mongo driver 内建类型.
  */
 fun MongoClientSettings.Builder.applyAronaCodecs(): MongoClientSettings.Builder = apply {
   codecRegistry(
     fromRegistries(
+      fromProviders(KotlinSerializerCodecProvider()),
       fromProviders(KotlinxJsonElementCodecProvider),
       fromProviders(UnsignedKotlinCodecProvider),
       MongoClientSettings.getDefaultCodecRegistry(),

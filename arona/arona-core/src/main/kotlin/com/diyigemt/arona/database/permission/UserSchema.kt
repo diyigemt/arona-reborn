@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.*
 import org.bson.Document
-import org.bson.codecs.pojo.annotations.BsonId
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -35,7 +34,6 @@ private const val BASE_ID_DEFAULT_SEED = 1_000_000L
 
 @Serializable
 private data class BaseIdSequence(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val seq: Long,

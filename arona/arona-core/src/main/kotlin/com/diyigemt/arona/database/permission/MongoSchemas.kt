@@ -3,26 +3,19 @@ package com.diyigemt.arona.database.permission
 import com.diyigemt.arona.utils.currentDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
 /**
  * Mongo 持久化 wrapper 类型与 mapper.
  *
  * 拓扑: domain/HTTP/SDK 层 (Policy / ContactRole / ContactMember / ContactDocument /
  * UserDocument / SimplifiedUserDocument) 保持字段名 `id`, 用于前端 JSON / golden test /
- * plugin SDK; Mongo 持久化层用本文件的 wrapper, 通过 `@SerialName("_id")` 把字段名映射到
+ * plugin SDK; Mongo 持久化层用本文件的 wrapper, 通过 `@SerialName("_id")` 映射到
  * BSON `_id`. 边界 mapper (`Domain.toMongo()` / `Mongo.toDomain()`) 集中在
  * Companion / Service / Endpoint 的 Mongo 入口处转换.
- *
- * `@BsonId` 是 transitional 注解, 与 `@SerialName("_id")` 双标. 反射 codec (C2-C4 仍接管)
- * 不认 `@SerialName` 只认 `@BsonId`; KotlinSerializerCodec (C5 切链后接管) 反过来认
- * `@SerialName` 且 4.11.1 拒绝 `@BsonId`. C5 切链同 commit 删除全部 `@BsonId`,
- * 保证任意单 commit revert 都 runtime 安全.
  */
 
 @Serializable
 internal data class MongoPolicy(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val name: String,
@@ -32,7 +25,6 @@ internal data class MongoPolicy(
 
 @Serializable
 internal data class MongoContactRole(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val name: String,
@@ -40,7 +32,6 @@ internal data class MongoContactRole(
 
 @Serializable
 internal data class MongoContactMember(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val name: String,
@@ -50,7 +41,6 @@ internal data class MongoContactMember(
 
 @Serializable
 internal data class MongoContactDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val contactName: String = "",
@@ -64,7 +54,6 @@ internal data class MongoContactDocument(
 
 @Serializable
 internal data class MongoUserDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val username: String = "Arona用户$id",
@@ -78,7 +67,6 @@ internal data class MongoUserDocument(
 
 @Serializable
 internal data class MongoSimplifiedUserDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val username: String,
@@ -86,7 +74,6 @@ internal data class MongoSimplifiedUserDocument(
 
 @Serializable
 internal data class MongoUserContactMemberDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val name: String,
@@ -95,7 +82,6 @@ internal data class MongoUserContactMemberDocument(
 
 @Serializable
 internal data class MongoUserContactDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val contactName: String,

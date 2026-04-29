@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.bson.Document
-import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
 
 @Serializable
@@ -138,7 +137,6 @@ data class ContactMember(
 }
 @Serializable
 internal data class SimplifiedContactDocument(
-  @BsonId
   @SerialName("_id")
   val id: String,
   val contactName: String,

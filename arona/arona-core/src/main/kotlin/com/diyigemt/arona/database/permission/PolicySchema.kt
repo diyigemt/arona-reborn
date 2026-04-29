@@ -5,13 +5,14 @@ import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMB
 import com.diyigemt.arona.utils.aronaConfig
 import com.diyigemt.arona.utils.uuid
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 
+@Serializable
 enum class PolicyNodeEffect {
   ALLOW,
   DENY
 }
 
+@Serializable
 enum class PolicyNodeGroupType {
   ALL,
   ANY,
@@ -19,6 +20,7 @@ enum class PolicyNodeGroupType {
   NOT_ANY,
 }
 
+@Serializable
 enum class PolicyRuleType {
   Resource,
   Action,
@@ -26,6 +28,7 @@ enum class PolicyRuleType {
   Environment
 }
 
+@Serializable
 enum class PolicyRuleOperator {
   Equal,
   LessThan,
@@ -58,7 +61,6 @@ typealias PolicyRoot = PolicyNode
 
 @Serializable
 data class Policy(
-  @BsonId
   val id: String,
   val name: String,
   val effect: PolicyNodeEffect,

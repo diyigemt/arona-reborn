@@ -28,10 +28,10 @@ import com.mongodb.kotlin.client.coroutine.FindFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.bson.Document
 import org.bson.codecs.pojo.annotations.BsonId
-import org.bson.codecs.pojo.annotations.BsonProperty
 import org.bson.types.ObjectId
 
 @Serializable
@@ -62,7 +62,6 @@ abstract class PluginContactMember : PluginVisibleData() {
 
 @Serializable
 data class ContactRole(
-  @BsonId
   val id: String,
   val name: String,
 ) {
@@ -97,7 +96,6 @@ data class ContactRole(
 
 @Serializable
 data class ContactMember(
-  @BsonId
   override val id: String, // 指向UserDocument.id
   override val name: String,
   override val roles: List<String>, // 指向ContactDocument.roles.id
@@ -116,7 +114,7 @@ data class ContactMember(
     value: String,
     cid: String,
   ) {
-    ContactDocument.withCollection<ContactDocument, UpdateResult> {
+    ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
       updateOne(
         filter = Filters.and(
           idFilter(cid),
@@ -140,15 +138,14 @@ data class ContactMember(
 }
 @Serializable
 internal data class SimplifiedContactDocument(
-  @BsonProperty("_id")
   @BsonId
+  @SerialName("_id")
   val id: String,
   val contactName: String,
   val contactType: ContactType = ContactType.Group,
 )
 @Serializable
 internal data class ContactDocument(
-  @BsonId
   override val id: String,
   override val contactName: String = "",
   override val contactType: ContactType = ContactType.Group,
@@ -166,7 +163,7 @@ internal data class ContactDocument(
     members.any { it.roles.contains(DEFAULT_ADMIN_CONTACT_ROLE_ID) && it.id == userId }
 
   suspend fun updateContactDocumentName(name: String) {
-    withCollection<ContactDocument, UpdateResult> {
+    withCollection<MongoContactDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
         update = Updates.set(ContactDocument::contactName.name, name)
@@ -192,7 +189,7 @@ internal data class ContactDocument(
       is ContactDocumentUpdateException.Success -> Unit
       else -> return v
     }
-    val res = withCollection<ContactDocument, UpdateResult> {
+    val res = withCollection<MongoContactDocument, UpdateResult> {
       updateOne(
         filter = Filters.and(idFilter(id), Filters.eq(membersIdPath(), memberId)),
         update = Updates.addToSet(memberPositional(ContactMember::roles), roleId),
@@ -210,7 +207,7 @@ internal data class ContactDocument(
     key: String,
     value: String,
   ) {
-    withCollection<ContactDocument, UpdateResult> {
+    withCollection<MongoContactDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
         update = Updates.set(pluginConfigPath(ContactDocument::config, pluginId, key), value)
@@ -230,9 +227,10 @@ internal data class ContactDocument(
   companion object : DocumentCompanionObject {
     override val documentName = "Contact"
 
-    suspend fun findContactDocumentByIdOrNull(id: String): ContactDocument? = withCollection {
-      find(idFilter(id)).limit(1).firstOrNull()
-    }
+    suspend fun findContactDocumentByIdOrNull(id: String): ContactDocument? =
+      withCollection<MongoContactDocument, MongoContactDocument?> {
+        find(idFilter(id)).limit(1).firstOrNull()
+      }?.toDomain()
 
     suspend fun createContactDocument(id: String, type: ContactType = ContactType.Group): ContactDocument {
       val cd = ContactDocument(
@@ -241,22 +239,23 @@ internal data class ContactDocument(
         policies = mutableListOf(createBaseContactAdminPolicy()).apply { addAll(createBaseMemberPolicy()) },
         contactType = type,
       )
-      withCollection { insertOne(cd) }
+      withCollection<MongoContactDocument, Unit> { insertOne(cd.toMongo()) }
       return cd
     }
 
     /**
      * 查询用户可见的群/频道; 先用 match 筛出当前用户所在集合, 再把 members 数组只保留当前用户自身,
-     * 并剔除 config 等敏感字段. 调用方通过 reified [R] 指定结果 DTO, 保持 DTO 关注点留在 endpoint.
+     * 并剔除 config 等敏感字段. 内部 aggregate 走 [MongoUserContactDocument] 解码,
+     * 边界 mapper 转 [UserContactDocument] DTO 后返回; 调用方拿到的是 domain 表示.
      */
-    internal suspend inline fun <reified R : Any> findVisibleToUser(userId: String): List<R> =
-      withCollection<ContactDocument, List<R>> {
-        aggregate<R>(visibleToUserPipeline(userId)).toList()
-      }
+    internal suspend fun findVisibleToUser(userId: String): List<UserContactDocument> =
+      withCollection<MongoContactDocument, List<MongoUserContactDocument>> {
+        aggregate<MongoUserContactDocument>(visibleToUserPipeline(userId)).toList()
+      }.map { it.toDomain() }
 
     internal suspend fun contacts(): List<SimplifiedContactDocument> {
       val filter = Aggregates.match(Filters.eq(ContactDocument::contactType.name, ContactType.Group.name))
-      return withCollection<ContactDocument, List<SimplifiedContactDocument>> {
+      return withCollection<MongoContactDocument, List<SimplifiedContactDocument>> {
         aggregate<SimplifiedContactDocument>(
           listOf(
             filter,
@@ -274,7 +273,7 @@ internal data class ContactDocument(
 
     internal suspend fun guilds(): List<SimplifiedContactDocument> {
       val filter = Aggregates.match(Filters.eq(ContactDocument::contactType.name, ContactType.Guild.name))
-      return withCollection<ContactDocument, List<SimplifiedContactDocument>> {
+      return withCollection<MongoContactDocument, List<SimplifiedContactDocument>> {
         aggregate<SimplifiedContactDocument>(
           listOf(
             filter,

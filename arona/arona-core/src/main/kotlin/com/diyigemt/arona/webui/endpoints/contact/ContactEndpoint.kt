@@ -34,27 +34,6 @@ import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 import org.bson.Document
-import org.bson.codecs.pojo.annotations.BsonId
-
-@Serializable
-internal data class UserContactMemberDocument(
-  @BsonId
-  val id: String, // 指向UserDocument.id
-  val name: String,
-  val roles: List<String>, // 指向ContactDocument.roles.id
-)
-
-@Serializable
-internal data class UserContactDocument(
-  @BsonId
-  val id: String,
-  val contactName: String,
-  val contactType: ContactType = ContactType.Group,
-  val members: List<UserContactMemberDocument> = listOf(),
-  val roles: List<ContactRole> = listOf(),
-  // 仅 /contact?id= 完整接口才填充; 列表接口 /contacts 与 /manage-contacts 不下发, 防止群级插件配置外泄.
-  val config: Map<String, Map<String, String>>? = null,
-)
 
 @Serializable
 internal data class IdBody(
@@ -180,7 +159,7 @@ internal object ContactEndpoint {
   @AronaBackendEndpointPost("/contact-basic")
   suspend fun PipelineContext<Unit, ApplicationCall>.updateContactBasic() {
     val data = context.receive<ContactUpdateReq>()
-    ContactDocument.withCollection<ContactDocument, UpdateResult> {
+    ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
       updateOne(
         filter = idFilter(contact.id),
         update = Updates.set(ContactDocument::contactName.name, data.contactName)
@@ -235,7 +214,7 @@ internal object ContactEndpoint {
     } else {
       Updates.set(memberPositional(ContactMember::name), data.name)
     }
-    val matched = ContactDocument.withCollection<ContactDocument, UpdateResult> {
+    val matched = ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
       updateOne(
         filter = Filters.and(
           idFilter(contact.id),
@@ -254,12 +233,12 @@ internal object ContactEndpoint {
   suspend fun PipelineContext<Unit, ApplicationCall>.createRole() {
     val data = context.receiveJsonOrNull<ContactRoleCreateReq>() ?: return badRequest()
     return if (
-      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+      ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
         updateOne(
           filter = idFilter(contact.id),
           update = Updates.addToSet(
             ContactDocument::roles.name,
-            ContactRole.createRole(data.name)
+            ContactRole.createRole(data.name).toMongo()
           )
         )
       }.modifiedOne()
@@ -293,7 +272,7 @@ internal object ContactEndpoint {
       return badRequest()
     }
     return if (
-      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+      ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
         updateOne(
           filter = Filters.and(
             idFilter(contact.id),
@@ -332,13 +311,13 @@ internal object ContactEndpoint {
     val policy = context.receiveJsonOrNull<Policy>() ?: return badRequest()
     if (checkPolicy(policy)) return badRequest()
     return if (
-      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+      ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
         updateOne(
           filter = Filters.and(
             idFilter(contact.id),
             Filters.eq(ContactDocument::policies.dot("_id"), policy.id)
           ),
-          update = Updates.set(ContactDocument::policies.dot("\$"), policy)
+          update = Updates.set(ContactDocument::policies.dot("\$"), policy.toMongo())
         )
       }.classify() != MongoWriteOutcome.NotMatched
     ) {
@@ -365,10 +344,10 @@ internal object ContactEndpoint {
       data.rules
     )
     return if (
-      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+      ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
         updateOne(
           filter = idFilter(contact.id),
-          update = Updates.push(ContactDocument::policies.name, policy)
+          update = Updates.push(ContactDocument::policies.name, policy.toMongo())
         )
       }.modifiedOne()
     ) success(policy.id)
@@ -385,7 +364,7 @@ internal object ContactEndpoint {
       return badRequest()
     }
     return if (
-      ContactDocument.withCollection<ContactDocument, UpdateResult> {
+      ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
         updateOne(
           filter = idFilter(contact.id),
           update = Document(

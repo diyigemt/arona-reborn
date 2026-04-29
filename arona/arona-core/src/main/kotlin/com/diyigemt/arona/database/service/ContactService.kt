@@ -14,7 +14,9 @@ import com.diyigemt.arona.database.permission.ContactDocumentUpdateException
 import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactType
+import com.diyigemt.arona.database.permission.MongoContactDocument
 import com.diyigemt.arona.database.permission.UserDocument
+import com.diyigemt.arona.database.permission.toMongo
 import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.runSagaOrRollback
 import com.mongodb.client.model.Updates
@@ -109,10 +111,10 @@ internal object ContactService {
 
     val defaultRole = contactDocument.roles.first { it.id == DEFAULT_MEMBER_CONTACT_ROLE_ID }
     val member = ContactMember(userId, "用户", listOf(defaultRole.id))
-    val firstWrite = ContactDocument.withCollection<ContactDocument, UpdateResult> {
+    val firstWrite = ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
       updateOne(
         filter = idFilter(contactDocument.id),
-        update = Updates.addToSet(ContactDocument::members.name, member),
+        update = Updates.addToSet(ContactDocument::members.name, member.toMongo()),
       )
     }
     val firstActuallyInserted = firstWrite.modifiedOne()
@@ -140,7 +142,7 @@ internal object ContactService {
   }
 
   private suspend fun rollbackAddedMember(contactDocument: ContactDocument, memberId: String) {
-    ContactDocument.withCollection<ContactDocument, UpdateResult> {
+    ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
       updateOne(
         filter = idFilter(contactDocument.id),
         update = Document("\$pull", Document(ContactDocument::members.name, Document("_id", memberId))),
@@ -155,7 +157,7 @@ internal object ContactService {
   }
 
   private suspend fun deleteContactDocument(contactId: String) {
-    ContactDocument.withCollection<ContactDocument, Unit> { deleteOne(idFilter(contactId)) }
+    ContactDocument.withCollection<MongoContactDocument, Unit> { deleteOne(idFilter(contactId)) }
   }
 
   private fun resolveContactType(contact: Contact): ContactType = when (contact) {

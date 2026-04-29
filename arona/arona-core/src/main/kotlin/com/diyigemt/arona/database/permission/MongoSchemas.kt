@@ -84,6 +84,27 @@ internal data class MongoSimplifiedUserDocument(
   val username: String,
 )
 
+@Serializable
+internal data class MongoUserContactMemberDocument(
+  @BsonId
+  @SerialName("_id")
+  val id: String,
+  val name: String,
+  val roles: List<String>,
+)
+
+@Serializable
+internal data class MongoUserContactDocument(
+  @BsonId
+  @SerialName("_id")
+  val id: String,
+  val contactName: String,
+  val contactType: ContactType = ContactType.Group,
+  val members: List<MongoUserContactMemberDocument> = listOf(),
+  val roles: List<MongoContactRole> = listOf(),
+  val config: Map<String, Map<String, String>>? = null,
+)
+
 internal fun Policy.toMongo(): MongoPolicy = MongoPolicy(
   id = id,
   name = name,
@@ -169,4 +190,19 @@ internal fun MongoUserDocument.toDomain(): UserDocument = UserDocument(
 internal fun MongoSimplifiedUserDocument.toDomain(): SimplifiedUserDocument = SimplifiedUserDocument(
   id = id,
   username = username,
+)
+
+internal fun MongoUserContactMemberDocument.toDomain(): UserContactMemberDocument = UserContactMemberDocument(
+  id = id,
+  name = name,
+  roles = roles,
+)
+
+internal fun MongoUserContactDocument.toDomain(): UserContactDocument = UserContactDocument(
+  id = id,
+  contactName = contactName,
+  contactType = contactType,
+  members = members.map { it.toDomain() },
+  roles = roles.map { it.toDomain() },
+  config = config,
 )

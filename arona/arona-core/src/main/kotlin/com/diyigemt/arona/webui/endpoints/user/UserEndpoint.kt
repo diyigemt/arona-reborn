@@ -5,6 +5,7 @@ import com.diyigemt.arona.database.MongoWriteOutcome
 import com.diyigemt.arona.database.RedisPrefixKey
 import com.diyigemt.arona.database.classify
 import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.permission.MongoUserDocument
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.withCollection
 import com.diyigemt.arona.utils.IpRateLimiter
@@ -162,7 +163,7 @@ internal object UserEndpoint {
     }
     // 幂等: 同值更新时 modifiedCount=0 仍视为成功, 仅在 filter 未命中 (用户不存在) 时才报错.
     return if (
-      UserDocument.withCollection<UserDocument, UpdateResult> {
+      UserDocument.withCollection<MongoUserDocument, UpdateResult> {
         updateOne(
           filter = idFilter(aronaUser.id),
           update = Updates.set(UserDocument::username.name, data.username)

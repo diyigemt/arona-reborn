@@ -2,9 +2,11 @@ package com.diyigemt.arona.database.service
 
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQueryReadUncommited
 import com.diyigemt.arona.database.idFilter
+import com.diyigemt.arona.database.permission.MongoUserDocument
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserSchema
 import com.diyigemt.arona.database.permission.nextBaseId
+import com.diyigemt.arona.database.permission.toMongo
 import com.diyigemt.arona.database.withCollection
 
 /**
@@ -44,7 +46,7 @@ internal object UserService {
       uid = mutableListOf(uid),
       contacts = mutableListOf(contactId),
     )
-    UserDocument.withCollection { insertOne(ud) }
+    UserDocument.withCollection<MongoUserDocument, Unit> { insertOne(ud.toMongo()) }
 
     var sqlMutation: SqlMutation = SqlMutation.None
     try {
@@ -69,13 +71,13 @@ internal object UserService {
         }
       }
     } catch (t: Throwable) {
-      runCatching { UserDocument.withCollection<UserDocument, Unit> { deleteOne(idFilter(ud.id)) } }
+      runCatching { UserDocument.withCollection<MongoUserDocument, Unit> { deleteOne(idFilter(ud.id)) } }
         .onFailure { t.addSuppressed(it) }
       throw t
     }
 
     val undo: suspend () -> Unit = {
-      UserDocument.withCollection<UserDocument, Unit> { deleteOne(idFilter(ud.id)) }
+      UserDocument.withCollection<MongoUserDocument, Unit> { deleteOne(idFilter(ud.id)) }
       sqlDbQueryReadUncommited {
         when (val m = sqlMutation) {
           is SqlMutation.InsertedNewRow -> UserSchema.findById(m.uid)?.delete()

@@ -2,6 +2,7 @@ package com.diyigemt.arona.database
 
 import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.database.permission.MongoContactDocument
+import com.diyigemt.arona.database.permission.MongoUserDocument
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.utils.commandLineLogger
 import com.mongodb.client.model.IndexOptions
@@ -12,7 +13,7 @@ import com.mongodb.kotlin.client.coroutine.MongoDatabase
 internal object MongoIndexes {
   suspend fun ensure(database: MongoDatabase) {
     val contact = database.getCollection<MongoContactDocument>("Contact")
-    val user = database.getCollection<UserDocument>("User")
+    val user = database.getCollection<MongoUserDocument>("User")
     ensureAscending(contact, "${ContactDocument::members.name}._id")
     ensureAscending(contact, ContactDocument::contactType.name)
     ensureAscending(user, UserDocument::uid.name)

@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.*
 import org.bson.Document
 import org.bson.codecs.pojo.annotations.BsonId
-import org.bson.codecs.pojo.annotations.BsonProperty
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -37,6 +36,7 @@ private const val BASE_ID_DEFAULT_SEED = 1_000_000L
 @Serializable
 private data class BaseIdSequence(
   @BsonId
+  @SerialName("_id")
   val id: String,
   val seq: Long,
 )
@@ -173,7 +173,7 @@ abstract class PluginUserDocument : PluginVisibleData() {
   abstract val qq: Long
   abstract val username: String
   suspend fun updateUsername(name: String) {
-    UserDocument.withCollection<UserDocument, UpdateResult> {
+    UserDocument.withCollection<MongoUserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
         update = Updates.set(UserDocument::username.name, name)
@@ -188,8 +188,6 @@ interface ExposedUserDocument {
 
 @Serializable
 data class SimplifiedUserDocument(
-  @BsonProperty("_id")
-  @BsonId
   val id: String,
   val username: String,
 ) {
@@ -198,7 +196,6 @@ data class SimplifiedUserDocument(
 
 @Serializable
 internal data class UserDocument(
-  @BsonId
   override val id: String, // 自己定义的唯一id
   override val username: String = "Arona用户$id", // 显示在前端的用户名
   override val unionOpenId: String = "", // 藤子定义的唯一id
@@ -208,7 +205,7 @@ internal data class UserDocument(
   val policies: List<Policy> = listOf(), // 用户自定义的规则
   override val config: Map<String, Map<String, String>> = mapOf(), // 用户自定义的,插件专有的配置项
 ) : PluginUserDocument() {
-  suspend fun updateUserContact(contactId: String) = withCollection<UserDocument, UpdateResult> {
+  suspend fun updateUserContact(contactId: String) = withCollection<MongoUserDocument, UpdateResult> {
     updateOne(
       filter = idFilter(id),
       update = Updates.addToSet(UserDocument::contacts.name, contactId)
@@ -227,7 +224,7 @@ internal data class UserDocument(
     pluginId: String, value: T,
     key: String = value::class.name,
   ) {
-    withCollection<UserDocument, UpdateResult> {
+    withCollection<MongoUserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
         update = Updates.set(
@@ -243,7 +240,7 @@ internal data class UserDocument(
     key: String,
     value: String,
   ) {
-    withCollection<UserDocument, UpdateResult> {
+    withCollection<MongoUserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(id),
         update = Updates.set(pluginConfigPath(UserDocument::config, pluginId, key), value)
@@ -270,20 +267,21 @@ internal data class UserDocument(
       return if (u == null) {
         null
       } else {
-        withCollection {
+        withCollection<MongoUserDocument, MongoUserDocument?> {
           find(idFilter(u.uid)).limit(1).firstOrNull()
-        }
+        }?.toDomain()
       }
     }
 
-    suspend fun findUserDocumentByIdOrNull(id: String): UserDocument? = withCollection {
-      find(idFilter(id)).limit(1).firstOrNull()
-    }
+    suspend fun findUserDocumentByIdOrNull(id: String): UserDocument? =
+      withCollection<MongoUserDocument, MongoUserDocument?> {
+        find(idFilter(id)).limit(1).firstOrNull()
+      }?.toDomain()
 
     override suspend fun querySimplifiedUser(ids: List<String>): Map<String, SimplifiedUserDocument> {
       val filter = Aggregates.match(Filters.`in`("_id", ids))
-      val res = withCollection<UserDocument, List<SimplifiedUserDocument>> {
-        aggregate<SimplifiedUserDocument>(
+      val res = withCollection<MongoUserDocument, List<MongoSimplifiedUserDocument>> {
+        aggregate<MongoSimplifiedUserDocument>(
           listOf(
             filter,
             Aggregates.project(
@@ -295,8 +293,8 @@ internal data class UserDocument(
           )
         ).toList()
       }
-      return ids.associateWith {
-        res.first { s -> s.id == it }
+      return ids.associateWith { id ->
+        res.first { s -> s.id == id }.toDomain()
       }
     }
   }

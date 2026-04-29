@@ -15,6 +15,7 @@ import com.diyigemt.arona.database.permission.ContactMember
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactType
 import com.diyigemt.arona.database.permission.MongoContactDocument
+import com.diyigemt.arona.database.permission.MongoUserDocument
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.toMongo
 import com.diyigemt.arona.database.withCollection
@@ -94,7 +95,7 @@ internal object ContactService {
   private suspend fun addMember(contactDocument: ContactDocument, userId: String): ContactMember {
     val existMember = contactDocument.members.firstOrNull { it.id == userId }
     if (existMember != null) {
-      val res = UserDocument.withCollection<UserDocument, UpdateResult> {
+      val res = UserDocument.withCollection<MongoUserDocument, UpdateResult> {
         updateOne(
           filter = idFilter(existMember.id),
           update = Updates.addToSet(UserDocument::contacts.name, contactDocument.id),
@@ -125,7 +126,7 @@ internal object ContactService {
         }
       },
     ) {
-      val secondWrite = UserDocument.withCollection<UserDocument, UpdateResult> {
+      val secondWrite = UserDocument.withCollection<MongoUserDocument, UpdateResult> {
         updateOne(
           filter = idFilter(member.id),
           update = Updates.addToSet(UserDocument::contacts.name, contactDocument.id),
@@ -148,7 +149,7 @@ internal object ContactService {
         update = Document("\$pull", Document(ContactDocument::members.name, Document("_id", memberId))),
       )
     }
-    UserDocument.withCollection<UserDocument, UpdateResult> {
+    UserDocument.withCollection<MongoUserDocument, UpdateResult> {
       updateOne(
         filter = idFilter(memberId),
         update = Document("\$pull", Document(UserDocument::contacts.name, contactDocument.id)),

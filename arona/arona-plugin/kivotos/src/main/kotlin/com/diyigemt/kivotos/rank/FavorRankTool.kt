@@ -101,12 +101,15 @@ object FavorRankTool {
 //        this::class.java.getResourceAsStream("/$path")?.readAllBytes()
   )
 
-  private fun Typeface.Companion.fromRankPath(path: String) = makeFromData(
-    Data.makeFromBytes(
-      Arona.dataFolder("gacha", path).readBytes()
+  // Skiko 0.9: Typeface.Companion.makeFromData 移除, 字体加载迁移到 FontMgr.default.
+  private fun Typeface.Companion.fromRankPath(path: String): Typeface =
+    FontMgr.default.makeFromData(
+      Data.makeFromBytes(
+        Arona.dataFolder("gacha", path).readBytes()
 //            this::class.java.getResourceAsStream("/$path")!!.readAllBytes()
-    )
-  )
+      ),
+      0,
+    ) ?: error("failed to load rank font: $path")
 
   /**
    * 榜单可视化 Skia部分

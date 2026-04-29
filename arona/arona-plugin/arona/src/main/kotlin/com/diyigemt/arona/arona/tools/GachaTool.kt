@@ -12,6 +12,7 @@ import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.arona.database.student.StudentTable
 import org.jetbrains.skia.*
 import java.nio.file.Files
+import kotlin.io.path.readBytes
 import kotlin.math.max
 import kotlin.math.min
 
@@ -55,8 +56,16 @@ object GachaTool {
   }
   private val srColor = Color4f.new(255, 247, 120)
   private val ssrColor = Color4f.new(242, 194, 218)
-  private val boldFont = Font(Typeface.makeFromFile(Arona.dataFolder("gacha", "font-bold.otf").toFile().path), 54f)
-  private val normalFont = Font(Typeface.makeFromFile(Arona.dataFolder("gacha", "font-bold.otf").toFile().path), 32f)
+  // Skiko 0.9 移除 Typeface.makeFromFile / makeFromData, 字体加载迁移到 FontMgr.default;
+  // 同时合并两次重复的字体加载为单 Typeface 共享, 避免同一文件被加载两次.
+  private val gachaFont: Typeface by lazy {
+    FontMgr.default.makeFromData(
+      Data.makeFromBytes(Arona.dataFolder("gacha", "font-bold.otf").readBytes()),
+      0,
+    ) ?: error("failed to load gacha font: font-bold.otf")
+  }
+  private val boldFont = Font(gachaFont, 54f)
+  private val normalFont = Font(gachaFont, 32f)
   var NormalPool = dbQuery {
     GachaPoolSchema.find { GachaPoolTable.id eq 1 }.toList().first().toGachaPool()
   }

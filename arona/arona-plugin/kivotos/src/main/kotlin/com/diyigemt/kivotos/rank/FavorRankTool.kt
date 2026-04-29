@@ -44,6 +44,12 @@ object FavorRankTool {
 
   //默认MiSans
 
+  private val MiSansDemibold: Typeface = Typeface
+    .fromRankPath("MiSans-Demibold.ttf")
+  private val MiSansBold: Typeface = Typeface
+    .fromRankPath("MiSans-Bold.ttf")
+  private var MiSansMedium: Typeface = Typeface
+    .fromRankPath("MiSans-Medium.ttf")
   private val rankFont = Font().apply {
     size = 40f
     setTypeface(MiSansMedium)
@@ -77,12 +83,6 @@ object FavorRankTool {
   private val blackPaint = Paint().apply {
     color = Color.makeRGB(61, 61, 61)
   }
-  private val MiSansDemibold: Typeface = Typeface
-    .fromRankPath("MiSans-Demibold.ttf")
-  private val MiSansBold: Typeface = Typeface
-    .fromRankPath("MiSans-Bold.ttf")
-  private var MiSansMedium: Typeface = Typeface
-    .fromRankPath("MiSans-Medium.ttf")
   private val favorHeart = Image.fromRankPath("heart.png")
   private val bg = Image.fromRankPath("Rank_BG.jpg")
   private val stuNameFont = Font().apply {

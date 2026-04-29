@@ -120,7 +120,7 @@ internal open class ShadowMap<K, V, KR, VR>(
     }?.let(vTransform)
 
   override fun merge(key: KR, value: VR, remappingFunction: BiFunction<in VR, in VR, out VR?>): VR? =
-    originMapComputer().merge(key.let(kTransformBack), value.let(vTransformBack)) { k, v ->
+    originMapComputer().merge(key.let(kTransformBack), value.let(vTransformBack)!!) { k, v ->
       remappingFunction.apply(k.let(vTransform), v.let(vTransform))?.let(vTransformBack)
     }?.let(vTransform)
 
@@ -133,7 +133,7 @@ internal open class ShadowMap<K, V, KR, VR>(
 
   override fun replaceAll(function: BiFunction<in KR, in VR, out VR>) {
     originMapComputer().replaceAll { t, u ->
-      function.apply(t.let(kTransform), u.let(vTransform))?.let(vTransformBack)
+      function.apply(t.let(kTransform), u.let(vTransform)).let(vTransformBack)!!
     }
   }
 }
@@ -337,7 +337,7 @@ internal fun <K, V> MutableMap<K, V>.observable(onChanged: () -> Unit): MutableM
       this@observable.computeIfPresent(key, remappingFunction).also { onChanged() }
 
     override fun merge(key: K, value: V, remappingFunction: BiFunction<in V, in V, out V?>): V? =
-      this@observable.merge(key, value, remappingFunction).also { onChanged() }
+      this@observable.merge(key, value!!, remappingFunction).also { onChanged() }
   }
 
   return ObservableMap()

@@ -1,6 +1,6 @@
 plugins {
   id("arona-plugin")
-  id("io.ktor.plugin") version "2.3.3"
+  id("io.ktor.plugin") version "2.3.13"
   id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
 }
 
@@ -34,9 +34,9 @@ dependencies {
 
   testImplementation(kotlin("test"))
   testImplementation("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
-  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
   testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3")
-  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.9.0")
 }
 
 tasks.test {

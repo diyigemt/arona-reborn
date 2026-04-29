@@ -1,6 +1,6 @@
 plugins {
   id("arona-plugin")
-  id("io.ktor.plugin") version "2.3.3"
+  id("io.ktor.plugin") version "2.3.13"
 }
 
 arona {

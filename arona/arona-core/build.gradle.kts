@@ -4,7 +4,7 @@ val kotlinVersion: String by project
 val exposedVersion: String by project
 plugins {
   kotlin("jvm") version "2.0.21"
-  id("io.ktor.plugin") version "2.3.7"
+  id("io.ktor.plugin") version "2.3.13"
   id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
 }
 kotlin {
@@ -116,7 +116,7 @@ dependencies {
   implementation("org.jline:jline:3.25.0")
   implementation("com.github.Towdium:PinIn:1.6.0")
   implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
-  implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
+  implementation("org.jetbrains.kotlinx:atomicfu:0.25.0")
   implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
@@ -131,13 +131,13 @@ dependencies {
   api("com.github.ajalt.clikt:clikt:4.2.1")
   api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
 
-  api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-  api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
-  api("ch.qos.logback:logback-core:1.4.12")
-  api("ch.qos.logback:logback-classic:1.4.14")
+  api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+  api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.9.0")
+  api("ch.qos.logback:logback-core:1.5.12")
+  api("ch.qos.logback:logback-classic:1.5.12")
 
   testImplementation("io.ktor:ktor-server-tests-jvm")
-  testImplementation("io.ktor:ktor-server-test-host-jvm:2.3.3")
+  testImplementation("io.ktor:ktor-server-test-host-jvm:2.3.13")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")
 }
 

@@ -70,8 +70,11 @@ sealed class AbstractCommandSender() : CommandSender {
   abstract override val subject: Contact?
   abstract override val user: User?
   private var _sourceId = EmptyMessageId
-  override val sourceId: String
+  override var sourceId: String
     get() = _sourceId
+    set(value) {
+      _sourceId = value
+    }
   internal val kType = this::class.starProjectedType
 
   /**
@@ -86,7 +89,7 @@ sealed class AbstractCommandSender() : CommandSender {
   final override fun nextSequence(): Int = messageSequenceRef.getAndIncrement()
 
   internal fun setSourceId(n: String) {
-    _sourceId = n
+    sourceId = n
   }
 
   constructor(sourceId: String) : this() {

@@ -3,9 +3,9 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 val kotlinVersion: String by project
 val exposedVersion: String by project
 plugins {
-  kotlin("jvm") version "2.0.21"
+  kotlin("jvm") version "2.1.20"
   id("io.ktor.plugin") version "2.3.13"
-  id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
+  id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20"
 }
 kotlin {
   compilerOptions {

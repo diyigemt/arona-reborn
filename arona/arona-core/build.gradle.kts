@@ -89,7 +89,6 @@ dependencies {
   api(libs.kreds)
 
   implementation(libs.jline)
-  implementation(libs.pinin)
   implementation(libs.caffeine)
   implementation(libs.atomicfu)
   implementation(libs.bcpkix.jdk18on)

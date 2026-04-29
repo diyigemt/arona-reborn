@@ -8,8 +8,8 @@ repositories {
 }
 
 dependencies {
-  implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.20")
-  implementation("com.gradleup.shadow:com.gradleup.shadow.gradle.plugin:8.3.5")
+  implementation(libs.kotlin.gradle.plugin)
+  implementation(libs.shadow.gradle.plugin)
 }
 
 gradlePlugin {

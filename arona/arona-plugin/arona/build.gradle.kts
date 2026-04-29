@@ -1,7 +1,7 @@
 plugins {
   id("arona-plugin")
-  id("io.ktor.plugin") version "2.3.13"
-  id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20"
+  alias(libs.plugins.ktor)
+  alias(libs.plugins.kotlin.serialization)
 }
 
 arona {
@@ -20,14 +20,14 @@ kotlin {
 }
 
 dependencies {
-  compileOnly("io.ktor:ktor-server-core-jvm")
-  compileOnly("io.ktor:ktor-client-cio")
-  compileOnly("io.ktor:ktor-client-core")
-  compileOnly("io.ktor:ktor-client-content-negotiation")
-  compileOnly("io.ktor:ktor-serialization-kotlinx-json-jvm")
-  api("org.jetbrains.skiko:skiko-awt-runtime-linux-x64:0.7.9")
-  api("org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.7.9")
-  api("net.coobird:thumbnailator:0.4.20")
+  compileOnly(libs.ktor.server.core.jvm)
+  compileOnly(libs.ktor.client.cio)
+  compileOnly(libs.ktor.client.core)
+  compileOnly(libs.ktor.client.content.negotiation)
+  compileOnly(libs.ktor.serialization.kotlinx.json.jvm)
+  api(libs.skiko.awt.runtime.linux.x64)
+  api(libs.skiko.awt.runtime.windows.x64)
+  api(libs.thumbnailator)
   testImplementation(kotlin("test"))
 }
 

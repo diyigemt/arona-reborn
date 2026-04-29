@@ -1,11 +1,9 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
-val kotlinVersion: String by project
-val exposedVersion: String by project
 plugins {
-  kotlin("jvm") version "2.1.20"
-  id("io.ktor.plugin") version "2.3.13"
-  id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20"
+  alias(libs.plugins.kotlin.jvm)
+  alias(libs.plugins.ktor)
+  alias(libs.plugins.kotlin.serialization)
 }
 kotlin {
   compilerOptions {
@@ -74,71 +72,45 @@ tasks.register("copyToPlugins") {
 }
 
 dependencies {
+  // kts: kotlin scripting + Ivy 协同支撑 .kts 脚本依赖解析
+  api(libs.bundles.kotlin.scripting.base)
+  api(libs.ivy)
 
-  // kts
-  api("org.jetbrains.kotlin:kotlin-main-kts")
-  api("org.jetbrains.kotlin:kotlin-scripting-jvm")
-  api("org.jetbrains.kotlin:kotlin-scripting-common")
-  api("org.jetbrains.kotlin:kotlin-scripting-jvm-host")
-  api("org.jetbrains.kotlin:kotlin-scripting-dependencies")
-  api("org.apache.ivy:ivy:2.5.2")
-  
-  implementation("io.ktor:ktor-server-cors")
-  implementation("io.ktor:ktor-server-core-jvm")
-  implementation("io.ktor:ktor-server-netty-jvm")
-  implementation("io.ktor:ktor-server-status-pages")
-  implementation("io.ktor:ktor-server-double-receive")
-  implementation("io.ktor:ktor-server-call-logging-jvm")
-  implementation("io.ktor:ktor-server-forwarded-header-jvm")
-  implementation("io.ktor:ktor-server-host-common-jvm")
-  implementation("io.ktor:ktor-server-status-pages-jvm")
-  implementation("io.ktor:ktor-server-double-receive-jvm")
-  implementation("io.ktor:ktor-server-content-negotiation-jvm")
+  implementation(libs.bundles.ktor.server.base)
+  implementation(libs.bundles.ktor.client.base)
+  implementation(libs.ktor.serialization.kotlinx.json.jvm)
 
-  implementation("io.ktor:ktor-client-cio")
-  implementation("io.ktor:ktor-client-core")
-  implementation("io.ktor:ktor-client-websockets")
-  implementation("io.ktor:ktor-client-content-negotiation")
-
-  implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
-
-  api("org.jetbrains.exposed:exposed-dao:$exposedVersion")
-  api("org.jetbrains.exposed:exposed-core:$exposedVersion")
-  api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-  api("org.jetbrains.exposed:exposed-json:$exposedVersion")
-  api("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.1")
+  api(libs.bundles.exposed.base)
+  api(libs.mongodb.driver.kotlin.coroutine)
   // bson-kotlinx 提供 KotlinSerializerCodecProvider, 仅 host 自身构造 Mongo codec registry 时需要,
   // 不必传递给下游 plugin 的编译 classpath, 故走 implementation.
-  implementation("org.mongodb:bson-kotlinx:4.11.1")
+  implementation(libs.mongodb.bson.kotlinx)
 
-  api("io.github.crackthecodeabhi:kreds:0.9.1")
+  api(libs.kreds)
 
-  implementation("org.jline:jline:3.25.0")
-  implementation("com.github.Towdium:PinIn:1.6.0")
-  implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
-  implementation("org.jetbrains.kotlinx:atomicfu:0.25.0")
-  implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
-  implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf")
-  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
-  //ABAC
+  implementation(libs.jline)
+  implementation(libs.pinin)
+  implementation(libs.caffeine)
+  implementation(libs.atomicfu)
+  implementation(libs.bcpkix.jdk18on)
+  implementation(libs.bundles.kotlinx.serialization.base)
+  // ABAC: 本地 fork 的 clikt + mordant + jansi (lib/clikt-master.7z 中有自定义 context2 扩展),
+  // 升级路径见 P2-C; 此处保持 fileTree 引入以等价于改造前的依赖图.
   api(fileTree("lib"))
 
-  api("org.mariadb.jdbc:mariadb-java-client:3.3.3")
-  api("org.xerial:sqlite-jdbc:3.42.0.1")
-  api("com.charleskorn.kaml:kaml:0.55.0")
-  api("io.github.z4kn4fein:semver:1.4.2")
-  api("org.reflections:reflections:0.10.2")
-  api("com.github.ajalt.clikt:clikt:4.2.1")
-  api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.1")
+  api(libs.mariadb.java.client)
+  api(libs.sqlite.jdbc)
+  api(libs.kaml)
+  api(libs.semver)
+  api(libs.reflections)
+  api(libs.clikt)
+  api(libs.kotlinx.datetime)
 
-  api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-  api("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.9.0")
-  api("ch.qos.logback:logback-core:1.5.12")
-  api("ch.qos.logback:logback-classic:1.5.12")
+  api(libs.bundles.kotlinx.coroutines.base)
+  api(libs.bundles.logback.base)
 
-  testImplementation("io.ktor:ktor-server-tests-jvm")
-  testImplementation("io.ktor:ktor-server-test-host-jvm:2.3.13")
-  testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")
+  testImplementation(libs.ktor.server.test.host)
+  testImplementation(kotlin("test-junit"))
 }
 
 tasks.withType<Jar> {

@@ -1,6 +1,6 @@
 plugins {
   id("arona-plugin")
-  id("io.ktor.plugin") version "2.3.13"
+  alias(libs.plugins.ktor)
 }
 
 arona {
@@ -13,11 +13,11 @@ arona {
 }
 
 dependencies {
-  compileOnly("io.ktor:ktor-server-core-jvm")
-  compileOnly("io.ktor:ktor-client-cio")
-  compileOnly("io.ktor:ktor-client-core")
-  compileOnly("io.ktor:ktor-client-content-negotiation")
-  compileOnly("io.ktor:ktor-serialization-kotlinx-json-jvm")
+  compileOnly(libs.ktor.server.core.jvm)
+  compileOnly(libs.ktor.client.cio)
+  compileOnly(libs.ktor.client.core)
+  compileOnly(libs.ktor.client.content.negotiation)
+  compileOnly(libs.ktor.serialization.kotlinx.json.jvm)
   testImplementation(kotlin("test"))
 }
 

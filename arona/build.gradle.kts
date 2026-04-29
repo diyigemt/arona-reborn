@@ -1,7 +1,7 @@
 plugins {
-  kotlin("jvm") version "2.1.20" apply false
-  id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20" apply false
-  id("com.gradleup.shadow") version "8.3.5" apply true
+  alias(libs.plugins.kotlin.jvm) apply false
+  alias(libs.plugins.kotlin.serialization) apply false
+  alias(libs.plugins.shadow) apply true
 }
 
 allprojects {

@@ -1,7 +1,7 @@
 plugins {
   id("arona-plugin")
-  id("io.ktor.plugin") version "2.3.13"
-  id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20"
+  alias(libs.plugins.ktor)
+  alias(libs.plugins.kotlin.serialization)
 }
 
 arona {
@@ -14,7 +14,7 @@ arona {
 }
 
 dependencies {
-  implementation("com.qcloud:cos_api:5.6.187")
+  implementation(libs.qcloud.cos.api)
   testImplementation(kotlin("test"))
 }
 

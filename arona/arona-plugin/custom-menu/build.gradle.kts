@@ -1,6 +1,6 @@
 plugins {
   id("arona-plugin")
-  id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20"
+  alias(libs.plugins.kotlin.serialization)
 }
 
 arona {

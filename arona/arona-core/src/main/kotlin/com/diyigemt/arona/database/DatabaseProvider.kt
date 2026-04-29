@@ -15,12 +15,11 @@ import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import io.github.crackthecodeabhi.kreds.connection.Endpoint
 import io.github.crackthecodeabhi.kreds.connection.KredsClient
 import io.github.crackthecodeabhi.kreds.connection.newClient
-import kotlinx.coroutines.currentCoroutineContext
 import org.jetbrains.exposed.v1.core.DatabaseConfig
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
-import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.sql.Connection
 
@@ -78,13 +77,13 @@ object DatabaseProvider {
   internal fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
 
   internal suspend fun <T> sqlDbQuerySuspended(block: suspend () -> T): T =
-    newSuspendedTransaction(currentCoroutineContext(), sqlDatabase) { block() }
+    suspendTransaction(sqlDatabase) { block() }
 
   suspend fun <T> sqlDbQueryReadUncommited(block: suspend () -> T): T =
-    newSuspendedTransaction(currentCoroutineContext(), sqlDatabase, Connection.TRANSACTION_READ_UNCOMMITTED) { block() }
+    suspendTransaction(sqlDatabase, transactionIsolation = Connection.TRANSACTION_READ_UNCOMMITTED) { block() }
 
   suspend fun <T> sqlDbQueryWithIsolation(isolationLevel: Int, block: suspend () -> T): T =
-    newSuspendedTransaction(currentCoroutineContext(), sqlDatabase, isolationLevel) { block() }
+    suspendTransaction(sqlDatabase, transactionIsolation = isolationLevel) { block() }
 
 
   /**

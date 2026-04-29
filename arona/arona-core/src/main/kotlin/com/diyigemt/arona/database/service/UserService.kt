@@ -13,7 +13,7 @@ import com.diyigemt.arona.database.withCollection
  * 跨 SQL + Mongo 的用户创建编排. 从 [UserDocument.Companion] 搬出, 让 schema 只负责数据/单点写.
  *
  * 事务边界:
- * - SQL 段显式用 [sqlDbQueryReadUncommited] (内部走 [newSuspendedTransaction] + READ_UNCOMMITTED) 运行,
+ * - SQL 段显式用 [sqlDbQueryReadUncommited] (内部走 suspendTransaction + READ_UNCOMMITTED) 运行,
  *   看起来意图是避免并入外层 endpoint 事务; 具体为何选 READ_UNCOMMITTED 而非 READ_COMMITTED 需要 owner 确认.
  * - Mongo 段不在 SQL 事务内, 跨库一致性由 [createUserTracking] 返回的 undo 闭包负责补偿,
  *   上层 (如 [ContactService.createContactAndUser]) 在失败时调用.

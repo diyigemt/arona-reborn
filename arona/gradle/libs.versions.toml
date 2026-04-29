@@ -96,7 +96,7 @@ ivy = { module = "org.apache.ivy:ivy", version.ref = "ivy" }
 kreds = { module = "io.github.crackthecodeabhi:kreds", version.ref = "kreds" }
 jline = { module = "org.jline:jline", version.ref = "jline" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
-bcpkix-jdk18on = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+bcprov-jdk18on = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 mariadb-java-client = { module = "org.mariadb.jdbc:mariadb-java-client", version.ref = "mariadb" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 kaml = { module = "com.charleskorn.kaml:kaml", version.ref = "kaml" }

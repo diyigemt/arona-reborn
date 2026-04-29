@@ -91,7 +91,7 @@ dependencies {
   implementation(libs.jline)
   implementation(libs.caffeine)
   implementation(libs.atomicfu)
-  implementation(libs.bcpkix.jdk18on)
+  implementation(libs.bcprov.jdk18on)
   implementation(libs.bundles.kotlinx.serialization.base)
   api(libs.mariadb.java.client)
   api(libs.sqlite.jdbc)

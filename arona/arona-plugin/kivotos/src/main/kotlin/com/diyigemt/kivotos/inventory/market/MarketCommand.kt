@@ -1,5 +1,6 @@
 package com.diyigemt.kivotos.inventory.market
 
+import com.diyigemt.kivotos.setObject
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.SubCommand
 import com.diyigemt.arona.command.nextButtonInteraction

@@ -19,7 +19,9 @@ sqlite-jdbc = "3.46.1.3"
 kaml = "0.104.0"
 semver = "3.0.0"
 reflections = "0.10.2"
-clikt = "4.2.1"
+clikt = "5.0.3"
+mordant = "3.0.2"
+jansi = "2.4.3"
 logback = "1.5.32"
 skiko = "0.7.9"
 thumbnailator = "0.4.21"
@@ -103,6 +105,8 @@ kaml = { module = "com.charleskorn.kaml:kaml", version.ref = "kaml" }
 semver = { module = "io.github.z4kn4fein:semver", version.ref = "semver" }
 reflections = { module = "org.reflections:reflections", version.ref = "reflections" }
 clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
+mordant = { module = "com.github.ajalt.mordant:mordant", version.ref = "mordant" }
+jansi = { module = "org.fusesource.jansi:jansi", version.ref = "jansi" }
 thumbnailator = { module = "net.coobird:thumbnailator", version.ref = "thumbnailator" }
 qcloud-cos-api = { module = "com.qcloud:cos_api", version.ref = "qcloud-cos" }
 shadow-gradle-plugin = { module = "com.gradleup.shadow:com.gradleup.shadow.gradle.plugin", version.ref = "shadow" }

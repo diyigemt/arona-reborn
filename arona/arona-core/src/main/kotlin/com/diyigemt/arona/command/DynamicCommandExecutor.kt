@@ -1,5 +1,6 @@
 package com.diyigemt.arona.command
 
+import com.diyigemt.arona.communication.command.AbstractCommandSender
 import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.communication.contact.Contact.Companion.toContactDocumentOrNull
 import com.diyigemt.arona.communication.contact.User.Companion.toUserDocumentOrNull
@@ -12,11 +13,13 @@ import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.currentTime
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.PrintHelpMessage
-import com.github.ajalt.clikt.core.context2
+import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.obj
+import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.core.terminal
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -104,6 +107,10 @@ internal class DynamicStaticCommandExecutor(
     get() = 0
   override val runningWorkers
     get() = runningCounter.value
+  // Static 路径对应 Kotlin object 命令: createCommandInstance() 实际返回同一个 singleton, 无法重建.
+  // 因此并发 parse 必须串行 (Mutex). Clikt 5 的 context() 是累积式, 单例长期复用会让 _contextConfig 闭包链
+  // 缓慢增长 (每次 parse 加一个 closure); 项目目前命令频次远低于 GC 压力, 接受此微小累积.
+  // TODO 长期方案: 等 Clikt 5 暴露官方 reset/replace API 时, 在 Mutex 内部清空闭包链.
   private val worker = run {
     assert(parentSignature.clazz.objectInstance != null)
     createCommandInstance()
@@ -124,14 +131,10 @@ internal class DynamicStaticCommandExecutor(
     return async {
       runningCounter.incrementAndGet()
       try {
-        // singleton worker, clikt 把 option/argument 绑定到 this, 并发 parse 会互相污染.
-        // 因此 Mutex 必须覆盖 "parse + 业务体" 整段, 不能只保护 parse.
+        // Mutex 必须覆盖 "parse + 业务体" 整段: clikt 把 option/argument 绑定到 this,
+        // 业务体读字段时仍在用同一份 worker 状态.
         lock.withLock {
-          try {
-            worker.execute(caller, parentSignature, args)
-          } finally {
-            worker.context2 { }
-          }
+          worker.execute(caller, parentSignature, args)
         }
       } finally {
         runningCounter.decrementAndGet()
@@ -147,11 +150,10 @@ internal inline fun AbstractCommand.execute(
   args: List<String>,
 ): CommandExecuteResult {
   return runCatching {
-    context2 {
-      obj = mutableMapOf(
-        "caller" to caller,
-        "signature" to signature,
-      )
+    context {
+      // Clikt 5 的 obj 是 Any?, 用类型化容器替代旧 fork 的 mutableMapOf("caller", "signature");
+      // AbstractCommand 子类通过 requireObject<DynamicCommandContext>() 一次拿全.
+      obj = DynamicCommandContext(caller as AbstractCommandSender, signature)
       terminal = commandTerminal
       localization = crsiveLocalization
     }
@@ -171,30 +173,22 @@ internal class DynamicContextualCommandExecutor(
   path: List<String>,
   primaryName: String,
   parentSignature: CommandSignature,
-  initCapacity: Int = Runtime.getRuntime().availableProcessors() * 2,
 ) : DynamicCommandExecutor(
   path,
   primaryName,
   parentSignature,
 ) {
-  private val workerPoolCapacity = initCapacity * 2
-
-  // Channel 同时承担"可复用 worker 资源池"和"等待队列"两个角色, 消除之前 ArrayDeque + lazy async
-  // 手工排队里 "归还 worker 后先 addLast 再 launch start" 的竞态窗口.
-  private val samples = List(workerPoolCapacity) { createCommandInstance() }
-  private val workerPool = Channel<AbstractCommand>(workerPoolCapacity).also { pool ->
-    samples.forEach { check(pool.trySend(it).isSuccess) { "failed to initialize worker pool" } }
-  }
-  private val idleCounter = atomic(workerPoolCapacity)
-  private val pendingCounter = atomic(0)
-
+  // Contextual 路径对应 class 命令: createCommandInstance() 每次返回新实例, 天然不存在跨调用污染.
+  // 因此既不需要 Mutex 也不需要 worker pool: 并发上限交给上层 Dispatcher;
+  // pendingTasks 永久 0, idleWorkers 报 Int.MAX_VALUE 表示没有人为容量阻塞.
+  // (旧 fork 时代用 worker pool + context2 重置维持复用; Clikt 5 后 context2 不存在, 用一次性实例代价更小.)
+  override val permission: Permission = createCommandInstance().permission
   override val idleWorkers
-    get() = idleCounter.value
+    get() = Int.MAX_VALUE
   override val pendingTasks
-    get() = pendingCounter.value
+    get() = 0
   override val runningWorkers
     get() = runningCounter.value
-  override val permission = samples.first().permission
 
   override suspend fun execute(
     args: List<String>,
@@ -203,36 +197,16 @@ internal class DynamicContextualCommandExecutor(
   ): Deferred<CommandExecuteResult> {
     if (checkPermission && !hasCommandPermission(caller, args)) {
       return async {
-        CommandExecuteResult.PermissionDenied(samples.first())
+        CommandExecuteResult.PermissionDenied(createCommandInstance())
       }
     }
     return async {
-      val worker = acquireWorker()
-      idleCounter.decrementAndGet()
       runningCounter.incrementAndGet()
       try {
-        worker.execute(caller, parentSignature, args)
+        createCommandInstance().execute(caller, parentSignature, args)
       } finally {
-        commitWorker(worker)
+        runningCounter.decrementAndGet()
       }
     }
-  }
-
-  private suspend fun acquireWorker(): AbstractCommand {
-    pendingCounter.incrementAndGet()
-    return try {
-      workerPool.receive()
-    } finally {
-      pendingCounter.decrementAndGet()
-    }
-  }
-
-  // 非挂起归还: 在 try/finally 里如果用挂起的 send(), 外层被取消时可能再次挂起并被取消, worker 会丢.
-  // Channel 容量等于 workerPoolCapacity, 取走多少归还多少, trySend 必然成功.
-  private fun commitWorker(command: AbstractCommand) {
-    command.context2 { }
-    runningCounter.decrementAndGet()
-    check(workerPool.trySend(command).isSuccess) { "worker pool overflow while returning worker" }
-    idleCounter.incrementAndGet()
   }
 }

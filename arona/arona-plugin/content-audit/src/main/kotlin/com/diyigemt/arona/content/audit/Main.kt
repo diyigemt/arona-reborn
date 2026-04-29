@@ -3,6 +3,7 @@ package com.diyigemt.arona.content.audit
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.value
 import com.diyigemt.arona.console.CommandLineSubCommand
+import com.diyigemt.arona.console.ConsoleSubCommand
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
 import com.diyigemt.arona.webui.event.ContentAuditEvent
@@ -67,9 +68,9 @@ object PluginMain : AronaPlugin(
 }
 
 @Suppress("unused")
-class AuditThresholdChangeCommand : CommandLineSubCommand, CliktCommand(
-  name = "auditThreshold", help = "改变内容审查阈值",
-  invokeWithoutSubcommand = true
+class AuditThresholdChangeCommand : CommandLineSubCommand, ConsoleSubCommand(
+  name = "auditThreshold",
+  helpText = "改变内容审查阈值",
 ) {
   private val threshold by argument().int()
   override fun run() {

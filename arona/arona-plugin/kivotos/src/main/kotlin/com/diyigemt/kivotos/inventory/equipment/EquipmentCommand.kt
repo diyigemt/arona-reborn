@@ -1,5 +1,6 @@
 package com.diyigemt.kivotos.inventory.equipment
 
+import com.diyigemt.kivotos.setObject
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.SubCommand

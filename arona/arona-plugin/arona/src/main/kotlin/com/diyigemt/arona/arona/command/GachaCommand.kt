@@ -32,6 +32,8 @@ import com.diyigemt.arona.communication.command.UserCommandSender.Companion.upda
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.updateUserPluginConfig
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.console.CommandLineSubCommand
+import com.diyigemt.arona.console.ConsoleSubCommand
+import com.github.ajalt.mordant.terminal.prompt
 import com.diyigemt.arona.console.confirm
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentLocalDateTime
@@ -404,8 +406,8 @@ class GachaCommand : AbstractCommand(
 }
 
 @Suppress("unused")
-class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "student", help = "学生管理cli") {
-  private class UpdateStudent : CliktCommand(name = "i", help = "更新一个学生信息") {
+class StudentConsoleCommand : CommandLineSubCommand, ConsoleSubCommand(name = "student", helpText = "学生管理cli") {
+  private class UpdateStudent : ConsoleSubCommand(name = "i", helpText = "更新一个学生信息") {
     override fun run() {
       val studentName = terminal.prompt("请输入学生名称", null) as String
       var schema = dbQuery { StudentSchema.find { StudentTable.name eq studentName }.firstOrNull() }?.also {
@@ -481,7 +483,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
 
   }
 
-  private class DeleteStudent : CliktCommand(name = "d", help = "删除一个学生信息") {
+  private class DeleteStudent : ConsoleSubCommand(name = "d", helpText = "删除一个学生信息") {
     override fun run() {
       val schema = studentSelector(this)
       if (terminal.confirm("将删除学生信息: $schema")) {
@@ -494,7 +496,7 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
     }
   }
 
-  private class QueryStudent : CliktCommand(name = "q", help = "查询学生信息") {
+  private class QueryStudent : ConsoleSubCommand(name = "q", helpText = "查询学生信息") {
     override fun run() {
       val studentName = terminal.prompt("请输入学生名称", null) as String
       dbQuery {
@@ -518,11 +520,11 @@ class StudentConsoleCommand : CommandLineSubCommand, CliktCommand(name = "studen
 }
 
 @Suppress("unused")
-class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
-  name = "gacha", help = "抽卡管理cli",
-  invokeWithoutSubcommand = true
+class GachaConsoleCommand : CommandLineSubCommand, ConsoleSubCommand(
+  name = "gacha",
+  helpText = "抽卡管理cli",
 ) {
-  private class QueryPool : CliktCommand(name = "q", help = "查询卡池信息") {
+  private class QueryPool : ConsoleSubCommand(name = "q", helpText = "查询卡池信息") {
     override fun run() {
       var poolName: String? = null
       while (poolName.isNullOrBlank()) {
@@ -544,7 +546,7 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
     }
   }
 
-  private class CreatePool : CliktCommand(name = "c", help = "创建卡池") {
+  private class CreatePool : ConsoleSubCommand(name = "c", helpText = "创建卡池") {
     override fun run() {
       val poolName = terminal.prompt("请输入卡池名称", null) as String
       val fes = terminal.confirm("fes", default = "N")
@@ -565,7 +567,7 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
     }
   }
 
-  private class ActivePool : CliktCommand(name = "a", help = "激活卡池") {
+  private class ActivePool : ConsoleSubCommand(name = "a", helpText = "激活卡池") {
     override fun run() {
       val pool = poolSelector(this)
       if (terminal.confirm("激活卡池")) {
@@ -574,7 +576,7 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
     }
   }
 
-  private class DeletePool : CliktCommand(name = "d", help = "删除卡池") {
+  private class DeletePool : ConsoleSubCommand(name = "d", helpText = "删除卡池") {
     override fun run() {
       val pool = poolSelector(this)
       echo(pool.toString())
@@ -592,7 +594,7 @@ class GachaConsoleCommand : CommandLineSubCommand, CliktCommand(
     }
   }
 
-  private class UpdatePool : CliktCommand(name = "u", help = "更新卡池信息") {
+  private class UpdatePool : ConsoleSubCommand(name = "u", helpText = "更新卡池信息") {
     override fun run() {
       val poolName = terminal.prompt("请输入卡池名称", null)
       val pool = dbQuery {

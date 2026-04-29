@@ -26,7 +26,7 @@ object PluginMain : AronaPlugin(
 }
 
 @Suppress("unused")
-class PressureTestCommandCommand : CommandLineSubCommand, CliktCommand(name = "pressure", help = "压测") {
+class PressureTestCommandCommand : CommandLineSubCommand, com.diyigemt.arona.console.ConsoleSubCommand(name = "pressure", helpText = "压测") {
   private val count by argument("threads").int().default(100)
   private val command by argument("command").default("塔罗牌")
   override fun run() {

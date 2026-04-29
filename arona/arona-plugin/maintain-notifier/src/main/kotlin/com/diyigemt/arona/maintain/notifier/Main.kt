@@ -13,6 +13,7 @@ import com.diyigemt.arona.utils.datetimeToInstant
 import com.diyigemt.arona.utils.toDateTime
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.mordant.terminal.prompt
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 
@@ -49,7 +50,7 @@ object NotifyConfig : AutoSavePluginData("notify-config") {
 }
 
 @Suppress("unused")
-class UpdateUpdateConsoleCommand : CommandLineSubCommand, CliktCommand(name = "maintain", help = "刷新更新日志") {
+class UpdateUpdateConsoleCommand : CommandLineSubCommand, com.diyigemt.arona.console.ConsoleSubCommand(name = "maintain", helpText = "刷新更新日志") {
   override fun run() {
     val start = terminal.prompt("起始时间", default = NotifyConfig.start) as String
     val end = terminal.prompt(

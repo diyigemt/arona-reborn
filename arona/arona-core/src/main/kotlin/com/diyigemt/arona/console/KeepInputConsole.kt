@@ -6,6 +6,8 @@ import ch.qos.logback.core.AppenderBase
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder
 import com.github.ajalt.mordant.terminal.ConversionResult
 import com.github.ajalt.mordant.terminal.Terminal
+// Mordant 3: prompt 是 PromptKt 顶层 extension, 需显式 import 才能在 Terminal.confirm 里用.
+import com.github.ajalt.mordant.terminal.prompt
 import kotlinx.coroutines.delay
 import org.fusesource.jansi.AnsiConsole
 import org.jline.reader.*

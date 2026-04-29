@@ -5,6 +5,7 @@ import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.value
 import com.diyigemt.arona.console.CommandLineSubCommand
+import com.diyigemt.arona.console.ConsoleSubCommand
 import com.diyigemt.arona.magic.PluginMain.emit
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
@@ -57,9 +58,9 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
 }
 
 @Suppress("unused")
-class MagicConsoleCommand : CommandLineSubCommand, CliktCommand(
-  name = "magic", help = "magic测试",
-  invokeWithoutSubcommand = true
+class MagicConsoleCommand : CommandLineSubCommand, ConsoleSubCommand(
+  name = "magic",
+  helpText = "magic测试",
 ) {
   override fun run() {
     runBlocking {

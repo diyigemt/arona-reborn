@@ -139,7 +139,7 @@ suspend fun getDauString(date: String): TencentCustomMarkdown {
 }
 
 @Suppress("unused")
-class DauClCommand : CommandLineSubCommand, CliktCommand(name = "dau", help = "显示当日dau") {
+class DauClCommand : CommandLineSubCommand, com.diyigemt.arona.console.ConsoleSubCommand(name = "dau", helpText = "显示当日dau") {
   private val offset by argument().int().default(0)
   override fun run() {
     // dau

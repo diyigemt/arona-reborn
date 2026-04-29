@@ -2,6 +2,7 @@
 
 package com.diyigemt.kivotos.coffee
 
+import com.diyigemt.kivotos.setObject
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager

@@ -5,6 +5,7 @@ import com.diyigemt.arona.communication.command.CommandSender
 import com.diyigemt.arona.permission.Permission
 import com.diyigemt.arona.permission.PermissionService
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.requireObject
 import kotlinx.coroutines.runBlocking
 import kotlin.reflect.KClass
@@ -123,15 +124,34 @@ annotation class SubCommand(
   val forClass: KClass<out AbstractCommand> = AbstractCommand::class,
 )
 
+/**
+ * 反射 endpoint 共享给 Clikt 子命令的执行上下文. 旧 fork 时代用 `obj = mutableMapOf("caller", "signature")`
+ * 配合 fork 自定义的 `requireObject<T>(name)` 命名 obj 读取; Clikt 5 标准 API 没有命名 obj,
+ * 收敛到单一类型化容器, AbstractCommand 子类一次 findObject 拿全部上下文.
+ */
+internal data class DynamicCommandContext(
+  val caller: AbstractCommandSender,
+  val signature: CommandSignature,
+)
+
 abstract class AbstractCommand(
   final override val owner: CommandOwner,
   final override val primaryName: String,
   final override val secondaryNames: Array<out String> = arrayOf(),
   override val description: String = "<no description available>",
   help: String = "",
-) : CliktCommand(name = primaryName, help = help, epilog = description, invokeWithoutSubcommand = true), Command {
-  private val caller by requireObject<AbstractCommandSender>("caller")
-  private val signature by requireObject<CommandSignature>("signature")
+) : CliktCommand(name = primaryName), Command {
+  // 构造参数 `help` 与下方 `override fun help(context)` 同名冲突, 不能直接 val 化;
+  // 通过显式属性捕获让外部调用方仍可写 `help = "..."`, 内部 override 走 helpText 读取.
+  private val helpText: String = help
+  // Clikt 5 把 help / epilog / invokeWithoutSubcommand 等迁出构造器, 改为 override 属性 / 函数.
+  override fun help(context: Context): String = helpText
+  override fun helpEpilog(context: Context): String = description
+  override val invokeWithoutSubcommand: Boolean = true
+
+  private val ctx by requireObject<DynamicCommandContext>()
+  private val caller get() = ctx.caller
+  private val signature get() = ctx.signature
 
   init {
     Command.checkCommandName(primaryName)

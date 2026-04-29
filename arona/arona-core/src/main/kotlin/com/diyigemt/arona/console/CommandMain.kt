@@ -8,19 +8,41 @@ import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.runSuspend
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.mordant.terminal.*
+import com.github.ajalt.mordant.terminal.PrintRequest
+import com.github.ajalt.mordant.terminal.StandardTerminalInterface
+import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.util.logging.*
 import kotlinx.coroutines.delay
 import kotlin.system.exitProcess
 
 interface CommandLineSubCommand
 
-internal val commandTerminal = Terminal(JLineTerminalInterface())
+// Mordant 3: Terminal 主构造私有, 改用静态工厂 ansiLevel/.../terminalInterface 配置;
+// 这里走 forTerminalInterface 把自定义 JLineTerminalInterface 注入.
+internal val commandTerminal = Terminal(terminalInterface = JLineTerminalInterface())
 
-class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invokeWithoutSubcommand = true) {
+// Clikt 5: CliktCommand 构造器只剩 name; help/epilog/invokeWithoutSubcommand/printHelpOnEmptyArgs
+// 等改 override 属性. 项目现有命令仅通过 help= 和这两个布尔传入, 用一个轻量基类把 override 集中管理,
+// 避免每个子类各自 override. CommandLineSubCommand 仍是空 marker interface.
+abstract class ConsoleSubCommand(
+  name: String,
+  private val helpText: String = "",
+) : CliktCommand(name = name) {
+  override fun help(context: Context): String = helpText
+  override val invokeWithoutSubcommand: Boolean = true
+}
+
+class CommandMain : CliktCommand(name = "cli") {
+  override fun help(context: Context): String = ""
+  override val printHelpOnEmptyArgs: Boolean = true
+  override val invokeWithoutSubcommand: Boolean = true
+
   @Suppress("UNCHECKED_CAST")
   companion object {
     private val instance = CommandMain().subcommands(ReflectionUtil
@@ -58,7 +80,7 @@ class CommandMain : CliktCommand(name = "cli", printHelpOnEmptyArgs = true, invo
 }
 
 @Suppress("unused")
-class ExitCommand : CommandLineSubCommand, CliktCommand(name = "exit", help = "安全退出程序") {
+class ExitCommand : CommandLineSubCommand, ConsoleSubCommand(name = "exit", helpText = "安全退出程序") {
   override fun run() {
     echo("exiting")
     BotManager.close()
@@ -67,14 +89,14 @@ class ExitCommand : CommandLineSubCommand, CliktCommand(name = "exit", help = "�
 }
 
 @Suppress("unused")
-class PermissionManagerCommand : CommandLineSubCommand, CliktCommand(name = "perm", help = "查看权限") {
+class PermissionManagerCommand : CommandLineSubCommand, ConsoleSubCommand(name = "perm", helpText = "查看权限") {
   override fun run() {
     echo("permission")
   }
 }
 
 @Suppress("unused")
-class GlobalAnnouncementCommand : CommandLineSubCommand, CliktCommand(name = "anno", help = "主动消息通知") {
+class GlobalAnnouncementCommand : CommandLineSubCommand, ConsoleSubCommand(name = "anno", helpText = "主动消息通知") {
   private val message by argument(name = "contain")
   override fun run() {
     runSuspend {
@@ -95,7 +117,7 @@ class GlobalAnnouncementCommand : CommandLineSubCommand, CliktCommand(name = "an
 }
 
 @Suppress("unused")
-class MonitorCommand : CommandLineSubCommand, CliktCommand(name = "monitor", help = "系统资源监视") {
+class MonitorCommand : CommandLineSubCommand, ConsoleSubCommand(name = "monitor", helpText = "系统资源监视") {
   override fun run() {
     ExecutorMap
       .entries
@@ -109,9 +131,10 @@ class MonitorCommand : CommandLineSubCommand, CliktCommand(name = "monitor", hel
   }
 }
 
-class JLineTerminalInterface : TerminalInterface {
-  override val info: TerminalInfo = TerminalDetection.detectTerminal(null, null, null, null, null)
-
+// Mordant 3 引入 StandardTerminalInterface 抽象基类, 已实现 info / getTerminalSize /
+// readInputEvent / enterRawMode / shouldAutoUpdateSize 等新增 abstract 方法的默认行为;
+// 自定义只覆盖 completePrintRequest (打印重定向到 JLine) 与 readLineOrNull (读 JLine 一行).
+class JLineTerminalInterface : StandardTerminalInterface() {
   override fun completePrintRequest(request: PrintRequest) {
     when {
       request.stderr -> {

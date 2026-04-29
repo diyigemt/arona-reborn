@@ -94,16 +94,16 @@ dependencies {
   implementation(libs.atomicfu)
   implementation(libs.bcpkix.jdk18on)
   implementation(libs.bundles.kotlinx.serialization.base)
-  // ABAC: 本地 fork 的 clikt + mordant + jansi (lib/clikt-master.7z 中有自定义 context2 扩展),
-  // 升级路径见 P2-C; 此处保持 fileTree 引入以等价于改造前的依赖图.
-  api(fileTree("lib"))
-
   api(libs.mariadb.java.client)
   api(libs.sqlite.jdbc)
   api(libs.kaml)
   api(libs.semver)
   api(libs.reflections)
   api(libs.clikt)
+  // P2-C2: Mordant 与 Jansi 由本地 lib/ jar 升级到 Maven 坐标; Clikt 5 transitively 拉 Mordant 3,
+  // 这里显式声明是因为项目代码层 (CommandMain / KeepInputConsole) 直接 import Mordant API.
+  api(libs.mordant)
+  implementation(libs.jansi)
   api(libs.kotlinx.datetime)
 
   api(libs.bundles.kotlinx.coroutines.base)

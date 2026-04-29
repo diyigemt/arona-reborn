@@ -40,7 +40,7 @@ object AronaApplication : CoroutineScope {
     val environment = applicationEngineEnvironment {
       connector {
         port = aronaConfig.web.port
-        host = "127.0.0.1"
+        host = "0.0.0.0"
       }
       rootPath = "/api/v1"
       module(Application::module)

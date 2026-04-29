@@ -53,7 +53,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import net.coobird.thumbnailator.Thumbnails
-import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.like
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.ByteArrayInputStream
 import java.nio.file.Files

@@ -2,11 +2,11 @@ package com.diyigemt.arona.arona.database.tarot
 
 import com.diyigemt.arona.arona.database.Database
 import com.diyigemt.arona.utils.currentLocalDateTime
-import org.jetbrains.exposed.dao.Entity
-import org.jetbrains.exposed.dao.EntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IdTable
-import org.jetbrains.exposed.sql.Column
+import org.jetbrains.exposed.v1.dao.Entity
+import org.jetbrains.exposed.v1.dao.EntityClass
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.core.dao.id.IdTable
+import org.jetbrains.exposed.v1.core.Column
 
 @Database
 object TarotRecordTable : IdTable<String>(name = "TarotRecord") {

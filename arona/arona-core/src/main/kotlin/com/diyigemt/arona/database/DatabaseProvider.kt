@@ -16,12 +16,12 @@ import io.github.crackthecodeabhi.kreds.connection.Endpoint
 import io.github.crackthecodeabhi.kreds.connection.KredsClient
 import io.github.crackthecodeabhi.kreds.connection.newClient
 import kotlinx.coroutines.currentCoroutineContext
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.DatabaseConfig
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.DatabaseConfig
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.SchemaUtils
+import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.sql.Connection
 
 object DatabaseProvider {
@@ -32,9 +32,11 @@ object DatabaseProvider {
       user = aronaConfig.mariadb.user,
       password = aronaConfig.mariadb.password,
       databaseConfig = DatabaseConfig {
-        defaultRepetitionAttempts = 5
-        defaultMinRepetitionDelay = 1000
-        defaultMaxRepetitionDelay = 5000
+        // Exposed 1.x 重命名: defaultRepetitionAttempts → defaultMaxAttempts,
+        // defaultMin/MaxRepetitionDelay → defaultMin/MaxRetryDelay (语义不变).
+        defaultMaxAttempts = 5
+        defaultMinRetryDelay = 1000
+        defaultMaxRetryDelay = 5000
       }
     )
     transaction(database) {

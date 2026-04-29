@@ -29,7 +29,10 @@ import kotlinx.coroutines.launch
 import org.slf4j.Logger
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
-import org.jetbrains.exposed.sql.and
+// Exposed 1.x: SqlExpressionBuilder 对象 deprecated, eq/inList/and 等迁为 v1.core 包内 top-level functions.
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.TimeUnit

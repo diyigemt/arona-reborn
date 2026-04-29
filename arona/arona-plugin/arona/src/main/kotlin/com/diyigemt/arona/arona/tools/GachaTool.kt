@@ -2,6 +2,7 @@ package com.diyigemt.arona.arona.tools
 
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import org.jetbrains.exposed.v1.core.eq
 import com.diyigemt.arona.arona.database.gacha.GachaPool
 import com.diyigemt.arona.arona.database.gacha.GachaPoolSchema
 import com.diyigemt.arona.arona.database.gacha.GachaPoolTable

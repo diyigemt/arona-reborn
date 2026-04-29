@@ -5,6 +5,7 @@
 package com.diyigemt.arona.arona.config
 
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuery
+import org.jetbrains.exposed.v1.core.inList
 import com.diyigemt.arona.arona.database.gacha.GachaPool
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.arona.database.student.StudentTable

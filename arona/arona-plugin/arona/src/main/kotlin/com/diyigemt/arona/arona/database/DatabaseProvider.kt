@@ -4,12 +4,12 @@ import com.diyigemt.arona.arona.tools.ReflectionTool
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.value
 import kotlinx.coroutines.currentCoroutineContext
-import org.jetbrains.exposed.sql.DatabaseConfig as DC
-import org.jetbrains.exposed.sql.Database as DB
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.DatabaseConfig as DC
+import org.jetbrains.exposed.v1.jdbc.Database as DB
+import org.jetbrains.exposed.v1.jdbc.SchemaUtils
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.sql.Connection
 
 object DatabaseProvider {
@@ -20,9 +20,11 @@ object DatabaseProvider {
       user = DatabaseConfig.user,
       password = DatabaseConfig.password,
       databaseConfig = DC {
-        defaultRepetitionAttempts = 5
-        defaultMinRepetitionDelay = 1000
-        defaultMaxRepetitionDelay = 5000
+        // Exposed 1.x: defaultRepetitionAttempts → defaultMaxAttempts; 同源
+        // defaultMin/MaxRepetitionDelay → defaultMin/MaxRetryDelay (语义不变).
+        defaultMaxAttempts = 5
+        defaultMinRetryDelay = 1000
+        defaultMaxRetryDelay = 5000
       }
     )
     transaction(database) {

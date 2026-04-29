@@ -3,8 +3,6 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.tasks.bundling.Jar
 import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 class AronaPluginConventionPlugin : Plugin<Project> {
   override fun apply(project: Project) {
@@ -29,10 +27,7 @@ class AronaPluginConventionPlugin : Plugin<Project> {
     }
 
     val kotlinExtension = project.extensions.getByType(KotlinProjectExtension::class.java)
-    project.tasks.withType(KotlinCompile::class.java).configureEach {
-      compilerOptions.languageVersion.set(KotlinVersion.KOTLIN_1_9)
-      compilerOptions.apiVersion.set(KotlinVersion.KOTLIN_1_9)
-    }
+    kotlinExtension.jvmToolchain(17)
 
     kotlinExtension.sourceSets.getByName("main").kotlin
       .srcDir(generateBuildConfig.flatMap { it.outputDirectory })

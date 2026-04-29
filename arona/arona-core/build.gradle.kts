@@ -1,5 +1,4 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 val kotlinVersion: String by project
 val exposedVersion: String by project
@@ -10,10 +9,9 @@ plugins {
 }
 kotlin {
   compilerOptions {
-    languageVersion.set(KotlinVersion.KOTLIN_1_9)
-    apiVersion.set(KotlinVersion.KOTLIN_1_9)
     freeCompilerArgs.add("-Xcontext-receivers")
   }
+  jvmToolchain(17)
 }
 version = "1.3.7"
 application {

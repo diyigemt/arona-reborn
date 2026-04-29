@@ -1,14 +1,17 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 val kotlinVersion: String by project
 val exposedVersion: String by project
 plugins {
-  kotlin("jvm") version "1.9.22"
+  kotlin("jvm") version "2.0.21"
   id("io.ktor.plugin") version "2.3.7"
-  id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
+  id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
 }
 kotlin {
   compilerOptions {
+    languageVersion.set(KotlinVersion.KOTLIN_1_9)
+    apiVersion.set(KotlinVersion.KOTLIN_1_9)
     freeCompilerArgs.add("-Xcontext-receivers")
   }
 }

@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.2.21"
-ktor = "2.3.13"
+ktor = "3.4.3"
 shadow = "8.3.10"
 exposed = "0.43.0"
 mongodb = "4.11.1"

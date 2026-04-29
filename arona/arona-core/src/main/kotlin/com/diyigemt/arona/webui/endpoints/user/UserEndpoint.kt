@@ -22,7 +22,6 @@ import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
 import io.github.crackthecodeabhi.kreds.args.SetOption
 import io.ktor.server.application.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 import java.security.SecureRandom
 import java.util.Base64
@@ -99,7 +98,7 @@ internal object UserEndpoint {
    * 带 query token:  查验证码状态; 若 QQ 端确认完成, 颁发长 web token (TTL 1 小时) 并失效验证码.
    */
   @AronaBackendEndpointGet("/login")
-  suspend fun PipelineContext<Unit, ApplicationCall>.login() {
+  suspend fun ApplicationCall.login() {
     val codeQuery = request.queryParameters["token"]
     val limiter = if (codeQuery == null) issueLimiter else pollLimiter
     if (!limiter.tryConsume(ip)) {
@@ -135,7 +134,7 @@ internal object UserEndpoint {
    * 获取个人信息
    */
   @AronaBackendEndpointGet("")
-  suspend fun PipelineContext<Unit, ApplicationCall>.profile() {
+  suspend fun ApplicationCall.profile() {
     return success(
       UserProfileResp(
         aronaUser.id,
@@ -148,8 +147,8 @@ internal object UserEndpoint {
    * 更新个人信息
    */
   @AronaBackendEndpointPut("")
-  suspend fun PipelineContext<Unit, ApplicationCall>.updateProfile() {
-    val data = context.receiveJsonOrNull<UserProfileUpdateReq>() ?: return badRequest()
+  suspend fun ApplicationCall.updateProfile() {
+    val data = receiveJsonOrNull<UserProfileUpdateReq>() ?: return badRequest()
     if (data.username.length > 15) {
       return errorMessage("用户名不能超过15个字符")
     }
@@ -180,7 +179,7 @@ internal object UserEndpoint {
    * 获取绑定凭证 / 查询绑定结果. 与 [login] 共用一套 NX 颁发与限流策略.
    */
   @AronaBackendEndpointGet("/bind")
-  suspend fun PipelineContext<Unit, ApplicationCall>.bind() {
+  suspend fun ApplicationCall.bind() {
     val codeQuery = request.queryParameters["token"]
     val limiter = if (codeQuery == null) issueLimiter else pollLimiter
     if (!limiter.tryConsume(ip)) {

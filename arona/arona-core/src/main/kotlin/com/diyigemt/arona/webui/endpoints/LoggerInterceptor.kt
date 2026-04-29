@@ -8,28 +8,27 @@ import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.utils.aronaConfig
 import com.diyigemt.arona.webui.plugins.AronaAdminToken
 import com.diyigemt.arona.webui.plugins.AronaInstanceVersion
+import com.diyigemt.arona.webui.plugins.HaltPipeline
 import com.diyigemt.arona.webui.plugins.XRealIp
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
-import io.ktor.server.response.*
 import io.ktor.util.*
 import io.ktor.util.logging.*
-import io.ktor.util.pipeline.*
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
-val PipelineContext<Unit, ApplicationCall>.version: String?
+val ApplicationCall.version: String?
   get() = request.header(HttpHeaders.AronaInstanceVersion)
 
-val PipelineContext<Unit, ApplicationCall>.token: String?
+val ApplicationCall.token: String?
   get() = request.header(HttpHeaders.AronaAdminToken)
 
-val PipelineContext<Unit, ApplicationCall>.authorization: String?
+val ApplicationCall.authorization: String?
   get() = request.header(HttpHeaders.Authorization)
 
-val PipelineContext<Unit, ApplicationCall>.ip: String
+val ApplicationCall.ip: String
   // 仅在确实部署在反向代理之后时才信任 X-Real-IP, 否则取 socket 远端地址.
   get() = if (aronaConfig.web.behindProxy) {
     request.header(HttpHeaders.XRealIp) ?: request.origin.remoteAddress
@@ -37,17 +36,14 @@ val PipelineContext<Unit, ApplicationCall>.ip: String
     request.origin.remoteAddress
   }
 
-val PipelineContext<Unit, ApplicationCall>.request: ApplicationRequest
-  get() = context.request
-
 private val ContextUserAttrKey = AttributeKey<UserDocument>("user")
 
-internal var PipelineContext<Unit, ApplicationCall>._aronaUser: UserDocument?
-  get() = context.attributes.getOrNull(ContextUserAttrKey)
-  set(value) = context.attributes.put(ContextUserAttrKey, value as UserDocument)
+internal var ApplicationCall._aronaUser: UserDocument?
+  get() = attributes.getOrNull(ContextUserAttrKey)
+  set(value) = attributes.put(ContextUserAttrKey, value as UserDocument)
 
-internal val PipelineContext<Unit, ApplicationCall>.aronaUser: UserDocument
-  get() = context.attributes[ContextUserAttrKey]
+internal val ApplicationCall.aronaUser: UserDocument
+  get() = attributes[ContextUserAttrKey]
 
 /**
  * 解析 RFC 6750 Bearer 令牌.
@@ -82,8 +78,8 @@ object LoggerInterceptor {
   private val AdminAccessRegexp = Regex("/api/v\\d/admin/.*")
 
   @AronaBackendRouteInterceptor
-  suspend fun PipelineContext<Unit, ApplicationCall>.accessLogging() {
-    val path = context.request.path()
+  suspend fun ApplicationCall.accessLogging() {
+    val path = request.path()
     if (AdminAccessRegexp.matches(path)) {
       // 将 admin 访问交由 adminAccessLogging 处理
       return
@@ -91,9 +87,9 @@ object LoggerInterceptor {
     if (path.endsWith("/login") || path.endsWith("/webhook")) {
       return
     }
-    val token = parseBearer(this.authorization) ?: run {
+    val token = parseBearer(authorization) ?: run {
       unauthorized()
-      return finish()
+      throw HaltPipeline()
     }
     val userId = DatabaseProvider.redisDbQuery {
       val key = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, token)
@@ -102,12 +98,12 @@ object LoggerInterceptor {
     }
     if (userId == null) {
       unauthorized()
-      return finish()
+      throw HaltPipeline()
     }
-    this._aronaUser = findUserDocumentByIdOrNull(userId)
+    _aronaUser = findUserDocumentByIdOrNull(userId)
     if (_aronaUser == null) {
       unauthorized()
-      return finish()
+      throw HaltPipeline()
     }
   }
 }
@@ -118,19 +114,19 @@ object AdminLoggerInterceptor {
   private val adminToken = aronaConfig.adminToken
 
   @AronaBackendAdminRouteInterceptor
-  suspend fun PipelineContext<Unit, ApplicationCall>.adminAccessLogging() {
-    val method = context.request.httpMethod.value
-    val path = context.request.path()
+  suspend fun ApplicationCall.adminAccessLogging() {
+    val method = request.httpMethod.value
+    val path = request.path()
     val token = this.token
     if (token == null) {
       adminLogger.warn("unauthorized admin access: $method: $path by $ip")
       forbidden()
-      return finish()
+      throw HaltPipeline()
     }
     if (!verifyAdminToken(token, adminToken)) {
       adminLogger.warn("failed authorized access: $method: $path by $ip")
       forbidden()
-      return finish()
+      throw HaltPipeline()
     }
     adminLogger.info("admin access: $method: $path by $ip")
   }

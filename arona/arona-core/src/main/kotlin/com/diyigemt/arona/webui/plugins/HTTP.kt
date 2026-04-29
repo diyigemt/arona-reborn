@@ -10,8 +10,6 @@ import io.ktor.server.plugins.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.server.request.*
-import io.ktor.util.pipeline.*
-import io.ktor.utils.io.core.*
 
 val HttpHeaders.AronaInstanceVersion: String
   get() = "Version"

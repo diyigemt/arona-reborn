@@ -7,7 +7,6 @@ import com.diyigemt.arona.webui.endpoints.admin.AdminServiceProvider.service
 import com.diyigemt.arona.utils.ReflectionUtil
 import io.ktor.server.application.*
 import io.ktor.server.request.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -25,7 +24,7 @@ object AdminServiceProvider {
   private val map: Map<AdminActionType, AdminService<*>> by lazy {
     ReflectionUtil.scanInterfacePetObjectInstance(AdminService::class).associateBy { it.type }
   }
-  suspend fun PipelineContext<Unit, ApplicationCall>.service(action: AdminAction0, body: String) {
+  suspend fun ApplicationCall.service(action: AdminAction0, body: String) {
     val obj = map[action.action] ?: return
     val data = json.decodeFromString(AdminAction.serializer((obj.deserializer)), body)
     obj::class.declaredFunctions.firstOrNull()?.callSuspend(obj, this, data.data)
@@ -85,8 +84,8 @@ object AdminActionEndpoint {
   }
 
   @AronaBackendEndpointPost("/action")
-  suspend fun PipelineContext<Unit, ApplicationCall>.adminAction() {
-    val body = context.receiveText()
+  suspend fun ApplicationCall.adminAction() {
+    val body = receiveText()
     val action = json.decodeFromString<AdminAction0>(body)
     service(action, body)
   }

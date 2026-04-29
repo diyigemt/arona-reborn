@@ -6,7 +6,6 @@ import com.diyigemt.arona.webui.endpoints.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspend
@@ -58,21 +57,27 @@ fun Application.configureRouting() {
         group.forEach { (father, method) ->
           val phase = method.findAnnotation<AronaBackendRouteInterceptor>()!!.phase
           intercept(phase.phase) {
-            checkTransaction(father, method)
+            // 拦截器内部已通过响应辅助函数 (errorMessage/unauthorized 等) 写出响应,
+            // HaltPipeline 把"跳过后续阶段"的信号回传到 PipelineContext, 调 finish() 阻止 handler 执行.
+            try {
+              call.checkTransaction(father, method)
+            } catch (_: HaltPipeline) {
+              finish()
+            }
           }
         }
       }
     }
     endpoints
-      .forEach {
-        val basePath = it::class.findAnnotation<AronaBackendEndpoint>()!!.path
-        val get = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointGet>(it::class)
+      .forEach { endpoint ->
+        val basePath = endpoint::class.findAnnotation<AronaBackendEndpoint>()!!.path
+        val get = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointGet>(endpoint::class)
           .map { method -> method.findAnnotation<AronaBackendEndpointGet>()!!.path to method }
-        val post = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointPost>(it::class)
+        val post = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointPost>(endpoint::class)
           .map { method -> method.findAnnotation<AronaBackendEndpointPost>()!!.path to method }
-        val delete = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointDelete>(it::class)
+        val delete = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointDelete>(endpoint::class)
           .map { method -> method.findAnnotation<AronaBackendEndpointDelete>()!!.path to method }
-        val put = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointPut>(it::class)
+        val put = ReflectionUtil.scanMethodWithAnnotated<AronaBackendEndpointPut>(endpoint::class)
           .map { method -> method.findAnnotation<AronaBackendEndpointPut>()!!.path to method }
         val methodList = listOf(
           HttpMethod.Get to get, HttpMethod.Post to post, HttpMethod.Delete to delete,
@@ -82,15 +87,25 @@ fun Application.configureRouting() {
           methodList.forEach { (httpMethod, handlers) ->
             handlers.forEach { (path, method) ->
               route(path, httpMethod) {
-                if (method.hasAnnotation<AronaBackendAdminEndpoint>() || it::class.hasAnnotation<AronaBackendAdminEndpoint>()) {
+                if (method.hasAnnotation<AronaBackendAdminEndpoint>() || endpoint::class.hasAnnotation<AronaBackendAdminEndpoint>()) {
                   intercept(ApplicationCallPipeline.Call) {
-                    adminCallInterceptors.forEach { (father, method) ->
-                      checkTransaction(father, method)
+                    try {
+                      adminCallInterceptors.forEach { (father, method) ->
+                        call.checkTransaction(father, method)
+                      }
+                    } catch (_: HaltPipeline) {
+                      finish()
                     }
                   }
                 }
-                handle { _ ->
-                  checkTransaction(it, method)
+                // Ktor 3 的 handle lambda 是 `suspend RoutingContext.() -> Unit`, 没有 Unit 入参; endpoint 实例
+                // 来自外层显式命名的 forEach { endpoint -> }, 避免依赖隐式 `it` 跨多层 lambda 解析的脆弱性.
+                handle {
+                  try {
+                    call.checkTransaction(endpoint, method)
+                  } catch (_: HaltPipeline) {
+                    // no-op: 响应已由 endpoint/拦截器写出, RoutingContext 自然完结.
+                  }
                 }
               }
             }
@@ -127,12 +142,25 @@ fun resolveIsolationLevel(clazz: KClass<*>, fn: KFunction<*>): TxLevel =
     ?: clazz.findAnnotation<AronaBackendEndpoint>()?.isolationLevel
     ?: TxLevel.READ_COMMITTED
 
-suspend fun PipelineContext<Unit, ApplicationCall>.checkTransaction(clazz: Any, fn: KFunction<*>) {
+suspend fun ApplicationCall.checkTransaction(clazz: Any, fn: KFunction<*>) {
   if (withoutTransaction(clazz::class, fn)) {
     fn.callSuspend(clazz, this)
   } else {
     sqlDbQueryWithIsolation(resolveIsolationLevel(clazz::class, fn).jdbcLevel) {
-      fn.callSuspend(clazz, this)
+      fn.callSuspend(clazz, this@checkTransaction)
     }
   }
+}
+
+/**
+ * Ktor 2 时代 endpoint/拦截器在 [io.ktor.util.pipeline.PipelineContext] 上调用 `finish()` 跳过后续阶段;
+ * Ktor 3 把 routing 主签名换成 [io.ktor.server.routing.RoutingContext], `finish()` 不再可见.
+ *
+ * 项目把所有反射 endpoint/拦截器统一迁到 [ApplicationCall] receiver, 失去 pipeline 控制权;
+ * 因此用这个轻量 sentinel 异常作为"halt 信号": 由 [Route.intercept] 的 PipelineContext 包装层捕获,
+ * 在那里再调用 PipelineContext.finish() 真正终止 pipeline. 抛出处不需要再 `return`.
+ */
+internal class HaltPipeline : RuntimeException() {
+  // 业务流控用, 不需要堆栈; 关 stack trace 减开销.
+  override fun fillInStackTrace(): Throwable = this
 }

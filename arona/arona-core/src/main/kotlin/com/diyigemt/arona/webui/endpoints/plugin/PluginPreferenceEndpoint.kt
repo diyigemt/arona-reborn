@@ -7,13 +7,11 @@ import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointPost
 import com.diyigemt.arona.webui.endpoints.aronaUser
-import com.diyigemt.arona.webui.endpoints.request
 import com.diyigemt.arona.webui.event.auditOrAllow
 import com.diyigemt.arona.webui.event.isBlock
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import io.ktor.server.application.*
 import io.ktor.server.request.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -38,7 +36,7 @@ internal fun parsePreferenceQuery(rawId: String?, rawKey: String?): PreferenceQu
 @AronaBackendEndpoint("/plugin/preference")
 object PluginPreferenceEndpoint {
   @AronaBackendEndpointGet
-  suspend fun PipelineContext<Unit, ApplicationCall>.getPreference() {
+  suspend fun ApplicationCall.getPreference() {
     // 此前误用 context.parameters[] (路径参数), 与前端实际传的 query 参数不匹配, 接口形同虚设.
     val query = parsePreferenceQuery(
       request.queryParameters["id"],
@@ -52,9 +50,9 @@ object PluginPreferenceEndpoint {
     return success()
   }
   @AronaBackendEndpointPost
-  suspend fun PipelineContext<Unit, ApplicationCall>.savePreference() {
+  suspend fun ApplicationCall.savePreference() {
     val obj = kotlin.runCatching {
-      context.receive<PluginPreferenceResp>()
+      receive<PluginPreferenceResp>()
     }.onFailure {
       return badRequest()
     }.getOrNull() ?: return badRequest()

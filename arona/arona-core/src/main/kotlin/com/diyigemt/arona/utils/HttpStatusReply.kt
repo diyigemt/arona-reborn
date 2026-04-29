@@ -3,7 +3,6 @@ package com.diyigemt.arona.utils
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 
 /**
@@ -50,29 +49,29 @@ data class ServerResponse<T>(
   }
 }
 
-suspend fun PipelineContext<Unit, ApplicationCall>.badRequest() =
-  context.respond(HttpStatusCode.BadRequest, ServerResponse.business<Unit>(BusinessCode.BAD_REQUEST))
+suspend fun ApplicationCall.badRequest() =
+  respond(HttpStatusCode.BadRequest, ServerResponse.business<Unit>(BusinessCode.BAD_REQUEST))
 
-suspend fun PipelineContext<Unit, ApplicationCall>.unauthorized() =
-  context.respond(HttpStatusCode.Unauthorized, ServerResponse.business<Unit>(BusinessCode.UNAUTHORIZED))
+suspend fun ApplicationCall.unauthorized() =
+  respond(HttpStatusCode.Unauthorized, ServerResponse.business<Unit>(BusinessCode.UNAUTHORIZED))
 
-suspend fun PipelineContext<Unit, ApplicationCall>.forbidden() =
-  context.respond(HttpStatusCode.Forbidden, ServerResponse.business<Unit>(BusinessCode.FORBIDDEN))
+suspend fun ApplicationCall.forbidden() =
+  respond(HttpStatusCode.Forbidden, ServerResponse.business<Unit>(BusinessCode.FORBIDDEN))
 
-suspend fun PipelineContext<Unit, ApplicationCall>.internalServerError() =
-  context.respond(HttpStatusCode.InternalServerError, ServerResponse.business<Unit>(BusinessCode.INTERNAL_ERROR))
+suspend fun ApplicationCall.internalServerError() =
+  respond(HttpStatusCode.InternalServerError, ServerResponse.business<Unit>(BusinessCode.INTERNAL_ERROR))
 
-suspend fun PipelineContext<Unit, ApplicationCall>.errorPermissionDeniedMessage() = errorMessage("权限不足")
+suspend fun ApplicationCall.errorPermissionDeniedMessage() = errorMessage("权限不足")
 
 /**
  * 业务级拒绝: HTTP 200 + 业务码 601 + 自定义 message.
  * 之前的实现把 message 塞进 HTTP reason phrase, 既不规范, 也存在 CRLF 注入面.
  */
-suspend fun PipelineContext<Unit, ApplicationCall>.errorMessage(message: String) =
-  context.respond(ServerResponse.business<Unit>(BusinessCode.BUSINESS_REJECTED, message = message))
+suspend fun ApplicationCall.errorMessage(message: String) =
+  respond(ServerResponse.business<Unit>(BusinessCode.BUSINESS_REJECTED, message = message))
 
-suspend inline fun <reified T : Any> PipelineContext<Unit, ApplicationCall>.success(data: T) =
-  context.respond(ServerResponse.success(data))
+suspend inline fun <reified T : Any> ApplicationCall.success(data: T) =
+  respond(ServerResponse.success(data))
 
-suspend fun PipelineContext<Unit, ApplicationCall>.success() =
-  context.respond(ServerResponse.success<Unit>(null))
+suspend fun ApplicationCall.success() =
+  respond(ServerResponse.success<Unit>(null))

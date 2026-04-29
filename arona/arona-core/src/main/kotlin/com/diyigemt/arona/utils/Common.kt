@@ -75,8 +75,8 @@ fun closeAronaPools() {
   ioPool.cancel("ApplicationStopping")
 }
 
-val PipelineContext<Unit, ApplicationCall>.isJsonPost
-  get() = context.request.header(HttpHeaders.ContentType) == "application/json"
+val ApplicationCall.isJsonPost
+  get() = request.header(HttpHeaders.ContentType) == "application/json"
 
 fun Logger.error(exception: Throwable) = error(exception.message ?: "Exception of type ${exception::class}", exception)
 

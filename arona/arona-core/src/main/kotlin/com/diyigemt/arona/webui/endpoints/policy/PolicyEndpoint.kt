@@ -13,7 +13,6 @@ import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointPost
 import io.ktor.server.application.*
 import io.ktor.server.request.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 
 @Suppress("unused")
@@ -21,7 +20,7 @@ import kotlinx.serialization.Serializable
 internal object PolicyEndpoint {
 
   @AronaBackendEndpointGet("/resources")
-  suspend fun PipelineContext<Unit, ApplicationCall>.getResources() {
+  suspend fun ApplicationCall.getResources() {
     success(PermissionService.permissions.keys().toList().map { it.toString() })
   }
 
@@ -32,8 +31,8 @@ internal object PolicyEndpoint {
    * 返回命中的 policy.id 和每条规则的求值快照, 用于编辑器高亮。
    */
   @AronaBackendEndpointPost("/preview")
-  suspend fun PipelineContext<Unit, ApplicationCall>.previewPolicy() {
-    val req = context.receive<PolicyPreviewReq>()
+  suspend fun ApplicationCall.previewPolicy() {
+    val req = receive<PolicyPreviewReq>()
     val allow = req.policies
       .filter { it.effect == PolicyNodeEffect.ALLOW }
       .flatMap { PolicyCompiler.compile(it) }

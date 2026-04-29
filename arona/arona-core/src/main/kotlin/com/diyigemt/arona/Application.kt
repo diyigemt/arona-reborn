@@ -37,19 +37,27 @@ object AronaApplication : CoroutineScope {
     PluginManager.initPlugin()
     initExecutorMap()
     TencentBotClient.invoke(aronaConfig.bot).auth()
-    val environment = applicationEngineEnvironment {
-      connector {
-        port = aronaConfig.web.port
-        host = "0.0.0.0"
-      }
-      rootPath = "/api/v1"
-      module(Application::module)
-    }
-    environment.monitor.subscribe(ApplicationStopping) {
-      coroutineContext.cancel()
-      closeAronaPools()
-    }
-    embeddedServer(Netty, environment).start(wait = true)
+    // Ktor 3 拆解: 引擎参数 (host/port) 进 configure; rootPath / module 注册进 serverConfig.
+    // ApplicationStopping 订阅放到 module 里, 拿到 Application 实例后再走 monitor.subscribe.
+    embeddedServer(
+      Netty,
+      configure = {
+        connector {
+          port = aronaConfig.web.port
+          host = "0.0.0.0"
+        }
+      },
+      rootConfig = serverConfig {
+        rootPath = "/api/v1"
+        module {
+          monitor.subscribe(ApplicationStopping) {
+            this@AronaApplication.coroutineContext.cancel()
+            closeAronaPools()
+          }
+          module()
+        }
+      },
+    ).start(wait = true)
   }
 }
 

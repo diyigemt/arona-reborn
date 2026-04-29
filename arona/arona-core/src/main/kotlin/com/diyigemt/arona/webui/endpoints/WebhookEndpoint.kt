@@ -13,7 +13,6 @@ import io.ktor.server.request.header
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.util.hex
-import io.ktor.util.pipeline.PipelineContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -110,14 +109,14 @@ object WebhookEndpoint {
 
   @OptIn(ExperimentalStdlibApi::class)
   @AronaBackendEndpointPost("")
-  suspend fun PipelineContext<Unit, ApplicationCall>.webhook() {
+  suspend fun ApplicationCall.webhook() {
     val sign = request.header("x-signature-ed25519") ?: return unauthorized()
     val ts = request.header("x-signature-timestamp") ?: return unauthorized()
     // 强制 Content-Length, 拒绝 chunked: 否则攻击者可绕过预检直接占用内存.
     val declared = request.contentLength() ?: return badRequest()
     if (declared <= 0L || declared > MaxWebhookBodyBytes) return badRequest()
     val signBytes = parseHexOrNull(sign) ?: return badRequest()
-    val body = context.receiveText()
+    val body = receiveText()
     if (body.toByteArray(Charsets.UTF_8).size > MaxWebhookBodyBytes) {
       return badRequest()
     }
@@ -131,7 +130,7 @@ object WebhookEndpoint {
     if (preData.operation == TencentWebhookOperationType.WebhookVerify) {
       // 握手路径: 每次都必须算新签名响应, 不做幂等化.
       val data = json.decodeFromString<TencentWebhookPayload<TencentWebhookVerifyReq>>(body)
-      return context.respond(
+      return respond(
         TencentWebhookVerifyResp(
           data.data.plainToken,
           bot.webHookSign(

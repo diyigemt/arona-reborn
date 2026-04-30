@@ -6,6 +6,7 @@ import com.diyigemt.arona.webui.endpoints.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
+import io.ktor.util.AttributeKey
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspend
@@ -53,18 +54,13 @@ fun Application.configureRouting() {
     }
   routing {
     commonCallInterceptors.forEach { (path, group) ->
+      // 空 group 不要 install: 同一 plugin key 在子 route 上 install 会覆盖父 route 的同 key
+      // 配置 (Ktor route-scoped plugin "more specific install wins" 语义), 空 install 会让父
+      // route 的 access logging / 权限链对子 path 失效 — 这是安全敏感回归.
+      if (group.isEmpty()) return@forEach
       route(path) {
-        group.forEach { (father, method) ->
-          val phase = method.findAnnotation<AronaBackendRouteInterceptor>()!!.phase
-          intercept(phase.phase) {
-            // 拦截器内部已通过响应辅助函数 (errorMessage/unauthorized 等) 写出响应,
-            // HaltPipeline 把"跳过后续阶段"的信号回传到 PipelineContext, 调 finish() 阻止 handler 执行.
-            try {
-              call.checkTransaction(father, method)
-            } catch (_: HaltPipeline) {
-              finish()
-            }
-          }
+        install(AronaCommonRouteInterceptors) {
+          interceptors = group
         }
       }
     }
@@ -88,14 +84,8 @@ fun Application.configureRouting() {
             handlers.forEach { (path, method) ->
               route(path, httpMethod) {
                 if (method.hasAnnotation<AronaBackendAdminEndpoint>() || endpoint::class.hasAnnotation<AronaBackendAdminEndpoint>()) {
-                  intercept(ApplicationCallPipeline.Call) {
-                    try {
-                      adminCallInterceptors.forEach { (father, method) ->
-                        call.checkTransaction(father, method)
-                      }
-                    } catch (_: HaltPipeline) {
-                      finish()
-                    }
+                  install(AronaAdminRouteInterceptors) {
+                    interceptors = adminCallInterceptors
                   }
                 }
                 // Ktor 3 的 handle lambda 是 `suspend RoutingContext.() -> Unit`, 没有 Unit 入参; endpoint 实例
@@ -112,6 +102,72 @@ fun Application.configureRouting() {
           }
         }
       }
+  }
+}
+
+/**
+ * 反射 interceptor 列表 (一组 endpoint:method 对) 在 ApplicationCallPipeline.Call phase 上的批量执行.
+ *
+ * 替代 Ktor 3.4 起 deprecated 的 `Route.intercept(phase, block)` 扩展函数. 仍走 pipeline base API
+ * (ApplicationCallPipeline.intercept), 保留 PipelineContext.finish() 的短路语义 — 这是当前
+ * [HaltPipeline] sentinel exception 模型的硬依赖, RouteScopedPlugin simplified `onCall` 不能等价替代.
+ *
+ * 注: [AronaBackendRouteInterceptor.phase] 当前**未在运行时使用** (项目无任何非默认 phase 调用方),
+ * 所有 interceptor 统一在 Call phase 执行. 该字段保留为 API 兼容占位; 后续若要彻底移除是 API
+ * breaking, 单独立项.
+ *
+ * 拆成 [AronaCommonRouteInterceptors] / [AronaAdminRouteInterceptors] 两个独立 plugin key 是
+ * 防御性设计: Ktor route-scoped plugin 同一 key 在嵌套 route 上的 "more specific install wins"
+ * 语义会让内层 admin install 覆盖外层 common install, 共用 key 即使当前流程行为正确, 未来路由
+ * 重构时也容易踩坑.
+ */
+private class AronaRouteInterceptorsConfig {
+  var interceptors: List<Pair<Any, KFunction<*>>> = emptyList()
+}
+
+private class AronaCommonRouteInterceptors private constructor() {
+  companion object Plugin : BaseRouteScopedPlugin<AronaRouteInterceptorsConfig, AronaCommonRouteInterceptors> {
+    override val key = AttributeKey<AronaCommonRouteInterceptors>("AronaCommonRouteInterceptors")
+
+    override fun install(
+      pipeline: ApplicationCallPipeline,
+      configure: AronaRouteInterceptorsConfig.() -> Unit,
+    ): AronaCommonRouteInterceptors {
+      val config = AronaRouteInterceptorsConfig().apply(configure)
+      pipeline.intercept(ApplicationCallPipeline.Call) {
+        try {
+          config.interceptors.forEach { (endpoint, method) ->
+            call.checkTransaction(endpoint, method)
+          }
+        } catch (_: HaltPipeline) {
+          finish()
+        }
+      }
+      return AronaCommonRouteInterceptors()
+    }
+  }
+}
+
+private class AronaAdminRouteInterceptors private constructor() {
+  companion object Plugin : BaseRouteScopedPlugin<AronaRouteInterceptorsConfig, AronaAdminRouteInterceptors> {
+    override val key = AttributeKey<AronaAdminRouteInterceptors>("AronaAdminRouteInterceptors")
+
+    override fun install(
+      pipeline: ApplicationCallPipeline,
+      configure: AronaRouteInterceptorsConfig.() -> Unit,
+    ): AronaAdminRouteInterceptors {
+      val config = AronaRouteInterceptorsConfig().apply(configure)
+      pipeline.intercept(ApplicationCallPipeline.Call) {
+        try {
+          config.interceptors.forEach { (endpoint, method) ->
+            call.checkTransaction(endpoint, method)
+          }
+        } catch (_: HaltPipeline) {
+          finish()
+        }
+      }
+      return AronaAdminRouteInterceptors()
+    }
   }
 }
 

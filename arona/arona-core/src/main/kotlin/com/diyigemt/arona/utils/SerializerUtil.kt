@@ -1,8 +1,10 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.utils
 
 import com.diyigemt.arona.communication.event.cast
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -10,11 +12,9 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.serializer
 import kotlinx.serialization.serializerOrNull
-import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-@OptIn(ExperimentalSerializationApi::class)
 @Suppress("UNCHECKED_CAST")
 internal fun SerializersModule.serializerTencentBot(type: KType): KSerializer<Any?> {
   fun serializerByKTypeImpl(type: KType): KSerializer<*> {
@@ -87,50 +87,20 @@ internal fun SerializersModule.serializerTencentBot(type: KType): KSerializer<An
   return if (type.isMarkedNullable) result.nullable else result.cast()
 }
 
-@Suppress(
-  "UNCHECKED_CAST",
-  "UNSUPPORTED",
-  "INVISIBLE_MEMBER",
-  "INVISIBLE_REFERENCE"
-)
-private fun <T : Any> KClass<T>.constructSerializerForGivenTypeArgs(vararg args: KSerializer<Any?>): KSerializer<T>? {
-  val jClass = this.java
-  // Search for serializer defined on companion object.
-  val companion =
-    jClass.declaredFields.singleOrNull { it.name == "Companion" }?.apply { isAccessible = true }?.get(null)
-  if (companion != null) {
-    val serializer = companion.javaClass.methods
-      .find { method ->
-        method.name == "serializer" && method.parameterTypes.size == args.size && method.parameterTypes.all { it == KSerializer::class.java }
-      }
-      ?.invoke(companion, *args) as? KSerializer<T>
-    if (serializer != null) return serializer
-  }
-  // Check whether it's serializable object
-  findObjectSerializer(jClass)?.let { return it }
-  // Search for default serializer if no serializer is defined in companion object.
-  return try {
-    jClass.declaredClasses.singleOrNull { it.simpleName == ("\$serializer") }
-      ?.getField("INSTANCE")?.get(null) as? KSerializer<T>
-  } catch (e: NoSuchFieldException) {
+// kotlinx.serialization 1.9 公开了 `serializer(KClass, List<KSerializer<*>>, isNullable)`,
+// 内部已经覆盖原本手写反射 lookup 的全部 3 条路径 (Companion.serializer / object INSTANCE.serializer() /
+// nested $serializer.INSTANCE), 因此删除手写实现 + 配套的 findObjectSerializer 死代码,
+// 顺手消掉旧实现的 INVISIBLE_MEMBER / INVISIBLE_REFERENCE / UNSUPPORTED 三个 @Suppress.
+// 仅吞 SerializationException 转回 nullable, 维持上游 requireNotNull(...) { "Can't find a method
+// to construct serializer..." } 调用约定; 非预期异常 (反射 / 类型转换边界) 直接抛出, 避免被错误
+// 折叠成 "找不到 serializer" 而丢失真实错误.
+private fun <T : Any> KClass<T>.constructSerializerForGivenTypeArgs(vararg args: KSerializer<Any?>): KSerializer<T>? =
+  try {
+    @Suppress("UNCHECKED_CAST")
+    serializer(this, args.toList(), isNullable = false) as KSerializer<T>
+  } catch (_: SerializationException) {
     null
   }
-}
-
-private fun <T : Any> findObjectSerializer(jClass: Class<T>): KSerializer<T>? {
-  // Check it is an object without using kotlin-reflect
-  val field =
-    jClass.declaredFields.singleOrNull { it.name == "INSTANCE" && it.type == jClass && Modifier.isStatic(it.modifiers) }
-      ?: return null
-  // Retrieve its instance and call serializer()
-  val instance = field.get(null)
-  val method =
-    jClass.methods.singleOrNull { it.name == "serializer" && it.parameters.isEmpty() && it.returnType == KSerializer::class.java }
-      ?: return null
-  val result = method.invoke(instance)
-  @Suppress("UNCHECKED_CAST")
-  return result as? KSerializer<T>
-}
 
 internal inline fun <E, R> KSerializer<E>.map(
   crossinline serializer: (R) -> E,

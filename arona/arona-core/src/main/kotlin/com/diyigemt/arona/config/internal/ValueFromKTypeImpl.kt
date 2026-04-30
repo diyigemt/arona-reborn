@@ -1,6 +1,5 @@
 package com.diyigemt.arona.config.internal
 
-import com.diyigemt.arona.communication.event.cast
 import com.diyigemt.arona.config.LazyReferenceValueImpl
 import com.diyigemt.arona.config.PluginData
 import com.diyigemt.arona.config.SerializableValue.Companion.serializableValueWith
@@ -70,10 +69,14 @@ internal fun KClass<*>.createInstanceSmart(): Any {
   }
 }
 
-@Suppress("UnsafeCall", "SMARTCAST_IMPOSSIBLE", "UNCHECKED_CAST")
+@Suppress("UNCHECKED_CAST")
 internal fun PluginData.valueFromKTypeImpl(type: KType): SerializerAwareValue<*> {
-  val classifier = type.classifier
-  require(classifier is KClass<*>)
+  // 直接 as? + error 而非 require(... is ...) + 隐式 smart cast: K2.3 收紧了 smart cast 在 lambda
+  // 捕获边界的传播 (mapInitializer 闭包以前要靠 cast<KClass<*>>() workaround), 此模式让 classifier
+  // 的非空 KClass<*> 类型在外层和内层 lambda 都直接成立, 顺手消掉 SMARTCAST_IMPOSSIBLE / UnsafeCall
+  // 两个 @Suppress.
+  val classifier = type.classifier as? KClass<*>
+    ?: error("Only KClass classifiers are supported for PluginData value, got ${type.classifier}")
 
   if (classifier.isPrimitiveOrBuiltInSerializableValue()) {
     return valueImplPrimitive(classifier) as SerializerAwareValue<*>
@@ -87,14 +90,11 @@ internal fun PluginData.valueFromKTypeImpl(type: KType): SerializerAwareValue<*>
     ConcurrentMap::class,
     ConcurrentHashMap::class,
     -> {
-      val keyClass = type.arguments[0].type?.classifier
-      require(keyClass is KClass<*>)
-
-      val valueClass = type.arguments[1].type?.classifier
-      require(valueClass is KClass<*>)
+      requireKClassArgument(type, index = 0, kind = "key")
+      requireKClassArgument(type, index = 1, kind = "value")
       return createCompositeMapValueImpl<Any?, Any?>(
         mapInitializer = {
-          if (classifier.cast<KClass<*>>().isSubclassOf(ConcurrentMap::class)) {
+          if (classifier.isSubclassOf(ConcurrentMap::class)) {
             ConcurrentHashMap()
           } else {
             null
@@ -109,8 +109,7 @@ internal fun PluginData.valueFromKTypeImpl(type: KType): SerializerAwareValue<*>
     List::class,
     ArrayList::class,
     -> {
-      val elementClass = type.arguments[0].type?.classifier
-      require(elementClass is KClass<*>)
+      requireKClassArgument(type, index = 0, kind = "element")
       return createCompositeListValueImpl<Any?> { v -> valueFromKType(type.arguments[0].type!!, v) }
         .serializableValueWith(serializersModule.serializerTencentBot(type) as KSerializer<List<Any?>>)
     }
@@ -120,8 +119,7 @@ internal fun PluginData.valueFromKTypeImpl(type: KType): SerializerAwareValue<*>
     LinkedHashSet::class,
     HashSet::class,
     -> {
-      val elementClass = type.arguments[0].type?.classifier
-      require(elementClass is KClass<*>)
+      requireKClassArgument(type, index = 0, kind = "element")
       return createCompositeSetValueImpl<Any?> { v -> valueFromKType(type.arguments[0].type!!, v) }
         .serializableValueWith(serializersModule.serializerTencentBot(type) as KSerializer<Set<Any?>>)
     }
@@ -130,6 +128,13 @@ internal fun PluginData.valueFromKTypeImpl(type: KType): SerializerAwareValue<*>
       val serializer = serializersModule.serializerTencentBot(type)
       return LazyReferenceValueImpl<Any?>().serializableValueWith(serializer)
     }
+  }
+}
+
+private fun requireKClassArgument(type: KType, index: Int, kind: String) {
+  val classifier = type.arguments[index].type?.classifier
+  require(classifier is KClass<*>) {
+    "PluginData value $kind classifier must be a KClass<*>, got $classifier in $type"
   }
 }
 

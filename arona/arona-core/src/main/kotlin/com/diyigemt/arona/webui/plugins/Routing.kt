@@ -121,11 +121,13 @@ fun Application.configureRouting() {
  * 语义会让内层 admin install 覆盖外层 common install, 共用 key 即使当前流程行为正确, 未来路由
  * 重构时也容易踩坑.
  */
-private class AronaRouteInterceptorsConfig {
+// internal (而非 private) 是为了给 arona-core 模块内的 routing smoke test 暴露 plugin / config 类型;
+// 模块外部 (插件 / 下游) 仍不可见, 不构成 API 暴露面扩张.
+internal class AronaRouteInterceptorsConfig {
   var interceptors: List<Pair<Any, KFunction<*>>> = emptyList()
 }
 
-private class AronaCommonRouteInterceptors private constructor() {
+internal class AronaCommonRouteInterceptors private constructor() {
   companion object Plugin : BaseRouteScopedPlugin<AronaRouteInterceptorsConfig, AronaCommonRouteInterceptors> {
     override val key = AttributeKey<AronaCommonRouteInterceptors>("AronaCommonRouteInterceptors")
 
@@ -148,7 +150,7 @@ private class AronaCommonRouteInterceptors private constructor() {
   }
 }
 
-private class AronaAdminRouteInterceptors private constructor() {
+internal class AronaAdminRouteInterceptors private constructor() {
   companion object Plugin : BaseRouteScopedPlugin<AronaRouteInterceptorsConfig, AronaAdminRouteInterceptors> {
     override val key = AttributeKey<AronaAdminRouteInterceptors>("AronaAdminRouteInterceptors")
 

@@ -283,7 +283,7 @@ internal abstract class AbstractContact(
           .get(url)
           .let {
             if (it.status == HttpStatusCode.OK) {
-              uploadImage(it.readBytes())
+              uploadImage(it.readRawBytes())
             } else {
               throw cache.exceptionOrNull()!!
             }
@@ -312,7 +312,7 @@ internal abstract class AbstractContact(
           .get(url)
           .let {
             if (it.status == HttpStatusCode.OK) {
-              uploadImage(it.readBytes())
+              uploadImage(it.readRawBytes())
             } else {
               throw cache.exceptionOrNull()!!
             }

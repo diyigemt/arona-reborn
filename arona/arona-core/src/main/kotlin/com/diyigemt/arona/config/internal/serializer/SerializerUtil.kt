@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package com.diyigemt.arona.config.internal.serializer
 
 import kotlinx.serialization.InternalSerializationApi

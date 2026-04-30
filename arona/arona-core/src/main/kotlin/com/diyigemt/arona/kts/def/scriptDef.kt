@@ -119,7 +119,12 @@ class MainKtsConfigurator : RefineScriptCompilationConfigurationHandler {
     private fun processAnnotations(context: ScriptConfigurationRefinementContext): ResultWithDiagnostics<ScriptCompilationConfiguration> {
         val diagnostics = arrayListOf<ScriptDiagnostic>()
 
-        val annotations = context.collectedData?.get(ScriptCollectedData.foundAnnotations)?.takeIf { it.isNotEmpty() }
+        // Kotlin scripting `foundAnnotations` 已弃用; `collectedAnnotations` 返回 `List<ScriptSourceAnnotation<*>>`,
+        // 这里把每项的 `.annotation` 取出, 维持下游对 `Annotation` 子类型 (Import / CompilerOptions /
+        // DependsOn / Repository) 的 instance check 不变.
+        val annotations = context.collectedData?.get(ScriptCollectedData.collectedAnnotations)
+            ?.map { it.annotation }
+            ?.takeIf { it.isNotEmpty() }
             ?: return context.compilationConfiguration.asSuccess()
 
         val scriptBaseDir = (context.script as? FileBasedScriptSource)?.file?.parentFile

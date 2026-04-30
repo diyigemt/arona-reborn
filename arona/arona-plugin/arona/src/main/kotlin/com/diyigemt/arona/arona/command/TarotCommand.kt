@@ -103,7 +103,7 @@ object TarotCommand : AbstractCommand(
     val userTarotConfig =
       readUserPluginConfigOrNull(Arona) ?: contactDocument().readPluginConfigOrDefault(Arona, default = TarotConfig())
     val id = userDocument().id
-    val today = currentLocalDateTime().date.dayOfMonth
+    val today = currentLocalDateTime().date.day
     val record = dbQueryReadUncommited {
       TarotRecordSchema.findById(id)
     }

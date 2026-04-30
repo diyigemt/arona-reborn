@@ -392,7 +392,7 @@ class GachaCommand : AbstractCommand(
     val userRecordMap = contactRecord.map.getOrDefault(user.id, mutableMapOf())
     val userRecord = userRecordMap.getOrDefault(type, ContactGachaLimitItem())
     // 检查次数
-    val today = currentLocalDateTime().date.dayOfMonth
+    val today = currentLocalDateTime().date.day
     if (type != 1 && contactConfig.limit > 0 && today == userRecord.day && contactConfig.limit <= userRecord.count) {
       sendMessage("今日已在本群抽卡${userRecord.count}次, 超过本群设置的${contactConfig.limit}上限")
       return true

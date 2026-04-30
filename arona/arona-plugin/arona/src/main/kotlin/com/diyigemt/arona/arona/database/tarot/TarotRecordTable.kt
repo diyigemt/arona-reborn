@@ -11,7 +11,7 @@ import org.jetbrains.exposed.v1.core.Column
 @Database
 object TarotRecordTable : IdTable<String>(name = "TarotRecord") {
   override val id = char("id", 255).entityId()
-  val day: Column<Int> = integer("day").clientDefault { currentLocalDateTime().date.dayOfMonth }
+  val day: Column<Int> = integer("day").clientDefault { currentLocalDateTime().date.day }
   val tarot: Column<Int> = integer("tarot").clientDefault { 0 }
   val positive: Column<Boolean> = bool("positive").clientDefault { true }
   val negativeCount: Column<Int> = integer("negative_count").clientDefault { 0 } // 统计连续逆位多少次了

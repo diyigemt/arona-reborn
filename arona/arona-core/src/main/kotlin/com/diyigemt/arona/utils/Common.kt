@@ -59,10 +59,10 @@ fun Instant.toDateTime() = "${toDate()} ${toTime()}"
  * 将形如 yyyy-MM-dd HH:mm:ss 格式的字符串转化回Instant
  */
 fun datetimeToInstant(datetime: String) =
-  datetime.replace(" ", "T").toLocalDateTime().toInstant(TimeZone.currentSystemDefault())
+  LocalDateTime.parse(datetime.replace(" ", "T")).toInstant(TimeZone.currentSystemDefault())
 
 fun String.toInstant() =
-  replace(" ", "T").toLocalDateTime().toInstant(TimeZone.currentSystemDefault())
+  LocalDateTime.parse(replace(" ", "T")).toInstant(TimeZone.currentSystemDefault())
 
 
 // 用 SupervisorJob 让单个子协程异常不会牵连整个池;

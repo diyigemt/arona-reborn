@@ -29,7 +29,8 @@ class CommonTest {
 
   @Test
   fun testContext() {
-    val a = object : CliktCommand(invokeWithoutSubcommand = true) {
+    val a = object : CliktCommand() {
+      override val invokeWithoutSubcommand: Boolean = true
       override fun run() {
         currentContext.findOrSetObject("i") {
           1

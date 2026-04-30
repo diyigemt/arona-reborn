@@ -118,7 +118,9 @@ class IvyResolver : ExternalDependenciesResolver {
         // val report = ivy.resolve(moduleDescriptor, resolveOptions)
 
         //creates an ivy configuration file
-        val ivyFile = createTempFile("ivy", ".xml").apply { deleteOnExit() }
+        // Kotlin 2.3 把顶层 createTempFile 升为 ERROR; 这里走 java.io.File.createTempFile 保留 File 返回类型,
+        // 让后续 deleteOnExit / toURI / XmlModuleDescriptorWriter.write 链路签名不变.
+        val ivyFile = File.createTempFile("ivy", ".xml").apply { deleteOnExit() }
         XmlModuleDescriptorWriter.write(moduleDescriptor, ivyFile)
         val report = ivy.resolve(ivyFile.toURI().toURL(), resolveOptions)
 

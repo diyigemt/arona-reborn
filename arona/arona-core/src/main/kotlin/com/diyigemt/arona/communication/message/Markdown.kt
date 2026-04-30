@@ -264,12 +264,12 @@ fun Markdown.at(target: String) {
   children.add(AtElement(target))
 }
 
-context(UserCommandSender)
+context(sender: UserCommandSender)
 fun Markdown.at() {
-  if (this@UserCommandSender is FriendUserCommandSender) {
+  if (sender is FriendUserCommandSender) {
     return
   }
-  children.add(AtElement(user.id))
+  children.add(AtElement(sender.user.id))
 }
 
 fun Markdown.link(block: LinkElement.() -> Unit) {

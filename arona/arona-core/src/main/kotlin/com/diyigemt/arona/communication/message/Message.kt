@@ -1059,8 +1059,8 @@ internal data class MessageReceiptImpl(
   val id: String = "",
   val timestamp: String = "",
 ) {
-  context(Contact)
-  fun toMessageReceipt() = MessageReceipt(this, this@Contact)
+  context(contact: Contact)
+  fun toMessageReceipt() = MessageReceipt(this, contact)
 }
 
 data class MessageReceipt<out C : Contact> internal constructor(

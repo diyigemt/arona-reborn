@@ -47,7 +47,10 @@ object ReflectionUtil : ReflectionUtils() {
     return all
   }
 
-  inline fun <reified T : Annotation> scanMethodWithAnnotated(clazz: KClass<*>) = clazz
+  // K2.4 起 public inline 触达 internal 类型会升 ERROR (KTLC-283); ReflectionIgnore 是模块内
+  // 标记注解, 故收紧 inline 函数自身可见性, 避免对外暴露 internal 注解类.
+  // 当前调用面仅 arona-core/.../webui/plugins/Routing.kt 同模块, 收紧不影响 plugin 模块.
+  internal inline fun <reified T : Annotation> scanMethodWithAnnotated(clazz: KClass<*>) = clazz
     .declaredFunctions
     .filterNot { it.hasAnnotation<ReflectionIgnore>() }
     .filter { it.hasAnnotation<T>() }

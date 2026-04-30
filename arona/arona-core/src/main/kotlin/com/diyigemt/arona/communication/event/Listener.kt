@@ -1,3 +1,5 @@
+@file:OptIn(InternalForInheritanceCoroutinesApi::class)
+
 package com.diyigemt.arona.communication.event
 
 import com.diyigemt.arona.utils.userLogger
@@ -17,6 +19,15 @@ enum class ListeningStatus {
   STOPPED
 }
 
+// kotlinx.coroutines 把 CompletableJob 标为 stable-for-use / opt-in-for-inheritance
+// (@SubclassOptInRequired(InternalForInheritanceCoroutinesApi)); 这里继承是为了让外部
+// 直接对 listener 调 complete()/cancel()/invokeOnCompletion(). 实际依赖点:
+// - 产线 Extendsions.syncFromEvent: 在 finally 调 listener.complete() 保证异常路径下 STOPPED
+// - 测试 helper (CallMessageOpenApiEventSymmetryTest 等 5 处) 直接 listener.complete() 主动停
+// 文件级 @OptIn(InternalForInheritanceCoroutinesApi) 显式承担继承不稳定 API 的风险,
+// 当前 coroutines 1.10.2 稳定, SafeListener 内部走 SupervisorJob by-delegate 自动跟随
+// 上游新增成员; 如未来 coroutines 把该约束升 ERROR, 再切 composition (持有 lifecycle 字段)
+// 重构, 同时把 syncFromEvent + 5 处测试 listener.complete() 调用迁到等价 helper.
 interface Listener<in E : Event> : CompletableJob {
   suspend fun onEvent(event: E): ListeningStatus?
 }

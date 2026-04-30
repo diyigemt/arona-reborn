@@ -1063,6 +1063,7 @@ internal data class MessageReceiptImpl(
   fun toMessageReceipt() = MessageReceipt(this, contact)
 }
 
+@ConsistentCopyVisibility
 data class MessageReceipt<out C : Contact> internal constructor(
   private val internalReceipt: MessageReceiptImpl,
   val target: C,

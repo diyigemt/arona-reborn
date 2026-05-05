@@ -22,6 +22,7 @@ import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
+import kotlin.reflect.KParameter
 import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.hasAnnotation
 
@@ -33,7 +34,26 @@ internal data class CommandSignature(
   val primaryName: String,
   val isUnderDevelopment: Boolean,
   val targetExtensionFunction: KFunction<*>,
-)
+) {
+  // 热路径反射缓存: 一次性查找全可选构造器, 后续 callBy(emptyMap) 跳过
+  // KClass.createInstance() 内部每次的 constructors.singleOrNull 反射查找.
+  // 仅 DynamicContextualCommandExecutor 热路径用 (kivotos 这类 class 命令日 6w+ 调用占比 60%+);
+  // 冷路径 register/match/getRegisteredCommands 仍走 createObjectOrInstance(), 避免改动扩散.
+  // 语义与 KClass.createInstance() 完全等价: object → 返回 singleton; class → 唯一全可选构造器
+  // callBy(emptyMap). 不修改 isAccessible, 与 createInstance() 的可见性约束保持一致.
+  // 非主构造器属性, 不参与 data class 的 equals/hashCode/copy/toString.
+  val instanceFactory: () -> AbstractCommand by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    val obj = clazz.objectInstance
+    if (obj != null) {
+      ({ obj })
+    } else {
+      val ctor = clazz.constructors.singleOrNull { it.parameters.all(KParameter::isOptional) }
+        ?: error("CommandSignature.instanceFactory: ${clazz.qualifiedName} 必须有唯一全可选构造器")
+      val emptyArgs = emptyMap<KParameter, Any?>()
+      ({ ctor.callBy(emptyArgs) })
+    }
+  }
+}
 
 @Suppress("NOTHING_TO_INLINE")
 inline fun <T : Any> KClass<T>.createObjectOrInstance() = objectInstance ?: createInstance()

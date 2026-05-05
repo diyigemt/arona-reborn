@@ -1,6 +1,7 @@
 package com.diyigemt.arona.command
 
 import com.diyigemt.arona.communication.command.ConsoleCommandSender
+import com.github.ajalt.clikt.core.BaseCliktCommand
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -16,6 +17,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 // 回归保护: 旧实现传 suspend=true 让 AbstractCommand.run() 走 caller.launch 分支,
@@ -100,6 +102,76 @@ class DynamicStaticCommandExecutorTest {
       assertEquals(1, Hooks.maxConcurrency.get(), "业务体应串行, max=${Hooks.maxConcurrency.get()}")
       assertEquals(0, executor.runningWorkers)
     }
+  }
+
+  @Test
+  fun `多 executor 指向同一 singleton 时旧 executor 仍可正常执行`() {
+    // register/unregister / plugin reload / 测试重跑都会触发 DynamicStaticCommandExecutor 重建.
+    // 修复后: shared state (Mutex + holder) 按 worker singleton 维度共享, 不会因第二个 executor 的 init
+    // 覆盖第一个 executor 的闭包而导致 in-flight 请求 checkNotNull 失败.
+    runBlocking {
+      Hooks.body = {}
+      val executor1 = DynamicStaticCommandExecutor(
+        path = listOf("static-test-cmd"),
+        primaryName = "static-test-cmd",
+        parentSignature = staticSignature(),
+      )
+      assertTrue(executor1.execute(emptyList(), ConsoleCommandSender, checkPermission = false).await() is CommandExecuteResult.Success)
+
+      val executor2 = DynamicStaticCommandExecutor(
+        path = listOf("static-test-cmd"),
+        primaryName = "static-test-cmd",
+        parentSignature = staticSignature(),
+      )
+      assertTrue(executor2.execute(emptyList(), ConsoleCommandSender, checkPermission = false).await() is CommandExecuteResult.Success)
+
+      // 关键断言: executor1 在 executor2 创建之后仍然能跑通 (旧 executor 不会因 _contextConfig 被新 executor
+      // 覆盖而抛错). 修复前这一行会因 checkNotNull(pendingCallContext) 抛出 IllegalStateException.
+      assertTrue(executor1.execute(emptyList(), ConsoleCommandSender, checkPermission = false).await() is CommandExecuteResult.Success)
+      assertEquals(3, Hooks.completed.get())
+    }
+  }
+
+  @Test
+  fun `_contextConfig 链长不应随 execute 调用次数累积`() {
+    // Clikt 5 的 context() 是累积式 (configureContext 把新闭包套在旧闭包外层).
+    // DynamicStaticCommandExecutor 的修复: 构造期一次性挂载, 之后 _contextConfig 引用必须稳定.
+    runBlocking {
+      Hooks.body = {}
+      val executor = DynamicStaticCommandExecutor(
+        path = listOf("static-test-cmd"),
+        primaryName = "static-test-cmd",
+        parentSignature = staticSignature(),
+      )
+
+      // 跑首次, 让 worker 完成初始化 + 触发一次 resetContext, 拿到稳定状态下的引用.
+      executor.execute(emptyList(), ConsoleCommandSender, checkPermission = false).await()
+      val initial = readContextConfig(TestStaticCommand)
+
+      repeat(1000) {
+        executor.execute(emptyList(), ConsoleCommandSender, checkPermission = false).await()
+      }
+
+      val after = readContextConfig(TestStaticCommand)
+      assertSame(
+        initial,
+        after,
+        "_contextConfig 引用应稳定: 出现新对象意味着 configureContext 被重复调用, 链长会随调用次数线性增长",
+      )
+      assertEquals(1001, Hooks.completed.get())
+    }
+  }
+
+  private fun readContextConfig(cmd: BaseCliktCommand<*>): Any {
+    var cls: Class<*>? = BaseCliktCommand::class.java
+    while (cls != null) {
+      cls.declaredFields.firstOrNull { it.name == "_contextConfig" }?.let { f ->
+        f.isAccessible = true
+        return f.get(cmd)!!
+      }
+      cls = cls.superclass
+    }
+    error("BaseCliktCommand._contextConfig 字段反射失败 (Clikt 升级后改名?)")
   }
 
   @Test

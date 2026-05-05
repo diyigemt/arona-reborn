@@ -34,6 +34,7 @@ interface TencentBot : Closeable, Contact, CoroutineScope {
   val friends: ContactList<FriendUser>
   val isPublic: Boolean
   val isDebug: Boolean
+  val isShadow: Boolean
   suspend fun <T> callOpenapi(
     endpoint: TencentEndpoint,
     decoder: KSerializer<T>,
@@ -80,6 +81,7 @@ private constructor(private val config: TencentBotConfig) :
   ) { EmptyFriendUserImpl(this, it) }
   override val isPublic = config.public
   override val isDebug = config.debug
+  override val isShadow = config.shadow
   // Sprint 3 后续: token 刷新合流到 TokenRefresher, 它内部用 AtomicReference<Job?> 做 single-flight gate
   // + AtomicReference<TokenSnapshot> 让 (token, version) 作为单原子读写, 消掉 stale 401 误判和并发刷新风暴.
   // 旧实现 (cancel + launch 重启长 while-loop) 在并发 401 下会撞车, 详见 TokenRefresher.
@@ -174,6 +176,31 @@ private constructor(private val config: TencentBotConfig) :
     urlPlaceHolder: Map<String, String>,
     block: HttpRequestBuilder.() -> Unit,
   ): Result<T> {
+    if (isShadow) {
+      // Shadow 必须先于 token snapshot 短路, 让灰度演练完全脱离下行 OpenAPI 网络面;
+      // 但仍然在 throwaway builder 上 invoke block, 让 setBody/json.encodeToString/multipart
+      // 这些本地构造路径里的 bug (中文/超长/字段缺失) 在灰度阶段就能被打出来, 而不是等真实流量回归时才暴露.
+      val buildAttempt = runCatching {
+        HttpRequestBuilder().apply {
+          contentType(ContentType.Application.Json)
+          block.invoke(this)
+        }
+      }
+      if (buildAttempt.isFailure) {
+        val cause = buildAttempt.exceptionOrNull()!!
+        logger.warn(
+          "[shadow] request-build failed before stub, endpoint={}, placeHolder={}, decoder={}",
+          endpoint, urlPlaceHolder, decoder.descriptor.serialName, cause
+        )
+        return Result.failure(cause)
+      }
+      val stub = buildShadowOpenapiStub(json, endpoint, decoder)
+      logger.info(
+        "[shadow] skip endpoint={}, placeHolder={}, decoder={}, stub={}",
+        endpoint, urlPlaceHolder, decoder.descriptor.serialName, stub.kind
+      )
+      return stub.result
+    }
     var bodyTmp = ""
     // 一次性原子读 (token, version) 快照: 避免分两次读到 (旧 version, 新 token) 的从未真实存在配对,
     // 否则 401 时 stale 检查会误判, 让真实失效的 token 反复 401 直到下一次 heartbeat 才解.
@@ -285,6 +312,63 @@ private constructor(private val config: TencentBotConfig) :
     // 同步取消整个 bot scope, 防止 close 后仍有人 launch 出新的子任务.
     coroutineContext.cancel()
   }
+}
+
+// Shadow 模式 stub 工厂: 灰度演练下让 callOpenapi 看起来"成功"地完成下行调用, 让 send/recall/uploadImage
+// 等链路的后置逻辑 (post-send 事件、TencentOfflineImage 包装、撤回回执) 仍能跑完, 而不是被误当成失败.
+// kind 仅用于诊断日志, 不参与真值判定.
+internal enum class ShadowOpenApiStubKind { UNIT, MEDIA, EMPTY_OBJECT, EMPTY_LIST, UNSUPPORTED }
+
+internal data class ShadowOpenApiStubResult<T>(
+  val kind: ShadowOpenApiStubKind,
+  val result: Result<T>,
+)
+
+// shadow 流量落到这个分支说明出现了未登记的 endpoint+decoder 组合. 选择 failure 而非编造 dummy,
+// 是为了不在灰度下伪造"看似成功但下游会 NPE"的假象, 让调用方走它原本的 onFailure 分支,
+// 在灰度阶段就把缺口暴露出来. suppressed cause 携带两次 decode 的真实异常便于排查.
+internal class ShadowOpenApiUnsupportedException(
+  val endpoint: TencentEndpoint,
+  val decoderSerialName: String,
+) : IllegalStateException("shadow openapi stub unsupported, endpoint=$endpoint, decoder=$decoderSerialName")
+
+@Suppress("UNCHECKED_CAST")
+@OptIn(ExperimentalSerializationApi::class)
+internal fun <T> buildShadowOpenapiStub(
+  json: Json,
+  endpoint: TencentEndpoint,
+  decoder: KSerializer<T>,
+): ShadowOpenApiStubResult<T> {
+  if (decoder == Unit.serializer()) {
+    return ShadowOpenApiStubResult(ShadowOpenApiStubKind.UNIT, Result.success(Unit as T))
+  }
+  // PostFriendRichMessage / PostGroupRichMessage 的 decoder 当前必为 TencentMessageMediaInfo.serializer():
+  // 该 DTO 的 fileInfo 字段无默认值, 通用 "{}" fallback 会 MissingFieldException, 而 uploadImage(url)
+  // 在 callOpenapi 失败时会 fallback 走 bot.client.get(url) 真实出网下载图片 — 那正是 shadow 必须避免的副作用.
+  // 因此这里显式构造一个空 fileInfo 的 media stub; 下游 getMediaUrlFromMediaInfo("") 已被改为返回 placeholder.
+  // decoder 校验: 防止未来若有人复用 rich endpoint 但传入别的 decoder, 让它 fallthrough 到通用分支而非 ClassCastException.
+  if (endpoint == TencentEndpoint.PostFriendRichMessage || endpoint == TencentEndpoint.PostGroupRichMessage) {
+    if (decoder == TencentMessageMediaInfo.serializer()) {
+      return ShadowOpenApiStubResult(
+        ShadowOpenApiStubKind.MEDIA,
+        Result.success(TencentMessageMediaInfo(fileInfo = "", fileUuid = "shadow", ttl = 0L) as T),
+      )
+    }
+  }
+  // 其余 DTO (MessageReceiptImpl 等) 字段都有默认值, "{}" 能 decode; ListSerializer 走 "[]".
+  // 顺序: 先尝试空对象, 再尝试空数组, 都不行才认输.
+  val emptyObjectAttempt = runCatching { json.decodeFromString(decoder, "{}") }
+  if (emptyObjectAttempt.isSuccess) {
+    return ShadowOpenApiStubResult(ShadowOpenApiStubKind.EMPTY_OBJECT, emptyObjectAttempt)
+  }
+  val emptyListAttempt = runCatching { json.decodeFromString(decoder, "[]") }
+  if (emptyListAttempt.isSuccess) {
+    return ShadowOpenApiStubResult(ShadowOpenApiStubKind.EMPTY_LIST, emptyListAttempt)
+  }
+  val unsupported = ShadowOpenApiUnsupportedException(endpoint, decoder.descriptor.serialName)
+  emptyObjectAttempt.exceptionOrNull()?.let(unsupported::addSuppressed)
+  emptyListAttempt.exceptionOrNull()?.let(unsupported::addSuppressed)
+  return ShadowOpenApiStubResult(ShadowOpenApiStubKind.UNSUPPORTED, Result.failure(unsupported))
 }
 
 // (token, version) 必须作为单原子单元一起更新/读取. 拆成 @Volatile token + AtomicLong version 看似等价,

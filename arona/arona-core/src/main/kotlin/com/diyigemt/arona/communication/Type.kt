@@ -53,6 +53,9 @@ data class TencentBotConfig(
   val secret: String,
   val public: Boolean = false,
   val debug: Boolean = false,
+  // shadow=true: 实际流量灰度演练. webhook/事件分发/命令解析全部照常跑, 但 callOpenapi 一律短路,
+  // 不向腾讯 OpenAPI 发起任何下行 HTTP. token 刷新仍真实进行 (语义边界仅限"OpenAPI 下行不出网").
+  val shadow: Boolean = false,
   val shard: List<Int> = listOf(0, 1), // [0,4] 分4片当前第0片, 默认[0,1]
   val contactCache: TencentBotContactCacheConfig = TencentBotContactCacheConfig(),
 ) {

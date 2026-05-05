@@ -7,7 +7,9 @@ import org.slf4j.event.*
 
 fun Application.configureMonitoring() {
   install(CallLogging) {
-    level = Level.TRACE
-    filter { call -> call.request.path().startsWith("/") }
+    level = Level.INFO
+    format { call ->
+      "${call.request.httpMethod.value} ${call.request.uri}"
+    }
   }
 }

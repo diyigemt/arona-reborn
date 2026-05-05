@@ -47,6 +47,7 @@ internal class StubBot(
   override val friends: ContactList<FriendUser> = SingleUserContactList { EmptyFriendUserImpl(this@StubBot, it) }
   override val isPublic: Boolean = false
   override val isDebug: Boolean = false
+  override val isShadow: Boolean = false
   override val coroutineContext: CoroutineContext =
     SupervisorJob() + Dispatchers.Default + CoroutineName("StubBot.$id")
 

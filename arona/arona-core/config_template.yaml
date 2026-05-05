@@ -5,6 +5,7 @@ bot:
   secret: ""
   public: false
   debug: false
+  shadow: false
   shard: [0, 1]
   # 顶层 ContactList (bot.guilds / bot.groups / bot.friends) 的有界缓存阈值.
   # maximumSize 触发 Caffeine size-based eviction (window TinyLFU, 非严格 LRU);

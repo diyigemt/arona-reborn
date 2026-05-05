@@ -222,6 +222,10 @@ private val protobuf by lazy {
 
 @OptIn(ExperimentalEncodingApi::class)
 fun getMediaUrlFromMediaInfo(data: String): String {
+  // Shadow 模式下 callOpenapi 的 MEDIA stub 会把 fileInfo 留空, 此时不能去 protobuf decode 空字节
+  // (会抛, 让 uploadImage(ByteArray) 整条链路崩溃). 真实成功路径腾讯返回的 fileInfo 必然非空,
+  // 因此用空串作为 shadow stub 的明确信号, 返回一个一眼可辨的 placeholder URL.
+  if (data.isEmpty()) return "shadow://media"
   val decoded = protobuf
     .decodeFromByteArray<MediaInfo>(Base64.decode(data))
   return "http://" +

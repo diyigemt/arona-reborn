@@ -70,6 +70,9 @@ suspend fun ApplicationCall.errorPermissionDeniedMessage() = errorMessage("æƒé™
 suspend fun ApplicationCall.errorMessage(message: String) =
   respond(ServerResponse.business<Unit>(BusinessCode.BUSINESS_REJECTED, message = message))
 
+suspend inline fun <reified T : Any> ApplicationCall.errorMessage(message: String, data: T?) =
+  respond(ServerResponse.business(BusinessCode.BUSINESS_REJECTED, message = message, data = data))
+
 suspend inline fun <reified T : Any> ApplicationCall.success(data: T) =
   respond(ServerResponse.success(data))
 

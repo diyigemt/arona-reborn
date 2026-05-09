@@ -7,16 +7,14 @@
         p-id="buildIn·normal"
         p-key="BaseConfig"
       >
-        <template #default="{ from }">
-          <ElFormItem v-if="from === 'user'" label="启用markdown" prop="enable">
-            <ElSwitch
-              v-model="markdownConfig.enable"
-              :active-value="true"
-              :inactive-value="false"
-              active-text="启用"
-              inactive-text="停用"
-            />
-          </ElFormItem>
+        <template #default>
+          <DynamicConfigForm
+            v-if="baseSchema"
+            :schema="baseSchema.fields"
+            :model-value="baseConfig as unknown as Record<string, unknown>"
+            p-id="buildIn·normal"
+            p-key="BaseConfig"
+          />
         </template>
       </PluginPreferenceForm>
     </ElTabPane>
@@ -36,8 +34,12 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
 import PluginPreferenceForm from "@/components/plugin/PluginPreferenceForm.vue";
+import DynamicConfigForm from "@/components/plugin/DynamicConfigForm.vue";
 import { CustomMenuConfig } from "@/interface";
+import { PluginPreferenceApi } from "@/api";
+import type { PluginConfigSchema } from "@/interface/pluginSchema";
 import CustomMenu from "@/views/config/plugin/component/CustomMenu.vue";
 
 defineOptions({
@@ -52,9 +54,15 @@ interface BaseConfig {
 const tab = ref<"base" | "menu">("base");
 const defaultBaseConfig: BaseConfig = {
   markdown: {
-    enable: false,
+    enable: true, // 与后端 MarkdownCompatiblyConfig.enable 默认值保持一致
   },
 };
+const baseSchema = ref<PluginConfigSchema>();
+onMounted(() => {
+  PluginPreferenceApi.fetchPluginConfigSchema("buildIn·normal", "BaseConfig").then((s) => {
+    if (s) baseSchema.value = s;
+  });
+});
 const defaultCustomMenuConfig: CustomMenuConfig = {
   rows: [
     {
@@ -90,14 +98,6 @@ const defaultCustomMenuConfig: CustomMenuConfig = {
   ],
 };
 const baseConfig = ref<BaseConfig>(defaultBaseConfig);
-const markdownConfig = computed({
-  get() {
-    return baseConfig.value.markdown;
-  },
-  set(val) {
-    baseConfig.value.markdown = val;
-  },
-});
 const menuConfig = ref(defaultCustomMenuConfig);
 </script>
 

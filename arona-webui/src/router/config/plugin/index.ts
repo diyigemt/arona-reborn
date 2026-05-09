@@ -36,6 +36,14 @@ const PluginRouter: Array<RouteRecordRaw> = [
         },
         component: () => import("@/views/config/plugin/GachaPoolPreferences.vue"),
       },
+      {
+        path: "kivotos-coffee",
+        name: "kivotos-coffee",
+        meta: {
+          title: "咖啡厅设置",
+        },
+        component: () => import("@/views/config/plugin/CoffeePreferences.vue"),
+      },
     ],
   },
 ];

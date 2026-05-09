@@ -4,6 +4,7 @@ export * from "./modules/arona";
 export * from "./modules/policy";
 export * from "./modules/plugin";
 export * from "./modules/contact";
+export * from "./pluginSchema";
 export interface SelectOption {
   id?: string;
   label: string;

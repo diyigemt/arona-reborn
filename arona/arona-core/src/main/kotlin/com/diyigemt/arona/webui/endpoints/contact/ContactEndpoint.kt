@@ -20,9 +20,11 @@ import com.diyigemt.arona.permission.abac.cache.PolicyCompileCache
 import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
+import com.diyigemt.arona.webui.endpoints.plugin.toPayloadOrNull
 import com.diyigemt.arona.webui.event.auditOrAllow
 import com.diyigemt.arona.webui.event.isBlock
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder.DataSafetyResult
 import com.diyigemt.arona.webui.plugins.HaltPipeline
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Filters
@@ -393,7 +395,11 @@ internal object ContactEndpoint {
     }.onFailure {
       return badRequest()
     }.getOrThrow()
-    val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
+    val value = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
+      is DataSafetyResult.Ok -> result.json
+      is DataSafetyResult.Err ->
+        return errorMessage(result.message, result.fieldErrors.toPayloadOrNull())
+    }
     val ev = auditOrAllow(value)
     if (ev?.isBlock == true) return errorMessage("内容审核失败: ${ev.message}")
     contact.updatePluginConfig(
@@ -424,7 +430,11 @@ internal object ContactEndpoint {
   @AronaBackendEndpointPost("/{id}/member/plugin/member-preference")
   suspend fun ApplicationCall.saveMemberPreference() {
     val obj = kotlin.runCatching { receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
-    val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
+    val value = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
+      is DataSafetyResult.Ok -> result.json
+      is DataSafetyResult.Err ->
+        return errorMessage(result.message, result.fieldErrors.toPayloadOrNull())
+    }
     val ev = auditOrAllow(value)
     if (ev?.isBlock == true) return errorMessage("内容审核失败: ${ev.message}")
     contact.findContactMemberOrNull(aronaUser.id)?.also {

@@ -4,10 +4,26 @@ import { errorMessage, IWarningConfirm, successMessage } from "@/utils/message";
 import UserContactSwitcher from "@/views/config/plugin/component/UserContactSwitcher.vue";
 import useBaseStore from "@/store/base";
 import { Contact } from "@/interface";
+import type { BusinessError, FieldError } from "@/interface/pluginSchema";
 
 defineOptions({
   name: "PluginPreferenceForm",
 });
+
+const fieldErrors = ref<FieldError[]>([]);
+provide("fieldErrors", fieldErrors);
+
+function reportSaveError(err: unknown) {
+  // simplifiedApiService 现在 reject 一个结构化 BusinessError; 同时兼容老的裸字符串/Error.
+  if (err && typeof err === "object" && "message" in err) {
+    const be = err as BusinessError;
+    errorMessage(be.message || "保存失败");
+    fieldErrors.value = be.fieldErrors ?? [];
+    return;
+  }
+  errorMessage(typeof err === "string" ? err || "保存失败" : "保存失败");
+  fieldErrors.value = [];
+}
 interface ProfileType {
   id: string;
   type: "user" | "contact" | "manage-contact";
@@ -128,6 +144,7 @@ function onCancel() {
 }
 function onConfirm() {
   emits("confirm");
+  fieldErrors.value = [];
   const data = props.postDataProcessor(props.form);
   switch (editType.value.type) {
     case "contact": {
@@ -136,9 +153,7 @@ function onConfirm() {
           cacheMemberProfileData[editType.value.id] = JSON.stringify(props.form);
           successMessage("保存成功");
         })
-        .catch(() => {
-          errorMessage("保存失败");
-        });
+        .catch(reportSaveError);
       break;
     }
     case "user": {
@@ -147,9 +162,7 @@ function onConfirm() {
           cacheProfileData = JSON.stringify(props.form);
           successMessage("保存成功");
         })
-        .catch(() => {
-          errorMessage("保存失败");
-        });
+        .catch(reportSaveError);
       break;
     }
     case "manage-contact": {
@@ -161,9 +174,7 @@ function onConfirm() {
           }
           successMessage("保存成功");
         })
-        .catch(() => {
-          errorMessage("保存失败");
-        });
+        .catch(reportSaveError);
       break;
     }
     default: {

@@ -9,10 +9,19 @@ import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointPost
 import com.diyigemt.arona.webui.endpoints.aronaUser
 import com.diyigemt.arona.webui.event.auditOrAllow
 import com.diyigemt.arona.webui.event.isBlock
+import com.diyigemt.arona.webui.pluginconfig.FieldError
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder.DataSafetyResult
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import kotlinx.serialization.Serializable
+
+/** 业务错误响应携带的字段级错误负载, 包装一层让前端 extractFieldErrors 能用对象 schema 识别. */
+@Serializable
+data class FieldErrorPayload(val fieldErrors: List<FieldError>)
+
+internal fun List<FieldError>.toPayloadOrNull(): FieldErrorPayload? =
+  takeIf { it.isNotEmpty() }?.let(::FieldErrorPayload)
 
 @Serializable
 data class PluginPreferenceResp(
@@ -49,6 +58,7 @@ object PluginPreferenceEndpoint {
     aronaUser.readAllConfig(query.id)?.also { return success(it) }
     return success()
   }
+
   @AronaBackendEndpointPost
   suspend fun ApplicationCall.savePreference() {
     val obj = kotlin.runCatching {
@@ -56,7 +66,11 @@ object PluginPreferenceEndpoint {
     }.onFailure {
       return badRequest()
     }.getOrNull() ?: return badRequest()
-    val value = PluginWebuiConfigRecorder.checkDataSafety(obj) ?: return badRequest()
+    val value = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
+      is DataSafetyResult.Ok -> result.json
+      is DataSafetyResult.Err ->
+        return errorMessage(result.message, result.fieldErrors.toPayloadOrNull())
+    }
     val audit = auditOrAllow(value)
     if (audit?.isBlock == true) return errorMessage("内容审核失败: ${audit.message}")
     aronaUser.updatePluginConfig(
@@ -65,5 +79,21 @@ object PluginPreferenceEndpoint {
       value
     )
     return success()
+  }
+
+  /**
+   * 返回某个已注册插件配置的 UI schema (字段类型/标签/默认值/嵌套结构).
+   * schema 与作用域 (user/contact/manage-contact) 无关, 一份即可.
+   * 未注册时返回 success(null), 与 [getPreference] 的"无内容"语义一致.
+   */
+  @AronaBackendEndpointGet("/schema", withoutTransaction = true)
+  suspend fun ApplicationCall.getPreferenceSchema() {
+    val query = parsePreferenceQuery(
+      request.queryParameters["id"],
+      request.queryParameters["key"],
+    ) ?: return badRequest()
+    val key = query.key ?: return badRequest()
+    val schema = PluginWebuiConfigRecorder.generateSchema(query.id, key) ?: return success()
+    return success(schema)
   }
 }

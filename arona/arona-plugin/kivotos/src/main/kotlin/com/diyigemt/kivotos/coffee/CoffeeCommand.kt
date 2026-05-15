@@ -102,8 +102,8 @@ class CoffeeCommand : AbstractCommand(
     }
   }.content
 ) {
-  private val md by requireObject<TencentCustomMarkdown>()
-  private val kb by requireObject<TencentCustomKeyboard>()
+  private val md by requireObject<TencentCustomMarkdown>("md")
+  private val kb by requireObject<TencentCustomKeyboard>("kb")
   suspend fun UserCommandSender.coffee0() {
     tencentCustomMarkdown {
       h1("夏莱附属咖啡厅")
@@ -115,7 +115,7 @@ class CoffeeCommand : AbstractCommand(
 
   @Suppress("lower_case")
   private suspend fun UserCommandSender.updateCoffeeStudents(sendMessage: Boolean) {
-    var coffee = currentContext.findObject<CoffeeDocument>()!!
+    var coffee = currentContext.findObject<CoffeeDocument>("coffee")!!
     md append tencentCustomMarkdown {
       +"当前咖啡厅等级: ${coffee.level}"
     }
@@ -256,12 +256,12 @@ class CoffeeTouchCommand : AbstractCommand(
   companion object {
     const val LOCK_PREFIX = "kivotos.coffee-touch-once"
   }
-  private val md by requireObject<TencentCustomMarkdown>()
-  private val kb by requireObject<TencentCustomKeyboard>()
-  private val visitedStudents by requireObject<List<StudentSchema>>()
-  private val touchedStudents by requireObject<List<StudentSchema>>()
-  private val coffee by requireObject<CoffeeDocument>()
-  private val kivotosUser by requireObject<UserDocument>()
+  private val md by requireObject<TencentCustomMarkdown>("md")
+  private val kb by requireObject<TencentCustomKeyboard>("kb")
+  private val visitedStudents by requireObject<List<StudentSchema>>("visitedStudents")
+  private val touchedStudents by requireObject<List<StudentSchema>>("touchedStudents")
+  private val coffee by requireObject<CoffeeDocument>("coffee")
+  private val kivotosUser by requireObject<UserDocument>("kivotosUser")
   private val studentName by argument("学生名")
   suspend fun UserCommandSender.coffeeTouch() {
     val key = "$LOCK_PREFIX.${user.unionOpenidOrId}"
@@ -323,12 +323,12 @@ class CoffeeTouchAllCommand : AbstractCommand(
   "一键摸头",
   description = "咖啡厅一键摸头指令",
 ) {
-  private val md by requireObject<TencentCustomMarkdown>()
-  private val kb by requireObject<TencentCustomKeyboard>()
-  private val visitedStudents by requireObject<List<StudentSchema>>()
-  private val touchedStudents by requireObject<List<StudentSchema>>()
-  private val coffee by requireObject<CoffeeDocument>()
-  private val kivotosUser by requireObject<UserDocument>()
+  private val md by requireObject<TencentCustomMarkdown>("md")
+  private val kb by requireObject<TencentCustomKeyboard>("kb")
+  private val visitedStudents by requireObject<List<StudentSchema>>("visitedStudents")
+  private val touchedStudents by requireObject<List<StudentSchema>>("touchedStudents")
+  private val coffee by requireObject<CoffeeDocument>("coffee")
+  private val kivotosUser by requireObject<UserDocument>("kivotosUser")
   suspend fun UserCommandSender.coffeeTouch() {
     val key = "${CoffeeTouchCommand.LOCK_PREFIX}.${user.unionOpenidOrId}"
     redis {
@@ -399,12 +399,12 @@ class CoffeeInviteCommand : AbstractCommand(
       json
     }
   }
-  private val md by requireObject<TencentCustomMarkdown>()
-  private val kb by requireObject<TencentCustomKeyboard>()
-  private val coffee by requireObject<CoffeeDocument>()
-  private val visitedStudents by requireObject<List<StudentSchema>>()
-  private val touchedStudents by requireObject<List<StudentSchema>>()
-  private val kivotosUser by requireObject<UserDocument>()
+  private val md by requireObject<TencentCustomMarkdown>("md")
+  private val kb by requireObject<TencentCustomKeyboard>("kb")
+  private val coffee by requireObject<CoffeeDocument>("coffee")
+  private val visitedStudents by requireObject<List<StudentSchema>>("visitedStudents")
+  private val touchedStudents by requireObject<List<StudentSchema>>("touchedStudents")
+  private val kivotosUser by requireObject<UserDocument>("kivotosUser")
   private val studentName by argument("学生名").optional()
   suspend fun UserCommandSender.invite() {
     if (!coffee.canInviteStudent) {
@@ -550,7 +550,7 @@ class CoffeeStudentTendencyCommand : AbstractCommand(
       /${KivotosCommand.primaryName} 咖啡厅 来访倾向 删除 日奈
     """.trimIndent()
 ) {
-  private val coffee by requireObject<CoffeeDocument>()
+  private val coffee by requireObject<CoffeeDocument>("coffee")
   suspend fun UserCommandSender.tendency() {
     val tendencyStudents = StudentSchema.StudentCache.filter {
       it.key in coffee.tendencyStudent
@@ -606,9 +606,9 @@ class CoffeeStudentTendencyCommand : AbstractCommand(
       /${KivotosCommand.primaryName} 咖啡厅 来访倾向 添加 日奈
     """.trimIndent()
   ) {
-    private val coffee by requireObject<CoffeeDocument>()
-    private val tendencyStudents by requireObject<List<StudentSchema>>()
-    private val md by requireObject<TencentCustomMarkdown>()
+    private val coffee by requireObject<CoffeeDocument>("coffee")
+    private val tendencyStudents by requireObject<List<StudentSchema>>("tendencyStudents")
+    private val md by requireObject<TencentCustomMarkdown>("md")
     private val studentName by argument("学生名").optional()
 
     suspend fun UserCommandSender.tendencyAdd() {
@@ -678,9 +678,9 @@ class CoffeeStudentTendencyCommand : AbstractCommand(
       /${KivotosCommand.primaryName} 咖啡厅 来访倾向 删除 日奈
     """.trimIndent()
   ) {
-    private val coffee by requireObject<CoffeeDocument>()
-    private val tendencyStudents by requireObject<List<StudentSchema>>()
-    private val md by requireObject<TencentCustomMarkdown>()
+    private val coffee by requireObject<CoffeeDocument>("coffee")
+    private val tendencyStudents by requireObject<List<StudentSchema>>("tendencyStudents")
+    private val md by requireObject<TencentCustomMarkdown>("md")
     private val studentName by argument("学生名").optional()
 
     suspend fun UserCommandSender.tendencyAdd() {

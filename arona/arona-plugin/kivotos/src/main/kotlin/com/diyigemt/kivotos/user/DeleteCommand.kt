@@ -19,7 +19,7 @@ class DeleteCommand : AbstractCommand(
   "删号",
   description = "删除账号"
 ) {
-  private val kivotosUser by requireObject<UserDocument>()
+  private val kivotosUser by requireObject<UserDocument>("kivotosUser")
   private val confirmCode by argument("code", help = "删号代码").optional()
   private fun generateNumber(): String = (1..6).map { "0123456789".random() }.joinToString("")
   suspend fun UserCommandSender.register() {

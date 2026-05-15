@@ -40,7 +40,7 @@ class ArenaCommand : AbstractCommand(
   "竞技场",
   description = "竞技场系列指令"
 ) {
-  private val md by requireObject<TencentCustomMarkdown>()
+  private val md by requireObject<TencentCustomMarkdown>("md")
   suspend fun UserCommandSender.arena() {
     tencentCustomMarkdown {
       h1("竞技场")
@@ -64,7 +64,7 @@ class ArenaMatchCommand : AbstractCommand(
   "匹配",
   description = "竞技场匹配指令"
 ) {
-  private val md by requireObject<TencentCustomMarkdown>()
+  private val md by requireObject<TencentCustomMarkdown>("md")
   suspend fun UserCommandSender.match() {
     val contactMatch = redisDbQuery {
       hgetAll(matchContactUserKey(subject.id))

@@ -32,6 +32,10 @@ import org.bson.Document
  * 任何一步失败都会按相反顺序回滚已生效的副作用, 保证不留下"半挂"成员.
  */
 internal object ContactService {
+  private data class AddMemberOutcome(
+    val member: ContactMember,
+    val insertedThisCall: Boolean,
+  )
 
   /**
    * 创建/合并群与用户的初始关系.
@@ -59,9 +63,10 @@ internal object ContactService {
           it.document
         }
 
-      val before = contactDocument.findContactMemberOrNull(userDocument.id)
-      val member = addMember(contactDocument, userDocument.id)
-      createdMember = before == null
+      val outcome = addMember(contactDocument, userDocument.id)
+      val member = outcome.member
+      // 仅当本次 Mongo $addToSet 真正插入 (modifiedOne) 时才让外层回滚, 避免并发下 $pull 掉别人的 member.
+      createdMember = outcome.insertedThisCall
 
       if (role !in member.roles) {
         when (val r = contactDocument.updateMemberRole(member.id, role)) {
@@ -92,7 +97,7 @@ internal object ContactService {
    * 把成员加入群; 已存在则补齐 user.contacts (修补历史脏数据).
    * 双写: Contact.members + User.contacts; 第二步失败通过 saga 回滚第一步.
    */
-  private suspend fun addMember(contactDocument: ContactDocument, userId: String): ContactMember {
+  private suspend fun addMember(contactDocument: ContactDocument, userId: String): AddMemberOutcome {
     val existMember = contactDocument.members.firstOrNull { it.id == userId }
     if (existMember != null) {
       val res = UserDocument.withCollection<MongoUserDocument, UpdateResult> {
@@ -107,7 +112,7 @@ internal object ContactService {
             "but the corresponding UserDocument is missing"
         )
       }
-      return existMember
+      return AddMemberOutcome(existMember, insertedThisCall = false)
     }
 
     val defaultRole = contactDocument.roles.first { it.id == DEFAULT_MEMBER_CONTACT_ROLE_ID }
@@ -138,7 +143,11 @@ internal object ContactService {
           "addMember failed: user.contacts not updated. contact=${contactDocument.id} member=${member.id}"
         )
       }
-      member
+      // 不依赖 modifiedOne (并发下别人可能先插入致其为 false), 以"本实例缺失"为补回信号.
+      if (contactDocument.members.none { it.id == member.id }) {
+        contactDocument.members = contactDocument.members + member
+      }
+      AddMemberOutcome(member, insertedThisCall = firstActuallyInserted)
     }
   }
 
@@ -155,6 +164,7 @@ internal object ContactService {
         update = Document("\$pull", Document(UserDocument::contacts.name, contactDocument.id)),
       )
     }
+    contactDocument.members = contactDocument.members.filterNot { it.id == memberId }
   }
 
   private suspend fun deleteContactDocument(contactId: String) {

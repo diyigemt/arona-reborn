@@ -35,6 +35,9 @@ interface TencentBot : Closeable, Contact, CoroutineScope {
   val isPublic: Boolean
   val isDebug: Boolean
   val isShadow: Boolean
+  // 暴露给 inner Contact 构造路径读取 inner ContactList 的 Caffeine tuning;
+  // 不直接暴露完整 TencentBotConfig, 收敛 mutable 字段表面积.
+  val contactCache: TencentBotContactCacheConfig
   suspend fun <T> callOpenapi(
     endpoint: TencentEndpoint,
     decoder: KSerializer<T>,
@@ -82,6 +85,7 @@ private constructor(private val config: TencentBotConfig) :
   override val isPublic = config.public
   override val isDebug = config.debug
   override val isShadow = config.shadow
+  override val contactCache: TencentBotContactCacheConfig get() = config.contactCache
   // Sprint 3 后续: token 刷新合流到 TokenRefresher, 它内部用 AtomicReference<Job?> 做 single-flight gate
   // + AtomicReference<TokenSnapshot> 让 (token, version) 作为单原子读写, 消掉 stale 401 误判和并发刷新风暴.
   // 旧实现 (cancel + launch 重启长 while-loop) 在并发 401 下会撞车, 详见 TokenRefresher.

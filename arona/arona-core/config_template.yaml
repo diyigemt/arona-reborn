@@ -7,12 +7,13 @@ bot:
   debug: false
   shadow: false
   shard: [0, 1]
-  # 顶层 ContactList (bot.guilds / bot.groups / bot.friends) 的有界缓存阈值.
+  # 顶层 + 容器内层 ContactList 的有界缓存阈值.
   # maximumSize 触发 Caffeine size-based eviction (window TinyLFU, 非严格 LRU);
   # expireAfterAccessSeconds 触发空闲过期, entry 在该秒数内未被访问即可被淘汰.
   # 淘汰回调会 cancel 被驱逐 contact 自己的 SupervisorJob (借用父 scope 的 leaf member 不受影响),
   # 进而连锁 cancel 它的 inner ContactList 内所有协程子任务. inner ContactList (Guild/Group/Channel
-  # 内嵌的 members/channels) 当前仍为无界 ConcurrentHashMap, 跟随 outer 容器一并被 GC.
+  # 内嵌的 members/channels) 同样走有界缓存, 跟随 outer 容器一并被 GC; GROUP_MESSAGE_CREATE (群全量
+  # 消息) 开启后 author 基数显著放大, 因此 inner 不再使用无界 ConcurrentHashMap.
   # 默认值按 6w DAU 量级估算; 调小会让缓存命中率下降, 调大会增加 heap 占用. 整段可省略, 不写时按下面默认值生效.
   contactCache:
     # 频道一般每 bot 几十~几百个; 1k + 7d 给大量余量.
@@ -27,6 +28,22 @@ bot:
     friends:
       maximumSize: 100000
       expireAfterAccessSeconds: 86400    # 24h
+    # 单 guild 成员: 仅缓存近期活跃 + 启动初始化触达成员.
+    guildMembers:
+      maximumSize: 5000
+      expireAfterAccessSeconds: 7200     # 2h
+    # 单 guild 子频道: 数量小且结构稳定, 保留时间长于成员.
+    guildChannels:
+      maximumSize: 500
+      expireAfterAccessSeconds: 604800   # 7d
+    # 单 channel 活跃成员.
+    channelMembers:
+      maximumSize: 2000
+      expireAfterAccessSeconds: 7200     # 2h
+    # 单 group 活跃成员: GROUP_MESSAGE_CREATE 下 author 基数接近全群发言用户.
+    groupMembers:
+      maximumSize: 3000
+      expireAfterAccessSeconds: 7200     # 2h
 adminToken: ""
 redis:
   host: "127.0.0.1"

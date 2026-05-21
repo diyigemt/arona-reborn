@@ -22,9 +22,9 @@ data class ContactCacheTuning(
 )
 
 /**
- * 三个顶层 ContactList (`bot.guilds` / `bot.groups` / `bot.friends`) 的容量配置.
- * inner ContactList (Guild/Group/Channel 内嵌的 members/channels) 当前仍走无界 ConcurrentHashMap,
- * 跟随 outer 容器一并被 GC.
+ * 顶层与容器内层 ContactList 的容量配置. inner ContactList 同样走有界 Caffeine,
+ * 跟随 outer 容器一并 GC; GROUP_MESSAGE_CREATE (群全量消息) 启用后, inner author 基数显著放大,
+ * 不再适合无界 ConcurrentHashMap.
  */
 @Serializable
 data class TencentBotContactCacheConfig(
@@ -42,6 +42,26 @@ data class TencentBotContactCacheConfig(
   val friends: ContactCacheTuning = ContactCacheTuning(
     maximumSize = 100_000,
     expireAfterAccessSeconds = 24 * 60 * 60L,
+  ),
+  // 单 guild 成员: 仅缓存近期活跃/启动初始化触达成员, 避免大 guild 长驻全量成员.
+  val guildMembers: ContactCacheTuning = ContactCacheTuning(
+    maximumSize = 5_000,
+    expireAfterAccessSeconds = 2 * 60 * 60L,
+  ),
+  // 单 guild 子频道: 数量小且结构稳定, 保留时间长于成员.
+  val guildChannels: ContactCacheTuning = ContactCacheTuning(
+    maximumSize = 500,
+    expireAfterAccessSeconds = 7 * 24 * 60 * 60L,
+  ),
+  // 单 channel 活跃成员: 频道消息路径不应让 member view 无界增长.
+  val channelMembers: ContactCacheTuning = ContactCacheTuning(
+    maximumSize = 2_000,
+    expireAfterAccessSeconds = 2 * 60 * 60L,
+  ),
+  // 单 group 活跃成员: GROUP_MESSAGE_CREATE 下 author 基数接近全群发言用户.
+  val groupMembers: ContactCacheTuning = ContactCacheTuning(
+    maximumSize = 3_000,
+    expireAfterAccessSeconds = 2 * 60 * 60L,
   ),
 )
 
@@ -95,6 +115,7 @@ internal enum class TencentWebsocketEventType(val type: String) {
   DIRECT_MESSAGE_CREATE("DIRECT_MESSAGE_CREATE"), // 频道私聊消息
   C2C_MESSAGE_CREATE("C2C_MESSAGE_CREATE"), // 私聊消息发送
   GROUP_AT_MESSAGE_CREATE("GROUP_AT_MESSAGE_CREATE"),// 群聊@机器人消息
+  GROUP_MESSAGE_CREATE("GROUP_MESSAGE_CREATE"), // 群全量消息
   GUILD_CREATE("GUILD_CREATE"), // 机器人被加入频道
   GUILD_DELETE("GUILD_DELETE"), // 机器人被踢出频道/频道解散
   GROUP_ADD_ROBOT("GROUP_ADD_ROBOT"), // 机器人被加入群

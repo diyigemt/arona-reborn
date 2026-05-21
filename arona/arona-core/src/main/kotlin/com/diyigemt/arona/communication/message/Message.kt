@@ -257,7 +257,7 @@ internal data class TencentBotFriendEventRaw(
 // Sprint 3.5(b): Java 默认 \s 不覆盖 NBSP (U+00A0) 与全角空格 (U+3000), Kotlin Char.isWhitespace
 // 同样不吞 NBSP. 客户端常见把这两类粘进 @bot 消息, 旧实现 split(" ") 会把整段当 PlainText, at 解析失败.
 // 显式列出字符集, 既不依赖 UNICODE_CHARACTER_CLASS flag, 也不放进所有 unicode 空白避免误伤 ZWSP 之类.
-private val TencentMessageWhitespaceRegex = Regex("[\\s\\u00A0\\u3000]+")
+internal val TencentMessageWhitespaceRegex = Regex("[\\s\\u00A0\\u3000]+")
 private fun Char.isTencentMessageWhitespace(): Boolean =
   isWhitespace() || this == ' ' || this == '　'
 

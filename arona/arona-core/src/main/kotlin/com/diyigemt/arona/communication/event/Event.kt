@@ -99,6 +99,18 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
   }
 }
 
+// 群全量消息 (公域 intent). payload schema 与 GROUP_AT_MESSAGE_CREATE 一致, 仅 type 不同, 故 handler 逻辑等价.
+internal object TencentWebsocketGroupMessageCreateHandler :
+  TencentWebsocketDispatchEventHandler<TencentGroupMessageRaw>() {
+  override val type = TencentWebsocketEventType.GROUP_MESSAGE_CREATE
+  override val decoder = TencentGroupMessageRaw.serializer()
+
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGroupMessageRaw, eventId: String) {
+    val member = ctx.bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
+    TencentGroupMessageEvent(payload.toMessageChain(), eventId, member).broadcast()
+  }
+}
+
 internal object TencentWebsocketC2CMessageCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentFriendMessageRaw>() {
   override val type = TencentWebsocketEventType.C2C_MESSAGE_CREATE
@@ -322,6 +334,7 @@ internal object TencentWebsocketDispatchEventManager {
     TencentWebsocketAtMessageCreateHandler,
     TencentWebsocketDirectMessageCreateHandler,
     TencentWebsocketGroupAtMessageCreateHandler,
+    TencentWebsocketGroupMessageCreateHandler,
     TencentWebsocketC2CMessageCreateHandler,
     TencentWebsocketGuildCreateHandler,
     TencentWebsocketGuildDeleteHandler,

@@ -9,6 +9,7 @@ import com.diyigemt.arona.communication.message.Message
 import com.diyigemt.arona.communication.message.PlainText
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toReadableTencentAt
 import com.diyigemt.arona.communication.message.TencentAt.Companion.toSourceTencentAt
+import com.diyigemt.arona.communication.message.TencentMessageWhitespaceRegex
 import com.diyigemt.arona.communication.message.toMessageChain
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.output.Localization
@@ -119,16 +120,16 @@ internal val ExecutorMap: MutableMap<String, DynamicCommandExecutor> = Concurren
 
 internal fun CommandSignature.matchChildPath(path: List<String>): List<String> {
   if (path.isEmpty()) return listOf(primaryName)
+  // 子命令比较跟顶级命令 (commandMap lowercase 查找) 对齐, 改为 ignoreCase;
+  // result 一律拼注册名 (而非用户输入), 否则 ExecutorMap 查 key 时大小写不一致会 miss.
   if (path.size == 1) {
-    return if (this.children.any { it.primaryName == path[0] })
-      listOf(primaryName) + path
-    else
-      listOf(primaryName)
+    val child = this.children.firstOrNull { it.primaryName.equals(path[0], ignoreCase = true) }
+    return if (child == null) listOf(primaryName) else listOf(primaryName, child.primaryName)
   }
   val result = mutableListOf(primaryName)
   var parentSignature = this
   for (it in path) {
-    val tmp = parentSignature.children.firstOrNull { c -> c.primaryName == it } ?: break
+    val tmp = parentSignature.children.firstOrNull { c -> c.primaryName.equals(it, ignoreCase = true) } ?: break
     result.add(tmp.primaryName)
     parentSignature = tmp
   }
@@ -339,8 +340,11 @@ internal suspend fun executeCommandImpl(
       CommandExecuteResult.UnresolvedCommand()
     }
   }
+  // 与 TencentMessageRaw.toMessageChain 共用同一空白集 (含 NBSP / 全角空格), 避免 split(" ") 在
+  // 客户端粘进 U+00A0 / U+3000 时把整段当 commandStr 而失配.
   val commandStr = messageString
-    .split(" ")
+    .split(TencentMessageWhitespaceRegex)
+    .filter { it.isNotEmpty() }
     .toMutableList()
     .removeFirstOrNull() ?: return coroutineScope {
     async {
@@ -349,7 +353,9 @@ internal suspend fun executeCommandImpl(
   }
   val commandSignature = CommandManager
     .matchCommandSignature(
-      commandStr.replaceFirst("/", "")
+      // removePrefix 而非 replaceFirst("/", ""): 后者会移除任意位置的首个 '/' (如 "abc/def" -> "abcdef"),
+      // 语义上仅应剥去前缀斜杠.
+      commandStr.removePrefix("/")
     ) ?: return coroutineScope {
     async {
       CommandExecuteResult.UnresolvedCommand()
@@ -357,7 +363,7 @@ internal suspend fun executeCommandImpl(
   }
   val arg = call.toString()
   val parseArg = arg
-    .split(" ")
+    .split(TencentMessageWhitespaceRegex)
     .filter { it.isNotEmpty() }
     .toMutableList()
     .apply {

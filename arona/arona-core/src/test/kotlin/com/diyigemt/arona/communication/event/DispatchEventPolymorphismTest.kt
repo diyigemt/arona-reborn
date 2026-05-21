@@ -109,6 +109,7 @@ class DispatchEventPolymorphismTest {
       TencentWebsocketEventType.AT_MESSAGE_CREATE,
       TencentWebsocketEventType.DIRECT_MESSAGE_CREATE,
       TencentWebsocketEventType.GROUP_AT_MESSAGE_CREATE,
+      TencentWebsocketEventType.GROUP_MESSAGE_CREATE,
       TencentWebsocketEventType.C2C_MESSAGE_CREATE,
       TencentWebsocketEventType.GUILD_CREATE,
       TencentWebsocketEventType.GUILD_DELETE,

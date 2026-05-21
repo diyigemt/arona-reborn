@@ -438,8 +438,18 @@ internal class GuildImpl(
 ) : Guild, AbstractContact(bot, parentCoroutineContext) {
   override val id get() = internalGuild.id
   override val unionOpenid: String? = null
-  override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
-  override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
+  override val members: ContactList<GuildMember> = bot.contactCache.guildMembers.let { tuning ->
+    GuildMemberContactList(
+      tuning.maximumSize,
+      tuning.expireAfterAccessSeconds,
+    ) { EmptyGuildMemberImpl(this, it) }
+  }
+  override val channels: ContactList<Channel> = bot.contactCache.guildChannels.let { tuning ->
+    ChannelContactList(
+      tuning.maximumSize,
+      tuning.expireAfterAccessSeconds,
+    ) { EmptyChannelImpl(this, it) }
+  }
   override val isPublic: Boolean = bot.isPublic
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Guild>? {
     // Guild 本身不是消息接收方; 腾讯 API 要求发送到具体 Channel.
@@ -516,8 +526,12 @@ internal class ChannelImpl(
 ) : Channel, AbstractContact(bot, guild.coroutineContext) {
   override val id get() = internalChannel.id
   override val unionOpenid: String? = null
-  override val members: ContactList<GuildChannelMember> =
-    GuildChannelMemberContactList { EmptyGuildChannelMemberImpl(this, it) }
+  override val members: ContactList<GuildChannelMember> = bot.contactCache.channelMembers.let { tuning ->
+    GuildChannelMemberContactList(
+      tuning.maximumSize,
+      tuning.expireAfterAccessSeconds,
+    ) { EmptyGuildChannelMemberImpl(this, it) }
+  }
 
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Channel>? {
     return callMessageOpenApi(
@@ -541,7 +555,12 @@ internal class GroupImpl(
   override val id: String,
   override val unionOpenid: String? = null,
 ) : Group, AbstractContact(bot, parentCoroutineContext) {
-  override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyGroupMemberImpl(this, it) }
+  override val members: ContactList<GroupMember> = bot.contactCache.groupMembers.let { tuning ->
+    GroupMemberContactList(
+      tuning.maximumSize,
+      tuning.expireAfterAccessSeconds,
+    ) { EmptyGroupMemberImpl(this, it) }
+  }
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Group>? {
     return callMessageOpenApi(
       TencentEndpoint.PostGroupMessage,
@@ -691,8 +710,12 @@ internal class EmptyChannelImpl(
   override val id: String = EmptyMessageId,
 ) : Channel, EmptyContact, AbstractContact(guild.bot, guild.coroutineContext) {
   override val unionOpenid = EmptyMessageId
-  override val members: ContactList<GuildChannelMember> =
-    GuildChannelMemberContactList { EmptyGuildChannelMemberImpl(this, it) }
+  override val members: ContactList<GuildChannelMember> = guild.bot.contactCache.channelMembers.let { tuning ->
+    GuildChannelMemberContactList(
+      tuning.maximumSize,
+      tuning.expireAfterAccessSeconds,
+    ) { EmptyGuildChannelMemberImpl(this, it) }
+  }
 
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Channel>? {
     return callMessageOpenApi(
@@ -711,8 +734,18 @@ internal class EmptyGuildImpl(
   override val id: String = EmptyMessageId,
 ) : Guild, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
-  override val members: ContactList<GuildMember> = GuildMemberContactList { EmptyGuildMemberImpl(this, it) }
-  override val channels: ContactList<Channel> = ChannelContactList { EmptyChannelImpl(this, it) }
+  override val members: ContactList<GuildMember> = bot.contactCache.guildMembers.let { tuning ->
+    GuildMemberContactList(
+      tuning.maximumSize,
+      tuning.expireAfterAccessSeconds,
+    ) { EmptyGuildMemberImpl(this, it) }
+  }
+  override val channels: ContactList<Channel> = bot.contactCache.guildChannels.let { tuning ->
+    ChannelContactList(
+      tuning.maximumSize,
+      tuning.expireAfterAccessSeconds,
+    ) { EmptyChannelImpl(this, it) }
+  }
   override val isPublic: Boolean = bot.isPublic
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Guild>? {
     throw IllegalStateException("EmptyGuildImpl is a placeholder (id=$id) and cannot send messages. It should be replaced by a real Guild via getOrCreate(id, factory) before use.")
@@ -767,7 +800,12 @@ internal class EmptyGroupImpl(
   override val id: String = EmptyMessageId,
 ) : Group, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
-  override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyGroupMemberImpl(this, it) }
+  override val members: ContactList<GroupMember> = bot.contactCache.groupMembers.let { tuning ->
+    GroupMemberContactList(
+      tuning.maximumSize,
+      tuning.expireAfterAccessSeconds,
+    ) { EmptyGroupMemberImpl(this, it) }
+  }
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Group>? {
     return callMessageOpenApi(
       TencentEndpoint.PostGroupMessage,
@@ -785,6 +823,7 @@ internal class EmptyMockGroupImpl(
   override val id: String = EmptyMessageId,
 ) : Group, EmptyContact, AbstractContact(bot, bot.coroutineContext) {
   override val unionOpenid: String = EmptyMessageId
+  // mock 替身的 inner members 保留无界 ConcurrentHashMap, 避免引入 Caffeine 异步淘汰对测试时序的不确定性.
   override val members: ContactList<GroupMember> = GroupMemberContactList { EmptyMockGroupMemberImpl(this, it) }
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<Group>? {
     return MessageReceipt(MessageReceiptImpl("", ""), this)
@@ -881,17 +920,23 @@ abstract class ContactList<out C : Contact>(
   override fun hashCode(): Int = delegate.hashCode()
 }
 
-internal class GuildMemberContactList(
-  generator: (id: String) -> GuildMember,
-) : ContactList<GuildMember>(generator)
+internal class GuildMemberContactList : ContactList<GuildMember> {
+  constructor(generator: (id: String) -> GuildMember) : super(generator)
+  constructor(maximumSize: Long, expireAfterAccessSeconds: Long, generator: (id: String) -> GuildMember) :
+    super(maximumSize, expireAfterAccessSeconds, generator)
+}
 
-internal class GuildChannelMemberContactList(
-  generator: (id: String) -> GuildChannelMember,
-) : ContactList<GuildChannelMember>(generator)
+internal class GuildChannelMemberContactList : ContactList<GuildChannelMember> {
+  constructor(generator: (id: String) -> GuildChannelMember) : super(generator)
+  constructor(maximumSize: Long, expireAfterAccessSeconds: Long, generator: (id: String) -> GuildChannelMember) :
+    super(maximumSize, expireAfterAccessSeconds, generator)
+}
 
-internal class ChannelContactList(
-  generator: (id: String) -> Channel,
-) : ContactList<Channel>(generator)
+internal class ChannelContactList : ContactList<Channel> {
+  constructor(generator: (id: String) -> Channel) : super(generator)
+  constructor(maximumSize: Long, expireAfterAccessSeconds: Long, generator: (id: String) -> Channel) :
+    super(maximumSize, expireAfterAccessSeconds, generator)
+}
 
 internal class GuildContactList : ContactList<Guild> {
   constructor(generator: (id: String) -> Guild) : super(generator)
@@ -905,9 +950,11 @@ internal class GroupContactList : ContactList<Group> {
     super(maximumSize, expireAfterAccessSeconds, generator)
 }
 
-internal class GroupMemberContactList(
-  generator: (id: String) -> GroupMember,
-) : ContactList<GroupMember>(generator)
+internal class GroupMemberContactList : ContactList<GroupMember> {
+  constructor(generator: (id: String) -> GroupMember) : super(generator)
+  constructor(maximumSize: Long, expireAfterAccessSeconds: Long, generator: (id: String) -> GroupMember) :
+    super(maximumSize, expireAfterAccessSeconds, generator)
+}
 
 internal class SingleUserContactList : ContactList<FriendUser> {
   constructor(generator: (id: String) -> FriendUser) : super(generator)

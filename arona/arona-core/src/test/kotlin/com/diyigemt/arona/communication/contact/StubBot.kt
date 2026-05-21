@@ -1,6 +1,7 @@
 package com.diyigemt.arona.communication.contact
 
 import com.diyigemt.arona.communication.TencentBot
+import com.diyigemt.arona.communication.TencentBotContactCacheConfig
 import com.diyigemt.arona.communication.TencentEndpoint
 import com.diyigemt.arona.communication.event.EventChannel
 import com.diyigemt.arona.communication.event.GlobalEventChannel
@@ -48,6 +49,7 @@ internal class StubBot(
   override val isPublic: Boolean = false
   override val isDebug: Boolean = false
   override val isShadow: Boolean = false
+  override val contactCache: TencentBotContactCacheConfig = TencentBotContactCacheConfig()
   override val coroutineContext: CoroutineContext =
     SupervisorJob() + Dispatchers.Default + CoroutineName("StubBot.$id")
 

@@ -14,10 +14,15 @@ import com.diyigemt.arona.database.permission.ContactRole.Companion.createBaseMe
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseContactAdminPolicy
 import com.diyigemt.arona.database.permission.Policy.Companion.createBaseMemberPolicy
 import com.diyigemt.arona.database.withCollection
-import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
 import com.diyigemt.arona.webui.endpoints.aronaUser
+import com.diyigemt.arona.command.CommandOwner
+import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import com.diyigemt.arona.webui.pluginconfig.resolveConfigKey
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.serializer
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Projections
@@ -50,12 +55,31 @@ abstract class PluginContactDocument : PluginVisibleData() {
   fun findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
   fun findContactMember(memberId: String) = members.first { it.id == memberId }
 
+  /** 写入群级插件配置. 仅持久化主 key, 不回写 alias 数据. */
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
+
+  @OptIn(InternalSerializationApi::class)
+  suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(
+    plugin: CommandOwner,
+    value: T,
+    key: String = resolveConfigKey(T::class.serializer()),
+  ) = updatePluginConfig(
+    plugin.permission.id.nameSpace.toMongodbKey(),
+    key,
+    JsonIgnoreUnknownKeys.encodeToString(T::class.serializer(), value),
+  )
 }
 
 abstract class PluginContactMember : PluginVisibleData() {
   abstract val id: String // 指向UserDocument.id
   abstract val name: String
   abstract val roles: List<String>
+
+  /**
+   * 写入"用户 × 群"维度的插件配置. cid 必填 —— 历史上存在过 3-arg 重载, 没有 cid 时只 warn 不写库,
+   * 误用会被静默吞掉; 现在用编译期签名强制要求传入所在群 id.
+   */
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String, cid: String)
 }
 
 
@@ -100,13 +124,6 @@ data class ContactMember(
   override val roles: List<String>, // 指向ContactDocument.roles.id
   override val config: Map<String, Map<String, String>> = mapOf(),
 ) : PluginContactMember() {
-  override suspend fun updatePluginConfig(
-    pluginId: String,
-    key: String,
-    value: String,
-  ) {
-    commandLineLogger.warn("trigger contact member update config without cid, ignoring.")
-  }
   override suspend fun updatePluginConfig(
     pluginId: String,
     key: String,
@@ -211,15 +228,6 @@ internal data class ContactDocument(
         update = Updates.set(pluginConfigPath(ContactDocument::config, pluginId, key), value)
       )
     }
-  }
-
-  override suspend fun updatePluginConfig(
-    pluginId: String,
-    key: String,
-    value: String,
-    cid: String
-  ) {
-    updatePluginConfig(pluginId, key, value)
   }
 
   companion object : DocumentCompanionObject {

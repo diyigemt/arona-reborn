@@ -43,14 +43,26 @@ object PluginWebuiConfigRecorder {
   data class ConfigEntry(
     val serializer: KSerializer<*>,
     val defaultProvider: (() -> PluginWebuiConfig)? = null,
+    /** 主 key 的历史别名, 仅供读路径回退使用; 见 [PluginConfigId.aliases]. */
+    val aliases: List<String> = emptyList(),
+  )
+
+  /** 任意 lookup key 命中后返回的归一化结果: 写路径用 [primaryKey] 落库, 读路径用 [entry.aliases] 续查. */
+  private data class MatchedEntry(
+    val primaryKey: String,
+    val entry: ConfigEntry,
   )
 
   /**
    * [checkDataSafety] 的结构化结果. 旧版直接返回 `String?` 把 reject 信息丢给前端的 400, 现在用 sealed
-   * result 把 reject message 与 fieldErrors 透传到 endpoint.
+   * result 把 reject message / fieldErrors / canonical 写入 key 一起透传到 endpoint.
    */
   sealed class DataSafetyResult {
-    data class Ok(val json: String) : DataSafetyResult()
+    /**
+     * @param json 归一化后的 JSON, 用于落库与审核
+     * @param canonicalKey 主 key. 前端若传 alias, 写路径必须用这个回到主 key, 否则数据会被分裂到旧 alias 下
+     */
+    data class Ok(val json: String, val canonicalKey: String) : DataSafetyResult()
     data class Err(
       val message: String,
       val fieldErrors: List<FieldError> = emptyList(),
@@ -58,6 +70,9 @@ object PluginWebuiConfigRecorder {
   }
 
   private val map: MutableMap<String, MutableMap<String, ConfigEntry>> = mutableMapOf()
+
+  /** 注册时禁止出现在 primary key / alias 中的字符. `.` 与 Mongo dot-path 冲突, `$` 是字段操作符前缀. */
+  private val FORBIDDEN_KEY_CHARS = listOf('.', '$')
 
   @OptIn(ExperimentalSerializationApi::class)
   fun register(
@@ -77,12 +92,25 @@ object PluginWebuiConfigRecorder {
     putEntry(owner.permission.id.nameSpace.toMongodbKey(), serializer, defaultProvider)
   }
 
+  /**
+   * 给任意 lookup key (可能是主 key 或 alias), 返回同一 entry 下其它可尝试 key.
+   * - 传主 key: 返回它的所有 aliases
+   * - 传 alias: 返回 [主 key] + 其它 aliases
+   * - 找不到 entry: 返回空
+   *
+   * 仅供读路径在主 key/alias 命中失败时挨个回查; 不触发写回迁移.
+   */
+  fun siblingKeysFor(pluginId: String, anyKey: String): List<String> {
+    val matched = findMatched(pluginId, anyKey) ?: return emptyList()
+    return (listOf(matched.primaryKey) + matched.entry.aliases).filter { it != anyKey }
+  }
+
   @OptIn(ExperimentalSerializationApi::class)
   @Suppress("UNCHECKED_CAST")
   fun checkDataSafety(obj: PluginPreferenceResp): DataSafetyResult {
-    val entry = getEntry(obj.id, obj.key)
+    val matched = findMatched(obj.id, obj.key)
       ?: return DataSafetyResult.Err("配置不存在或未注册: ${obj.id}/${obj.key}")
-    val serializer = entry.serializer
+    val serializer = matched.entry.serializer
     return runCatching {
       val decoded = JsonIgnoreUnknownKeys.decodeFromString(serializer, obj.value) as PluginWebuiConfig
       when (val checkResult = decoded.check()) {
@@ -90,7 +118,10 @@ object PluginWebuiConfigRecorder {
           return DataSafetyResult.Err(checkResult.message, checkResult.fieldErrors)
         is PluginConfigCheckResult.PluginConfigCheckAccept -> Unit
       }
-      DataSafetyResult.Ok(JsonIgnoreUnknownKeys.encodeToString(serializer as KSerializer<PluginWebuiConfig>, decoded))
+      DataSafetyResult.Ok(
+        json = JsonIgnoreUnknownKeys.encodeToString(serializer as KSerializer<PluginWebuiConfig>, decoded),
+        canonicalKey = matched.primaryKey,
+      )
     }.getOrElse { err ->
       commandLineLogger.error("deserialize ${serializer.descriptor.serialName} failed.")
       commandLineLogger.error(err)
@@ -98,14 +129,14 @@ object PluginWebuiConfigRecorder {
     }
   }
 
-  /** 给一个已注册的 (pluginId, configKey) 生成 schema, 找不到时返回 null. */
+  /** 给一个已注册的 (pluginId, configKey) 生成 schema, 找不到时返回 null; schema 内固定吐主 key. */
   fun generateSchema(id: String, key: String): PluginConfigSchema? {
-    val entry = getEntry(id, key) ?: return null
+    val matched = findMatched(id, key) ?: return null
     return SchemaGenerator.generate(
       pluginId = id,
-      configKey = key,
-      serializer = entry.serializer,
-      defaultJson = resolveDefaultJson(entry),
+      configKey = matched.primaryKey,
+      serializer = matched.entry.serializer,
+      defaultJson = resolveDefaultJson(matched.entry),
     )
   }
 
@@ -140,9 +171,66 @@ object PluginWebuiConfigRecorder {
     serializer: KSerializer<*>,
     defaultProvider: (() -> PluginWebuiConfig)?,
   ) {
-    val key = serializer.descriptor.serialName.split(".").last()
-    map.getOrPut(namespace) { mutableMapOf() }[key] = ConfigEntry(serializer, defaultProvider)
+    // 主 key 与命令侧 inline 默认 key 走同一函数, 保证两条写入路径强同源.
+    val primaryKey = resolveConfigKey(serializer)
+    val aliases = resolveConfigAliases(serializer)
+    validateConfigKey(primaryKey, namespace, role = "primary key")
+    aliases.forEach { alias -> validateConfigKey(alias, namespace, role = "alias") }
+    assertNoCollision(namespace, primaryKey, aliases)
+    map.getOrPut(namespace) { mutableMapOf() }[primaryKey] = ConfigEntry(serializer, defaultProvider, aliases)
   }
 
-  private fun getEntry(id: String, key: String): ConfigEntry? = map[id]?.get(key)
+  /**
+   * 校验单个 key 是否合法. 启动期 fail-fast, 避免 [PluginConfigId] 把"非法"字符传入 Mongo dot-path
+   * 导致写入嵌套字段或被识别为操作符. 当前禁止字符: `.` (路径分隔) / `$` (操作符前缀);
+   * 同时拒绝空白 key.
+   */
+  private fun validateConfigKey(key: String, namespace: String, role: String) {
+    require(key.isNotBlank()) {
+      "Invalid plugin config key in $namespace ($role): key is blank"
+    }
+    val forbidden = FORBIDDEN_KEY_CHARS.firstOrNull { it in key }
+    require(forbidden == null) {
+      "Invalid plugin config key in $namespace ($role): '$key' contains forbidden character '$forbidden'"
+    }
+  }
+
+  /**
+   * 同一 plugin namespace 下, 新 entry 的 primary + aliases 集合不能:
+   *   1) 自身有重复
+   *   2) 与已注册 entry 的任一 primary / alias 冲突
+   * 命中即抛, 避免运行期靠注册顺序决定胜负.
+   */
+  private fun assertNoCollision(namespace: String, primaryKey: String, aliases: List<String>) {
+    val requested = listOf(primaryKey) + aliases
+    val duplicates = requested.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+    require(duplicates.isEmpty()) {
+      "Duplicate plugin config key in $namespace: ${duplicates.joinToString()}"
+    }
+    val inner = map[namespace] ?: return
+    val occupied = mutableMapOf<String, String>()
+    inner.forEach { (existingPrimary, entry) ->
+      occupied[existingPrimary] = existingPrimary
+      entry.aliases.forEach { alias -> occupied[alias] = existingPrimary }
+    }
+    requested.forEach { candidate ->
+      val owner = occupied[candidate]
+      require(owner == null) {
+        "Plugin config key collision in $namespace: '$candidate' already registered by entry '$owner'"
+      }
+    }
+  }
+
+  /**
+   * 精确匹配主 key 优先; 命中失败时按 aliases 反查, 用于前端拿到旧 schema key 时也能识别.
+   * 写路径调用方需用 [MatchedEntry.primaryKey] 落库, 避免 alias 请求继续污染旧 key.
+   */
+  private fun findMatched(id: String, key: String): MatchedEntry? {
+    val inner = map[id] ?: return null
+    inner[key]?.let { return MatchedEntry(key, it) }
+    return inner.entries
+      .firstOrNull { (_, entry) -> key in entry.aliases }
+      ?.let { (primary, entry) -> MatchedEntry(primary, entry) }
+  }
+
 }

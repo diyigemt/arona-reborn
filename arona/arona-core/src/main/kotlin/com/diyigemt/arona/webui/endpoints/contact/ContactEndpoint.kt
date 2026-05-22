@@ -395,17 +395,18 @@ internal object ContactEndpoint {
     }.onFailure {
       return badRequest()
     }.getOrThrow()
-    val value = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
-      is DataSafetyResult.Ok -> result.json
+    val checked = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
+      is DataSafetyResult.Ok -> result
       is DataSafetyResult.Err ->
         return errorMessage(result.message, result.fieldErrors.toPayloadOrNull())
     }
-    val ev = auditOrAllow(value)
+    val ev = auditOrAllow(checked.json)
     if (ev?.isBlock == true) return errorMessage("内容审核失败: ${ev.message}")
+    // 用 canonicalKey 落库: alias POST 也归一到主 key.
     contact.updatePluginConfig(
       obj.id,
-      obj.key,
-      value
+      checked.canonicalKey,
+      checked.json,
     )
     return success()
   }
@@ -430,18 +431,19 @@ internal object ContactEndpoint {
   @AronaBackendEndpointPost("/{id}/member/plugin/member-preference")
   suspend fun ApplicationCall.saveMemberPreference() {
     val obj = kotlin.runCatching { receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
-    val value = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
-      is DataSafetyResult.Ok -> result.json
+    val checked = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
+      is DataSafetyResult.Ok -> result
       is DataSafetyResult.Err ->
         return errorMessage(result.message, result.fieldErrors.toPayloadOrNull())
     }
-    val ev = auditOrAllow(value)
+    val ev = auditOrAllow(checked.json)
     if (ev?.isBlock == true) return errorMessage("内容审核失败: ${ev.message}")
     contact.findContactMemberOrNull(aronaUser.id)?.also {
+      // 用 canonicalKey 落库: alias POST 也归一到主 key.
       it.updatePluginConfig(
         obj.id,
-        obj.key,
-        value,
+        checked.canonicalKey,
+        checked.json,
         contact.id,
       )
       return success()

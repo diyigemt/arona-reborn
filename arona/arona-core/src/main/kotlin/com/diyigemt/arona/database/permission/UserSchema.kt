@@ -9,6 +9,8 @@ import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.name
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
+import com.diyigemt.arona.webui.pluginconfig.resolveConfigKey
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.FindOneAndUpdateOptions
@@ -104,36 +106,37 @@ internal class UserSchema(id: EntityID<String>) : Entity<String>(id) {
 
 fun String.toMongodbKey() = this.replace(".", "·")
 fun String.fromMongodbKey() = this.replace("·", ".")
+
+/**
+ * 读路径基类: 把"按 (pluginId, key) 取嵌套 JSON 字符串"统一封装.
+ * 写路径不在这层抽象, 交给 [PluginUserDocument]/[PluginContactDocument]/[PluginContactMember]
+ * 各自约束签名 (member 强制 cid, 不再允许 3-arg 静默吞掉).
+ */
 abstract class PluginVisibleData {
   abstract val config: Map<String, Map<String, String>>
 
   @OptIn(InternalSerializationApi::class)
-  inline fun <reified T : PluginWebuiConfig> readPluginConfigOrNull(plugin: CommandOwner, key: String = T::class.name) =
-    readPluginConfigOrNull(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
+  inline fun <reified T : PluginWebuiConfig> readPluginConfigOrNull(
+    plugin: CommandOwner,
+    key: String = resolveConfigKey(T::class.serializer()),
+  ) = readPluginConfigOrNull(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
 
   @OptIn(InternalSerializationApi::class)
   inline fun <reified T : PluginWebuiConfig> readPluginConfigOrDefault(
     plugin: CommandOwner,
     default: T,
-    key: String = T::class.name,
-  ) =
-    readPluginConfigOrDefault(plugin.permission.id.nameSpace.toMongodbKey(), default, key, T::class.serializer())
+    key: String = resolveConfigKey(T::class.serializer()),
+  ) = readPluginConfigOrDefault(plugin.permission.id.nameSpace.toMongodbKey(), default, key, T::class.serializer())
 
   @OptIn(InternalSerializationApi::class)
-  inline fun <reified T : PluginWebuiConfig> readPluginConfig(plugin: CommandOwner, key: String = T::class.name) =
-    readPluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
-
-  suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(
+  inline fun <reified T : PluginWebuiConfig> readPluginConfig(
     plugin: CommandOwner,
-    value: T,
-    key: String = T::class.name,
-  ) =
-    updatePluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, JsonIgnoreUnknownKeys.encodeToString(value))
+    key: String = resolveConfigKey(T::class.serializer()),
+  ) = readPluginConfig(plugin.permission.id.nameSpace.toMongodbKey(), key, T::class.serializer())
 
   fun <T : PluginWebuiConfig> readPluginConfigOrNull(pluginId: String, key: String, serializer: KSerializer<T>): T? {
-    return config[pluginId.toMongodbKey()]?.get(key)?.let {
-      JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
-    }
+    val raw = lookupRaw(pluginId, key) ?: return null
+    return JsonIgnoreUnknownKeys.decodeFromString(serializer, raw)
   }
 
   fun <T : PluginWebuiConfig> readPluginConfigOrDefault(
@@ -142,27 +145,33 @@ abstract class PluginVisibleData {
     key: String,
     serializer: KSerializer<T>,
   ): T {
-    return config[pluginId.toMongodbKey()]?.get(key)?.let {
-      JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
-    } ?: default
+    val raw = lookupRaw(pluginId, key) ?: return default
+    return JsonIgnoreUnknownKeys.decodeFromString(serializer, raw)
   }
 
   fun <T : PluginWebuiConfig> readPluginConfig(pluginId: String, key: String, serializer: KSerializer<T>): T {
-    return config[pluginId.toMongodbKey()]!![key]!!.let {
-      JsonIgnoreUnknownKeys.decodeFromString(serializer, it)
+    val raw = lookupRaw(pluginId, key) ?: error("plugin config $pluginId/$key not found")
+    return JsonIgnoreUnknownKeys.decodeFromString(serializer, raw)
+  }
+
+  fun readPluginConfigString(pluginId: String, key: String): String =
+    lookupRaw(pluginId, key) ?: error("plugin config $pluginId/$key not found")
+
+  fun readPluginConfigStringOrNull(pluginId: String, key: String): String? = lookupRaw(pluginId, key)
+
+  /**
+   * 先查传入 key; 没命中时按注册表声明的同组 key (主 key + 其它 aliases) 挨个回查,
+   * 兼容传入主或 alias 两种情形. 不在读时把旧数据迁回主 key, 避免读路径触发 Mongo 写.
+   */
+  private fun lookupRaw(pluginId: String, key: String): String? {
+    val encoded = pluginId.toMongodbKey()
+    val inner = config[encoded] ?: return null
+    inner[key]?.let { return it }
+    for (sibling in PluginWebuiConfigRecorder.siblingKeysFor(encoded, key)) {
+      inner[sibling]?.let { return it }
     }
+    return null
   }
-
-  fun readPluginConfigString(pluginId: String, key: String): String {
-    return config[pluginId.toMongodbKey()]!![key]!!
-  }
-
-  fun readPluginConfigStringOrNull(pluginId: String, key: String): String? {
-    return config[pluginId.toMongodbKey()]?.get(key)
-  }
-
-  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
-  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String, cid: String)
 }
 
 abstract class PluginUserDocument : PluginVisibleData() {
@@ -170,6 +179,21 @@ abstract class PluginUserDocument : PluginVisibleData() {
   abstract val unionOpenId: String
   abstract val qq: Long
   abstract val username: String
+
+  /** 写入用户级插件配置. 仅持久化主 key, 不回写 alias 数据. */
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
+
+  @OptIn(InternalSerializationApi::class)
+  suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(
+    plugin: CommandOwner,
+    value: T,
+    key: String = resolveConfigKey(T::class.serializer()),
+  ) = updatePluginConfig(
+    plugin.permission.id.nameSpace.toMongodbKey(),
+    key,
+    JsonIgnoreUnknownKeys.encodeToString(T::class.serializer(), value),
+  )
+
   suspend fun updateUsername(name: String) {
     UserDocument.withCollection<MongoUserDocument, UpdateResult> {
       updateOne(
@@ -210,27 +234,8 @@ internal data class UserDocument(
     )
   }
 
-  fun readPluginConfigOrNull(pluginId: String, key: String): String? {
-    return config[pluginId.toMongodbKey()]?.get(key)
-  }
-
   internal fun readAllConfig(pluginId: String): Map<String, String>? {
     return config[pluginId.toMongodbKey()]
-  }
-
-  internal suspend inline fun <reified T : Any> updatePluginConfig(
-    pluginId: String, value: T,
-    key: String = value::class.name,
-  ) {
-    withCollection<MongoUserDocument, UpdateResult> {
-      updateOne(
-        filter = idFilter(id),
-        update = Updates.set(
-          pluginConfigPath(UserDocument::config, pluginId, key),
-          JsonIgnoreUnknownKeys.encodeToString(value)
-        )
-      )
-    }
   }
 
   override suspend fun updatePluginConfig(
@@ -244,15 +249,6 @@ internal data class UserDocument(
         update = Updates.set(pluginConfigPath(UserDocument::config, pluginId, key), value)
       )
     }
-  }
-
-  override suspend fun updatePluginConfig(
-    pluginId: String,
-    key: String,
-    value: String,
-    cid: String,
-  ) {
-    updatePluginConfig(pluginId, key, value)
   }
 
   companion object : DocumentCompanionObject, ExposedUserDocument {

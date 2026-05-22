@@ -52,7 +52,9 @@ object PluginPreferenceEndpoint {
       request.queryParameters["key"],
     ) ?: return badRequest()
     if (query.key != null) {
-      aronaUser.readPluginConfigOrNull(query.id, query.key)?.also { return success(it) }
+      // 走 readPluginConfigStringOrNull 以经过 PluginVisibleData 的 alias 回查,
+      // 兼容 @PluginConfigId 引入前用 simpleName 存的旧数据.
+      aronaUser.readPluginConfigStringOrNull(query.id, query.key)?.also { return success(it) }
       return success()
     }
     aronaUser.readAllConfig(query.id)?.also { return success(it) }
@@ -66,17 +68,18 @@ object PluginPreferenceEndpoint {
     }.onFailure {
       return badRequest()
     }.getOrNull() ?: return badRequest()
-    val value = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
-      is DataSafetyResult.Ok -> result.json
+    val checked = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
+      is DataSafetyResult.Ok -> result
       is DataSafetyResult.Err ->
         return errorMessage(result.message, result.fieldErrors.toPayloadOrNull())
     }
-    val audit = auditOrAllow(value)
+    val audit = auditOrAllow(checked.json)
     if (audit?.isBlock == true) return errorMessage("内容审核失败: ${audit.message}")
+    // 用 canonicalKey 落库: 即使前端用 alias POST 也归一到主 key, 避免新写入污染历史 alias.
     aronaUser.updatePluginConfig(
       obj.id,
-      obj.key,
-      value
+      checked.canonicalKey,
+      checked.json,
     )
     return success()
   }

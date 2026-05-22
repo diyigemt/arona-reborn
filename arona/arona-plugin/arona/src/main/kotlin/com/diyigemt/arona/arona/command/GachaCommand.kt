@@ -208,7 +208,8 @@ class GachaCommand : AbstractCommand(
     record.ssr += result.filter { it.rarity == StudentRarity.SSR }.size
     record.pickup += result.filter { it.isPickup }.size
     recordMap.map[poolId] = record
-    updateUserPluginConfig(Arona, recordMap)
+    // 抽卡计数为机器派生状态, 不含用户输入, 关 audit 避免 3s 超时叠加到响应延迟.
+    updateUserPluginConfig(Arona, recordMap, audit = false)
 
     // 发送图片
     sendResult(pool.name, record.point, result, null)
@@ -402,7 +403,8 @@ class GachaCommand : AbstractCommand(
     userRecord.day = today
     userRecordMap[type] = userRecord
     contactRecord.map[user.id] = userRecordMap
-    updateContactPluginConfig(Arona, contactRecord)
+    // 群抽卡限制计数为机器派生状态, 关 audit.
+    updateContactPluginConfig(Arona, contactRecord, audit = false)
     return false
   }
 

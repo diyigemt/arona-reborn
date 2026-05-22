@@ -81,7 +81,8 @@ class ConfigurationCoffeeCommand : AbstractCommand(
           }
         }
         message?.recall()
-        updateUserPluginConfig(Kivotos, configure)
+        // CoffeeConfig 仅含 bool 开关, 由按钮交互翻转, 无用户自由文本; 关 audit 避免按钮切换叠加 3s 超时.
+        updateUserPluginConfig(Kivotos, configure, audit = false)
         message = sendMessage(md + renderConfig(configure))
       }
     }

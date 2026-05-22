@@ -5,7 +5,7 @@ import { PluginConfigSchema } from "@/interface/pluginSchema";
 export const PluginPreferenceApi = {
   fetchPluginPreference(pluginId: string, preferenceKey: string) {
     return simplifiedApiService(
-      service.raw<string>({
+      service.raw<Record<string, unknown> | null>({
         url: "/plugin/preference",
         method: "GET",
         params: {
@@ -15,9 +15,10 @@ export const PluginPreferenceApi = {
       }),
     );
   },
+  // 后端返回该插件在当前 user 下所有 configKey 的对象树, 不再是 JSON 字符串数组.
   fetchPluginPreferences(pluginId: string) {
     return simplifiedApiService(
-      service.raw<string[]>({
+      service.raw<Record<string, Record<string, unknown>> | null>({
         url: "/plugin/preference",
         method: "GET",
         params: {
@@ -26,7 +27,7 @@ export const PluginPreferenceApi = {
       }),
     );
   },
-  updatePluginPreference(pluginId: string, preferenceKey: string, preference: string | object) {
+  updatePluginPreference(pluginId: string, preferenceKey: string, preference: Record<string, unknown>) {
     return simplifiedApiService(
       service.raw<void>({
         url: "/plugin/preference",
@@ -34,7 +35,7 @@ export const PluginPreferenceApi = {
         data: {
           id: pluginId,
           key: preferenceKey,
-          value: typeof preference === "string" ? preference : JSON.stringify(preference),
+          value: preference,
         },
       }),
     );

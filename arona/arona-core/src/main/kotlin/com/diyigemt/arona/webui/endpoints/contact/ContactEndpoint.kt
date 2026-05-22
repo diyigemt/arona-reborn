@@ -35,37 +35,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import org.bson.Document
-
-/**
- * 递归在 JSON 树里寻找名为 `config` 的子对象, 把 `config.<ns>.<key>` 的 JsonObject 叶子转回
- * `JsonPrimitive(json string)`. 任意其它字段透明递归.
- *
- * 仅供 `/contact?id=` endpoint 在批 4 切结构化 wire 前临时兼容前端 `jsonParse(leaf)` 期望.
- * 批 4 完成后整个函数与对应调用点一同删除.
- */
-internal fun downgradePluginConfigLeaves(element: JsonElement): JsonElement = when (element) {
-  is JsonObject -> JsonObject(
-    element.mapValues { (key, value) ->
-      if (key == "config" && value is JsonObject) {
-        JsonObject(
-          value.mapValues { (_, inner) ->
-            if (inner !is JsonObject) inner
-            else JsonObject(inner.mapValues { (_, leaf) -> JsonPrimitive(leaf.toString()) })
-          },
-        )
-      } else {
-        downgradePluginConfigLeaves(value)
-      }
-    },
-  )
-  is JsonArray -> JsonArray(element.map { downgradePluginConfigLeaves(it) })
-  else -> element
-}
 
 @Serializable
 internal data class IdBody(
@@ -160,20 +130,12 @@ internal object ContactEndpoint {
     ContactDocument.findVisibleToUser(aronaUser.id)
 
   /**
-   * 根据id获取一个contact的所有信息(仅管理员
-   *
-   * 批 4 切结构化 wire 前临时层: ContactDocument.config / members[].config 的叶子类型已经
-   * 是 JsonObject, 但前端 PluginPreferenceForm.vue 当前还在 jsonParse(leaf), 期望叶子是 JSON
-   * 文本. 这里递归把 config 的叶子 downgrade 回字符串, 等批 4 同步前端后整段函数恢复成
-   * `success(contact)`.
+   * 根据id获取一个contact的所有信息(仅管理员).
+   * config 字段的叶子已是结构化 JsonObject, 由 Ktor 序列化器原生编码, 前端无需再 jsonParse.
    */
   @AronaBackendEndpointGet("/contact")
   suspend fun ApplicationCall.contact() {
-    success(
-      downgradePluginConfigLeaves(
-        JsonIgnoreUnknownKeys.encodeToJsonElement(ContactDocument.serializer(), contact),
-      ),
-    )
+    success(contact)
   }
 
   private fun ContactMember.toSimply() = UserContactMemberDocument(id, name, roles)
@@ -458,10 +420,12 @@ internal object ContactEndpoint {
     val pid = request.queryParameters["pid"] ?: return badRequest()
     val key = request.queryParameters["key"] ?: return badRequest()
     val member = contact.findContactMemberOrNull(aronaUser.id) ?: return internalServerError()
-    member.readPluginConfigStringOrNull(pid, key)?.also {
+    member.readPluginConfigRawOrNull(pid, key)?.also {
       return success(it)
     }
-    return success("")
+    // 与 PluginPreferenceEndpoint.getPreference 对齐: 无数据时 data=null, 前端按"无内容"处理.
+    // 历史上回的是空串 "", 前端拿到也会走默认 form 分支, 新接口去掉这个 ad-hoc 哨兵.
+    return success()
   }
 
   /**

@@ -8,6 +8,7 @@ import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder.DataSafetyResult
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -226,7 +227,7 @@ class PluginWebuiConfigRecorderTest {
   fun `checkDataSafety 收到 alias key 时返回主 key`() {
     val owner = freshOwner()
     PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
-    val resp = PluginPreferenceResp(id = namespaceOf(owner), key = "config_v1", value = "{}")
+    val resp = PluginPreferenceResp(id = namespaceOf(owner), key = "config_v1", value = JsonObject(emptyMap()))
     val result = PluginWebuiConfigRecorder.checkDataSafety(resp)
     val ok = assertIs<DataSafetyResult.Ok>(result)
     assertEquals("config_v2", ok.canonicalKey, "alias 入参必须 canonical 化为 primary")
@@ -236,7 +237,7 @@ class PluginWebuiConfigRecorderTest {
   fun `checkDataSafety 收到主 key 时 canonicalKey 保持不变`() {
     val owner = freshOwner()
     PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
-    val resp = PluginPreferenceResp(id = namespaceOf(owner), key = "config_v2", value = "{}")
+    val resp = PluginPreferenceResp(id = namespaceOf(owner), key = "config_v2", value = JsonObject(emptyMap()))
     val result = PluginWebuiConfigRecorder.checkDataSafety(resp)
     val ok = assertIs<DataSafetyResult.Ok>(result)
     assertEquals("config_v2", ok.canonicalKey)
@@ -246,7 +247,7 @@ class PluginWebuiConfigRecorderTest {
   fun `checkDataSafety 收到未注册 key 时返回 Err`() {
     val owner = freshOwner()
     PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
-    val resp = PluginPreferenceResp(id = namespaceOf(owner), key = "ghost", value = "{}")
+    val resp = PluginPreferenceResp(id = namespaceOf(owner), key = "ghost", value = JsonObject(emptyMap()))
     assertIs<DataSafetyResult.Err>(PluginWebuiConfigRecorder.checkDataSafety(resp))
   }
 

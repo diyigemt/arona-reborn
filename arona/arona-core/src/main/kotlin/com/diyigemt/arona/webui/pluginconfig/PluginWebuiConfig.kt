@@ -168,22 +168,27 @@ object PluginWebuiConfigRecorder {
       ?: return DataSafetyResult.Err("配置不存在或未注册: ${obj.id}/${obj.key}")
     val serializer = matched.entry.serializer
     return runCatching {
-      val decoded = JsonIgnoreUnknownKeys.decodeFromString(serializer, obj.value) as PluginWebuiConfig
+      // wire DTO 已是结构化 JsonObject, 直接 decodeFromJsonElement, 不再绕 string.
+      val decoded = JsonIgnoreUnknownKeys
+        .decodeFromJsonElement(serializer, obj.value) as PluginWebuiConfig
       when (val checkResult = decoded.check()) {
         is PluginConfigCheckResult.PluginConfigCheckReject ->
           return DataSafetyResult.Err(checkResult.message, checkResult.fieldErrors)
         is PluginConfigCheckResult.PluginConfigCheckAccept -> Unit
       }
-      val json = JsonIgnoreUnknownKeys.encodeToString(serializer as KSerializer<PluginWebuiConfig>, decoded)
-      // element 与 prepare 层一致: 单一权威源是 json, element 派生. 安全扫描在派生时一并完成,
+      // 单一权威源: serializer roundtrip 后的归一化 JsonObject. element 直接落 Mongo BSON Document,
+      // json 文本仅用于 audit / 日志, 由 element.toString() 派生, 不会二次分裂. 安全扫描在派生后立即做,
       // 失败转 Err 让 endpoint 直接 400, 不会污染 Mongo.
       val element = try {
-        JsonIgnoreUnknownKeys.parseToJsonElement(json).jsonObject.also { requireSafeBsonLeafKeys(it) }
+        JsonIgnoreUnknownKeys.encodeToJsonElement(
+          serializer as KSerializer<PluginWebuiConfig>,
+          decoded,
+        ).jsonObject.also { requireSafeBsonLeafKeys(it) }
       } catch (e: IllegalArgumentException) {
         return DataSafetyResult.Err(e.message ?: "配置字段名不安全")
       }
       DataSafetyResult.Ok(
-        json = json,
+        json = element.toString(),
         canonicalKey = matched.primaryKey,
         element = element,
       )

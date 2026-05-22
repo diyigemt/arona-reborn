@@ -1,7 +1,7 @@
 export interface PluginPreference {
   id: string; // 插件id
   key: string; // 配置文件名
-  value: string; // 配置文件json序列化后的值
+  value: Record<string, unknown>; // 配置 JSON 对象, 与后端 BSON 子文档结构一一对应
 }
 
 type PluginPreferences = Record<string, PluginPreference>;

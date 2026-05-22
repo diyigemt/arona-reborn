@@ -19,7 +19,8 @@ export interface Contact {
   roles: ContactRole[];
   members: ContactMember[];
   registerTime?: string;
-  config?: Record<string, Record<string, string>>;
+  // pluginNs -> configKey -> 配置 JSON 对象; 后端已是结构化叶子, 不再做 JSON.stringify
+  config?: Record<string, Record<string, Record<string, unknown>>>;
 }
 export interface EditableContactRole extends ContactRole {
   edit: boolean;

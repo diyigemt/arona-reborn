@@ -162,15 +162,14 @@ abstract class PluginVisibleData {
   }
 
   /**
-   * 把 leaf 序列化回 JSON 文本. 仅 endpoint 在批 4 切到结构化 wire 前继续用; 命令侧应当走
-   * typed `readPluginConfig*` 而不是再绕一遍字符串.
+   * 暴露给 wire 层的"取原始 JsonObject"读出口. endpoint 直接把它丢给 Ktor 序列化即可,
+   * 等价于"已 decode 出 T 后再 encodeToJsonElement"但少一次 roundtrip.
+   *
+   * 命令侧不应调用本方法, 应当走 typed [readPluginConfig] / [readPluginConfigOrNull] /
+   * [readPluginConfigOrDefault] 以获得编译期类型保证. 本方法只暴露给 HTTP endpoint 透传裸数据.
    */
-  fun readPluginConfigString(pluginId: String, key: String): String =
-    lookupRaw(pluginId, key)?.let { JsonIgnoreUnknownKeys.encodeToString(it) }
-      ?: error("plugin config $pluginId/$key not found")
-
-  fun readPluginConfigStringOrNull(pluginId: String, key: String): String? =
-    lookupRaw(pluginId, key)?.let { JsonIgnoreUnknownKeys.encodeToString(it) }
+  fun readPluginConfigRawOrNull(pluginId: String, key: String): JsonObject? =
+    lookupRaw(pluginId, key)
 
   /**
    * 先查传入 key; 没命中时按注册表声明的同组 key (主 key + 其它 aliases) 挨个回查,
@@ -259,14 +258,12 @@ internal data class UserDocument(
   }
 
   /**
-   * endpoint `/plugin/preference?id=` 的"取一插件全部配置"出口, 批 4 切结构化 wire 前继续以
-   * JSON 文本回前端; leaf JsonObject 在这里按需 encodeToString.
+   * endpoint `/plugin/preference?id=` 的"取一插件全部配置"出口: 直接返回某 namespace 下的
+   * `key -> JsonObject` 子树, 由 Ktor 序列化器原生编码为 JSON 对象. 不存在时返回 null,
+   * 由 endpoint 自行决定 fallthrough 语义.
    */
-  internal fun readAllConfig(pluginId: String): Map<String, String>? {
-    return config[pluginId.toMongodbKey()]?.mapValues { (_, value) ->
-      JsonIgnoreUnknownKeys.encodeToString(value)
-    }
-  }
+  internal fun readAllConfig(pluginId: String): Map<String, JsonObject>? =
+    config[pluginId.toMongodbKey()]
 
   override suspend fun updatePluginConfig(
     pluginId: String,

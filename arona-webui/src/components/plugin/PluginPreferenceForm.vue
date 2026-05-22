@@ -76,11 +76,29 @@ interface ImportForm {
 }
 const importForm = ref<ImportForm>({ source: "contact", id: "" });
 const formEl = ref<{ resetFields(): void }>();
-let cacheProfileData: string;
-const cacheMemberProfileData: { [key: string]: string } = {};
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function jsonParse(text: string): any {
-  return props.dataProcessor(JSON.parse(text));
+// 后端 wire 已切结构化 JsonObject, 缓存改为对象副本而非字符串. 字符串时代是后端把对象 JSON.stringify
+// 进 wire / 前端再 JSON.parse 兜出来, 缓存只能存字符串. 现在直接存对象, 避免反复 parse/stringify.
+let cacheProfileData: Record<string, unknown> | undefined;
+const cacheMemberProfileData: Record<string, Record<string, unknown>> = {};
+
+// 深拷贝快照: 表单 v-model 直接写到响应式对象上, 若 cache 持有同引用则下一次"取消编辑"会拿到已脏数据.
+// 配置 JSON 不会含 undefined / 函数 / 循环, 用 JSON 深拷贝最朴素够用.
+function cloneConfig(data: object): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(data)) as Record<string, unknown>;
+}
+
+// "无数据" 判定: null / undefined / 空对象都视为没有持久化, 走 defaultForm. 历史用 "" / "{}" 哨兵已下线.
+function hasConfigData(
+  data: Record<string, unknown> | null | undefined,
+): data is Record<string, unknown> {
+  return data != null && typeof data === "object" && Object.keys(data).length > 0;
+}
+
+// 字符串时代 form / cache 都是字符串, 天然 immutable; 切对象 wire 后, fetch 出的对象若直接进 cache
+// 再 emit 给父表单, v-model 的原地 mutate 会反向污染 cache. 入 cache 时存独立快照, emit 时给 form
+// 独立副本, 双方互不污染.
+function emitForm(data: object) {
+  emits("update:form", props.dataProcessor(cloneConfig(data)));
 }
 const updateTrigger = computed(() => [editType.value.type, editType.value.id]);
 provide("updateTrigger", updateTrigger);
@@ -91,26 +109,27 @@ watch(
       case "contact": {
         if (prv === "manage-contact") {
           const { id } = editType.value;
-          if (cacheMemberProfileData[id]) {
-            emits("update:form", jsonParse(cacheMemberProfileData[id]));
+          const cached = cacheMemberProfileData[id];
+          if (cached) {
+            emitForm(cached);
           } else {
             ContactApi.fetchMemberPluginPreference(id, props.pId, props.pKey).then((data) => {
-              if (data) {
-                cacheMemberProfileData[id] = data;
+              if (hasConfigData(data)) {
+                cacheMemberProfileData[id] = cloneConfig(data);
               }
-              emits("update:form", data ? jsonParse(data) : props.defaultForm);
+              emitForm(hasConfigData(data) ? data : props.defaultForm);
             });
           }
         }
         break;
       }
       case "manage-contact": {
-        const tmp = contact.value?.config?.[props.pId];
-        emits("update:form", tmp && tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
+        const leaf = contact.value?.config?.[props.pId]?.[props.pKey];
+        emitForm(hasConfigData(leaf) ? leaf : props.defaultForm);
         break;
       }
       case "user": {
-        emits("update:form", jsonParse(cacheProfileData));
+        emitForm(cacheProfileData ?? props.defaultForm);
         break;
       }
       default: {
@@ -123,19 +142,20 @@ watch(
   () => editType.value.id,
   (cur) => {
     if (editType.value.type === "contact") {
-      if (cacheMemberProfileData[cur]) {
-        emits("update:form", jsonParse(cacheMemberProfileData[cur]));
+      const cached = cacheMemberProfileData[cur];
+      if (cached) {
+        emitForm(cached);
       } else {
         ContactApi.fetchMemberPluginPreference(cur, props.pId, props.pKey).then((data) => {
-          if (data && data !== "" && data !== "{}") {
-            cacheMemberProfileData[cur] = data;
+          if (hasConfigData(data)) {
+            cacheMemberProfileData[cur] = cloneConfig(data);
           }
-          emits("update:form", data ? jsonParse(data) : props.defaultForm);
+          emitForm(hasConfigData(data) ? data : props.defaultForm);
         });
       }
     } else if (editType.value.type === "manage-contact") {
-      const tmp = contact.value?.config?.[props.pId];
-      emits("update:form", tmp && tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
+      const leaf = contact.value?.config?.[props.pId]?.[props.pKey];
+      emitForm(hasConfigData(leaf) ? leaf : props.defaultForm);
     }
   },
 );
@@ -150,7 +170,7 @@ function onConfirm() {
     case "contact": {
       ContactApi.updateMemberPluginPreference(editType.value.id, props.pId, props.pKey, data)
         .then(() => {
-          cacheMemberProfileData[editType.value.id] = JSON.stringify(props.form);
+          cacheMemberProfileData[editType.value.id] = cloneConfig(props.form);
           successMessage("保存成功");
         })
         .catch(reportSaveError);
@@ -159,7 +179,7 @@ function onConfirm() {
     case "user": {
       PluginPreferenceApi.updatePluginPreference(props.pId, props.pKey, data)
         .then(() => {
-          cacheProfileData = JSON.stringify(props.form);
+          cacheProfileData = cloneConfig(props.form);
           successMessage("保存成功");
         })
         .catch(reportSaveError);
@@ -170,7 +190,7 @@ function onConfirm() {
         .then(() => {
           const tmp = contact.value?.config?.[props.pId];
           if (tmp) {
-            tmp[props.pKey] = JSON.stringify(props.form);
+            tmp[props.pKey] = cloneConfig(props.form);
           }
           successMessage("保存成功");
         })
@@ -189,21 +209,22 @@ function onConfirmImport() {
   IWarningConfirm("警告", "已有内容将会被覆盖, 是否继续?").then(() => {
     const { id, source } = importForm.value;
     if (source === "user") {
-      emits("update:form", jsonParse(cacheProfileData));
+      emitForm(cacheProfileData ?? props.defaultForm);
     } else if (source === "contact") {
-      if (cacheMemberProfileData[id]) {
-        emits("update:form", jsonParse(cacheMemberProfileData[id]));
+      const cached = cacheMemberProfileData[id];
+      if (cached) {
+        emitForm(cached);
       } else {
         ContactApi.fetchMemberPluginPreference(id, props.pId, props.pKey).then((data) => {
-          cacheMemberProfileData[id] = data;
-          emits("update:form", data ? jsonParse(data) : props.defaultForm);
+          if (hasConfigData(data)) {
+            cacheMemberProfileData[id] = cloneConfig(data);
+          }
+          emitForm(hasConfigData(data) ? data : props.defaultForm);
         });
       }
     } else {
-      const tmp = contact.value?.config?.[props.pId];
-      if (tmp) {
-        emits("update:form", tmp[props.pKey] ? jsonParse(tmp[props.pKey]) : props.defaultForm);
-      }
+      const leaf = contact.value?.config?.[props.pId]?.[props.pKey];
+      emitForm(hasConfigData(leaf) ? leaf : props.defaultForm);
     }
   });
 }
@@ -212,11 +233,12 @@ onMounted(() => {
     contacts.value = data;
   });
   PluginPreferenceApi.fetchPluginPreference(props.pId, props.pKey).then((data) => {
-    if (data && data !== "" && data !== "{}") {
-      cacheProfileData = data;
-      emits("update:form", jsonParse(data));
+    if (hasConfigData(data)) {
+      cacheProfileData = cloneConfig(data);
+      emitForm(data);
     } else {
-      cacheProfileData = JSON.stringify(props.defaultForm);
+      // 没持久化过, 缓存一份 defaultForm 的快照, 之后跨 type 切换时 "user" 分支能直接用上.
+      cacheProfileData = cloneConfig(props.defaultForm);
     }
   });
 });

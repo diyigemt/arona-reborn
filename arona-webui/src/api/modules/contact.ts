@@ -146,7 +146,7 @@ export const ContactApi = {
       }),
     );
   },
-  updatePluginPreference(cid: string, pid: string, pKey: string, preference: string | object) {
+  updatePluginPreference(cid: string, pid: string, pKey: string, preference: Record<string, unknown>) {
     return simplifiedApiService(
       service.raw<void>({
         url: `/contact/${cid}/plugin/preference`,
@@ -154,14 +154,14 @@ export const ContactApi = {
         data: {
           id: pid,
           key: pKey,
-          value: typeof preference === "string" ? preference : JSON.stringify(preference),
+          value: preference,
         },
       }),
     );
   },
   fetchMemberPluginPreference(cid: string, pid: string, pKey: string) {
     return simplifiedApiService(
-      service.raw<string>({
+      service.raw<Record<string, unknown> | null>({
         url: `/contact/${cid}/member/plugin/member-preference`,
         method: "GET",
         params: {
@@ -171,7 +171,7 @@ export const ContactApi = {
       }),
     );
   },
-  updateMemberPluginPreference(cid: string, pid: string, pKey: string, preference: string | object) {
+  updateMemberPluginPreference(cid: string, pid: string, pKey: string, preference: Record<string, unknown>) {
     return simplifiedApiService(
       service.raw<void>({
         url: `/contact/${cid}/member/plugin/member-preference`,
@@ -179,7 +179,7 @@ export const ContactApi = {
         data: {
           id: pid,
           key: pKey,
-          value: typeof preference === "string" ? preference : JSON.stringify(preference),
+          value: preference,
         },
       }),
     );

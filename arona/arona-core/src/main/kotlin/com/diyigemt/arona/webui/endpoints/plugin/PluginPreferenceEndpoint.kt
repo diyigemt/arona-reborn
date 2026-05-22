@@ -15,6 +15,7 @@ import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder.DataSafet
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /** 业务错误响应携带的字段级错误负载, 包装一层让前端 extractFieldErrors 能用对象 schema 识别. */
 @Serializable
@@ -23,11 +24,15 @@ data class FieldErrorPayload(val fieldErrors: List<FieldError>)
 internal fun List<FieldError>.toPayloadOrNull(): FieldErrorPayload? =
   takeIf { it.isNotEmpty() }?.let(::FieldErrorPayload)
 
+/**
+ * 插件配置的 wire DTO. `value` 是结构化 JsonObject, 与 Mongo 内 BSON Document 形态一一对应;
+ * 不再做"前端 JSON.stringify / 后端 parseToJsonElement"那层多余的字符串转换.
+ */
 @Serializable
 data class PluginPreferenceResp(
   val id: String,
   val key: String,
-  val value: String,
+  val value: JsonObject,
 )
 
 internal data class PreferenceQuery(val id: String, val key: String?)
@@ -52,9 +57,9 @@ object PluginPreferenceEndpoint {
       request.queryParameters["key"],
     ) ?: return badRequest()
     if (query.key != null) {
-      // 走 readPluginConfigStringOrNull 以经过 PluginVisibleData 的 alias 回查,
+      // 走 readPluginConfigRawOrNull 拿原始 JsonObject, 内部会经过 PluginVisibleData 的 alias 回查,
       // 兼容 @PluginConfigId 引入前用 simpleName 存的旧数据.
-      aronaUser.readPluginConfigStringOrNull(query.id, query.key)?.also { return success(it) }
+      aronaUser.readPluginConfigRawOrNull(query.id, query.key)?.also { return success(it) }
       return success()
     }
     aronaUser.readAllConfig(query.id)?.also { return success(it) }

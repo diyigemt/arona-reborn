@@ -162,17 +162,27 @@ interface UserCommandSender : CommandSender {
     suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.readUserPluginConfig(plugin: CommandOwner) =
       contactMember().readPluginConfigOrNull<T>(plugin) ?: userDocument().readPluginConfig<T>(plugin)
 
+    /**
+     * 写入用户级配置. [audit] 透传至 [preparePluginConfigWrite],
+     * 默认 true 与 endpoint 同款; 写入纯机器派生状态 (如抽卡计数) 的热路径可显式传 false
+     * 跳过审核以规避 3s 超时叠加到响应延迟.
+     */
     suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.updateUserPluginConfig(
       plugin: CommandOwner,
-      value: T
+      value: T,
+      audit: Boolean = true,
     ) =
-      userDocument().updatePluginConfig<T>(plugin, value)
+      userDocument().updatePluginConfig<T>(plugin, value, audit = audit)
 
+    /**
+     * 写入群级配置. 语义同 [updateUserPluginConfig], 差别在落库目标是 contact 文档.
+     */
     suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.updateContactPluginConfig(
       plugin: CommandOwner,
-      value: T
+      value: T,
+      audit: Boolean = true,
     ) =
-      contactDocument().updatePluginConfig<T>(plugin, value)
+      contactDocument().updatePluginConfig<T>(plugin, value, audit = audit)
 
   }
 }

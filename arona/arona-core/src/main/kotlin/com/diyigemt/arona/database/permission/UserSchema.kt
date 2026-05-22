@@ -10,6 +10,7 @@ import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.name
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
+import com.diyigemt.arona.webui.pluginconfig.preparePluginConfigWrite
 import com.diyigemt.arona.webui.pluginconfig.resolveConfigKey
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
@@ -180,19 +181,29 @@ abstract class PluginUserDocument : PluginVisibleData() {
   abstract val qq: Long
   abstract val username: String
 
-  /** 写入用户级插件配置. 仅持久化主 key, 不回写 alias 数据. */
+  /**
+   * 写入用户级插件配置. 仅持久化主 key, 不回写 alias 数据.
+   * 该 raw 写入不做 check/audit/canonical, 仅供 endpoint 在自己 prepare 之后落库使用;
+   * 业务代码请走带类型参数的 inline 重载, 它会经过 [preparePluginConfigWrite] 的完整守卫.
+   */
   abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
 
+  /**
+   * 命令侧 typed 写入入口: 经过 [preparePluginConfigWrite] 后再落库.
+   * - [audit] 默认 true, 与 endpoint 同款; 写入纯机器派生状态 (计数/开关) 的热路径可显式 false 跳过 3s 审核超时
+   * - 失败抛 [com.diyigemt.arona.webui.pluginconfig.PluginConfigWriteRejectedException]
+   */
   @OptIn(InternalSerializationApi::class)
   suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(
     plugin: CommandOwner,
     value: T,
     key: String = resolveConfigKey(T::class.serializer()),
-  ) = updatePluginConfig(
-    plugin.permission.id.nameSpace.toMongodbKey(),
-    key,
-    JsonIgnoreUnknownKeys.encodeToString(T::class.serializer(), value),
-  )
+    audit: Boolean = true,
+  ) {
+    val ns = plugin.permission.id.nameSpace.toMongodbKey()
+    val prepared = preparePluginConfigWrite(ns, key, value, T::class.serializer(), audit = audit)
+    updatePluginConfig(ns, prepared.canonicalKey, prepared.json)
+  }
 
   suspend fun updateUsername(name: String) {
     UserDocument.withCollection<MongoUserDocument, UpdateResult> {
@@ -205,6 +216,7 @@ abstract class PluginUserDocument : PluginVisibleData() {
 }
 
 interface ExposedUserDocument {
+  // 稀疏 Map: 仅包含 Mongo 中存在 UserDocument 的 id, 缺失条目不出现在结果中.
   suspend fun querySimplifiedUser(ids: List<String>): Map<String, SimplifiedUserDocument>
 }
 
@@ -287,9 +299,7 @@ internal data class UserDocument(
           )
         ).toList()
       }
-      return ids.associateWith { id ->
-        res.first { s -> s.id == id }.toDomain()
-      }
+      return res.associate { it.id to it.toDomain() }
     }
   }
 }

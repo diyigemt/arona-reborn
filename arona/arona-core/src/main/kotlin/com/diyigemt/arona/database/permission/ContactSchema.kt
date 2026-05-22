@@ -18,8 +18,8 @@ import com.diyigemt.arona.utils.currentDateTime
 import com.diyigemt.arona.utils.uuid
 import com.diyigemt.arona.webui.endpoints.aronaUser
 import com.diyigemt.arona.command.CommandOwner
-import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import com.diyigemt.arona.webui.pluginconfig.preparePluginConfigWrite
 import com.diyigemt.arona.webui.pluginconfig.resolveConfigKey
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.serializer
@@ -55,19 +55,29 @@ abstract class PluginContactDocument : PluginVisibleData() {
   fun findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
   fun findContactMember(memberId: String) = members.first { it.id == memberId }
 
-  /** 写入群级插件配置. 仅持久化主 key, 不回写 alias 数据. */
+  /**
+   * 写入群级插件配置. 仅持久化主 key, 不回写 alias 数据.
+   * 该 raw 写入不做 check/audit/canonical, 仅供 endpoint 在自己 prepare 之后落库使用;
+   * 业务代码请走带类型参数的 inline 重载, 它会经过 [preparePluginConfigWrite] 的完整守卫.
+   */
   abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
 
+  /**
+   * 命令侧 typed 写入入口: 经过 [preparePluginConfigWrite] 后再落库.
+   * - [audit] 默认 true, 与 endpoint 同款; 写入纯机器派生状态 (计数/开关) 的热路径可显式 false 跳过 3s 审核超时
+   * - 失败抛 [com.diyigemt.arona.webui.pluginconfig.PluginConfigWriteRejectedException]
+   */
   @OptIn(InternalSerializationApi::class)
   suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(
     plugin: CommandOwner,
     value: T,
     key: String = resolveConfigKey(T::class.serializer()),
-  ) = updatePluginConfig(
-    plugin.permission.id.nameSpace.toMongodbKey(),
-    key,
-    JsonIgnoreUnknownKeys.encodeToString(T::class.serializer(), value),
-  )
+    audit: Boolean = true,
+  ) {
+    val ns = plugin.permission.id.nameSpace.toMongodbKey()
+    val prepared = preparePluginConfigWrite(ns, key, value, T::class.serializer(), audit = audit)
+    updatePluginConfig(ns, prepared.canonicalKey, prepared.json)
+  }
 }
 
 abstract class PluginContactMember : PluginVisibleData() {

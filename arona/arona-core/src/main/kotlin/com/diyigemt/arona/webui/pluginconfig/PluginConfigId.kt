@@ -1,5 +1,9 @@
 package com.diyigemt.arona.webui.pluginconfig
 
+import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
+import com.diyigemt.arona.webui.event.ContentAuditEvent
+import com.diyigemt.arona.webui.event.auditOrAllow
+import com.diyigemt.arona.webui.event.isBlock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialInfo
@@ -55,3 +59,97 @@ internal fun resolveConfigAliases(serializer: KSerializer<*>): List<String> =
     ?.aliases
     ?.asList()
     ?: emptyList()
+
+/**
+ * 命令侧/endpoint 走 [preparePluginConfigWrite] 失败时抛出.
+ * 用 [Kind] 区分原因, 让命令框架或 endpoint 能机器可读地映射到日志/错误码,
+ * 而不是再去解 message 字符串.
+ */
+class PluginConfigWriteRejectedException(
+  val kind: Kind,
+  override val message: String,
+  val fieldErrors: List<FieldError> = emptyList(),
+) : IllegalStateException(message) {
+  enum class Kind {
+    /** 用户提供的 key 含禁字符 / 空白. */
+    InvalidKey,
+    /** [PluginWebuiConfig.check] 主动 reject. */
+    CheckRejected,
+    /** 内容审核命中. */
+    AuditBlocked,
+  }
+}
+
+/** [preparePluginConfigWrite] 的产出: 已 canonical 化、可直接落库的 (key, json). */
+data class PreparedPluginConfigWrite(
+  val canonicalKey: String,
+  val json: String,
+)
+
+/**
+ * 命令侧 inline `updatePluginConfig<T>` 与 endpoint POST 的共同写入准备层.
+ *
+ * 旧实现里命令侧只做 `encodeToString` 后直接 Mongo `$set`, 完全绕过 webui 那边的
+ * `check / audit / canonical` 三道关. 本函数把这三件事 + Mongo path 安全校验集中:
+ *
+ *   1. [PluginWebuiConfigRecorder.requireSafeRuntimeKey] 拦下含 `.` / `$` / 空白的 key
+ *      (注册期校验对未注册 fallthrough 的 key 不生效, 必须在写时再补一道)
+ *   2. [PluginWebuiConfig.check] reject → [PluginConfigWriteRejectedException.Kind.CheckRejected]
+ *   3. canonical 化: 注册了就归一到主 key; 未注册则保持原 key 落库 (反射注册不是绝对契约,
+ *      也允许插件自由 key 重载)
+ *   4. [audit]=true 时跑 [auditOrAllow], 命中拦截 → [PluginConfigWriteRejectedException.Kind.AuditBlocked].
+ *      命中 fail-open 语义: timeout/异常 (`ev == null`) 不拒绝, 与 endpoint 写路径同款.
+ *
+ * 命令侧热路径 (如 GachaCommand 抽卡计数) 写的多半是机器派生状态, 调用方可以传 `audit=false`
+ * 规避 3s audit 超时叠加到响应延迟. endpoint 仍默认 audit=true 强制审核.
+ *
+ * 失败语义用异常: 命令侧调用栈天然走异常通道, 改 sealed result 会对所有调用站点造成 churn 且
+ * 容易被忽略; endpoint 端可以 catch 转 [com.diyigemt.arona.utils.errorMessage].
+ *
+ * [auditor] 与 [auditOrAllow] 的 `auditor` 形参语义一致, 仅供测试注入故障/拦截行为.
+ *
+ * `@PublishedApi internal` 是因为这函数会被命令侧 inline 入口跨模块展开, 必须在外部模块可访问.
+ */
+@PublishedApi
+internal suspend fun <T : PluginWebuiConfig> preparePluginConfigWrite(
+  pluginNamespace: String,
+  rawKey: String,
+  value: T,
+  serializer: KSerializer<T>,
+  audit: Boolean = true,
+  auditor: (suspend (ContentAuditEvent) -> ContentAuditEvent)? = null,
+): PreparedPluginConfigWrite {
+  try {
+    PluginWebuiConfigRecorder.requireSafeRuntimeKey(rawKey)
+  } catch (e: IllegalArgumentException) {
+    throw PluginConfigWriteRejectedException(
+      kind = PluginConfigWriteRejectedException.Kind.InvalidKey,
+      message = e.message ?: "invalid plugin config key",
+    )
+  }
+
+  when (val checkResult = value.check()) {
+    is PluginConfigCheckResult.PluginConfigCheckReject ->
+      throw PluginConfigWriteRejectedException(
+        kind = PluginConfigWriteRejectedException.Kind.CheckRejected,
+        message = checkResult.message,
+        fieldErrors = checkResult.fieldErrors,
+      )
+    is PluginConfigCheckResult.PluginConfigCheckAccept -> Unit
+  }
+
+  val json = JsonIgnoreUnknownKeys.encodeToString(serializer, value)
+  val canonicalKey = PluginWebuiConfigRecorder.canonicalKeyOf(pluginNamespace, rawKey) ?: rawKey
+
+  if (audit) {
+    val ev = if (auditor != null) auditOrAllow(json, auditor = auditor) else auditOrAllow(json)
+    if (ev?.isBlock == true) {
+      throw PluginConfigWriteRejectedException(
+        kind = PluginConfigWriteRejectedException.Kind.AuditBlocked,
+        message = "内容审核拒绝: ${ev.message}",
+      )
+    }
+  }
+
+  return PreparedPluginConfigWrite(canonicalKey, json)
+}

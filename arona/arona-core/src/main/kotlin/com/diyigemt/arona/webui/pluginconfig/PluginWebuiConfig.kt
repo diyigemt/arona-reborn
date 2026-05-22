@@ -74,6 +74,27 @@ object PluginWebuiConfigRecorder {
   /** 注册时禁止出现在 primary key / alias 中的字符. `.` 与 Mongo dot-path 冲突, `$` 是字段操作符前缀. */
   private val FORBIDDEN_KEY_CHARS = listOf('.', '$')
 
+  /**
+   * 命令侧 inline 写入路径会用插件传入的任意 `key` 拼 Mongo dot-path; 未走注册期校验也得拦下含
+   * `.` / `$` / 空白的 key, 否则等同于把"注册期 fail-fast"绕过.
+   * 与 [validateConfigKey] 共用 [FORBIDDEN_KEY_CHARS], 入参检查规则强同源.
+   * 由 prepare 层调用, 失败抛 [IllegalArgumentException], prepare 转成 InvalidKey 异常.
+   */
+  internal fun requireSafeRuntimeKey(key: String) {
+    require(key.isNotBlank()) { "plugin config key is blank" }
+    val forbidden = FORBIDDEN_KEY_CHARS.firstOrNull { it in key }
+    require(forbidden == null) {
+      "plugin config key '$key' contains forbidden character '$forbidden'"
+    }
+  }
+
+  /**
+   * 已注册的话返回主 key (alias 入参也能拿到主 key); 未注册返回 null, 写路径自行 fallthrough.
+   * 注册不是绝对契约 (反射扫描可能漏到, 也允许插件自由 key 重载), 因此不抛.
+   */
+  internal fun canonicalKeyOf(pluginId: String, key: String): String? =
+    findMatched(pluginId, key)?.primaryKey
+
   @OptIn(ExperimentalSerializationApi::class)
   fun register(
     owner: AronaPlugin,

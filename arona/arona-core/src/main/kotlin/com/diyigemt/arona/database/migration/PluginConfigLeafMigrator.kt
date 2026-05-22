@@ -1,7 +1,10 @@
 package com.diyigemt.arona.database.migration
 
+import com.diyigemt.arona.database.toBsonDocument
+import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.currentDateTime
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.mongodb.client.model.Aggregates
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.ReplaceOptions
@@ -11,6 +14,7 @@ import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.json.jsonObject
 import org.bson.BsonArray
 import org.bson.BsonDocument
 import org.bson.BsonInt32
@@ -142,12 +146,22 @@ internal data class MigrationStats(
 /**
  * 纯函数 transform: 返回 null 表示文档无需写回 (无 config 字段, 或所有叶子已是 BsonDocument).
  *
- * - leaf 是 BsonString: 视为遗留 JSON 文本, `BsonDocument.parse(...)` 转 BsonDocument; 解析失败 throw
+ * - leaf 是 BsonString: 视为遗留 JSON 文本, 按标准 JSON 解析为 JsonObject, 跑 leaf-key 安全校验,
+ *   再用 [com.diyigemt.arona.database.toBsonDocument] (与读路径同款映射) 转 BsonDocument.
+ *   不能用 `BsonDocument.parse` — 它是 Mongo Extended JSON parser, 会把内部首字段名命中
+ *   `$date`/`$oid`/`$numberLong`/`$numberDecimal`/`$timestamp`/`$symbol`/`$binary` 等的子对象
+ *   误解析成 BsonDateTime / Decimal128 等非 JSON 兼容 BSON 类型, 之后 [com.diyigemt.arona.database.KotlinxJsonElementCodecProvider]
+ *   读路径拒解, 服务起不来.
  * - leaf 已是 BsonDocument: 保留, 幂等
  * - leaf 是其它类型 (BsonNull / BsonInt32 等): 保留 + stats.unexpectedLeafTypes++ (异常但容忍)
  * - includeMembers=true: 额外递归 `members[]` 数组里的每个 member doc (内部用 includeMembers=false)
  *
  * `stats.scanned` 只在最外层加 1 (members 内部递归不再叠加 scanned, 否则单 Contact 文档会被多次计数).
+ *
+ * 失败语义: 解析非标准 JSON / leaf-key 命中 `.` 或 `$` 前缀 / kotlinx→BSON 写入失败, 一律
+ * `failedLeaves++` 后 throw [IllegalStateException], 由 runOnceIfNeeded 把异常抛回 main, JVM 退出.
+ * 旧数据如含 unsafe leaf-key (新写路径已禁), 必须人工清洗后才能继续迁移 — 否则迁出来的形态
+ * 新写路径会拒, 用户陷入"读得到、改不了"死锁.
  */
 internal fun migrateDocument(
   doc: BsonDocument,
@@ -234,9 +248,11 @@ private fun migrateConfigBranch(config: BsonDocument, stats: MigrationStats, pat
 
 private fun parseLegacyLeaf(raw: String, path: String, stats: MigrationStats): BsonDocument {
   // catch Exception 而不是 Throwable: OOM / CancellationException / StackOverflowError 必须向上抛,
-  // 不能被当成"数据损坏"包装. BsonDocument.parse 失败抛的是普通 Exception 子类.
+  // 不能被当成"数据损坏"包装. kotlinx JSON 解析 / leaf-key 校验 / kotlinx codec 写出都抛普通 Exception 子类.
   return try {
-    BsonDocument.parse(raw)
+    val element = JsonIgnoreUnknownKeys.parseToJsonElement(raw).jsonObject
+    PluginWebuiConfigRecorder.requireSafeBsonLeafKeys(element)
+    element.toBsonDocument()
   } catch (e: Exception) {
     stats.failedLeaves++
     throw IllegalStateException(

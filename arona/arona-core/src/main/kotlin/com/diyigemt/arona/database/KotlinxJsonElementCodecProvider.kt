@@ -6,6 +6,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import org.bson.BsonDocument
+import org.bson.BsonDocumentWriter
 import org.bson.BsonReader
 import org.bson.BsonType
 import org.bson.BsonWriter
@@ -41,6 +43,23 @@ object KotlinxJsonElementCodecProvider : CodecProvider {
   @Suppress("UNCHECKED_CAST")
   override fun <T : Any> get(clazz: Class<T>, registry: CodecRegistry): Codec<T>? =
     if (clazz == JsonElement::class.java) JsonElementCodec as Codec<T> else null
+}
+
+/**
+ * 把 [JsonObject] 用本文件 [JsonElementCodec] 的同一套映射写成一个独立的 [BsonDocument].
+ *
+ * 用于离 codec registry 的场景 —— 典型是数据迁移工具,需要在不经过 `MongoCollection<T>`
+ * 的 Mongo wrapper codec 链时,把"已经过校验的 JsonObject"直接转成 BSON 落库,且保证
+ * 转换规则与运行期写入路径完全一致(否则迁出来的文档可能被新 read 路径拒解).
+ *
+ * 严禁绕过本扩展再写一份 JSON→BSON 映射;若 codec 升级了类型支持,本扩展会自动同步.
+ */
+internal fun JsonObject.toBsonDocument(): BsonDocument {
+  val document = BsonDocument()
+  BsonDocumentWriter(document).use { writer ->
+    JsonElementCodec.encode(writer, this, EncoderContext.builder().build())
+  }
+  return document
 }
 
 private object JsonElementCodec : Codec<JsonElement> {

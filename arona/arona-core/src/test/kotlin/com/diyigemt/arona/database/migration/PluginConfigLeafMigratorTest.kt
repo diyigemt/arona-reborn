@@ -1,5 +1,6 @@
 package com.diyigemt.arona.database.migration
 
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import org.bson.BsonArray
 import org.bson.BsonDocument
 import org.bson.BsonInt32
@@ -72,6 +73,68 @@ class PluginConfigLeafMigratorTest {
     assertTrue(ex.message!!.contains("config.ns.main"), "异常信息要带 leaf path: ${ex.message}")
     assertEquals(1, stats.failedLeaves)
   }
+
+  /**
+   * 防御 mongo java driver `BsonDocument.parse` 的 Extended JSON 行为: 旧版迁移用它解析叶子时,
+   * 嵌套 `{"$date":"..."}` 会被识别成 BsonDateTime 等非 JSON 兼容类型, 之后 KotlinxJsonElementCodecProvider
+   * 读路径直接拒解, 服务崩.
+   *
+   * 切到 kotlinx 解析 + [PluginWebuiConfigRecorder.requireSafeBsonLeafKeys] 后, `$date` 作为字段名
+   * 应当被 leaf-key 校验拦下来, 不再有 Extended JSON 误解析的机会.
+   */
+  @Test
+  fun `legacy leaf containing Extended JSON marker field is rejected without BSON coercion`() {
+    val stats = MigrationStats()
+    val doc = legacyLeafDoc(id = "u1", raw = """{"someField":{"${'$'}date":"2024-01-01T00:00:00Z"}}""")
+
+    val ex = assertFailsWith<IllegalStateException> {
+      migrateDocument(doc, includeMembers = false, stats = stats)
+    }
+
+    assertTrue(ex.message!!.contains("_id=u1"), "异常信息要带 doc _id: ${ex.message}")
+    assertTrue(ex.message!!.contains("config.ns.main"), "异常信息要带 leaf path: ${ex.message}")
+    assertTrue(ex.message!!.contains("starts with forbidden character"), "异常信息要带 unsafe key 原因: ${ex.message}")
+    assertEquals(1, stats.failedLeaves)
+  }
+
+  /** leaf 字段名以 `$` 开头, 命中 [PluginWebuiConfigRecorder.requireSafeBsonLeafKeys]. */
+  @Test
+  fun `legacy leaf with dollar-prefixed key throws fail-fast`() {
+    val stats = MigrationStats()
+    val doc = legacyLeafDoc(id = "u1", raw = """{"${'$'}weird":1}""")
+
+    val ex = assertFailsWith<IllegalStateException> {
+      migrateDocument(doc, includeMembers = false, stats = stats)
+    }
+
+    assertTrue(ex.message!!.contains("_id=u1"))
+    assertTrue(ex.message!!.contains("config.ns.main"))
+    assertTrue(ex.message!!.contains("starts with forbidden character"), ex.message)
+    assertEquals(1, stats.failedLeaves)
+  }
+
+  /** leaf 字段名含 `.`, 命中 [PluginWebuiConfigRecorder.requireSafeBsonLeafKeys]. */
+  @Test
+  fun `legacy leaf with dotted key throws fail-fast`() {
+    val stats = MigrationStats()
+    val doc = legacyLeafDoc(id = "u1", raw = """{"a.b":1}""")
+
+    val ex = assertFailsWith<IllegalStateException> {
+      migrateDocument(doc, includeMembers = false, stats = stats)
+    }
+
+    assertTrue(ex.message!!.contains("_id=u1"))
+    assertTrue(ex.message!!.contains("config.ns.main"))
+    assertTrue(ex.message!!.contains("contains forbidden character '.'"), ex.message)
+    assertEquals(1, stats.failedLeaves)
+  }
+
+  private fun legacyLeafDoc(id: String, raw: String): BsonDocument = BsonDocument()
+    .append("_id", BsonString(id))
+    .append(
+      "config",
+      BsonDocument().append("ns", BsonDocument().append("main", BsonString(raw))),
+    )
 
   @Test
   fun `contact members nested config is migrated through array recursion`() {

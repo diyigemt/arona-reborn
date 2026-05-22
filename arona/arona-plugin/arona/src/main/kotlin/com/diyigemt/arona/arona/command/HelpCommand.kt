@@ -5,7 +5,6 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.BaseConfig
 import com.diyigemt.arona.command.BuildInCommandOwner
 import com.diyigemt.arona.command.CommandManager
-import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.message.*
@@ -30,7 +29,7 @@ private val md by lazy {
 }
 
 private val kb by lazy {
-  tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+  tencentCustomKeyboard {
     row {
       button(1) {
         render {

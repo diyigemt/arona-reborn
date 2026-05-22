@@ -39,7 +39,7 @@ object Arona : AronaPlugin(
             +"欢迎连接「シッテムの箱」，老师。"
             +"使用手册：https://doc.arona.diyigemt.com/v2/manual/command"
           }
-          val kb = tencentCustomKeyboard(it.bot.unionOpenidOrId) {
+          val kb = tencentCustomKeyboard {
             row {
               button(1) {
                 render {

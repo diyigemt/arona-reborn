@@ -891,8 +891,23 @@ class TencentMessageBuilder private constructor(
     eventId = other.eventId ?: eventId
   }
 
+  // 发送期 bot_appid 解析: 仅当 keyboard 自身未显式设置时, 用当前发送 bot 的 appId 构造副本.
+  //  - 不就地写回 content.botAppid: 顶层 `private val kb by lazy { tencentCustomKeyboard { ... } }` 模板
+  //    可能被多个 bot 复用, 首次发送回填会让后续 bot 误用前一个 bot 的 appId.
+  //  - 仅处理 TencentCustomKeyboard: TencentTempleKeyboard 没有 bot_appid 字段.
+  //  - data class 的 copy 是浅拷贝, rows 列表会共享; 发送路径单次消费, 不存在并发改 rows 的风险.
+  private fun TencentKeyboard.resolveBotAppIdForSend(botAppId: String?): TencentKeyboard {
+    if (this !is TencentCustomKeyboard) return this
+    if (!content.botAppid.isNullOrEmpty()) return this
+    if (botAppId.isNullOrEmpty()) return this
+    return copy(content = content.copy(botAppid = botAppId))
+  }
+
   // TODO build其他类型消息
-  fun build(isPrivateChannel: Boolean = false): TencentMessage {
+  // botAppId: 当前发送 bot 的 unionOpenidOrId, 由调用点 (AbstractContact.callMessageOpenApi) 透传.
+  //  - 用于在 wire 阶段把 TencentCustomKeyboard 缺失的 bot_appid 临时补齐, 支持顶层 lazy 模板的多 bot 复用.
+  //  - 兼容旧调用方: 默认值 null 时仅在 keyboard 自身已有 botAppid 的前提下能正常工作 (反向解析路径或单元测试).
+  fun build(isPrivateChannel: Boolean = false, botAppId: String? = null): TencentMessage {
     val content = container
       .filterIsInstance<PlainText>()
       .joinToString("\n") { it.toString() }
@@ -903,7 +918,7 @@ class TencentMessageBuilder private constructor(
         it.content = it.content.replace(lfSimplified, "\n")
       }
     }
-    val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()
+    val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()?.resolveBotAppIdForSend(botAppId)
     if (isPrivateChannel) {
       return TencentGuildMessage(
         content = content,

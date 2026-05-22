@@ -5,7 +5,6 @@ package com.diyigemt.arona.arona.command
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.CommandManager
-import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrNull
@@ -47,7 +46,7 @@ class TotalAssaultCommand : AbstractCommand(
   """.trimIndent()
 ) {
   private val availableButton by lazy {
-    tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+    tencentCustomKeyboard {
       row {
         button("B服", "/总力档线 B服", true)
         button("官服", "/总力档线 官服", true)
@@ -93,7 +92,7 @@ class TotalAssaultExCommand : AbstractCommand(
   """.trimIndent()
 ) {
   private val availableButton by lazy {
-    tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+    tencentCustomKeyboard {
       row {
         button("日服", "/大决战档线 日服", true)
       }

@@ -2,7 +2,6 @@
 
 package com.diyigemt.arona.command
 
-import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.isPrivateChannel
 import com.diyigemt.arona.communication.event.*
@@ -111,7 +110,7 @@ object BuiltInCommands : AutoSavePluginDataHolder {
         +"非管理员不用试了, 点着没反应的"
       }
       private val kb by lazy {
-        tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+        tencentCustomKeyboard {
           row {
             button(1) {
               render {

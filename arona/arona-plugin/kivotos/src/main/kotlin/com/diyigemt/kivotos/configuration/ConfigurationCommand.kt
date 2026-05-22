@@ -3,7 +3,6 @@ package com.diyigemt.kivotos.configuration
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.SubCommand
 import com.diyigemt.arona.command.nextButtonInteraction
-import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.updateUserPluginConfig
@@ -40,7 +39,7 @@ class ConfigurationCommand : AbstractCommand(
 
   companion object {
     private val kb by lazy {
-      tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+      tencentCustomKeyboard {
         row {
           subButton("咖啡厅", "设置 咖啡厅", enter = true)
           subButton("没做,放着好看", "", enter = false)

@@ -70,6 +70,12 @@ annotation class KeyboardDsl
 @Serializable
 data class TencentCustomKeyboard0(
   internal val rows: MutableList<TencentCustomKeyboardRow> = mutableListOf(),
+  // 腾讯 wire 字段: 标识这块 keyboard 属于哪个 bot.
+  //  - 普通构造路径 (无参顶层重载 / CommandSender 扩展) 保持为 null, 在 TencentMessageBuilder.build 里
+  //    用当前发送 bot 的 unionOpenidOrId 临时补齐. 关键不变量: 发送解析路径绝不就地写回, 而是 copy
+  //    出副本写; 否则顶层 lazy 模板被 bot A 首次发送后, bot B 复用时会带上 bot A 的 appId.
+  //  - 显式入口 tencentCustomKeyboard(botAppId, init) 仍允许调用方提前固化 appId, 留给 custom-menu
+  //    这类已经从外部拿到目标 botAppId 的 wire 构造场景.
   @SerialName("bot_appid")
   @EncodeDefault
   var botAppid: String? = null
@@ -131,6 +137,24 @@ fun TencentCustomKeyboardRow.button(id: String, block: TencentKeyboardButton.() 
   buttons.add(
     TencentKeyboardButton(id).also(block)
   )
+}
+
+/**
+ * 构造指令按钮: 立即把 "/[primary] [args]" 落到 action.data, 不引入任何 row/keyboard 级 scope 状态.
+ *
+ * 各插件之前各自 `subButton(label, data, enter)` -> `button(uuid(), label, "/${PrimaryName} $data", enter)`
+ * 的样板, 现在收敛到 arona-core. primary 由调用方显式给出 (通常来自自家 AbstractCommand.primaryName),
+ * 避免把命令注册体系反向耦合到 keyboard DSL.
+ *
+ * 由于 data 在构造期就落实, 后续 [TencentCustomKeyboard.windowed] 重排 row、`+` 合并都不影响已写入的命令文本.
+ */
+fun TencentCustomKeyboardRow.commandButton(
+  primary: String,
+  label: String,
+  args: String = label,
+  enter: Boolean = false,
+) {
+  button(uuid(), label, "/$primary $args", enter)
 }
 
 @KeyboardDsl
@@ -351,10 +375,39 @@ enum class TencentKeyboardButtonRenderDataStyle(val id: Int) {
  * }
  *
  */
-fun tencentCustomKeyboard(botAppId: String, init: TencentCustomKeyboard0.() -> Unit): TencentCustomKeyboard {
-  // TODO id去重 按钮上限
-  return TencentCustomKeyboard(TencentCustomKeyboard0(botAppid = botAppId).also(init))
-}
+/**
+ * 默认构造入口: 不绑 botAppId, 在 [TencentMessageBuilder.build] 阶段按实际发送 bot 临时补齐.
+ *
+ * 适用于:
+ *  - 顶层 `private val foo by lazy { tencentCustomKeyboard { ... } }` 的命令模板, 之前 9 处都靠
+ *    `BotManager.getBot().unionOpenidOrId` 在 bot 注册前后存在抛 `NoSuchElementException` 的时序风险.
+ *  - 同一模板在多 bot 场景被复用: 发送时不会回填 botAppid, 不会污染到后续不同 bot 的发送.
+ */
+fun tencentCustomKeyboard(init: TencentCustomKeyboard0.() -> Unit): TencentCustomKeyboard =
+  buildTencentCustomKeyboard(botAppId = null, init = init)
 
-fun CommandSender.tencentCustomKeyboard(init: TencentCustomKeyboard0.() -> Unit) =
-  tencentCustomKeyboard(bot?.unionOpenidOrId ?: "", init)
+/**
+ * 显式 botAppId 入口: 调用方已经从外部拿到目标 bot 的 appId, 想直接固化进 wire payload.
+ *
+ * 当前主要用于 custom-menu 的 [com.diyigemt.arona.custom.menu.CustomMenuConfig.toCustomKeyboard],
+ * 它从外部 (Contact.bot.unionOpenidOrId) 取到 appId 后构造静态 keyboard. 这条路径绕开发送期 resolve,
+ * 因此调用方自行负责 appId 的正确性 (尤其多 bot 下).
+ */
+fun tencentCustomKeyboard(botAppId: String, init: TencentCustomKeyboard0.() -> Unit): TencentCustomKeyboard =
+  buildTencentCustomKeyboard(botAppId = botAppId, init = init)
+
+/**
+ * CommandSender DSL 入口: 语义上等同于无参顶层重载 (都走发送期 resolve), 保留这个扩展是为了在
+ * 命令处理体内通过 receiver 显式表达"这是 sender 上下文里的 keyboard". 不再依赖 `bot?.unionOpenidOrId`
+ * 早绑定 (旧实现兜底为 `""` 会把错误藏到腾讯接口层).
+ */
+@Suppress("UnusedReceiverParameter")
+fun CommandSender.tencentCustomKeyboard(init: TencentCustomKeyboard0.() -> Unit): TencentCustomKeyboard =
+  buildTencentCustomKeyboard(botAppId = null, init = init)
+
+// TODO id 去重 按钮上限
+private fun buildTencentCustomKeyboard(
+  botAppId: String?,
+  init: TencentCustomKeyboard0.() -> Unit,
+): TencentCustomKeyboard =
+  TencentCustomKeyboard(TencentCustomKeyboard0(botAppid = botAppId).also(init))

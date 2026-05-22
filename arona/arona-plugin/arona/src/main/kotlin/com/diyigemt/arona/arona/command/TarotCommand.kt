@@ -16,7 +16,6 @@ import com.diyigemt.arona.arona.tools.randomInt
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.BaseConfig
 import com.diyigemt.arona.command.BuildInCommandOwner
-import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
@@ -46,7 +45,7 @@ data class TarotConfig(
 ) : PluginWebuiConfig()
 
 private val kb by lazy {
-  tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+  tencentCustomKeyboard {
     row {
       button("1") {
         render {

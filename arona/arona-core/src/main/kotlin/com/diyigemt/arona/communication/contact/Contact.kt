@@ -205,7 +205,9 @@ internal abstract class AbstractContact(
           contentType(ContentType.Application.Json)
           setBody(
             bot.json.encodeToString(
-              builder.build(this@AbstractContact is GuildMember)
+              // 把当前发送 bot 的 appId 透传给 builder: 用于补齐 TencentCustomKeyboard 未显式设置的 bot_appid,
+              // 同时不污染原 keyboard, 让顶层 lazy 模板能跨 bot 安全复用.
+              builder.build(this@AbstractContact is GuildMember, bot.unionOpenidOrId)
             )
           )
         }
@@ -227,7 +229,7 @@ internal abstract class AbstractContact(
             contentType(ContentType.Application.Json)
             setBody(
               bot.json.encodeToString(
-                builder.build(this@AbstractContact is GuildMember)
+                builder.build(this@AbstractContact is GuildMember, bot.unionOpenidOrId)
               )
             )
           }

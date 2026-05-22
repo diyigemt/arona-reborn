@@ -7,7 +7,6 @@ import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.BaseConfig
 import com.diyigemt.arona.command.BuildInCommandOwner
 import com.diyigemt.arona.command.SubCommand
-import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.message.*
@@ -50,7 +49,7 @@ class RankCommand : AbstractCommand(
     }
 
     private val kb by lazy {
-      tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+      tencentCustomKeyboard {
         row {
           subButton("好感度排行", "排行榜 好感度", enter = true)
           button("没做,放着好看", "")
@@ -237,7 +236,7 @@ class RankFavorCommand : AbstractCommand(
 
   companion object {
     private val quickKb by lazy {
-      tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+      tencentCustomKeyboard {
         row {
           subButton("看看我的", "排行榜 好感度", enter = true)
           subButton("看看子榜", "排行榜 好感度 日奈")

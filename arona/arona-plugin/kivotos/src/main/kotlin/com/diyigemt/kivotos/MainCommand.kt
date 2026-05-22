@@ -1,17 +1,15 @@
 package com.diyigemt.kivotos
 
 import com.diyigemt.arona.command.AbstractCommand
-import com.diyigemt.arona.communication.BotManager
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.message.*
-import com.diyigemt.arona.utils.uuid
 import com.diyigemt.kivotos.schema.kivotosUser
 
 
 private val visitorMenu by lazy {
   tencentCustomMarkdown {
     +"访客菜单"
-  } + tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+  } + tencentCustomKeyboard {
     row {
       subButton("注册")
     }
@@ -19,7 +17,7 @@ private val visitorMenu by lazy {
 }
 
 private val playerMainMenu by lazy {
-  tencentCustomKeyboard(BotManager.getBot().unionOpenidOrId) {
+  tencentCustomKeyboard {
     row {
       subButton("咖啡厅", enter = true)
       subButton("背包", enter = true)
@@ -39,9 +37,10 @@ private val playerMainMenuWithTitle by lazy {
   } + playerMainMenu
 }
 
-fun TencentCustomKeyboardRow.subButton(label: String, data: String = label, enter: Boolean = false) {
-  button(uuid(), label, "/${KivotosCommand.primaryName} $data", enter)
-}
+// 委托给 arona-core 的 commandButton, 把 "/{primary} {data}" 拼接交给统一原语;
+// 本地包装继续保留, 因为 KivotosCommand.primaryName 是这个插件特定的命令前缀.
+fun TencentCustomKeyboardRow.subButton(label: String, data: String = label, enter: Boolean = false) =
+  commandButton(KivotosCommand.primaryName, label, data, enter)
 
 @Suppress("unused")
 class KivotosCommand : AbstractCommand(

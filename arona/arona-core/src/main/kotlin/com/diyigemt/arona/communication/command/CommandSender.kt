@@ -184,6 +184,22 @@ interface UserCommandSender : CommandSender {
     ) =
       contactDocument().updatePluginConfig<T>(plugin, value, audit = audit)
 
+    /**
+     * 写入"用户 × 群"维度配置. cid 取自当前 sender 所在 [contactDocument]; 与
+     * [updateUserPluginConfig] / [updateContactPluginConfig] 一样经过 [preparePluginConfigWrite]
+     * 的 check/audit/canonical 守卫, 给命令侧提供 prepare-after 落库的标准入口.
+     */
+    suspend inline fun <reified T : PluginWebuiConfig> UserCommandSender.updateMemberPluginConfig(
+      plugin: CommandOwner,
+      value: T,
+      audit: Boolean = true,
+    ) {
+      // contactMember 与 contactDocument 是接口契约里的两次独立 suspend 调用; 不要假设实现会缓存,
+      // 显式取一次, 把 cid 与 member 绑到同一文档快照.
+      val contact = contactDocument()
+      contact.findContactMember(userDocument().id).updatePluginConfig<T>(plugin, value, cid = contact.id, audit = audit)
+    }
+
   }
 }
 

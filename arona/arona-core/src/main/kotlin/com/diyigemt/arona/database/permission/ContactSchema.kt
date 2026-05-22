@@ -89,8 +89,30 @@ abstract class PluginContactMember : PluginVisibleData() {
   /**
    * 写入"用户 × 群"维度的插件配置. cid 必填 —— 历史上存在过 3-arg 重载, 没有 cid 时只 warn 不写库,
    * 误用会被静默吞掉; 现在用编译期签名强制要求传入所在群 id.
+   *
+   * 该 raw 写入不做 check/audit/canonical, 仅供 endpoint 在自己 prepare 之后落库使用;
+   * 业务代码请走带类型参数的 inline 重载, 它会经过 [preparePluginConfigWrite] 的完整守卫.
    */
   abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: JsonObject, cid: String)
+
+  /**
+   * 命令侧 typed 写入入口: 经过 [preparePluginConfigWrite] 后再落库.
+   * - [cid] 不提供默认值, 必须显式传入所在群 id, 避免回归到"3-arg 静默吞 cid"的历史行为
+   * - [audit] 默认 true, 与 endpoint 同款; 写入纯机器派生状态 (计数/开关) 的热路径可显式 false 跳过 3s 审核超时
+   * - 失败抛 [com.diyigemt.arona.webui.pluginconfig.PluginConfigWriteRejectedException]
+   */
+  @OptIn(InternalSerializationApi::class)
+  suspend inline fun <reified T : PluginWebuiConfig> updatePluginConfig(
+    plugin: CommandOwner,
+    value: T,
+    cid: String,
+    key: String = resolveConfigKey(T::class.serializer()),
+    audit: Boolean = true,
+  ) {
+    val ns = plugin.permission.id.nameSpace.toMongodbKey()
+    val prepared = preparePluginConfigWrite(ns, key, value, T::class.serializer(), audit = audit)
+    updatePluginConfig(ns, prepared.canonicalKey, prepared.element, cid)
+  }
 }
 
 

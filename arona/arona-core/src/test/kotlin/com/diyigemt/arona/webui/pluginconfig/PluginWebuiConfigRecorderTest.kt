@@ -1,6 +1,7 @@
 package com.diyigemt.arona.webui.pluginconfig
 
 import com.diyigemt.arona.command.CommandOwner
+import com.diyigemt.arona.database.permission.PluginVisibleData
 import com.diyigemt.arona.database.permission.toMongodbKey
 import com.diyigemt.arona.permission.Permission
 import com.diyigemt.arona.permission.PermissionId
@@ -9,6 +10,7 @@ import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder.DataSafetyResult
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,9 +31,11 @@ class PluginWebuiConfigRecorderTest {
 
   // --- fixture configs ---
 
+  // marker 字段仅供"主 key 与 alias 同时落库"测试区分两份 JsonObject 来源; 默认空串保持
+  // 既有 checkDataSafety / generateSchema 测试用 `{}` 输入仍可解码 (kotlinx 缺失字段填默认).
   @Serializable
   @PluginConfigId(id = "config_v2", aliases = ["config_v1"])
-  private class CfgPrimaryWithAlias : PluginWebuiConfig()
+  private class CfgPrimaryWithAlias(val marker: String = "") : PluginWebuiConfig()
 
   @Serializable
   @PluginConfigId(id = "")
@@ -259,5 +263,73 @@ class PluginWebuiConfigRecorderTest {
     PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
     val schema = PluginWebuiConfigRecorder.generateSchema(namespaceOf(owner), "config_v1")
     assertEquals("config_v2", schema?.configKey, "alias 入参 schema 也必须吐主 key")
+  }
+
+  // --- 5. lookupRaw 读路径优先级 ---
+
+  /**
+   * 固化当前读路径策略: lookupRaw 先按入参 key 精确命中, 没命中才回查 siblings.
+   * 含义: 当主 key 与 alias 同时存在数据时, "按入参 key 读" 拿到的是入参对应那份,
+   * 不会被 canonical-first 化. 这是潜伏的双源不一致风险, 但当前写路径 (endpoint 与 typed
+   * inline) 已全部 canonical 化落库, 双存只可能来自 raw `updatePluginConfig` 直调,
+   * 仓库内业务侧无此调用.
+   *
+   * 若后续改为 canonical-first (先按主 key 读, alias 仅在主 key 缺失时回查), 本测试需更新.
+   */
+  @Test
+  fun `主 key 与 alias 同存时 lookupRaw 按入参 key 精确命中优先`() {
+    val owner = freshOwner()
+    PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
+    val ns = namespaceOf(owner)
+    val visible = object : PluginVisibleData() {
+      override val config: Map<String, Map<String, JsonObject>> = mapOf(
+        ns to mapOf(
+          "config_v2" to JsonObject(mapOf("marker" to JsonPrimitive("from-primary"))),
+          "config_v1" to JsonObject(mapOf("marker" to JsonPrimitive("from-alias"))),
+        )
+      )
+    }
+
+    val byPrimary = visible.readPluginConfigOrNull<CfgPrimaryWithAlias>(owner, key = "config_v2")
+    val byAlias = visible.readPluginConfigOrNull<CfgPrimaryWithAlias>(owner, key = "config_v1")
+
+    assertEquals("from-primary", byPrimary?.marker, "主 key 入参应命中主 key 那份, 不被 alias 覆盖")
+    assertEquals("from-alias", byAlias?.marker, "alias 入参应命中 alias 那份, 不被 canonical 化到主 key")
+  }
+
+  @Test
+  fun `仅存 alias 时按主 key 查得 lookupRaw 走 sibling 回退`() {
+    val owner = freshOwner()
+    PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
+    val ns = namespaceOf(owner)
+    val visible = object : PluginVisibleData() {
+      override val config: Map<String, Map<String, JsonObject>> = mapOf(
+        ns to mapOf(
+          "config_v1" to JsonObject(mapOf("marker" to JsonPrimitive("legacy"))),
+        )
+      )
+    }
+
+    val cfg = visible.readPluginConfigOrNull<CfgPrimaryWithAlias>(owner, key = "config_v2")
+
+    assertEquals("legacy", cfg?.marker, "主 key 缺失时应回查 alias, 命中旧数据")
+  }
+
+  @Test
+  fun `仅存主 key 时按 alias 查得 lookupRaw 走 sibling 回退`() {
+    val owner = freshOwner()
+    PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
+    val ns = namespaceOf(owner)
+    val visible = object : PluginVisibleData() {
+      override val config: Map<String, Map<String, JsonObject>> = mapOf(
+        ns to mapOf(
+          "config_v2" to JsonObject(mapOf("marker" to JsonPrimitive("current"))),
+        )
+      )
+    }
+
+    val cfg = visible.readPluginConfigOrNull<CfgPrimaryWithAlias>(owner, key = "config_v1")
+
+    assertEquals("current", cfg?.marker, "alias 缺失时应回查主 key, 命中新数据")
   }
 }

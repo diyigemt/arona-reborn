@@ -22,6 +22,11 @@ import kotlinx.serialization.json.jsonObject
  * 加 `@SerialName` 后会分叉. 引入注解后:
  *   - 主 id 决定写入位置, aliases 决定读路径回退;
  *   - [resolveConfigKey] 让注册侧 / 命令侧共用一套 key 生成.
+ *
+ * 迁移指南: 历史使用过 `@SerialName`, 或将经过 R8/Proguard 混淆, 或 simpleName 不等于
+ * `serialName.substringAfterLast('.')` 的类, 在首次引入本注解时必须把旧 simpleName
+ * (历史命令侧 `T::class.name` 落库 key) 加入 [aliases], 否则旧用户配置在新代码中读不到.
+ * 该兼容是源码层 — 必须重新编译并发版包含 alias 的版本; 已发版的旧 jar 不会因为新注解被回溯生效.
  */
 @OptIn(ExperimentalSerializationApi::class)
 @SerialInfo

@@ -5,6 +5,7 @@ import com.diyigemt.arona.command.initExecutorMap
 import com.diyigemt.arona.communication.TencentBotClient
 import com.diyigemt.arona.console.launchConsole
 import com.diyigemt.arona.database.DatabaseProvider
+import com.diyigemt.arona.database.migration.PluginConfigLeafMigrator
 import com.diyigemt.arona.plugins.PluginManager
 import com.diyigemt.arona.utils.aronaConfig
 import com.diyigemt.arona.utils.closeAronaPools
@@ -32,6 +33,12 @@ object AronaApplication : CoroutineScope {
     // 走全表扫但结果正确. 如需"启动即具备索引"语义, 改用 runBlocking 阻塞启动.
     runSuspend {
       DatabaseProvider.ensureMongoIndexes()
+    }
+    // 阻塞: 插件 config 叶子原生 BSON 化迁移, 必须在 PluginManager 初始化 / 任何 User|Contact 读之前
+    // 跑完. 旧 BsonString 叶子在批 2 切完 codec 后无法 decode, 这里没跑就直接起服务会全面崩溃.
+    // 失败 throw 出来终止 JVM, 让运维介入. 详见 PluginConfigLeafMigrator KDoc.
+    runBlocking {
+      PluginConfigLeafMigrator.runOnceIfNeeded(DatabaseProvider.defaultMongoDatabase)
     }
     PluginManager.loadPluginFromPluginDirectory()
     PluginManager.initPlugin()

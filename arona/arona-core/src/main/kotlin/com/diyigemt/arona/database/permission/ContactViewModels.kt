@@ -1,6 +1,7 @@
 package com.diyigemt.arona.database.permission
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * HTTP 暴露给前端的 Contact 视图 DTO. 字段名保持 `id` (与前端 TS interface 一致).
@@ -24,5 +25,5 @@ internal data class UserContactDocument(
   val members: List<UserContactMemberDocument> = listOf(),
   val roles: List<ContactRole> = listOf(),
   // 仅 /contact?id= 完整接口才填充; 列表接口 /contacts 与 /manage-contacts 不下发, 防止群级敏感插件配置外泄.
-  val config: Map<String, Map<String, String>>? = null,
+  val config: Map<String, Map<String, JsonObject>>? = null,
 )

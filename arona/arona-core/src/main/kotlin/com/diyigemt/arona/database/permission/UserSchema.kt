@@ -22,6 +22,8 @@ import com.mongodb.client.result.UpdateResult
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.bson.Document
 import org.jetbrains.exposed.v1.dao.Entity
 import org.jetbrains.exposed.v1.dao.EntityClass
@@ -109,12 +111,16 @@ fun String.toMongodbKey() = this.replace(".", "·")
 fun String.fromMongodbKey() = this.replace("·", ".")
 
 /**
- * 读路径基类: 把"按 (pluginId, key) 取嵌套 JSON 字符串"统一封装.
+ * 读路径基类: 把"按 (pluginId, key) 取嵌套 BSON 子文档"统一封装.
  * 写路径不在这层抽象, 交给 [PluginUserDocument]/[PluginContactDocument]/[PluginContactMember]
  * 各自约束签名 (member 强制 cid, 不再允许 3-arg 静默吞掉).
+ *
+ * 存储形态: leaf 类型是 [JsonObject], BSON codec 通过 [com.diyigemt.arona.database.KotlinxJsonElementCodecProvider]
+ * 落成原生 BSON Document, 不再走"叶子是 JSON 字符串"的旧形态. 反序列化时 kotlinx 的
+ * `decodeFromJsonElement` 直接消费 JsonObject, 没有中间 `parseToJsonElement` 一步.
  */
 abstract class PluginVisibleData {
-  abstract val config: Map<String, Map<String, String>>
+  abstract val config: Map<String, Map<String, JsonObject>>
 
   @OptIn(InternalSerializationApi::class)
   inline fun <reified T : PluginWebuiConfig> readPluginConfigOrNull(
@@ -137,7 +143,7 @@ abstract class PluginVisibleData {
 
   fun <T : PluginWebuiConfig> readPluginConfigOrNull(pluginId: String, key: String, serializer: KSerializer<T>): T? {
     val raw = lookupRaw(pluginId, key) ?: return null
-    return JsonIgnoreUnknownKeys.decodeFromString(serializer, raw)
+    return JsonIgnoreUnknownKeys.decodeFromJsonElement(serializer, raw)
   }
 
   fun <T : PluginWebuiConfig> readPluginConfigOrDefault(
@@ -147,24 +153,30 @@ abstract class PluginVisibleData {
     serializer: KSerializer<T>,
   ): T {
     val raw = lookupRaw(pluginId, key) ?: return default
-    return JsonIgnoreUnknownKeys.decodeFromString(serializer, raw)
+    return JsonIgnoreUnknownKeys.decodeFromJsonElement(serializer, raw)
   }
 
   fun <T : PluginWebuiConfig> readPluginConfig(pluginId: String, key: String, serializer: KSerializer<T>): T {
     val raw = lookupRaw(pluginId, key) ?: error("plugin config $pluginId/$key not found")
-    return JsonIgnoreUnknownKeys.decodeFromString(serializer, raw)
+    return JsonIgnoreUnknownKeys.decodeFromJsonElement(serializer, raw)
   }
 
+  /**
+   * 把 leaf 序列化回 JSON 文本. 仅 endpoint 在批 4 切到结构化 wire 前继续用; 命令侧应当走
+   * typed `readPluginConfig*` 而不是再绕一遍字符串.
+   */
   fun readPluginConfigString(pluginId: String, key: String): String =
-    lookupRaw(pluginId, key) ?: error("plugin config $pluginId/$key not found")
+    lookupRaw(pluginId, key)?.let { JsonIgnoreUnknownKeys.encodeToString(it) }
+      ?: error("plugin config $pluginId/$key not found")
 
-  fun readPluginConfigStringOrNull(pluginId: String, key: String): String? = lookupRaw(pluginId, key)
+  fun readPluginConfigStringOrNull(pluginId: String, key: String): String? =
+    lookupRaw(pluginId, key)?.let { JsonIgnoreUnknownKeys.encodeToString(it) }
 
   /**
    * 先查传入 key; 没命中时按注册表声明的同组 key (主 key + 其它 aliases) 挨个回查,
    * 兼容传入主或 alias 两种情形. 不在读时把旧数据迁回主 key, 避免读路径触发 Mongo 写.
    */
-  private fun lookupRaw(pluginId: String, key: String): String? {
+  private fun lookupRaw(pluginId: String, key: String): JsonObject? {
     val encoded = pluginId.toMongodbKey()
     val inner = config[encoded] ?: return null
     inner[key]?.let { return it }
@@ -186,7 +198,7 @@ abstract class PluginUserDocument : PluginVisibleData() {
    * 该 raw 写入不做 check/audit/canonical, 仅供 endpoint 在自己 prepare 之后落库使用;
    * 业务代码请走带类型参数的 inline 重载, 它会经过 [preparePluginConfigWrite] 的完整守卫.
    */
-  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: JsonObject)
 
   /**
    * 命令侧 typed 写入入口: 经过 [preparePluginConfigWrite] 后再落库.
@@ -202,7 +214,7 @@ abstract class PluginUserDocument : PluginVisibleData() {
   ) {
     val ns = plugin.permission.id.nameSpace.toMongodbKey()
     val prepared = preparePluginConfigWrite(ns, key, value, T::class.serializer(), audit = audit)
-    updatePluginConfig(ns, prepared.canonicalKey, prepared.json)
+    updatePluginConfig(ns, prepared.canonicalKey, prepared.element)
   }
 
   suspend fun updateUsername(name: String) {
@@ -237,7 +249,7 @@ internal data class UserDocument(
   val uid: List<String> = listOf(), // 藤子给定的不同聊天环境下的id
   val contacts: List<String> = listOf(), // 存在的不同的群/频道的id
   val policies: List<Policy> = listOf(), // 用户自定义的规则
-  override val config: Map<String, Map<String, String>> = mapOf(), // 用户自定义的,插件专有的配置项
+  override val config: Map<String, Map<String, JsonObject>> = mapOf(), // 用户自定义的,插件专有的配置项
 ) : PluginUserDocument() {
   suspend fun updateUserContact(contactId: String) = withCollection<MongoUserDocument, UpdateResult> {
     updateOne(
@@ -246,14 +258,20 @@ internal data class UserDocument(
     )
   }
 
+  /**
+   * endpoint `/plugin/preference?id=` 的"取一插件全部配置"出口, 批 4 切结构化 wire 前继续以
+   * JSON 文本回前端; leaf JsonObject 在这里按需 encodeToString.
+   */
   internal fun readAllConfig(pluginId: String): Map<String, String>? {
-    return config[pluginId.toMongodbKey()]
+    return config[pluginId.toMongodbKey()]?.mapValues { (_, value) ->
+      JsonIgnoreUnknownKeys.encodeToString(value)
+    }
   }
 
   override suspend fun updatePluginConfig(
     pluginId: String,
     key: String,
-    value: String,
+    value: JsonObject,
   ) {
     withCollection<MongoUserDocument, UpdateResult> {
       updateOne(

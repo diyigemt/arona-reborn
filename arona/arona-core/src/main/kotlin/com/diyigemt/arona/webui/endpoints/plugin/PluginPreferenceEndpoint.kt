@@ -76,10 +76,11 @@ object PluginPreferenceEndpoint {
     val audit = auditOrAllow(checked.json)
     if (audit?.isBlock == true) return errorMessage("内容审核失败: ${audit.message}")
     // 用 canonicalKey 落库: 即使前端用 alias POST 也归一到主 key, 避免新写入污染历史 alias.
+    // value 走 checked.element (JsonObject), Mongo driver 编成原生 BSON Document.
     aronaUser.updatePluginConfig(
       obj.id,
       checked.canonicalKey,
-      checked.json,
+      checked.element,
     )
     return success()
   }

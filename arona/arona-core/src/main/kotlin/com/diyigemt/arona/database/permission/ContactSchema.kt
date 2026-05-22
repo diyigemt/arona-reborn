@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import org.bson.Document
 import org.bson.types.ObjectId
 
@@ -60,7 +61,7 @@ abstract class PluginContactDocument : PluginVisibleData() {
    * 该 raw 写入不做 check/audit/canonical, 仅供 endpoint 在自己 prepare 之后落库使用;
    * 业务代码请走带类型参数的 inline 重载, 它会经过 [preparePluginConfigWrite] 的完整守卫.
    */
-  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String)
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: JsonObject)
 
   /**
    * 命令侧 typed 写入入口: 经过 [preparePluginConfigWrite] 后再落库.
@@ -76,7 +77,7 @@ abstract class PluginContactDocument : PluginVisibleData() {
   ) {
     val ns = plugin.permission.id.nameSpace.toMongodbKey()
     val prepared = preparePluginConfigWrite(ns, key, value, T::class.serializer(), audit = audit)
-    updatePluginConfig(ns, prepared.canonicalKey, prepared.json)
+    updatePluginConfig(ns, prepared.canonicalKey, prepared.element)
   }
 }
 
@@ -89,7 +90,7 @@ abstract class PluginContactMember : PluginVisibleData() {
    * 写入"用户 × 群"维度的插件配置. cid 必填 —— 历史上存在过 3-arg 重载, 没有 cid 时只 warn 不写库,
    * 误用会被静默吞掉; 现在用编译期签名强制要求传入所在群 id.
    */
-  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: String, cid: String)
+  abstract suspend fun updatePluginConfig(pluginId: String, key: String, value: JsonObject, cid: String)
 }
 
 
@@ -132,12 +133,12 @@ data class ContactMember(
   override val id: String, // 指向UserDocument.id
   override val name: String,
   override val roles: List<String>, // 指向ContactDocument.roles.id
-  override val config: Map<String, Map<String, String>> = mapOf(),
+  override val config: Map<String, Map<String, JsonObject>> = mapOf(),
 ) : PluginContactMember() {
   override suspend fun updatePluginConfig(
     pluginId: String,
     key: String,
-    value: String,
+    value: JsonObject,
     cid: String,
   ) {
     ContactDocument.withCollection<MongoContactDocument, UpdateResult> {
@@ -178,7 +179,7 @@ internal data class ContactDocument(
   override var roles: List<ContactRole> = listOf(),
   override var members: List<ContactMember> = listOf(),
   val registerTime: String = currentDateTime(),
-  override val config: Map<String, Map<String, String>> = mapOf(), // 环境自定义的,插件专有的配置项
+  override val config: Map<String, Map<String, JsonObject>> = mapOf(), // 环境自定义的,插件专有的配置项
 ): PluginContactDocument() {
 
   /**
@@ -230,7 +231,7 @@ internal data class ContactDocument(
   override suspend fun updatePluginConfig(
     pluginId: String,
     key: String,
-    value: String,
+    value: JsonObject,
   ) {
     withCollection<MongoContactDocument, UpdateResult> {
       updateOne(

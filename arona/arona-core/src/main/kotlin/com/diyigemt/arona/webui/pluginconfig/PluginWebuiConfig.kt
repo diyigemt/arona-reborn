@@ -10,8 +10,11 @@ import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 
 @Serializable
 data class FieldError(
@@ -59,10 +62,12 @@ object PluginWebuiConfigRecorder {
    */
   sealed class DataSafetyResult {
     /**
-     * @param json 归一化后的 JSON, 用于落库与审核
+     * @param json 归一化后的 JSON 文本, 用于审核与日志
      * @param canonicalKey 主 key. 前端若传 alias, 写路径必须用这个回到主 key, 否则数据会被分裂到旧 alias 下
+     * @param element [json] 解析后的 JsonObject, 用于 Mongo `Updates.set` 直接落 BSON Document.
+     *   与 [json] 是同一份数据的两种表示, 由 [checkDataSafety] 一次性派生.
      */
-    data class Ok(val json: String, val canonicalKey: String) : DataSafetyResult()
+    data class Ok(val json: String, val canonicalKey: String, val element: JsonObject) : DataSafetyResult()
     data class Err(
       val message: String,
       val fieldErrors: List<FieldError> = emptyList(),
@@ -85,6 +90,36 @@ object PluginWebuiConfigRecorder {
     val forbidden = FORBIDDEN_KEY_CHARS.firstOrNull { it in key }
     require(forbidden == null) {
       "plugin config key '$key' contains forbidden character '$forbidden'"
+    }
+  }
+
+  /**
+   * 递归校验 JSON 树内部所有字段名是否符合 BSON 字段名约束: 不能含 `.` (Mongo dot-path 分隔符),
+   * 也不能以 `$` 开头 (操作符前缀, 老版 Mongo 直接拒收, 新版接受但破坏路径路由).
+   *
+   * 配置叶子原本是 JSON 文本时, 这些字符只是字面值; 改成原生 BSON 子文档后, kotlinx codec
+   * 把 JSON 对象 key 直接当 BSON 字段名写入, 不做转义. 详见预飞测试
+   * `PluginConfigCodecRoundTripTest.JsonElementCodec passes dot and dollar field names through`.
+   *
+   * 命中即抛 [IllegalArgumentException], 由 prepare / endpoint 层各自转 [PluginConfigWriteRejectedException.Kind.InvalidKey]
+   * 或 [DataSafetyResult.Err]. [path] 用于 fail 时定位 leaf 位置 (形如 `$.nested.bad.key`).
+   */
+  internal fun requireSafeBsonLeafKeys(element: JsonElement, path: String = "\$") {
+    when (element) {
+      is JsonObject -> element.forEach { (key, child) ->
+        val childPath = "$path.$key"
+        require(!key.contains('.')) {
+          "plugin config BSON leaf key '$childPath' contains forbidden character '.'"
+        }
+        require(!key.startsWith('$')) {
+          "plugin config BSON leaf key '$childPath' starts with forbidden character '\$'"
+        }
+        requireSafeBsonLeafKeys(child, childPath)
+      }
+      is JsonArray -> element.forEachIndexed { index, child ->
+        requireSafeBsonLeafKeys(child, "$path[$index]")
+      }
+      else -> Unit
     }
   }
 
@@ -139,9 +174,18 @@ object PluginWebuiConfigRecorder {
           return DataSafetyResult.Err(checkResult.message, checkResult.fieldErrors)
         is PluginConfigCheckResult.PluginConfigCheckAccept -> Unit
       }
+      val json = JsonIgnoreUnknownKeys.encodeToString(serializer as KSerializer<PluginWebuiConfig>, decoded)
+      // element 与 prepare 层一致: 单一权威源是 json, element 派生. 安全扫描在派生时一并完成,
+      // 失败转 Err 让 endpoint 直接 400, 不会污染 Mongo.
+      val element = try {
+        JsonIgnoreUnknownKeys.parseToJsonElement(json).jsonObject.also { requireSafeBsonLeafKeys(it) }
+      } catch (e: IllegalArgumentException) {
+        return DataSafetyResult.Err(e.message ?: "配置字段名不安全")
+      }
       DataSafetyResult.Ok(
-        json = JsonIgnoreUnknownKeys.encodeToString(serializer as KSerializer<PluginWebuiConfig>, decoded),
+        json = json,
         canonicalKey = matched.primaryKey,
+        element = element,
       )
     }.getOrElse { err ->
       commandLineLogger.error("deserialize ${serializer.descriptor.serialName} failed.")

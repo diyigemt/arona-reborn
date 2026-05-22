@@ -7,8 +7,10 @@ import com.diyigemt.arona.permission.PermissionId
 import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.webui.event.ContentAuditEvent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,6 +38,25 @@ class PluginConfigWriteTest {
   @Serializable
   @PluginConfigId(id = "plain")
   private class WriteConfigPlain : PluginWebuiConfig()
+
+  /**
+   * 字段 SerialName 含点号, 触发 leaf-key 安全扫描.
+   * 不能用 default value, 否则 kotlinx 编码时跳过该字段, JSON 退化成 `{}`, 安全扫描扫不到任何 key.
+   */
+  @Serializable
+  @PluginConfigId(id = "dotted_leaf")
+  private class WriteConfigWithDottedLeaf(
+    @SerialName("bad.key")
+    val value: String,
+  ) : PluginWebuiConfig()
+
+  /** 字段 SerialName 以 `$` 开头, 触发 leaf-key 安全扫描. 同样必须显式赋值. */
+  @Serializable
+  @PluginConfigId(id = "dollar_leaf")
+  private class WriteConfigWithDollarLeaf(
+    @SerialName("\$bad")
+    val value: String,
+  ) : PluginWebuiConfig()
 
   /** 主动 reject 的配置, 用于覆盖 check 失败路径. */
   @Serializable
@@ -120,6 +141,36 @@ class PluginConfigWriteTest {
       )
     }
     assertEquals(PluginConfigWriteRejectedException.Kind.InvalidKey, ex.kind)
+  }
+
+  @Test
+  fun `leaf 字段名含点号时抛 InvalidKey`() = runTest {
+    val ex = assertFailsWith<PluginConfigWriteRejectedException> {
+      preparePluginConfigWrite(
+        pluginNamespace = "anyns",
+        rawKey = "dotted_leaf",
+        value = WriteConfigWithDottedLeaf(value = "x"),
+        serializer = WriteConfigWithDottedLeaf.serializer(),
+        audit = false,
+      )
+    }
+    assertEquals(PluginConfigWriteRejectedException.Kind.InvalidKey, ex.kind)
+    assertTrue(ex.message.contains("$.bad.key"), "错误信息应带 leaf path: ${ex.message}")
+  }
+
+  @Test
+  fun `leaf 字段名以美元符开头时抛 InvalidKey`() = runTest {
+    val ex = assertFailsWith<PluginConfigWriteRejectedException> {
+      preparePluginConfigWrite(
+        pluginNamespace = "anyns",
+        rawKey = "dollar_leaf",
+        value = WriteConfigWithDollarLeaf(value = "x"),
+        serializer = WriteConfigWithDollarLeaf.serializer(),
+        audit = false,
+      )
+    }
+    assertEquals(PluginConfigWriteRejectedException.Kind.InvalidKey, ex.kind)
+    assertTrue(ex.message.contains("\$bad"), "错误信息应带 leaf path: ${ex.message}")
   }
 
   // --- 2. check reject 路径 ---
@@ -239,5 +290,23 @@ class PluginConfigWriteTest {
     )
     val decoded = Json.parseToJsonElement(prepared.json)
     assertTrue(decoded.toString().contains("\"flag\":true"), "json 应包含 flag=true: ${prepared.json}")
+  }
+
+  @Test
+  fun `prepared element 与 prepared json 派生自同一份数据`() = runTest {
+    val owner = freshOwner()
+    PluginWebuiConfigRecorder.register(owner, WriteConfigWithAlias.serializer())
+    val prepared = preparePluginConfigWrite(
+      pluginNamespace = namespaceOf(owner),
+      rawKey = "v2",
+      value = WriteConfigWithAlias(flag = true),
+      serializer = WriteConfigWithAlias.serializer(),
+      audit = false,
+    )
+    assertEquals(
+      Json.parseToJsonElement(prepared.json).jsonObject,
+      prepared.element,
+      "element 必须等于 parseToJsonElement(json).jsonObject, 否则审核侧和落库侧会不一致",
+    )
   }
 }

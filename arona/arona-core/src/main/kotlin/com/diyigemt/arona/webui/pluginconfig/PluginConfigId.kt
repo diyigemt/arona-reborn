@@ -8,6 +8,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialInfo
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 /**
  * 显式声明 [PluginWebuiConfig] 子类的稳定持久化 id 与历史 aliases.
@@ -80,10 +82,18 @@ class PluginConfigWriteRejectedException(
   }
 }
 
-/** [preparePluginConfigWrite] 的产出: 已 canonical 化、可直接落库的 (key, json). */
+/**
+ * [preparePluginConfigWrite] 的产出: 已 canonical 化、可直接落库的写入候选.
+ *
+ * - [canonicalKey] alias 入参归一后的主 key, raw `updatePluginConfig` 直接拿去拼 Mongo dot-path
+ * - [json] 标准 JSON 文本; 给 audit / 日志用, 也是 [element] 的派生源 (单一权威源)
+ * - [element] 给 Mongo 落库用; 经过 [KotlinxJsonElementCodecProvider][com.diyigemt.arona.database.KotlinxJsonElementCodecProvider]
+ *   编成原生 BSON Document. 与 [json] 完全等价, 不能各自被修改.
+ */
 data class PreparedPluginConfigWrite(
   val canonicalKey: String,
   val json: String,
+  val element: JsonObject,
 )
 
 /**
@@ -139,6 +149,18 @@ internal suspend fun <T : PluginWebuiConfig> preparePluginConfigWrite(
   }
 
   val json = JsonIgnoreUnknownKeys.encodeToString(serializer, value)
+  // 单一权威源是 json; element 从它派生. 派生失败 (top-level 不是 JsonObject 或 leaf key 含 `.`/`$`)
+  // 一律转 InvalidKey: 这是 schema 级别的写入违例, 不应当走到 Mongo.
+  val element = try {
+    JsonIgnoreUnknownKeys.parseToJsonElement(json).jsonObject.also {
+      PluginWebuiConfigRecorder.requireSafeBsonLeafKeys(it)
+    }
+  } catch (e: IllegalArgumentException) {
+    throw PluginConfigWriteRejectedException(
+      kind = PluginConfigWriteRejectedException.Kind.InvalidKey,
+      message = e.message ?: "invalid plugin config leaf key",
+    )
+  }
   val canonicalKey = PluginWebuiConfigRecorder.canonicalKeyOf(pluginNamespace, rawKey) ?: rawKey
 
   if (audit) {
@@ -151,5 +173,5 @@ internal suspend fun <T : PluginWebuiConfig> preparePluginConfigWrite(
     }
   }
 
-  return PreparedPluginConfigWrite(canonicalKey, json)
+  return PreparedPluginConfigWrite(canonicalKey, json, element)
 }

@@ -3,6 +3,7 @@ package com.diyigemt.arona.database.permission
 import com.diyigemt.arona.utils.currentDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Mongo 持久化 wrapper 类型与 mapper.
@@ -36,7 +37,7 @@ internal data class MongoContactMember(
   val id: String,
   val name: String,
   val roles: List<String>,
-  val config: Map<String, Map<String, String>> = mapOf(),
+  val config: Map<String, Map<String, JsonObject>> = mapOf(),
 )
 
 @Serializable
@@ -49,7 +50,7 @@ internal data class MongoContactDocument(
   val roles: List<MongoContactRole> = listOf(),
   val members: List<MongoContactMember> = listOf(),
   val registerTime: String = currentDateTime(),
-  val config: Map<String, Map<String, String>> = mapOf(),
+  val config: Map<String, Map<String, JsonObject>> = mapOf(),
 )
 
 @Serializable
@@ -62,7 +63,7 @@ internal data class MongoUserDocument(
   val uid: List<String> = listOf(),
   val contacts: List<String> = listOf(),
   val policies: List<MongoPolicy> = listOf(),
-  val config: Map<String, Map<String, String>> = mapOf(),
+  val config: Map<String, Map<String, JsonObject>> = mapOf(),
 )
 
 @Serializable
@@ -88,7 +89,7 @@ internal data class MongoUserContactDocument(
   val contactType: ContactType = ContactType.Group,
   val members: List<MongoUserContactMemberDocument> = listOf(),
   val roles: List<MongoContactRole> = listOf(),
-  val config: Map<String, Map<String, String>>? = null,
+  val config: Map<String, Map<String, JsonObject>>? = null,
 )
 
 internal fun Policy.toMongo(): MongoPolicy = MongoPolicy(

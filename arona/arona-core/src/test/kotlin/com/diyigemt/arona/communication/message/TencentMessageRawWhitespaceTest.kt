@@ -75,6 +75,17 @@ class TencentMessageRawWhitespaceTest {
   }
 
   @Test
+  fun `GROUP_MESSAGE_CREATE 格式 at 无感叹号也能解析`() {
+    val chain = rawWith("<@4709460572C28A4703BD507B58BD6038> /攻略 圣娅").toMessageChain()
+    val at = chain.firstOrNull { it is TencentAt } as? TencentAt
+    assertNotNull(at, "全量消息 <@ID> 格式 (无 !) 必须能解析")
+    assertEquals("4709460572C28A4703BD507B58BD6038", at.target)
+    val text = chain.firstOrNull { it is PlainText } as? PlainText
+    assertNotNull(text)
+    assertEquals("/攻略 圣娅", text.toString())
+  }
+
+  @Test
   fun `没有 at 时纯文本回到 PlainText 不抛`() {
     val chain = rawWith("just plain text").toMessageChain()
     assertEquals(1, chain.size)

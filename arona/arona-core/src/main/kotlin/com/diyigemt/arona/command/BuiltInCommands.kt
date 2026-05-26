@@ -2,6 +2,7 @@
 
 package com.diyigemt.arona.command
 
+import com.diyigemt.arona.communication.command.GroupCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.isPrivateChannel
 import com.diyigemt.arona.communication.event.*
@@ -14,10 +15,16 @@ import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMI
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.service.ContactService
 import com.diyigemt.arona.permission.PermissionService
+import com.diyigemt.arona.utils.aronaConfig
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.net.URLEncoder
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.KClass
@@ -81,6 +88,63 @@ object BuiltInCommands : AutoSavePluginDataHolder {
       } else {
         sendMessage("token无效")
       }
+    }
+  }
+
+  class FullReceiveCommand : AbstractCommand(
+    BuildInCommandOwner,
+    "全量接收",
+    description = "申请接收群内所有消息",
+    help = """
+      /全量接收 <当前群号>
+      
+      生成全量消息接收权限的授权链接, 群主打开后即可让机器人接收群内所有消息
+    """.trimIndent()
+  ) {
+    private val groupCode by argument("群号")
+    suspend fun UserCommandSender.fullReceive() {
+      if (this !is GroupCommandSender) {
+        sendMessage("该指令仅支持群聊环境使用")
+        return
+      }
+      if (!groupCode.all { it.isDigit() }) {
+        sendMessage("请输入QQ群号(纯数字), 不是group_openid")
+        return
+      }
+      val botUid = aronaConfig.bot.botUid
+      if (botUid.isBlank()) {
+        sendMessage("未配置botUid, 请在config.yaml中填写bot.botUid后重启")
+        return
+      }
+      val data = buildJsonObject {
+        put("page_name", "ai_group_service_agreement_pop_page")
+        put("groupCode", groupCode)
+        put("botUin", bot.id)
+        put("botUid", botUid)
+        put("screen", 1)
+      }
+      val url = "https://club.vip.qq.com/transfer?open_kuikly_info=" +
+          withContext(Dispatchers.IO) {
+            URLEncoder.encode(data.toString(), "UTF-8")
+          }
+      val md = tencentCustomMarkdown {
+        h1("全量接收权限申请")
+        image { 
+          h = 1408
+          w = 1216
+          href = "https://yuuka.cdn.diyigemt.com/image/enable_group_massage.webp"
+          placeholder = "操作示意"
+        }
+        divider()
+        link {
+          url to "点此打开授权页面"
+        }
+        list {
+          +"仅群主可以完成授权操作"
+          +"请使用 QQ 9.0.90 及以上版本打开链接"
+        }
+      }
+      sendMessage(md)
     }
   }
 

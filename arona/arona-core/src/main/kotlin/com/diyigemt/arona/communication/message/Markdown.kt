@@ -56,7 +56,7 @@ data class TitleElement(
     return when (level) {
       TitleElementLevel.H1 -> "# $content"
       TitleElementLevel.H2 -> "## $content"
-    }
+    } + "\n"
   }
 
   enum class TitleElementLevel {

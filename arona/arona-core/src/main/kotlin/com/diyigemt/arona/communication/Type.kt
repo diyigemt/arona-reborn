@@ -71,6 +71,7 @@ data class TencentBotConfig(
   val appId: String,
   val token: String,
   val secret: String,
+  val botUid: String = "",
   val public: Boolean = false,
   val debug: Boolean = false,
   // shadow=true: 实际流量灰度演练. webhook/事件分发/命令解析全部照常跑, 但 callOpenapi 一律短路,

@@ -6,7 +6,7 @@ plugins {
 
 allprojects {
   group = "com.diyigemt.arona"
-  version = "1.3.6"
+  version = "2.0.0"
   buildscript {
     configurations.classpath {
       resolutionStrategy.capabilitiesResolution.withCapability("gradle.plugin.com.github.johnrengelman:shadow") {

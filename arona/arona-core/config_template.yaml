@@ -3,6 +3,7 @@ bot:
   appId: ""
   token: ""
   secret: ""
+  botUid: ""
   public: false
   debug: false
   shadow: false

@@ -603,7 +603,7 @@ data class TencentAt(
 
   companion object {
     private val matcher = Regex("^\\[tencent:at:(\\w+)]$")
-    private val tencentMatcher = Regex("^<@!(\\w+)>$")
+    private val tencentMatcher = Regex("^<@!?(\\w+)>$")
     private val readableMatcher = Regex("^@(\\w+)$")
 
     /**

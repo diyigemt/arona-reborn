@@ -131,6 +131,44 @@ class AronaRouteInterceptorsTest {
   }
 
   /**
+   * 防御 configureRouting 合并根路径拦截器后的回归: 子路由自己 install
+   * [AronaCommonRouteInterceptors] 时, effective group 应包含父级 deny
+   * (模拟 accessLogging prepend 到每个子路径组的效果).
+   * 若子 route 的 same-key install 覆盖了父 route, deny 必须仍在 effective group 中.
+   */
+  @Test
+  fun `merged child common install keeps parent common deny`() = testApplication {
+    val handlerRan = AtomicBoolean(false)
+    application {
+      routing {
+        route("/parent") {
+          install(AronaCommonRouteInterceptors) {
+            interceptors = listOf(FakeInterceptors to method("commonDeny"))
+          }
+          route("/child") {
+            // 模拟 effectiveCommonCallInterceptors: 根 deny + 子 noop
+            install(AronaCommonRouteInterceptors) {
+              interceptors = listOf(
+                FakeInterceptors to method("commonDeny"),
+                FakeInterceptors to method("commonNoop"),
+              )
+            }
+            get {
+              handlerRan.set(true)
+              call.respondText("BODY")
+            }
+          }
+        }
+      }
+    }
+
+    val response = client.get("/parent/child")
+    assertEquals(HttpStatusCode.Unauthorized, response.status)
+    assertEquals("DENY", response.bodyAsText())
+    assertFalse(handlerRan.get(), "handler must not run after merged parent common HaltPipeline")
+  }
+
+  /**
    * 防御 F2.5-G v2 review 修过的 split-key 回归: parent route 的 [AronaCommonRouteInterceptors]
    * install 与 child route 的 [AronaAdminRouteInterceptors] install 必须各自独立, 不能因 same-key
    * "more specific install wins" 让 admin install 吞掉 parent 的 common deny.

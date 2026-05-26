@@ -77,7 +77,7 @@ internal fun verifyAdminToken(actual: String?, expected: String): Boolean {
 object LoggerInterceptor {
   private val AdminAccessRegexp = Regex("/api/v\\d/admin/.*")
 
-  @AronaBackendRouteInterceptor
+  @AronaBackendRouteInterceptor(withoutTransaction = true)
   suspend fun ApplicationCall.accessLogging() {
     val path = request.path()
     if (AdminAccessRegexp.matches(path)) {

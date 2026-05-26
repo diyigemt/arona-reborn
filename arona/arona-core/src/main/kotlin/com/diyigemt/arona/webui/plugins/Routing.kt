@@ -7,6 +7,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import io.ktor.util.AttributeKey
+import java.lang.reflect.InvocationTargetException
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspend
@@ -52,11 +53,20 @@ fun Application.configureRouting() {
       v.value.map { it.second }.flatten()
         .sortedBy { (_, method) -> method.findAnnotation<AronaBackendRouteInterceptor>()!!.priority }
     }
+  // 同一 plugin key 在子 route 上 install 会覆盖父 route 的同 key 配置
+  // (Ktor route-scoped plugin "more specific install wins" 语义). 因此非根 path
+  // 的 effective group 必须显式包含根 path 的 common interceptor (如 accessLogging),
+  // 否则 /contact 这类子 path 会绕过 access logging / 权限链.
+  // 根 common interceptor (如 accessLogging) 总是前置于子路径拦截器执行,
+  // priority 仅在各 path 自身的拦截器内排序. 这是刻意设计: 鉴权/用户注入必须先于业务拦截器.
+  val rootInterceptors = commonCallInterceptors[""].orEmpty()
+  val effectiveCommonCallInterceptors =
+    if (rootInterceptors.isEmpty()) commonCallInterceptors
+    else commonCallInterceptors.mapValues { (path, group) ->
+      if (path.isEmpty()) group else rootInterceptors + group
+    }
   routing {
-    commonCallInterceptors.forEach { (path, group) ->
-      // 空 group 不要 install: 同一 plugin key 在子 route 上 install 会覆盖父 route 的同 key
-      // 配置 (Ktor route-scoped plugin "more specific install wins" 语义), 空 install 会让父
-      // route 的 access logging / 权限链对子 path 失效 — 这是安全敏感回归.
+    effectiveCommonCallInterceptors.forEach { (path, group) ->
       if (group.isEmpty()) return@forEach
       route(path) {
         install(AronaCommonRouteInterceptors) {
@@ -95,6 +105,8 @@ fun Application.configureRouting() {
                     call.checkTransaction(endpoint, method)
                   } catch (_: HaltPipeline) {
                     // no-op: 响应已由 endpoint/拦截器写出, RoutingContext 自然完结.
+                  } catch (e: InvocationTargetException) {
+                    if (!e.isHaltPipeline()) throw e
                   }
                 }
               }
@@ -121,6 +133,9 @@ fun Application.configureRouting() {
  * 语义会让内层 admin install 覆盖外层 common install, 共用 key 即使当前流程行为正确, 未来路由
  * 重构时也容易踩坑.
  */
+private fun InvocationTargetException.isHaltPipeline(): Boolean =
+  targetException is HaltPipeline || cause is HaltPipeline
+
 // internal (而非 private) 是为了给 arona-core 模块内的 routing smoke test 暴露 plugin / config 类型;
 // 模块外部 (插件 / 下游) 仍不可见, 不构成 API 暴露面扩张.
 internal class AronaRouteInterceptorsConfig {
@@ -143,6 +158,8 @@ internal class AronaCommonRouteInterceptors private constructor() {
           }
         } catch (_: HaltPipeline) {
           finish()
+        } catch (e: InvocationTargetException) {
+          if (e.isHaltPipeline()) finish() else throw e
         }
       }
       return AronaCommonRouteInterceptors()
@@ -166,6 +183,8 @@ internal class AronaAdminRouteInterceptors private constructor() {
           }
         } catch (_: HaltPipeline) {
           finish()
+        } catch (e: InvocationTargetException) {
+          if (e.isHaltPipeline()) finish() else throw e
         }
       }
       return AronaAdminRouteInterceptors()
@@ -188,9 +207,9 @@ private fun hasAdminEndpoint(endpoints: List<Any>): Boolean = endpoints.any { en
   }
 }
 
-fun withoutTransaction(clazz: KClass<*>, fn: KFunction<*>) = clazz
-  .findAnnotation<AronaBackendEndpoint>()?.withoutTransaction
-  ?: fn.findAnnotation<AronaBackendRouteInterceptor>()?.withoutTransaction ?: false
+fun withoutTransaction(clazz: KClass<*>, fn: KFunction<*>): Boolean =
+  fn.findAnnotation<AronaBackendRouteInterceptor>()?.withoutTransaction == true ||
+    clazz.findAnnotation<AronaBackendEndpoint>()?.withoutTransaction == true
 
 /**
  * 解析事务隔离级别: 拦截器注解 > 端点注解 > 默认 READ_COMMITTED.

@@ -3,7 +3,8 @@
     "target": "esnext",
     "useDefineForClassFields": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    // TS 6.0 废弃了 "node"/"node10"; 本项目由 Vite/Rolldown 打包, 语义正确且面向未来的解析模式是 "bundler".
+    "moduleResolution": "bundler",
     "strict": true,
     "jsx": "preserve",
     "sourceMap": true,
@@ -11,11 +12,9 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "lib": ["esnext", "dom"],
-    // baseUrl来告诉编译器到哪里去查找模块，所有非相对模块导入都会被当做相对于 baseUrl。
-    "baseUrl": ".",
-    // 非相对模块导入的路径映射配置
+    // TS 6.0 废弃了 baseUrl; paths 自 TS4.1 起无需 baseUrl, 直接相对 tsconfig 目录解析 (写成显式 ./ 前缀).
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "skipLibCheck": true,
   },

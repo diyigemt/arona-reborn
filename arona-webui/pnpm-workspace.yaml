@@ -1,0 +1,30 @@
+# pnpm 10+ 不再从 .npmrc 读取安装行为设置, 统一收敛到本文件 (pnpm 会静默忽略 .npmrc 里的同类项).
+
+# publicHoistPattern: 仅把 app 代码以"裸包名"引用的 phantom 传递依赖提升到顶层 node_modules.
+# 本项目唯一需要提升的是 @pixi/utils —— src/views/home/HomeIndex.vue 以 `import { Dict } from "@pixi/utils"`
+# 裸引用它 (它只是 pixi.js@6 的传递依赖, 非直接依赖), 不提升则该文件类型检查报 TS2307.
+#
+# 刻意"不"使用 shamefullyHoist (等价 publicHoistPattern: ['*']): 那会把 @antv/g-base 也提升到顶层.
+# 而 src/views/config/policy/graph.ts 深引了 `@antv/g-base/src/interfaces` (仅取 IElement 类型).
+# 一旦 @antv/g-base 在顶层可解析, TS 会把它的 src/*.ts 源码拉进类型检查程序, 引入 50+ 库级类型错误 ——
+# graph.ts 自身是 @ts-nocheck, 但被它 import 进来的 .ts 文件不受 @ts-nocheck 保护. 保持 @antv/g-base
+# 不提升时, 该深引在 @ts-nocheck 下静默(不解析也不报错、不进入检查程序), 与升级前 pnpm 8 的 8 个基线错误一致.
+# (@antv/g6 是直接依赖、本就在顶层, 其运行时用自身私有的 @antv/g-base, 不依赖顶层提升; IElement 是纯类型, 构建期被擦除.)
+publicHoistPattern:
+  - '@pixi/utils'
+
+# 沿用升级前的宽松 peer 解析 (传递 peer 不满足时不致安装失败).
+strictPeerDependencies: false
+
+# pnpm 10+ 以白名单方式管控依赖的 build script (strictDepBuilds 默认开启).
+# 下列两个包沿用 pnpm 8 时代的构建行为:
+#   - esbuild         : 由 @intlify/bundle-utils (vue-i18n 消息编译) 在构建期调用, 需其平台原生二进制.
+#   - @parcel/watcher : 供 sass / vite 的文件监听 (dev/watch), 需其平台原生二进制.
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': true
+
+# pnpm 11 默认对"刚发布不久"的版本施加冷却期 (minimumReleaseAge), 并会自动写入按 包@版本 钉死的
+# minimumReleaseAgeExclude 列表 —— 该列表随依赖变动而腐化. 本项目依赖解析完全由 pnpm-lock.yaml 锁定,
+# 故关闭冷却期以保持安装确定性 (与升级前 pnpm 8 的行为一致).
+minimumReleaseAge: 0

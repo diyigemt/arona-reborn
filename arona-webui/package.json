@@ -2,7 +2,7 @@
   "name": "arona-webui-frontend",
   "version": "0.0.1",
   "author": "diyigemt",
-  "packageManager": "pnpm@8.15.7",
+  "packageManager": "pnpm@11.4.0",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
@@ -70,7 +70,7 @@
     "markdown-it-prism": "^3.0.1",
     "prettier": "^3.8.3",
     "sass": "^1.100.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.0",
     "unocss": "^66.7.0",
     "unocss-preset-daisy": "^7.0.0",

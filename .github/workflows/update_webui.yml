@@ -22,13 +22,13 @@ jobs:
       with:
         fetch-depth: 0
     # Set up Node.js environment
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
         node-version: '22.x'
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
       name: Install pnpm
       with:
-        version: 8
+        version: 11.4.0
         cache: false
     - name: Build
       run: |

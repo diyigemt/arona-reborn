@@ -1,4 +1,4 @@
-import type { Edge, Node, Position } from "@vue-flow/core";
+import { MarkerType, type Edge, type Node, type Position } from "@vue-flow/core";
 import type {
   Policy,
   PolicyNode,
@@ -400,8 +400,12 @@ export function treeToFlow(
         id: `e:${visibleParentId}->${node.id}`,
         source: visibleParentId,
         target: node.id,
-        type: "bezier",
+        type: "step",
         style: { stroke: EDGE_STROKE },
+        markerEnd: {
+          type: MarkerType.Arrow,
+          color: "transparent",
+        },
       });
     }
 

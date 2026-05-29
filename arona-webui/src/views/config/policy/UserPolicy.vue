@@ -21,7 +21,7 @@
   </ElForm>
   <VueFlow
     :id="FLOW_ID"
-    class="w-100% h-480px rounded-5px container"
+    class="w-100% !h-480px rounded-5px container"
     :nodes="nodes"
     :edges="edges"
     :node-types="nodeTypes"
@@ -199,7 +199,10 @@ const FLOW_ID = "user-policy-graph";
 const policyGraph = usePolicyGraph();
 const { nodes, edges } = policyGraph;
 // 与 <VueFlow :id> 同 id, 保证父级 fitView 操作的是同一个图实例。
-const { fitView } = useVueFlow(FLOW_ID);
+const { fitView } = useVueFlow({
+  id: FLOW_ID,
+  snapToGrid: true,
+});
 const nodeTypes = {
   "policy-root": markRaw(PolicyRootNode),
   "policy-node": markRaw(PolicyNodeNode),

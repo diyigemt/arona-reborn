@@ -1,0 +1,84 @@
+// 策略节点共享视觉基座。被三个节点组件的 scoped <style> @import，
+// 复刻旧 G6 rectConfig（202x60 / #ecf5ff / #a0cfff / radius4）与状态色（allow/deny）。
+.policy-flow-node {
+  position: relative;
+  box-sizing: border-box;
+  width: 202px;
+  height: 60px;
+  border: 1px solid #a0cfff;
+  border-radius: 4px;
+  background: #ecf5ff;
+  color: #409eff;
+  font-size: 12px;
+  line-height: 1.2;
+
+  &.is-allow {
+    border-color: #b3e19d;
+    background: #f0f9eb;
+    color: #67c23a;
+  }
+
+  &.is-deny {
+    border-color: #fab6b6;
+    background: #fef0f0;
+    color: #f56c6c;
+  }
+}
+
+// 内嵌动作按钮（E / + / - / 折叠）通用样式。
+.node-action,
+.collapse-action {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #409eff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.node-action-edit {
+  top: 4px;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.node-action-append {
+  top: 3px;
+  right: 26px;
+  width: 16px;
+  height: 16px;
+  font-size: 20px;
+}
+
+.node-action-remove {
+  right: 10px;
+  bottom: 2px;
+  width: 16px;
+  height: 18px;
+  color: #f56c6c;
+  font-size: 24px;
+}
+
+// 折叠开关：贴右缘外侧，白底蓝框，复刻旧 collapse-back/collapse-text。
+.collapse-action {
+  top: 22px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #a0cfff;
+  background: #fff;
+  color: #a0cfff;
+  font-size: 16px;
+}
+
+// 句柄：小圆点，蓝框白底，与边色一致。
+:deep(.vue-flow__handle) {
+  width: 6px;
+  height: 6px;
+  border-color: #a0cfff;
+  background: #fff;
+}

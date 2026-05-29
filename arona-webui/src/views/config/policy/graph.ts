@@ -1,551 +1,93 @@
-// @ts-nocheck
-import { Ref, watch } from "vue";
-import G6, { IG6GraphEvent, IGroup, TreeGraph } from "@antv/g6";
-import { IElement } from "@antv/g-base/src/interfaces";
-import { PolicyTestResultStatus } from "@/views/config/policy/util";
+import { ref } from "vue";
+import type { Edge } from "@vue-flow/core";
+import {
+  addChildNode,
+  removeNode,
+  treeToFlow,
+  updateNodeData,
+  type GraphRoot,
+  type PolicyFlowNode,
+  type PolicyNodeStatus,
+  type UpdateNodePatch,
+} from "@/views/config/policy/model";
+import { layoutWithDagre } from "@/views/config/policy/layout";
 
-export function initGraph(container: HTMLDivElement, data: unknown) {
-  const { width, height } = useElementBounding(container);
-  const tooltip = new G6.Tooltip({
-    offsetX: 20,
-    offsetY: 30,
-    itemTypes: ["node"],
-    getContent: (e) => {
-      if (!e || !e.item) return "";
-      const outDiv = document.createElement("div");
-      const nodeName = e.item.getModel().name || e.item.getModel().formater;
-      if (!nodeName) return "";
-      if (typeof nodeName === "function") {
-        return nodeName();
-      }
-      return nodeName.toString();
-    },
-    shouldBegin: (e) => {
-      if (!e) return false;
-      const name = e.target.get("name");
-      return ["name-shape", "mask-label-shape", "rule-name-item"].includes(name);
-    },
-  });
-  const graph = new G6.TreeGraph({
-    container,
-    width: width.value,
-    height: height.value,
-    ...defaultConfig,
-    plugins: [tooltip],
-  });
-  registerNodes(graph);
-  graph.data(data);
-  graph.render();
+// addChildNode 第三参的 payload 联合类型（model 未单独导出，这里按签名取用）。
+type AddChildPayload = Parameters<typeof addChildNode>[2];
 
-  function handleCollapse(e: IG6GraphEvent) {
-    const { target } = e;
-    const id = target.get("modelId");
-    const item = graph.findById(id);
-    const nodeModel = item.getModel();
-    nodeModel.collapsed = !nodeModel.collapsed;
-    graph.layout();
-    graph.setItemState(item, "collapse", nodeModel.collapsed as boolean);
+function createEmptyRoot(): GraphRoot {
+  return { id: "", kind: "policy-root", parent: "", name: "", effect: "ALLOW", children: [] };
+}
+
+/**
+ * 策略树 ↔ Vue Flow 视图的编排组合式函数。
+ *
+ * graphData（嵌套树）是唯一可写真源，onSave 经 getData()→mapGraphToPolicy 读它；
+ * nodes/edges 始终由 treeToFlow + dagre 从 graphData 派生（rebuild），组件只读。
+ * 任何结构/数据突变都先清除测试状态（status 不跨编辑保留），再 rebuild。
+ */
+export function usePolicyGraph() {
+  let graphData: GraphRoot = createEmptyRoot();
+  const collapsed = new Set<string>();
+  let statusById = new Map<string, PolicyNodeStatus>();
+  const nodes = ref<PolicyFlowNode[]>([]);
+  const edges = ref<Edge[]>([]);
+
+  function rebuild(): void {
+    const flow = treeToFlow(graphData, { collapsed, statusById });
+    nodes.value = layoutWithDagre(flow.nodes, flow.edges);
+    edges.value = flow.edges;
   }
-  graph.on("collapse-text:click", (e) => {
-    handleCollapse(e);
-  });
-  graph.on("collapse-back:click", (e) => {
-    handleCollapse(e);
-  });
 
-  // 监听画布缩放，缩小到一定程度，节点显示缩略样式
-  let currentLevel = 1;
-  const briefZoomThreshold = Math.max(graph.getZoom(), 0.5);
-  graph.on("viewportchange", (e) => {
-    if (e.action !== "zoom") return;
-    const currentZoom = graph.getZoom();
-    let toLevel = currentLevel;
-    if (currentZoom < briefZoomThreshold) {
-      toLevel = 0;
+  function clearStatus(): void {
+    if (statusById.size) statusById = new Map();
+  }
+
+  /** 切换 / 新建 / 导入策略：重置树、折叠与测试状态。 */
+  function setData(root: GraphRoot): void {
+    graphData = root;
+    collapsed.clear();
+    clearStatus();
+    rebuild();
+  }
+
+  /** 供 onSave / onDelete / doTest 读取当前最新树。 */
+  function getData(): GraphRoot {
+    return graphData;
+  }
+
+  function addChild(parentId: string, payload: AddChildPayload): void {
+    addChildNode(graphData, parentId, payload);
+    clearStatus();
+    rebuild();
+  }
+
+  function update(id: string, patch: UpdateNodePatch): void {
+    updateNodeData(graphData, id, patch);
+    clearStatus();
+    rebuild();
+  }
+
+  function remove(id: string): void {
+    removeNode(graphData, id, collapsed);
+    clearStatus();
+    rebuild();
+  }
+
+  /** 测试结果上色（当前仅根节点）。不清状态——这本身就是要展示的状态。 */
+  function setStatus(id: string, status: PolicyNodeStatus): void {
+    statusById = new Map(statusById).set(id, status);
+    rebuild();
+  }
+
+  function toggleCollapse(id: string): void {
+    if (collapsed.has(id)) {
+      collapsed.delete(id);
     } else {
-      toLevel = 1;
+      collapsed.add(id);
     }
-    if (toLevel !== currentLevel) {
-      currentLevel = toLevel;
-      graph.getNodes().forEach((node) => {
-        graph.updateItem(node, {
-          level: toLevel,
-        });
-      });
-    }
-  });
-  const effectHandle = watch(
-    () => [width.value, height.value],
-    (cur) => {
-      graph.changeSize(cur[0], cur[1]);
-    },
-  );
-  return {
-    graph,
-    destroy() {
-      effectHandle();
-      graph.destroy();
-    },
-  };
-}
+    rebuild();
+  }
 
-// 默认配置
-const defaultConfig = {
-  modes: {
-    default: ["zoom-canvas", "drag-canvas"],
-  },
-  fitView: true,
-  fitViewPadding: [20, 50],
-  animate: true,
-  defaultNode: {
-    type: "policy-root",
-  },
-  defaultEdge: {
-    type: "cubic-horizontal",
-    style: {
-      stroke: "#a0cfff",
-    },
-  },
-  layout: {
-    type: "indented",
-    direction: "LR",
-    dropCap: false,
-    indent: 300,
-    getHeight: () => {
-      return 60;
-    },
-  },
-};
-const rectConfig = {
-  width: 202,
-  height: 60,
-  lineWidth: 1,
-  fontSize: 12,
-  fill: "#ecf5ff",
-  radius: 4,
-  stroke: "#a0cfff",
-  opacity: 1,
-};
-
-const nodeOrigin = {
-  x: -rectConfig.width / 2,
-  y: -rectConfig.height / 2,
-};
-export const colors = {
-  Permit: "#67c23a",
-  Reject: "#f56c6c",
-  Normal: "#409eff",
-};
-const textConfig = {
-  textAlign: "left",
-  textBaseline: "bottom",
-  fill: colors.Normal,
-};
-const StatusColor = {
-  allow: {
-    bg: "#f0f9eb",
-    border: "#b3e19d",
-    text: "#67c23a",
-  },
-  deny: {
-    bg: "#fef0f0",
-    border: "#fab6b6",
-    text: "#f56c6c",
-  },
-};
-function updateColor(root: IElement, text: IElement[], status: PolicyTestResultStatus) {
-  root?.attr({
-    stroke: StatusColor[status].border,
-    fill: StatusColor[status].bg,
-  });
-  text
-    .filter((it) => it)
-    .forEach((it) => {
-      it.attr({
-        fill: StatusColor[status].text,
-      });
-    });
-}
-function addCollapse(group: IGroup, id: string, collapsed: boolean) {
-  group.addShape("rect", {
-    attrs: {
-      x: rectConfig.width / 2 - 8,
-      y: -8,
-      width: 16,
-      height: 16,
-      stroke: "#a0cfff",
-      cursor: "pointer",
-      fill: "#fff",
-    },
-    name: "collapse-back",
-    modelId: id,
-  });
-
-  // collpase text
-  group.addShape("text", {
-    attrs: {
-      x: rectConfig.width / 2,
-      y: 0,
-      textAlign: "center",
-      textBaseline: "middle",
-      text: collapsed ? "+" : "-",
-      fontSize: 16,
-      cursor: "pointer",
-      fill: "#a0cfff",
-    },
-
-    name: "collapse-text",
-    modelId: id,
-  });
-}
-function addEdit(group: IGroup, id: string) {
-  // collpase text
-  group.addShape("text", {
-    attrs: {
-      x: rectConfig.width / 2 - 16,
-      y: -rectConfig.height / 2 + 14,
-      textAlign: "center",
-      textBaseline: "middle",
-      text: "E",
-      fontSize: 16,
-      cursor: "pointer",
-      fill: colors.Normal,
-    },
-
-    name: "edit-text",
-    modelId: id,
-  });
-}
-function addChild(group: IGroup, id: string) {
-  // collpase text
-  group.addShape("text", {
-    attrs: {
-      x: rectConfig.width / 2 - 32,
-      y: -rectConfig.height / 2 + 13,
-      textAlign: "center",
-      textBaseline: "middle",
-      text: "+",
-      fontSize: 20,
-      cursor: "pointer",
-      fill: colors.Normal,
-    },
-
-    name: "append-child",
-    modelId: id,
-  });
-}
-function addRemove(group: IGroup, id: string) {
-  // collpase text
-  group.addShape("text", {
-    attrs: {
-      x: rectConfig.width / 2 - 16,
-      y: rectConfig.height / 2 - 8,
-      textAlign: "center",
-      textBaseline: "middle",
-      text: "-",
-      fontSize: 24,
-      cursor: "pointer",
-      fill: colors.Reject,
-    },
-
-    name: "remove-self",
-    modelId: id,
-  });
-}
-function registerNodes(graph: TreeGraph) {
-  G6.registerNode(
-    "policy-root",
-    {
-      shapeType: "policy-root",
-      draw(config, group) {
-        const { name, effect, collapsed } = config;
-
-        const rect = group.addShape("rect", {
-          attrs: {
-            x: nodeOrigin.x,
-            y: nodeOrigin.y,
-            ...rectConfig,
-          },
-          name: "root-shape",
-        });
-
-        const rectBBox = rect.getBBox();
-        // label title
-        group.addShape("text", {
-          attrs: {
-            ...textConfig,
-            x: 12 + nodeOrigin.x,
-            y: 20 + nodeOrigin.y,
-            text: name.length > 28 ? `${name.substring(0, 28)}...` : name,
-            fontSize: 12,
-            opacity: 0.85,
-            cursor: "pointer",
-          },
-          name: "name-shape",
-        });
-        group.addShape("text", {
-          attrs: {
-            ...textConfig,
-            x: 12 + nodeOrigin.x,
-            y: 50 + nodeOrigin.y,
-            text: effect,
-            fontSize: 12,
-            opacity: 0.85,
-          },
-          name: "effect",
-        });
-        addEdit(group, config.id);
-        addChild(group, config.id);
-        // collapse rect
-        if (config.children) {
-          addCollapse(group, config.id, collapsed);
-        }
-
-        this.drawLinkPoints(config, group);
-        return rect;
-      },
-
-      update(config, item) {
-        const { level, form, effect, status, name } = config;
-        const group = item.getContainer();
-        const maskLabel = group.find((ele) => ele.get("name") === "mask-label-shape");
-        // if (level === 0) {
-        //   group.get("children").forEach((child) => {
-        //     if (child.get("name")?.includes("collapse")) return;
-        //     if (child.get("name")?.includes("root-shape")) return;
-        //     child.hide();
-        //   });
-        //   if (!maskLabel) {
-        //     maskLabel = group.addShape("text", {
-        //       attrs: {
-        //         fontSize: 20,
-        //         x: 0,
-        //         y: 0,
-        //         text: effect,
-        //         textAlign: "center",
-        //         textBaseline: "middle",
-        //         fill: colors.Normal,
-        //       },
-        //
-        //       name: "mask-label-shape",
-        //     });
-        //     const collapseRect = group.find((ele) => ele.get("name") === "collapse-back");
-        //     const collapseText = group.find((ele) => ele.get("name") === "collapse-text");
-        //     collapseRect?.toFront();
-        //     collapseText?.toFront();
-        //   } else {
-        //     maskLabel.show();
-        //   }
-        //   maskLabel.animate({ opacity: 1 }, 200);
-        //   return maskLabel;
-        // }
-        group.get("children").forEach((child) => {
-          if (child.get("name")?.includes("collapse")) return;
-          child.show();
-        });
-        maskLabel?.animate(
-          { opacity: 0 },
-          {
-            duration: 200,
-            callback: () => maskLabel.hide(),
-          },
-        );
-        if (form) {
-          // 更新表单信息
-          const effectEl = group.findAllByName("effect")[0];
-          const nameShapeEl = group.findAllByName("name-shape")[0];
-          effectEl?.attr("text", effect);
-          nameShapeEl?.attr("text", name);
-          maskLabel?.attr("text", effect);
-        }
-        if (status) {
-          const rootReact = group.find((ele) => ele.get("name") === "root-shape");
-          const text1 = group.find((ele) => ele.get("name") === "name-shape");
-          const text2 = group.find((ele) => ele.get("name") === "effect");
-          updateColor(rootReact, [text1, text2], status);
-        }
-        this.updateLinkPoints(config, group);
-      },
-      setState(name, value, item) {
-        if (name === "collapse") {
-          const group = item.getContainer();
-          const collapseText = group.find((e) => e.get("name") === "collapse-text");
-          if (collapseText) {
-            if (!value) {
-              collapseText.attr({
-                text: "-",
-              });
-            } else {
-              collapseText.attr({
-                text: "+",
-              });
-            }
-          }
-        }
-      },
-      getAnchorPoints() {
-        return [
-          [0, 0.5],
-          [1, 0.5],
-        ];
-      },
-    },
-    "rect",
-  );
-  G6.registerNode(
-    "policy-node",
-    {
-      shapeType: "policy-node",
-      draw(config, group) {
-        const { groupType, collapsed } = config;
-
-        const rect = group.addShape("rect", {
-          attrs: {
-            x: nodeOrigin.x,
-            y: nodeOrigin.y,
-            ...rectConfig,
-          },
-          name: "root-shape",
-        });
-
-        const rectBBox = rect.getBBox();
-        // label title
-        group.addShape("text", {
-          attrs: {
-            ...textConfig,
-            fontSize: 20,
-            x: 0,
-            y: 0,
-            text: groupType,
-            textAlign: "center",
-            textBaseline: "middle",
-            fill: colors.Normal,
-          },
-
-          name: "name-item",
-        });
-        addEdit(group, config.id);
-        addChild(group, config.id);
-        addRemove(group, config.id);
-        // collapse rect
-        if (config.children) {
-          addCollapse(group, config.id, collapsed);
-        }
-
-        this.drawLinkPoints(config, group);
-        return rect;
-      },
-      update(config, item) {
-        const { form, groupType, status } = config;
-        const group = item.getContainer();
-        if (form) {
-          // 更新表单信息
-          const nameEl = group.findAllByName("name-item")[0];
-          nameEl?.attr("text", groupType);
-        }
-        if (status) {
-          const rootReact = group.find((ele) => ele.get("name") === "root-shape");
-          const text1 = group.find((ele) => ele.get("name") === "name-item");
-          updateColor(rootReact, [text1], status);
-        }
-        this.updateLinkPoints(config, group);
-        this.updateLinkPoints(config, group);
-      },
-      setState(name, value, item) {
-        if (name === "collapse") {
-          const group = item.getContainer();
-          const collapseText = group.find((e) => e.get("name") === "collapse-text");
-          if (collapseText) {
-            if (!value) {
-              collapseText.attr({
-                text: "-",
-              });
-            } else {
-              collapseText.attr({
-                text: "+",
-              });
-            }
-          }
-        }
-      },
-      getAnchorPoints() {
-        return [
-          [0, 0.5],
-          [1, 0.5],
-        ];
-      },
-    },
-    "rect",
-  );
-  G6.registerNode(
-    "policy-rule",
-    {
-      shapeType: "policy-rule",
-      draw(config, group) {
-        const { oType, operator, key, value } = config;
-        const rect = group.addShape("rect", {
-          attrs: {
-            x: nodeOrigin.x,
-            y: nodeOrigin.y,
-            ...rectConfig,
-          },
-          name: "root-shape",
-        });
-
-        const rectBBox = rect.getBBox();
-        const valueMap = Array.isArray(value) ? value.join(",") : value;
-        const text = `${oType}.${key} ${operator}\n${valueMap}`;
-        config.name = `[${oType}.${key}] ${operator}\n[${valueMap}]`;
-        // label title
-        group.addShape("text", {
-          attrs: {
-            ...textConfig,
-            fontSize: 12,
-            lineHeight: 16,
-            x: 0,
-            y: 0,
-            text,
-            textAlign: "center",
-            textBaseline: "middle",
-            fill: colors.Normal,
-            cursor: "pointer",
-          },
-
-          name: "rule-name-item",
-        });
-        addEdit(group, config.id);
-        addChild(group, config.id);
-        addRemove(group, config.id);
-
-        this.drawLinkPoints(config, group);
-        return rect;
-      },
-      update(config, item) {
-        const { form, oType, operator, key, value, status } = config;
-        const group = item.getContainer();
-        const valueMap = Array.isArray(value) ? value.join(",") : value;
-        if (form) {
-          // 更新表单信息
-          const nameEl = group.findAllByName("rule-name-item")[0];
-          const text = `${oType}.${key} ${operator}\n${valueMap}`;
-          config.name = `[${oType}.${key}] ${operator}\n[${valueMap}]`;
-          nameEl?.attr("text", text);
-        }
-        if (status) {
-          const rootReact = group.find((ele) => ele.get("name") === "root-shape");
-          const text1 = group.find((ele) => ele.get("name") === "rule-name-item");
-          updateColor(rootReact, [text1], status);
-        }
-        this.updateLinkPoints(config, group);
-      },
-      setState(name, value, item) {},
-      getAnchorPoints() {
-        return [
-          [0, 0.5],
-          [1, 0.5],
-        ];
-      },
-    },
-    "rect",
-  );
+  return { nodes, edges, rebuild, setData, getData, addChild, update, remove, setStatus, toggleCollapse };
 }

@@ -13,12 +13,13 @@ import "element-plus/dist/index.css";
 import { setApp } from "@/utils/vueTools";
 
 const i18n = createI18n({
+  // 全应用使用 useI18n() 组合式 API; vue-i18n 10 起 legacy 模式不再允许组合式 API, 故显式关闭 legacy.
+  legacy: false,
   locale: "zh-cn",
   fallbackLocale: "zh",
   messages,
 });
 
-// eslint-disable-next-line no-extend-native
 String.prototype.toMongodbKey = function toMongodbKey() {
   return this.replace(/[.]/g, "·");
 };

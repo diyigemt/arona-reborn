@@ -4,7 +4,6 @@ import G6, { IG6GraphEvent, IGroup, TreeGraph } from "@antv/g6";
 import { IElement } from "@antv/g-base/src/interfaces";
 import { PolicyTestResultStatus } from "@/views/config/policy/util";
 
-// eslint-disable-next-line import/prefer-default-export
 export function initGraph(container: HTMLDivElement, data: unknown) {
   const { width, height } = useElementBounding(container);
   const tooltip = new G6.Tooltip({
@@ -305,7 +304,7 @@ function registerNodes(graph: TreeGraph) {
         this.drawLinkPoints(config, group);
         return rect;
       },
-      // eslint-disable-next-line consistent-return
+
       update(config, item) {
         const { level, form, effect, status, name } = config;
         const group = item.getContainer();

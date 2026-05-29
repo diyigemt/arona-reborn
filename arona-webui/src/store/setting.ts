@@ -1,8 +1,7 @@
 import { defineStore } from "pinia";
 import { SettingStoreState } from "./type";
 
-const useSettingStore = defineStore({
-  id: "setting",
+const useSettingStore = defineStore("setting", {
   state: (): SettingStoreState => ({
     theme: {
       themeType: "亮蓝色",
@@ -13,9 +12,7 @@ const useSettingStore = defineStore({
     getThemeType: (state: SettingStoreState) => state.theme.themeType,
     getThemeColor: (state: SettingStoreState) => state.theme.themeColor,
   },
-  actions: {
-
-  },
+  actions: {},
   persist: {
     key: "setting",
   },

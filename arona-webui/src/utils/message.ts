@@ -1,8 +1,5 @@
 import { ElMessage, ElMessageBox } from "element-plus";
-import {
-  ElMessageBoxOptions,
-  MessageBoxData,
-} from "element-plus/es/components/message-box/src/message-box.type";
+import { ElMessageBoxOptions, MessageBoxData } from "element-plus/es/components/message-box/src/message-box.type";
 
 export function infoMessage(info: any) {
   return ElMessage.info(info);

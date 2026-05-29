@@ -1,7 +1,6 @@
 import service, { simplifiedApiService } from "@/api/http";
 import { PluginConfigSchema } from "@/interface/pluginSchema";
 
-// eslint-disable-next-line import/prefer-default-export
 export const PluginPreferenceApi = {
   fetchPluginPreference(pluginId: string, preferenceKey: string) {
     return simplifiedApiService(

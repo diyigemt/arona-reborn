@@ -22,7 +22,6 @@ function splitAndSort(data: string[]): string[] {
   return entry.map(([key, value]) => value.map((it) => (it ? `${key}:${it}` : key))).flat();
 }
 
-// eslint-disable-next-line import/prefer-default-export
 export const PolicyApi = {
   fetchUserDefinePolicy() {
     return service.raw<Policy[]>({

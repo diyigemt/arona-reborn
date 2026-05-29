@@ -8,7 +8,7 @@ import { useForceUpdate } from "@/utils";
 defineOptions({
   name: "CustomMenu",
 });
-// eslint-disable-next-line no-undef
+
 const props = withDefaults(defineProps<{ data: CustomMenuConfig }>(), {
   data: () => ({
     rows: [

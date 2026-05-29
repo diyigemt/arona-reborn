@@ -1,6 +1,5 @@
 import { defineConfig, loadEnv, normalizePath } from "vite";
 import { resolve } from "path";
-import VueTypeImports from "vite-plugin-vue-type-imports";
 import { compression } from "vite-plugin-compression2";
 import UnoCss from "unocss/vite";
 
@@ -18,7 +17,6 @@ export default defineConfig((env) => {
     // 插件
     plugins: [
       presets(env),
-      VueTypeImports(),
       viteStaticCopy({
         targets: [
           {
@@ -30,7 +28,9 @@ export default defineConfig((env) => {
       }),
       UnoCss(),
       compression({
-        exclude: /\.(skel|atlas|webm|webp)(\?.*|)$/
+        // 显式仅 gzip: 与升级前一致, 避免 v2 默认额外产出 .br 改变部署侧静态压缩预期.
+        algorithms: ["gzip"],
+        exclude: /\.(skel|atlas|webm|webp)(\?.*|)$/,
       }),
     ],
     // 别名设置
@@ -60,7 +60,9 @@ export default defineConfig((env) => {
       reportCompressedSize: false,
       // 消除打包大小超过500kb警告
       chunkSizeWarningLimit: 2000,
-      minify: "esbuild",
+      // Vite 8 起默认打包器为 Rolldown, 不再内置 esbuild; minify:true 走 Rolldown 自带的 Oxc 压缩器.
+      // (旧值 "esbuild" 在 Vite 8 下需额外安装 esbuild 依赖才可用, 已无必要.)
+      minify: true,
       assetsDir: "static/assets",
       target: "esnext",
       // 静态资源打包到dist下的不同目录
@@ -76,10 +78,10 @@ export default defineConfig((env) => {
       preprocessorOptions: {
         // 全局引入了 scss 的文件
         scss: {
-          additionalData: `
-          @import "@/assets/styles/variables.scss";
-        `,
-          javascriptEnabled: true,
+          api: "modern-compiler",
+          additionalData: `@import "@/assets/styles/variables.scss";`,
+          // 仍沿用 @import 注入全局变量, 暂不迁移到 @use; 静音其废弃告警避免污染构建日志.
+          silenceDeprecations: ["legacy-js-api", "import"],
         },
       },
     },

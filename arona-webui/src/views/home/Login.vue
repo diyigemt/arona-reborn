@@ -78,7 +78,11 @@
         <div v-if="respErrorMessage">{{ respErrorMessage }}</div>
         <el-text class="mt-4"
           >不会使用?
-          <el-link type="primary" href="https://doc.arona.diyigemt.com/v2/manual/webui" target="_blank" rel="noopener noreferrer"
+          <el-link
+            type="primary"
+            href="https://doc.arona.diyigemt.com/v2/manual/webui"
+            target="_blank"
+            rel="noopener noreferrer"
             >访问arona在线文档</el-link
           ></el-text
         >
@@ -89,7 +93,8 @@
     <div class="absolute bottom-16px w-full text-center">
       <ElLink
         href="https://beian.miit.gov.cn/"
-        target="_blank" rel="noopener noreferrer"
+        target="_blank"
+        rel="noopener noreferrer"
         class="text-xl!"
         :class="{ 'color-black!': pvSelector === 0, 'color-white!': pvSelector !== 0 }"
         >桂ICP备2022008499号-2</ElLink

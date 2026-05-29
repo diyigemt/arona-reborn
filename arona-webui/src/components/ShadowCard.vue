@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-const props = withDefaults(defineProps<{ disablePaddingTop: boolean }>(), {
+const props = withDefaults(defineProps<{ disablePaddingTop?: boolean }>(), {
   disablePaddingTop: false,
 });
 const paddingTop = computed(() => {

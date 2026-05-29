@@ -175,7 +175,6 @@ const VoiceList = [
   "Zunko_Title.ogg",
 ];
 
-// eslint-disable-next-line import/prefer-default-export
 export function playLoginVoice() {
   const index = randomInt(0, VoiceList.length);
   const fileName = VoiceList[index];

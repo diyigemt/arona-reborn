@@ -1,7 +1,6 @@
 import { AxiosError, AxiosPromise, AxiosRequestConfig, AxiosResponse } from "axios";
 import { instanceObject } from "@/utils/format";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface IRequestConfig<D = any> extends AxiosRequestConfig<D> {
   // 当网络请求错误时是否显示错误
   showResponseError?: boolean;
@@ -13,13 +12,13 @@ export interface IRequestConfig<D = any> extends AxiosRequestConfig<D> {
 }
 
 // @ts-ignore
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export interface IResponseError<T = any, D = any> extends AxiosError<T, D> {
   config: IRequestConfig<D>;
 }
 
 // @ts-ignore
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export interface IResponse<T = any, D = any> extends AxiosResponse<T, D> {
   config: IRequestConfig<D>;
 }

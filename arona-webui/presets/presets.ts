@@ -6,8 +6,7 @@ import Components from 'unplugin-vue-components/vite';
 import Icons from 'unplugin-icons/vite';
 import IconsResolver from 'unplugin-icons/resolver';
 import { ElementPlusResolver, VueUseComponentsResolver } from 'unplugin-vue-components/resolvers';
-// @ts-ignore
-import Markdown from 'vite-plugin-md';
+import Markdown from 'unplugin-vue-markdown/vite';
 import Prism from 'markdown-it-prism';
 import ViteFonts from 'unplugin-fonts/vite';
 import VueI18n from '@intlify/unplugin-vue-i18n/vite';
@@ -22,10 +21,6 @@ export default (env: ConfigEnv) => {
   return [
     vue({
       include: [/\.vue$/, /\.md$/],
-      script: {
-        propsDestructure: true,
-        defineModel: true,
-      },
     }),
     vueJsx(),
     svgLoader(),

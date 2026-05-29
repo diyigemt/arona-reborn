@@ -34,9 +34,9 @@ const props = withDefaults(
     pKey: string;
     form: Record<string, never> | object;
     defaultForm: Record<string, never> | object;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     dataProcessor?: (data: any) => any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     postDataProcessor?: (data: any) => any;
   }>(),
   {
@@ -44,9 +44,9 @@ const props = withDefaults(
     pKey: "",
     form: () => ({}),
     defaultForm: () => ({}),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     dataProcessor: (data: any) => data,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     postDataProcessor: (data: any) => data,
   },
 );
@@ -88,9 +88,7 @@ function cloneConfig(data: object): Record<string, unknown> {
 }
 
 // "无数据" 判定: null / undefined / 空对象都视为没有持久化, 走 defaultForm. 历史用 "" / "{}" 哨兵已下线.
-function hasConfigData(
-  data: Record<string, unknown> | null | undefined,
-): data is Record<string, unknown> {
+function hasConfigData(data: Record<string, unknown> | null | undefined): data is Record<string, unknown> {
   return data != null && typeof data === "object" && Object.keys(data).length > 0;
 }
 

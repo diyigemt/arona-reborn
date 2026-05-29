@@ -24,7 +24,7 @@ jobs:
     # Set up Node.js environment
     - uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
+        node-version: '22.x'
     - uses: pnpm/action-setup@v4
       name: Install pnpm
       with:

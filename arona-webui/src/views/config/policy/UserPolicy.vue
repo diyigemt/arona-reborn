@@ -346,7 +346,6 @@ function onPropertySelectChange(type: "object" | "key") {
 }
 function onOperatorSelectChange() {
   if (isPolicyRuleValueArrayInput.value) {
-    // eslint-disable-next-line no-nested-ternary
     policyRuleForm.value.value = Array.isArray(policyRuleForm.value.value)
       ? policyRuleForm.value.value
       : policyRuleForm.value.value

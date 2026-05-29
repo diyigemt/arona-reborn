@@ -2,8 +2,7 @@ import { defineStore } from "pinia";
 import { BaseStoreState } from "./type";
 import { User } from "@/interface";
 
-const useBaseStore = defineStore({
-  id: "common",
+const useBaseStore = defineStore("common", {
   state: (): BaseStoreState => ({
     token: "",
     // @ts-ignore
@@ -29,7 +28,7 @@ const useBaseStore = defineStore({
   // 仅持久化 user 字段; token 留在内存, 页面刷新后必须重新登录, 避免 XSS 通过 localStorage 拿走 token.
   persist: {
     key: "base",
-    paths: ["user"],
+    pick: ["user"],
   },
 });
 export default useBaseStore;

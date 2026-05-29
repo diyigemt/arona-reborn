@@ -1,7 +1,6 @@
 import service, { simplifiedApiService } from "@/api/http";
 import { Contact, EditableContact, ContactUpdateReq, ContactMember, ContactRole, Policy } from "@/interface";
 
-// eslint-disable-next-line import/prefer-default-export
 export const ContactApi = {
   fetchContacts() {
     return simplifiedApiService(
@@ -29,9 +28,8 @@ export const ContactApi = {
         },
       }),
     ).then((data) => {
-      // eslint-disable-next-line no-return-assign
       data.roles.forEach((it) => (it.edit = false));
-      // eslint-disable-next-line no-return-assign
+
       data.members.forEach((it) => (it.edit = false));
       return data;
     });
@@ -46,9 +44,8 @@ export const ContactApi = {
         },
       }),
     ).then((data) => {
-      // eslint-disable-next-line no-return-assign
       data.roles.forEach((it) => (it.edit = false));
-      // eslint-disable-next-line no-return-assign
+
       data.members.forEach((it) => (it.edit = false));
       return data;
     });

@@ -1,7 +1,6 @@
 import service from "@/api/http";
 import { Student } from "@/interface";
 
-// eslint-disable-next-line import/prefer-default-export
 export const GachaApi = {
   fetchStudents() {
     return service

@@ -89,7 +89,12 @@ export const CustomRow = defineComponent({
     return () => (
       <ElRow gutter={16}>
         {buttons.value.map((it, index) => (
-          <CustomButton button={it} key={index} onUpdate:button={onButtonUpdate} onDelete={() => onButtonDelete(index)} />
+          <CustomButton
+            button={it}
+            key={index}
+            onUpdate:button={onButtonUpdate}
+            onDelete={() => onButtonDelete(index)}
+          />
         ))}
         <ElCol
           class={"max-w-60px!"}

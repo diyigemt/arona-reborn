@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { inject, reactive, ref, watch } from "vue";
 import type { Ref } from "vue";
-import type {
-  ConfigFieldSchema,
-  ConfigFieldType,
-  FieldError,
-} from "@/interface/pluginSchema";
+import type { ConfigFieldSchema, ConfigFieldType, FieldError } from "@/interface/pluginSchema";
 import { resolveWidget } from "@/components/plugin/widgetRegistry";
 
 const props = defineProps<{
@@ -41,6 +37,7 @@ function ensureNestedObject(field: ConfigFieldSchema): Record<string, unknown> {
   let nested = props.modelValue[field.key] as Record<string, unknown> | undefined;
   if (nested == null || typeof nested !== "object") {
     nested = {};
+    // eslint-disable-next-line vue/no-mutating-props -- 见顶部 modelValue 注释: 本组件按设计直接 mutate 传入的共享 reactive 对象.
     props.modelValue[field.key] = nested;
   }
   return nested;
@@ -59,6 +56,7 @@ function readString(field: ConfigFieldSchema): string {
   return typeof v === "string" ? v : "";
 }
 function setValue(field: ConfigFieldSchema, val: unknown): void {
+  // eslint-disable-next-line vue/no-mutating-props -- 见顶部 modelValue 注释: 本组件按设计直接 mutate 传入的共享 reactive 对象.
   props.modelValue[field.key] = val;
 }
 
@@ -107,12 +105,7 @@ function fallbackError(field: ConfigFieldSchema): string | undefined {
   return fallbackErrors[pathOf(field)] ?? errorOf(pathOf(field));
 }
 
-const FALLBACK_TYPES: ReadonlySet<ConfigFieldType> = new Set([
-  "array",
-  "map",
-  "polymorphic",
-  "unknown",
-]);
+const FALLBACK_TYPES: ReadonlySet<ConfigFieldType> = new Set(["array", "map", "polymorphic", "unknown"]);
 
 function isFallback(field: ConfigFieldSchema): boolean {
   return FALLBACK_TYPES.has(field.type);
@@ -132,10 +125,7 @@ function isFallback(field: ConfigFieldSchema): boolean {
       @update:model-value="(v: unknown) => setValue(field, v)"
     />
 
-    <fieldset
-      v-else-if="field.type === 'object'"
-      class="dyn-config-fieldset"
-    >
+    <fieldset v-else-if="field.type === 'object'" class="dyn-config-fieldset">
       <legend>{{ field.label }}</legend>
       <DynamicConfigForm
         :schema="field.fields ?? []"
@@ -174,12 +164,7 @@ function isFallback(field: ConfigFieldSchema): boolean {
         :model-value="readString(field)"
         @update:model-value="(v) => setValue(field, v)"
       >
-        <ElOption
-          v-for="opt in field.enumOptions ?? []"
-          :key="opt.value"
-          :value="opt.value"
-          :label="opt.label"
-        />
+        <ElOption v-for="opt in field.enumOptions ?? []" :key="opt.value" :value="opt.value" :label="opt.label" />
       </ElSelect>
       <ElInput
         v-else-if="field.type === 'string'"

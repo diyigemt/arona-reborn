@@ -26,13 +26,25 @@
     </el-tooltip>
 
     <el-tooltip :content="t('template process')" placement="top">
-      <a class="icon-btn mx-2" href="https://juejin.cn/post/7058201396113309703" target="_blank" rel="noopener noreferrer" title="JveJin">
+      <a
+        class="icon-btn mx-2"
+        href="https://juejin.cn/post/7058201396113309703"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="JveJin"
+      >
         <i-mdi-content-duplicate class="icon-footer" />
       </a>
     </el-tooltip>
 
     <el-tooltip content="GitHub" placement="top">
-      <a class="icon-btn mx-2" href="https://github.com/nekobc1998923/vitecamp" target="_blank" rel="noopener noreferrer" title="GitHub">
+      <a
+        class="icon-btn mx-2"
+        href="https://github.com/nekobc1998923/vitecamp"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="GitHub"
+      >
         <i-akar-icons-github-fill class="icon-footer" />
       </a>
     </el-tooltip>
@@ -40,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { isDark, toggleDark } from '@/utils/dark';
+import { isDark, toggleDark } from "@/utils/dark";
 
 const { t, availableLocales, locale } = useI18n();
 const toggleLocales = () => {

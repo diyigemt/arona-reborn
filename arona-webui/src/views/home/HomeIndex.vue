@@ -294,7 +294,7 @@ function initBackground(el: HTMLElement) {
       voiceLock: Ref<boolean>,
       spine: Spine,
       cb?: () => void,
-      // eslint-disable-next-line @typescript-eslint/no-shadow
+
       stereo = 0,
     ) {
       if (voiceLock.value) {
@@ -507,12 +507,10 @@ function loadEmitter(app: Container, configs: EmitterConfig[], loadOffset = true
 }
 
 function showMasks(masks: (Sprite | Container)[]) {
-  // eslint-disable-next-line no-return-assign
   masks.forEach((it) => (it.visible = true));
 }
 
 function hideMasks(masks: (Sprite | Container)[]) {
-  // eslint-disable-next-line no-return-assign
   masks.forEach((it) => (it.visible = false));
 }
 
@@ -731,12 +729,8 @@ $button-card-size: 200px;
 }
 
 .kivotos {
-  background: linear-gradient(
-      340deg,
-      rgba(240, 240, 240, 0.1) 0%,
-      rgba(240, 240, 240, 0.1) 30%,
-      rgba(240, 240, 240, 1) 70%
-    ),
+  background:
+    linear-gradient(340deg, rgba(240, 240, 240, 0.1) 0%, rgba(240, 240, 240, 0.1) 30%, rgba(240, 240, 240, 1) 70%),
     url("/image/poli-light.png"), url("/image/BG_View_Kivotos.jpg");
   background-repeat: no-repeat;
   background-position:
@@ -750,7 +744,8 @@ $button-card-size: 200px;
 }
 
 .setting {
-  background: linear-gradient(340deg, rgba(240, 240, 240, 0.1) 0%, rgba(240, 240, 240, 0.1) 30%, rgb(240, 240, 240) 70%),
+  background:
+    linear-gradient(340deg, rgba(240, 240, 240, 0.1) 0%, rgba(240, 240, 240, 0.1) 30%, rgb(240, 240, 240) 70%),
     url("/image/poli-light.png"), url("/image/BG_CS_PR_05.jpg");
   background-repeat: no-repeat;
   background-position:
@@ -764,7 +759,8 @@ $button-card-size: 200px;
 }
 
 .arona {
-  background: linear-gradient(340deg, rgba(240, 240, 240, 0.1) 0%, rgba(240, 240, 240, 0.1) 30%, rgb(240, 240, 240) 70%),
+  background:
+    linear-gradient(340deg, rgba(240, 240, 240, 0.1) 0%, rgba(240, 240, 240, 0.1) 30%, rgb(240, 240, 240) 70%),
     url("/image/poli-light.png"), url("/image/BG_CS_PR_03.jpg");
   background-repeat: no-repeat;
   background-position:

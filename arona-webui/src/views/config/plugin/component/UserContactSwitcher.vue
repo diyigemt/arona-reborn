@@ -6,11 +6,11 @@ import ToDocument from "@/components/common/ToDocument.vue";
 defineOptions({
   name: "UserContactSwitcher",
 });
-// eslint-disable-next-line no-undef
+
 const formData = defineModel<{
   id: string;
   type: "user" | "contact" | "manage-contact";
-}>({ local: true, default: { id: "", type: "user" } });
+}>({ default: { id: "", type: "user" } });
 const props = withDefaults(
   defineProps<{
     contacts: Contact[];
@@ -56,7 +56,7 @@ function onImport() {
     </ElFormItem>
     <ElFormItem>
       <ElButton type="primary" plain @click="onImport">{{ importButtonText }}</ElButton>
-      <ToDocument path=""/>
+      <ToDocument path="" />
     </ElFormItem>
   </ElForm>
 </template>

@@ -15,19 +15,10 @@ function buildKey(pluginId: string, configKey: string, fieldPath: string): Widge
   return `${pluginId}/${configKey}/${fieldPath}`;
 }
 
-export function registerWidget(
-  pluginId: string,
-  configKey: string,
-  fieldPath: string,
-  component: Component,
-): void {
+export function registerWidget(pluginId: string, configKey: string, fieldPath: string, component: Component): void {
   registry.set(buildKey(pluginId, configKey, fieldPath), component);
 }
 
-export function resolveWidget(
-  pluginId: string,
-  configKey: string,
-  fieldPath: string,
-): Component | undefined {
+export function resolveWidget(pluginId: string, configKey: string, fieldPath: string): Component | undefined {
   return registry.get(buildKey(pluginId, configKey, fieldPath));
 }

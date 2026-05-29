@@ -1,3 +1,4 @@
+/* eslint-disable no-loss-of-precision -- 本文件为 Pixi 粒子发射器配置数据, 高精度浮点字面量为原始导出值, 不做改写. */
 import { BehaviorEntry, EmitterConfigV3 } from "@pixi/particle-emitter/lib/EmitterConfig";
 import { Texture } from "pixi.js";
 

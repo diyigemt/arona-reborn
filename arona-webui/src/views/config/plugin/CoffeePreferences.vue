@@ -1,10 +1,5 @@
 <template>
-  <PluginPreferenceForm
-    v-model:form="config"
-    :default-form="defaultConfig"
-    :p-id="pluginId"
-    :p-key="configKey"
-  >
+  <PluginPreferenceForm v-model:form="config" :default-form="defaultConfig" :p-id="pluginId" :p-key="configKey">
     <template #default>
       <DynamicConfigForm
         v-if="schema"

@@ -25,6 +25,8 @@ dependencies {
   compileOnly(libs.ktor.client.core)
   compileOnly(libs.ktor.client.content.negotiation)
   compileOnly(libs.ktor.serialization.kotlinx.json.jvm)
+  // host (arona-core) 以 implementation 引入 caffeine, 运行期经父 ClassLoader 提供; 此处仅需编译期可见.
+  compileOnly(libs.caffeine)
   api(libs.skiko.awt.runtime.linux.x64)
   api(libs.skiko.awt.runtime.windows.x64)
   api(libs.thumbnailator)

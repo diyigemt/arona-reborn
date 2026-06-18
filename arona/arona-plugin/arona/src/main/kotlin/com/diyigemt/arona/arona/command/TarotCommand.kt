@@ -4,10 +4,6 @@ package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
 import com.diyigemt.arona.arona.database.DatabaseProvider.dbQueryReadUncommited
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
-import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
-import com.diyigemt.arona.arona.database.image.contactType
-import com.diyigemt.arona.arona.database.image.update
 import com.diyigemt.arona.arona.database.tarot.TarotRecordSchema
 import com.diyigemt.arona.arona.database.tarot.TarotSchema
 import com.diyigemt.arona.arona.tools.queryTeacherNameFromDB
@@ -20,6 +16,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrNull
+import com.diyigemt.arona.communication.image.ImageUploadCache
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.currentLocalDateTime
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
@@ -176,7 +173,6 @@ object TarotCommand : AbstractCommand(
     }
     val path = "/tarot/$name.png"
     val teacherName = queryTeacherNameFromDB()
-    val from = contactType()
     val url = "https://arona.cdn.diyigemt.com/image$path"
 
     val mdConfig = readUserPluginConfigOrDefault(BuildInCommandOwner, default = BaseConfig()).markdown
@@ -209,25 +205,22 @@ object TarotCommand : AbstractCommand(
       }
       sendMessage(m.build())
     } else {
-      val im = dbQuerySuspended {
-        findImage(name, from)
-      } ?: subject.uploadImage(url).also {
-        dbQuerySuspended { it.update(name, from) }
-      }
-      val resp = MessageChainBuilder()
-        .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
-        .append(im)
-        .build().let { ch -> sendMessage(ch) }
-      if (resp.isFailed) {
-        subject.uploadImage(url).also { image ->
-          sendMessage(
-            MessageChainBuilder()
-              .append("看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}")
-              .append(im)
-              .build()
-          )
-          dbQuerySuspended { image.update(name, from) }
+      val text = "看看${teacherName}抽到了什么:\n${cardName}(${resName})\n${res}"
+      fun chain(image: TencentImage) = MessageChainBuilder().append(text).append(image).build()
+      val cached = ImageUploadCache.find(IMAGE_CACHE_NAMESPACE, name, subject)
+      if (cached != null) {
+        val resp = sendMessage(chain(cached))
+        if (resp.isFailed) {
+          // 缓存命中却发送失败: 凭证可能已失效, 条件失效后重新上传, 并用新凭证 (而非旧的 cached) 重发一次。
+          ImageUploadCache.invalidateIfMatches(IMAGE_CACHE_NAMESPACE, name, subject, cached.resourceId)
+          val fresh = subject.uploadImage(url)
+          sendMessage(chain(fresh))
+          ImageUploadCache.put(IMAGE_CACHE_NAMESPACE, name, subject, fresh)
         }
+      } else {
+        val fresh = subject.uploadImage(url)
+        sendMessage(chain(fresh))
+        ImageUploadCache.put(IMAGE_CACHE_NAMESPACE, name, subject, fresh)
       }
     }
   }

@@ -8,7 +8,7 @@ arona {
   id = "com.diyigemt.arona"
   name = "arona"
   author = "diyigemt"
-  version = "1.3.19"
+  version = "1.4.0"
   description = "arona plugin"
   mainClass = "com.diyigemt.arona.arona.Arona"
 }

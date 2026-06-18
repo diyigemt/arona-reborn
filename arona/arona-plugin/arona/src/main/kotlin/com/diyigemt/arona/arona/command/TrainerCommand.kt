@@ -3,10 +3,6 @@
 package com.diyigemt.arona.arona.command
 
 import com.diyigemt.arona.arona.Arona
-import com.diyigemt.arona.arona.database.DatabaseProvider.dbQuerySuspended
-import com.diyigemt.arona.arona.database.image.ImageCacheSchema.Companion.findImage
-import com.diyigemt.arona.arona.database.image.contactType
-import com.diyigemt.arona.arona.database.image.update
 import com.diyigemt.arona.arona.tools.BackendEndpoint
 import com.diyigemt.arona.arona.tools.NetworkTool
 import com.diyigemt.arona.arona.tools.ServerResponse
@@ -18,6 +14,7 @@ import com.diyigemt.arona.communication.command.UserCommandSender
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.UserCommandSender.Companion.readUserPluginConfigOrDefault
 import com.diyigemt.arona.communication.command.isGuild
+import com.diyigemt.arona.communication.image.ImageUploadCache
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -96,34 +93,24 @@ class TrainerCommand : AbstractCommand(
   }
 
   private suspend fun UserCommandSender.sendImage(query: ImageQueryData) {
-    val from = contactType()
     with(query) {
       val url = "https://arona.cdn.diyigemt.com/image" +
         (if (isGuild()) "/s" else "") +
         content
-      val im = dbQuerySuspended {
-        findImage(hash, from)
-      }
-      when (im) {
-        is TencentImage -> {
-          sendMessage(im).also {
-            if (it.isFailed) {
-              subject.uploadImage(url).also { image ->
-                sendMessage(image)
-                dbQuerySuspended { image.update(hash, from) }
-              }
-            }
-          }
+      val cached = ImageUploadCache.find(IMAGE_CACHE_NAMESPACE, hash, subject)
+      if (cached != null) {
+        if (sendMessage(cached).isFailed) {
+          // 缓存命中却发送失败: 凭证可能已失效, 条件失效后重新上传, 并用新凭证重发一次。
+          ImageUploadCache.invalidateIfMatches(IMAGE_CACHE_NAMESPACE, hash, subject, cached.resourceId)
+          val fresh = subject.uploadImage(url)
+          sendMessage(fresh)
+          ImageUploadCache.put(IMAGE_CACHE_NAMESPACE, hash, subject, fresh)
         }
-
-        else -> {
-          subject.uploadImage(url).also {
-            sendMessage(it)
-            dbQuerySuspended { it.update(hash, from) }
-          }
-        }
+      } else {
+        val fresh = subject.uploadImage(url)
+        sendMessage(fresh)
+        ImageUploadCache.put(IMAGE_CACHE_NAMESPACE, hash, subject, fresh)
       }
-
     }
   }
 

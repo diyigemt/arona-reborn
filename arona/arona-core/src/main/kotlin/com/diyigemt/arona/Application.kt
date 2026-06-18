@@ -3,6 +3,7 @@ package com.diyigemt.arona
 import com.diyigemt.arona.command.BuiltInCommands
 import com.diyigemt.arona.command.initExecutorMap
 import com.diyigemt.arona.communication.TencentBotClient
+import com.diyigemt.arona.communication.image.ImageUploadCache
 import com.diyigemt.arona.console.launchConsole
 import com.diyigemt.arona.database.DatabaseProvider
 import com.diyigemt.arona.database.migration.PluginConfigLeafMigrator
@@ -34,6 +35,8 @@ object AronaApplication : CoroutineScope {
     runSuspend {
       DatabaseProvider.ensureMongoIndexes()
     }
+    // 图片上传凭证缓存的过期清理: 启动即清一次, 之后定时跑; 随 app scope 取消而结束.
+    ImageUploadCache.launchCleanup(this)
     // 阻塞: 插件 config 叶子原生 BSON 化迁移, 必须在 PluginManager 初始化 / 任何 User|Contact 读之前
     // 跑完. 旧 BsonString 叶子在批 2 切完 codec 后无法 decode, 这里没跑就直接起服务会全面崩溃.
     // 失败 throw 出来终止 JVM, 让运维介入. 详见 PluginConfigLeafMigrator KDoc.

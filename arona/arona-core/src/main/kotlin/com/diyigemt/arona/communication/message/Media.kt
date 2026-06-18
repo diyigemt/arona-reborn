@@ -226,9 +226,10 @@ fun getMediaUrlFromMediaInfo(data: String): String {
   // (会抛, 让 uploadImage(ByteArray) 整条链路崩溃). 真实成功路径腾讯返回的 fileInfo 必然非空,
   // 因此用空串作为 shadow stub 的明确信号, 返回一个一眼可辨的 placeholder URL.
   if (data.isEmpty()) return "shadow://media"
-  val decoded = protobuf
-    .decodeFromByteArray<MediaInfo>(Base64.decode(data))
-  return "http://" +
-    decoded.data.fileInfo.fileInfo.urlInfo.host +
-    decoded.data.urlInfo.download.fullPath
+  return "protobuf decode is not logger support"
+//  val decoded = protobuf
+//    .decodeFromByteArray<MediaInfo>(Base64.decode(data))
+//  return "http://" +
+//    decoded.data.fileInfo.fileInfo.urlInfo.host +
+//    decoded.data.urlInfo.download.fullPath
 }

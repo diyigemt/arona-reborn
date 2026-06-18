@@ -1,0 +1,3 @@
+httpx[socks]>=0.27,<1
+playwright>=1.44,<2
+pillow>=10,<12

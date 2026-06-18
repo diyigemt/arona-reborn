@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @font-face {
+      font-family: "Rollpig CJK";
+      src: url("__FONT_URI__");
+      /* 默认字体为静态 Regular: 声明为 normal, 让浏览器为 #name 的 700 合成粗体。
+         若改用可变字重字体, 可把这里改成 100 900。 */
+      font-weight: normal;
+      font-style: normal;
+      font-display: block;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 800px;
+      height: 800px;
+      margin: 0;
+      overflow: hidden;
+      background: #ffffff;
+      font-family: "Rollpig CJK", sans-serif;
+    }
+
+    /* 卡片本体: 800x800 白底圆角, 截图对象。 */
+    #card {
+      width: 800px;
+      height: 800px;
+      padding: 56px 64px 48px;
+      overflow: hidden;
+      border-radius: 40px;
+      background: #ffffff;
+      text-align: center;
+    }
+
+    #avatar {
+      display: block;
+      width: 240px;
+      height: 240px;
+      margin: 0 auto 24px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    #name {
+      margin: 0 0 20px;
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1.15;
+      color: #000000;
+    }
+
+    /* 可变文本区域: 固定高度, 溢出检测据此判定。 */
+    #content {
+      height: 348px;
+      overflow: hidden;
+    }
+
+    #description {
+      margin: 0 0 20px;
+      font-size: 30px;
+      line-height: 1.4;
+      color: #555555;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    #analysis {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.5;
+      color: #333333;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+<body>
+  <main id="card">
+    <img id="avatar" alt="">
+    <h1 id="name"></h1>
+    <section id="content">
+      <p id="description"></p>
+      <p id="analysis"></p>
+    </section>
+  </main>
+
+  <script>
+    // 填充一只猪的内容, 并等待字体与头像就绪后再返回, 保证截图时刻渲染完整。
+    window.setCard = async function (payload) {
+      const avatar = document.getElementById("avatar");
+      document.getElementById("name").textContent = payload.name;
+      document.getElementById("description").textContent = payload.description;
+      document.getElementById("analysis").textContent = payload.analysis;
+      avatar.src = payload.avatar;
+
+      await document.fonts.ready;
+      if (!avatar.complete) {
+        await new Promise((resolve, reject) => {
+          avatar.addEventListener("load", resolve, { once: true });
+          avatar.addEventListener("error", () => reject(new Error("avatar load failed")), { once: true });
+        });
+      }
+      if (avatar.naturalWidth === 0) {
+        throw new Error("avatar failed to decode");
+      }
+    };
+
+    window.applyFontSizes = function (descriptionSize, analysisSize) {
+      document.getElementById("description").style.fontSize = descriptionSize + "px";
+      document.getElementById("analysis").style.fontSize = analysisSize + "px";
+    };
+
+    window.hasOverflow = function () {
+      const card = document.getElementById("card");
+      const content = document.getElementById("content");
+      const name = document.getElementById("name");
+      // 文本区溢出、整卡超出 800、或名称横向溢出(过长名换行/截断), 任一即判溢出。
+      return content.scrollHeight > content.clientHeight
+        || card.scrollHeight > card.clientHeight
+        || name.scrollWidth > name.clientWidth;
+    };
+  </script>
+</body>
+</html>

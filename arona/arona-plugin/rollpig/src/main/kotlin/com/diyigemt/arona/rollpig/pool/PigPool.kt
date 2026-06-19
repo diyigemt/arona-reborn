@@ -86,11 +86,15 @@ internal object PigPool {
     return snapshot[ThreadLocalRandom.current().nextInt(snapshot.size)]
   }
 
-  /** 读取某只猪的卡片字节。id 非法或卡片缺失(如已被移除的旧猪)时抛出, 由调用方降级处理。 */
-  fun cardBytes(id: String): ByteArray {
+  /**
+   * 某只猪的本地卡片是否仍存在且非空。id 非法时抛出, 由调用方降级处理。
+   *
+   * 本地 `cards/` 是 CDN(`/image/rollpig/<id>.png`)的同步源, 故发送前以本地存在性兜底:
+   * 已落库但卡片被移除的旧猪在 CDN 上同样可能缺失, 命中则降级提示而非发出 404 图。
+   */
+  fun hasCard(id: String): Boolean {
     val file = cardFile(id)
-    require(file.isFile && file.length() > 0L) { "卡片缺失或为空: ${file.absolutePath}" }
-    return file.readBytes()
+    return file.isFile && file.length() > 0L
   }
 
   private fun cardFile(id: String): File {

@@ -15,6 +15,7 @@ import re
 import shutil
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -24,13 +25,20 @@ from PIL import Image, ImageOps
 from playwright.sync_api import Page, sync_playwright
 
 DEFAULT_BASE_URL = "https://pig.felislab.cc/resources/rollpig"
-DEFAULT_PROXY = "http://127.0.0.1:12355"
+# DEFAULT_PROXY = "http://127.0.0.1:12355"
+DEFAULT_PROXY = ""
 # 与 Kotlin 侧 PigPool.SAFE_ID 保持一致, 防脏数据与资源路径穿越。
 SAFE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 IMAGE_EXTENSIONS = ("png", "jpg", "jpeg", "webp", "gif")
 # 文本溢出时按此阶梯逐级缩小 (description, analysis) 字号; 仍溢出则记入报告。
 FONT_STEPS = ((30, 28), (28, 26), (26, 24), (24, 22), (22, 20))
 DOWNLOAD_ATTEMPTS = 3
+# COS 上传默认参数。对象键 <prefix>/<id>.png 对应 CDN https://arona.cdn.diyigemt.com/<prefix>/<id>.png,
+# 与 rollpig 插件运行期引用的 image/rollpig/<id>.png 一致。凭证沿用 arona 既有的 ~/.ssh/arona-cos.json。
+COS_DEFAULT_REGION = "ap-shanghai"
+COS_DEFAULT_PREFIX = "image/rollpig"
+COS_DEFAULT_CREDENTIALS = Path.home() / ".ssh" / "arona-cos.json"
+COS_UPLOAD_WORKERS = 8
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,7 +47,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="上游资源根, 取 <base>/pig.json 与 <base>/image/<id>.<ext>")
     parser.add_argument("--proxy", default=DEFAULT_PROXY, help="下载代理, 支持 http:// 或 socks5://; 传空字符串则不走代理")
     parser.add_argument("--output", type=Path, default=here / "output", help="产物目录(会被清空重建)")
-    parser.add_argument("--font", type=Path, default=here / "fonts" / "NotoSansCJKsc-Regular.otf", help="卡片使用的本地 CJK 字体")
+    parser.add_argument("--font", type=Path, default=here / "ResourceHanRoundedCN-VF.otf", help="卡片使用的本地 CJK 字体")
+    parser.add_argument("--no-upload", dest="upload", action="store_false", help="只生成本地产物, 不上传到 COS")
+    parser.add_argument("--cos-prefix", default=COS_DEFAULT_PREFIX, help=f"COS 对象键前缀, 默认 {COS_DEFAULT_PREFIX}")
+    parser.add_argument("--cos-region", default=COS_DEFAULT_REGION, help=f"COS 地域, 默认 {COS_DEFAULT_REGION}")
+    parser.add_argument("--cos-credentials", type=Path, default=COS_DEFAULT_CREDENTIALS, help="COS 凭证 JSON 路径")
+    parser.set_defaults(upload=True)
     return parser.parse_args()
 
 
@@ -97,7 +110,7 @@ def validate_pigs(raw: Any) -> list[dict[str, str]]:
 def fetch_avatar(client: httpx.Client, base_url: str, pig_id: str, raw_dir: Path) -> Path:
     """逐个扩展名探测并下载头像原图, 保存到 raw_dir。"""
     for ext in IMAGE_EXTENSIONS:
-        content = download(client, f"{base_url}/image/{quote(pig_id)}.{ext}", allow_not_found=True)
+        content = download(client, f"{base_url}/images/{quote(pig_id)}.{ext}", allow_not_found=True)
         if content is None:
             continue
         path = raw_dir / f"{pig_id}.{ext}"
@@ -161,6 +174,68 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def upload_cards_to_cos(
+    cards_dir: Path,
+    pigs: list[dict[str, str]],
+    *,
+    credentials_path: Path,
+    region: str,
+    prefix: str,
+) -> list[dict[str, str]]:
+    """把生成成功的卡片并发上传到腾讯云 COS, 对象键为 <prefix>/<id>.png。
+
+    返回失败清单(每项含 id 与 error); 全部成功则为空。凭证文件/字段缺失或 SDK 未安装时抛
+    RuntimeError, 由调用方决定是否中断整批。同名对象直接覆盖(换图), 不做压缩、不生成 /s/ 缩略图。
+    """
+    # 延迟导入: 仅在确实要上传时才依赖 COS SDK, 不拖累 --no-upload 的纯生成流程。
+    try:
+        from qcloud_cos import CosConfig, CosS3Client
+    except ImportError as exc:
+        raise RuntimeError("缺少 qcloud_cos, 请先 pip install -r requirements.txt") from exc
+
+    if not credentials_path.is_file():
+        raise RuntimeError(f"COS 凭证文件不存在: {credentials_path} (离线生成可加 --no-upload 跳过上传)")
+
+    normalized_prefix = prefix.strip("/")
+    if not normalized_prefix:
+        raise RuntimeError(f"COS 对象键前缀不能为空: {prefix!r}")
+
+    # 读取/解析失败收敛成 RuntimeError, 让上层与「凭证字段缺失」走同一条降级路径(写报告 + 非 0 退出),
+    # 而不是在写完 index.json 后抛栈中断。
+    try:
+        credentials = json.loads(credentials_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"COS 凭证读取/解析失败: {credentials_path}: {exc}") from exc
+    required = ("COS_ID", "COS_NAME", "SECRET_RAW_ID", "SECRET_RAW_KEY")
+    missing = [key for key in required if not credentials.get(key)]
+    if missing:
+        raise RuntimeError(f"COS 凭证字段缺失: {', '.join(missing)}")
+
+    bucket = f"{credentials['COS_NAME']}-{credentials['COS_ID']}"
+    client = CosS3Client(
+        CosConfig(Region=region, SecretId=credentials["SECRET_RAW_ID"], SecretKey=credentials["SECRET_RAW_KEY"])
+    )
+
+    def upload_one(pig: dict[str, str]) -> dict[str, str] | None:
+        pig_id = pig["id"]
+        local_file = cards_dir / f"{pig_id}.png"
+        if not local_file.is_file():
+            return {"id": pig_id, "error": f"卡片文件不存在: {local_file}"}
+        try:
+            client.upload_file(Bucket=bucket, Key=f"{normalized_prefix}/{pig_id}.png", LocalFilePath=str(local_file))
+            return None
+        except Exception as exc:  # noqa: BLE001 - 单图上传失败应汇总进报告, 不中断其余
+            return {"id": pig_id, "error": f"{type(exc).__name__}: {exc}"}
+
+    failures: list[dict[str, str]] = []
+    with ThreadPoolExecutor(max_workers=COS_UPLOAD_WORKERS) as executor:
+        for failure in executor.map(upload_one, pigs):
+            if failure is not None:
+                failures.append(failure)
+                print(f"[上传失败] {failure['id']}: {failure['error']}", file=sys.stderr)
+    return failures
+
+
 def main() -> int:
     args = parse_args()
     here = Path(__file__).resolve().parent
@@ -195,7 +270,15 @@ def main() -> int:
     if proxy is not None:
         client_options["proxy"] = proxy  # http(s):// 或 socks5://; socks 需 httpx[socks]
 
-    report: dict[str, Any] = {"baseUrl": base_url, "proxy": proxy, "generated": [], "scaled": [], "overflow": [], "failures": []}
+    report: dict[str, Any] = {
+        "baseUrl": base_url,
+        "proxy": proxy,
+        "generated": [],
+        "scaled": [],
+        "overflow": [],
+        "failures": [],
+        "uploadFailures": [],
+    }
     successful: list[dict[str, str]] = []
 
     with httpx.Client(**client_options) as client:
@@ -238,13 +321,35 @@ def main() -> int:
     (output_dir / "index.json").write_text(
         json.dumps({"pigs": successful}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+
+    if args.upload and successful:
+        prefix = args.cos_prefix.strip("/")
+        print(f"上传 COS: region={args.cos_region}, {prefix}/<id>.png, 共 {len(successful)} 张")
+        # 凭证缺失/SDK 缺失等整体性失败收敛成一条 uploadFailures, 既保留本地产物又让退出码非 0。
+        try:
+            report["uploadFailures"] = upload_cards_to_cos(
+                cards_dir,
+                successful,
+                credentials_path=args.cos_credentials,
+                region=args.cos_region,
+                prefix=args.cos_prefix,
+            )
+        except RuntimeError as exc:
+            report["uploadFailures"] = [{"id": "*", "error": str(exc)}]
+            print(f"[上传中止] {exc}", file=sys.stderr)
+    elif not args.upload:
+        print("已跳过 COS 上传 (--no-upload)")
+
     (output_dir / "generation-report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
 
-    print(f"完成: 成功 {len(successful)}, 失败 {len(report['failures'])}, 仍溢出 {len(report['overflow'])}")
+    print(
+        f"完成: 成功 {len(successful)}, 失败 {len(report['failures'])}, "
+        f"仍溢出 {len(report['overflow'])}, 上传失败 {len(report['uploadFailures'])}"
+    )
     print(f"产物目录: {output_dir}")
-    return 1 if report["failures"] or report["overflow"] else 0
+    return 1 if report["failures"] or report["overflow"] or report["uploadFailures"] else 0
 
 
 if __name__ == "__main__":

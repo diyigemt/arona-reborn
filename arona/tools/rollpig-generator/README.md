@@ -1,7 +1,8 @@
 # rollpig 卡片生成器
 
-离线下载上游小猪数据与头像, 用 Playwright/Chromium 把每只猪渲染成 800×800 PNG 卡片。
-**仅用于资源预处理**, 产物放进插件 dataFolder(见下文「产物与安装」), 不打进 jar。
+离线下载上游小猪数据与头像, 用 Playwright/Chromium 把每只猪渲染成 800×800 PNG 卡片,
+并默认上传到 COS CDN(`image/rollpig/<id>.png`)供插件运行期以 Markdown 引用。
+**仅用于资源预处理**, 产物同时放进插件 dataFolder(见下文「产物与安装」), 不打进 jar。
 
 ## 环境准备
 
@@ -52,13 +53,30 @@ python generate.py --proxy socks5://127.0.0.1:12355
 下载会自动重试; GIF 头像固定取第一帧, 头像统一做 EXIF 方向修正并转静态 PNG;
 文本过长时按阶梯缩小字号, 仍溢出则记入报告(退出码非 0)。
 
+## 上传 COS
+
+卡片生成成功后**默认**上传到腾讯云 COS, 对象键为 `image/rollpig/<id>.png`, 对应插件运行期
+Markdown 引用的 `https://arona.cdn.diyigemt.com/image/rollpig/<id>.png`。同 id 直接覆盖, 不压缩、
+不生成 `/s/` 缩略图。
+
+凭证沿用 arona 既有约定, 从 `~/.ssh/arona-cos.json` 读取(字段 `COS_ID`/`COS_NAME`/
+`SECRET_RAW_ID`/`SECRET_RAW_KEY`, Bucket = `COS_NAME-COS_ID`, 默认地域 `ap-shanghai`):
+
+```shell
+python generate.py --no-upload                       # 只生成本地产物, 不上传
+python generate.py --cos-prefix image/rollpig        # 自定义对象键前缀
+python generate.py --cos-credentials /path/to/cos.json --cos-region ap-shanghai
+```
+
+凭证缺失或个别卡片上传失败都会记入报告的 `uploadFailures` 并使退出码非 0(本地产物仍保留)。
+
 ## 产物与安装
 
 ```text
 output/
 ├─ cards/<id>.png          # 800x800 卡片
 ├─ index.json              # {"pigs":[{"id","name"}, ...]}
-└─ generation-report.json  # 每只猪的 sha256/字号/溢出, 与失败清单
+└─ generation-report.json  # 每只猪的 sha256/字号/溢出、失败清单与 uploadFailures
 ```
 
 校验通过(退出码 0)后, 把产物放进插件的 **dataFolder**(框架外置存储, 不进 jar):
@@ -71,7 +89,8 @@ output/
 1. output/cards/*  ->  data/com.diyigemt.arona.rollpig/cards/   (先放卡片, 同 id 直接覆盖)
 2. output/index.json -> data/com.diyigemt.arona.rollpig/index.json  (最后替换索引)
 3. 旧卡片暂不删除(当天已抽到的用户仍需发送), 至少保留到次日
-4. 重启插件/进程使其重新加载(内存猪池与上传缓存不热更新)
+4. 确认 COS 上已存在 image/rollpig/<id>.png(生成器默认已上传)
+5. 重启插件/进程使其重新加载(内存猪池不热更新)
 ```
 
 ## 注意

@@ -95,7 +95,12 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
 
   override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGroupMessageRaw, eventId: String) {
     val member = ctx.bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
-    TencentGroupMessageEvent(payload.toMessageChain(), eventId, member).broadcast()
+    TencentGroupMessageEvent(
+      payload.toMessageChain(),
+      eventId,
+      member,
+      isAtBot = payload.mentions?.any { it.isYou } == true,
+    ).broadcast()
   }
 }
 
@@ -107,7 +112,12 @@ internal object TencentWebsocketGroupMessageCreateHandler :
 
   override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGroupMessageRaw, eventId: String) {
     val member = ctx.bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
-    TencentGroupMessageEvent(payload.toMessageChain(), eventId, member).broadcast()
+    TencentGroupMessageEvent(
+      payload.toMessageChain(),
+      eventId,
+      member,
+      isAtBot = payload.mentions?.any { it.isYou } == true,
+    ).broadcast()
   }
 }
 

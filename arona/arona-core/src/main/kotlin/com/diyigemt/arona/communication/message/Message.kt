@@ -427,6 +427,27 @@ internal data class TencentFriendMessageRaw(
   override val attachments: List<TencentMessageAttachmentRaw>? = null,
 ) : TencentMessageRaw
 
+/**
+ * 群消息中被 @ 到的成员.
+ *
+ * 与频道的 [TencentGuildUserRaw] 结构不同, 群 mention 直接携带 [isYou] 标记当前 mention 是否为机器人自身,
+ * 因此判定"消息是否 @ 了机器人"无需再比对 openid. 除 [isYou] 外字段均可空/带默认值, 避免下行 payload
+ * 缺字段时整条消息反序列化失败.
+ */
+@Serializable
+internal data class TencentGroupMessageMentionRaw(
+  val id: String? = null,
+  val username: String? = null,
+  val bot: Boolean? = null,
+  @SerialName("member_openid")
+  val memberOpenid: String? = null,
+  val scope: String? = null,
+  @SerialName("is_you")
+  val isYou: Boolean = false,
+  @SerialName("member_role")
+  val memberRole: String? = null,
+)
+
 @Serializable
 internal data class TencentGroupMessageRaw(
   override val id: String,
@@ -434,6 +455,10 @@ internal data class TencentGroupMessageRaw(
   override val content: String,
   override val timestamp: String,
   override val attachments: List<TencentMessageAttachmentRaw>? = null,
+  /**
+   * 消息中 @ 到的成员, 用于判定是否 @ 了机器人自身. 旧 payload 无此字段, 故可空.
+   */
+  val mentions: List<TencentGroupMessageMentionRaw>? = null,
   @SerialName("group_openid")
   val groupId: String,
 ) : TencentMessageRaw

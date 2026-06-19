@@ -66,6 +66,10 @@ class TencentGroupMessageEvent internal constructor(
   message: MessageChain,
   override val eventId: String,
   override val sender: GroupMember,
+  /**
+   * 该消息是否 @ 了机器人自身. 来源于群消息 payload 的 mentions.is_you, 与 content 文本无关.
+   */
+  val isAtBot: Boolean = false,
 ) : TencentGroupEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.group
   override val group get() = sender.group

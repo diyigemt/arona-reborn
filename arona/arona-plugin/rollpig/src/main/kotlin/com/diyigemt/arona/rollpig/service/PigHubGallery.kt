@@ -14,6 +14,12 @@ import java.util.concurrent.ThreadLocalRandom
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
+/** 「随机小猪」可发送的一张图片: [url] 为规范化后的完整原图地址, [title] 为 pighub 标题(可能为空)。 */
+internal data class PigHubGalleryImage(
+  val title: String,
+  val url: String,
+)
+
 /**
  * pighub.top 图片列表缓存, 供「随机小猪」取一张原图 URL。
  *
@@ -36,7 +42,7 @@ internal object PigHubGallery {
   private val mutex = Mutex()
 
   @Volatile
-  private var cache: List<String> = emptyList()
+  private var cache: List<PigHubGalleryImage> = emptyList()
 
   // 下一次允许联网刷新的最早时刻(ms): 成功后推到 +TTL, 失败/空后只推 +RETRY_BACKOFF。
   @Volatile
@@ -46,10 +52,13 @@ internal object PigHubGallery {
   private data class AllImages(val images: List<PigHubImage> = emptyList())
 
   @Serializable
-  private data class PigHubImage(val thumbnail: String = "")
+  private data class PigHubImage(
+    val title: String = "",
+    val thumbnail: String = "",
+  )
 
-  /** 随机取一张 pighub 原图的完整 URL; 列表始终为空(从未成功拉取)时返回 null。 */
-  suspend fun randomImageUrl(): String? {
+  /** 随机取一张 pighub 原图及其标题; 列表始终为空(从未成功拉取)时返回 null。 */
+  suspend fun randomImage(): PigHubGalleryImage? {
     ensureFresh()
     val snapshot = cache
     if (snapshot.isEmpty()) return null
@@ -77,15 +86,22 @@ internal object PigHubGallery {
     }
   }
 
-  private suspend fun fetch(): List<String> {
+  private suspend fun fetch(): List<PigHubGalleryImage> {
     val text = client.get(API).bodyAsText()
     return json.decodeFromString<AllImages>(text).images
       .asSequence()
-      .mapNotNull { it.thumbnail.trim().takeIf(String::isNotEmpty) }
-      // thumbnail 形如 /data/<中文文件名>.jpg, 需对路径里的非 ASCII 编码(保留 '/'); 已是绝对 URL 则原样用。
-      // 英文括号等 Markdown 不安全字符由 core 的 ImageElement.build() 统一转义, 此处不再处理。
-      .map { if (it.startsWith("http://") || it.startsWith("https://")) it else ORIGIN + it.encodeURLPath() }
-      .distinct()
+      .mapNotNull { image ->
+        val thumbnail = image.thumbnail.trim().takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        // thumbnail 形如 /data/<中文文件名>.jpg, 需对路径里的非 ASCII 编码(保留 '/'); 已是绝对 URL 则原样用。
+        // 英文括号等 Markdown 不安全字符由 core 的 ImageElement.build() 统一转义, 此处不再处理。
+        val url = if (thumbnail.startsWith("http://") || thumbnail.startsWith("https://")) {
+          thumbnail
+        } else {
+          ORIGIN + thumbnail.encodeURLPath()
+        }
+        PigHubGalleryImage(title = image.title.trim(), url = url)
+      }
+      .distinctBy { it.url }
       .toList()
   }
 }

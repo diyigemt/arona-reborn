@@ -12,7 +12,7 @@
   `https://arona.cdn.diyigemt.com/image/rollpig/<id>.png`, 不再上传图片字节。
 - 「随机小猪」从 `GET https://pighub.top/api/all-images` 拉取列表(内存缓存 1h, 失败沿用旧快照),
   直接以 pighub 原图 URL(`https://pighub.top/data/<file>`)作为 Markdown 图片; 因原图尺寸不一,
-  显示尺寸取固定方形, 可能有轻微变形。
+  显示尺寸取固定方形, 可能有轻微变形。卡片在图片上方一并显示该图的 pighub 标题(title)。
 
 ## 数据存放(框架 dataFolder, 不在 jar 内)
 

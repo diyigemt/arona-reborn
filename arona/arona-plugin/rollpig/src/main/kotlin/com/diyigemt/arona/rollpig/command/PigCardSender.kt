@@ -51,6 +51,7 @@ internal val pigKeyboard by lazy {
  * 以 Markdown 引用一张图片发送卡片, 并附 [pigKeyboard] 双按钮。
  *
  * [header] 为图片上方的说明文字(如「今日小猪」「随机小猪」), 同时保证 Markdown 内容非空;
+ * [title] 为可选图片标题, 非空白时显示在 [header] 与图片之间;
  * [imageUrl] 为完整图片 URL; [width]/[height] 为 Markdown 图片的显示尺寸提示(需调用方按图源给出)。
  * `at()` 是 `context(sender: UserCommandSender)` DSL, 依赖本函数的 `UserCommandSender` receiver
  * 及模块的 `-Xcontext-parameters` 编译选项。
@@ -60,10 +61,15 @@ internal suspend fun UserCommandSender.sendMarkdownCard(
   imageUrl: String,
   width: Int,
   height: Int,
+  title: String? = null,
 ) {
+  val safeTitle = title?.let(::sanitizePigTitle)?.takeIf(String::isNotEmpty)
   val card = tencentCustomMarkdown {
     at()
     + header
+    if (safeTitle != null) {
+      + safeTitle
+    }
     image {
       href = imageUrl
       w = width
@@ -72,6 +78,12 @@ internal suspend fun UserCommandSender.sendMarkdownCard(
   }
   sendMessage(MessageChainBuilder().append(card).append(pigKeyboard).build())
 }
+
+// title 来自 pighub 外部数据, 用作 Markdown 普通文本行。QQ Markdown 是否支持反斜杠转义并不确定
+// (本框架对 URL 用的是 percent-encoding 而非反斜杠), 贸然反斜杠转义反而可能显示出多余的 '\';
+// 而 title 是图片文件名派生的短中文名, 唯一会破坏卡片结构的是换行, 故只做 trim + 折叠空白为单空格。
+private fun sanitizePigTitle(title: String): String =
+  title.trim().replace(Regex("\\s+"), " ")
 
 /**
  * 发送本地预生成猪卡片(自有 CDN, 固定 800x800)。调用方需自行保证 [pigId] 对应卡片存在。

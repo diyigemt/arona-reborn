@@ -18,11 +18,11 @@ class RandomPigCommand : AbstractCommand(
   help = "/随机小猪"
 ) {
   suspend fun UserCommandSender.randomPig() {
-    val imageUrl = PigHubGallery.randomImageUrl()
-    if (imageUrl == null) {
+    val image = PigHubGallery.randomImage()
+    if (image == null) {
       sendMessage("随机小猪暂时跑丢了, 请稍后再试~")
       return
     }
-    sendMarkdownCard("随机小猪", imageUrl, PIGHUB_IMG_SIZE, PIGHUB_IMG_SIZE)
+    sendMarkdownCard("随机小猪", image.url, PIGHUB_IMG_SIZE, PIGHUB_IMG_SIZE, title = image.title)
   }
 }

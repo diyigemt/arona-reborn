@@ -83,15 +83,9 @@ internal object PigHubGallery {
       .asSequence()
       .mapNotNull { it.thumbnail.trim().takeIf(String::isNotEmpty) }
       // thumbnail 形如 /data/<中文文件名>.jpg, 需对路径里的非 ASCII 编码(保留 '/'); 已是绝对 URL 则原样用。
+      // 英文括号等 Markdown 不安全字符由 core 的 ImageElement.build() 统一转义, 此处不再处理。
       .map { if (it.startsWith("http://") || it.startsWith("https://")) it else ORIGIN + it.encodeURLPath() }
-      .map(::markdownSafeUrl)
       .distinct()
       .toList()
   }
-
-  /**
-   * encodeURLPath 不会编码 `()`(它们是合法路径字符), 但 Markdown 链接目标里的 `)` 会提前闭合
-   * `![..](url)` 导致解析失败。这里把 `()` 额外转义为 `%28`/`%29`(语义等价, 服务端按原字符处理)。
-   */
-  private fun markdownSafeUrl(url: String): String = url.replace("(", "%28").replace(")", "%29")
 }

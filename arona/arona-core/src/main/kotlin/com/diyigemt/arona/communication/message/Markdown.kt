@@ -110,7 +110,8 @@ data class LinkElement(
 
   override fun build(): String {
     return if (placeholder.isNotEmpty()) {
-      "[$placeholder]($href)"
+      // `[文字](url)` 形式同样会被 url 中的 `)` 提前闭合; `<url>` 自动链接由尖括号定界, 无此问题。
+      "[$placeholder](${markdownSafeUrl(href)})"
     } else {
       "<$href>"
     }
@@ -133,9 +134,15 @@ data class ImageElement(
   var placeholder: String = "img",
 ) : MarkdownElement() {
   override fun build(): String {
-    return "![$placeholder #${w}px #${h}px]($href)"
+    return "![$placeholder #${w}px #${h}px](${markdownSafeUrl(href)})"
   }
 }
+
+/**
+ * Markdown 链接/图片目标里未转义的英文括号会破坏解析: `)` 会提前闭合 `](url)`。
+ * 这里把 `(`/`)` 转义为 `%28`/`%29`(语义等价, 服务端按原字符处理), 使含括号的远程图片 URL 也能正常渲染。
+ */
+private fun markdownSafeUrl(url: String): String = url.replace("(", "%28").replace(")", "%29")
 
 data class ListElementItem(
   var content: TextElement = TextElement(),

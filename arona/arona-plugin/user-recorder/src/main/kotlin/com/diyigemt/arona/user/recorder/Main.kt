@@ -20,6 +20,8 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.default
 import com.github.ajalt.clikt.parameters.types.int
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DateTimePeriod
@@ -27,21 +29,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery as redis
 
-// dau.{date}.dau hash_map uid -> messageCount 日活
-// dau.{date}.contact hash_map cid -> messageCount 日环境
-// dau.{date}.message integer 消息数
-// dau.{date}.command hash_map commandName -> integer 指令执行
-// dau.command hash_map commandName -> integer 总指令执行
-// dau.user hash_map uid -> string 最后交互时间
-// dau.contact hash_map cid -> string 最后交互时间
-
-fun dayDauKey(date: String) = "dau.$date.dau"
-fun dayContactKey(date: String) = "dau.$date.contact"
-fun dayMessageKey(date: String) = "dau.$date.message"
-fun dayCommandKey(date: String) = "dau.$date.command"
-const val UserKey = "dau.user"
-const val ContactKey = "dau.contact"
-const val CommandKey = "dau.command"
+// Redis key 构造、按天/累计键定义与聚合解析见 DauArchive.kt; MongoDB 归档见 DauArchive*.kt。
 
 object PluginMain : AronaPlugin(
   AronaPluginDescription(
@@ -53,6 +41,13 @@ object PluginMain : AronaPlugin(
   )
 ) {
   override fun onLoad() {
+    // MongoDB 归档: 仅在启用时创建连接并启动后台调度; 关闭时完全不接触 Mongo, 维持纯 Redis 记录路径。
+    if (ArchiveConfig.enabled) {
+      coroutineContext[Job]?.invokeOnCompletion { DauArchiveRepository.close() }
+      DauArchiveScheduler.launchIn(this)
+    } else {
+      logger.info("DAU MongoDB 归档未启用, 继续仅用 Redis 记录数据")
+    }
     pluginEventChannel().subscribeAlways<TencentMessageEvent> { ev ->
       PluginMain.launch {
         // 统计消息数
@@ -101,42 +96,52 @@ suspend fun getDauString(date: String): TencentCustomMarkdown {
   var md = tencentCustomMarkdown {
     h1(date)
   }
-  val userCount = redis {
-    hlen(UserKey)
+  // 累计指标永远只在 Redis: 全时段用户/环境数 + 各命令累计执行次数。
+  val cumulative = redis {
+    CumulativeDauSnapshot(
+      userCount = hlen(UserKey),
+      contactCount = hlen(ContactKey),
+      command = decodeCountHash(hgetAll(CommandKey)),
+    )
   }
-  val contactCount = redis {
-    hlen(ContactKey)
+  md += "contact: ${cumulative.contactCount}, user: ${cumulative.userCount}"
+
+  // 当日指标: 当天读 Redis, 往日 Redis 缺失则回退归档库; Mongo 不可用时明确提示而非伪装成 0。
+  var archiveFailed = false
+  val daily = try {
+    DauArchiveService.readForDisplay(date)
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: ArchiveUnavailableException) {
+    PluginMain.logger.warn("历史 DAU 归档读取失败: date=$date", e)
+    md += "历史归档读取失败: ${e.message ?: "MongoDB 不可用"}"
+    archiveFailed = true
+    null
   }
-  md += "contact: $contactCount, user: $userCount"
-  val dayCommandKey = dayCommandKey(date)
-  // commandName -> count
-  val (dayCommandExecute, commandExecute) =
-    redis {
-      hgetAll(dayCommandKey) to hgetAll(CommandKey)
-    }
-  .let {
-    it.first
-      .windowed(2, 2, true)
-      .associate { w -> w[0] to w[1] } to it.second
-      .windowed(2, 2, true)
-      .associate { w -> w[0] to w[1] }
+
+  if (daily != null) {
+    md += "user=${daily.userCount}, contact=${daily.contactCount}, message=${daily.message}"
+  } else if (!archiveFailed && date < currentDate()) {
+    // 仅在确认"读取成功但无该日数据"时提示未找到; 存储故障已在上面单独提示, 不再叠加误导为"无数据"。
+    md += "未找到该日期的历史数据"
   }
-  val dauKey = dayDauKey(date)
-  val contactKey = dayContactKey(date)
-  val messageKey = dayMessageKey(date)
-  redis {
-    md += "user=${hlen(dauKey)}, contact=${hlen(contactKey)}, message=${get(messageKey)}"
-  }
-  // 指令执行次数
+
+  // 指令执行次数: 当日次数/累计次数。累计表 dau.command 从不删除, 必涵盖任何归档日出现过的命令。
   md append tencentCustomMarkdown {
     indexedList {
-      commandExecute.forEach {
-        +"${it.key}: ${dayCommandExecute[it.key] ?: 0}/${it.value}"
+      cumulative.command.forEach { (name, total) ->
+        +"$name: ${daily?.command?.get(name) ?: 0L}/$total"
       }
     }
   }
   return md
 }
+
+private data class CumulativeDauSnapshot(
+  val userCount: Long,
+  val contactCount: Long,
+  val command: Map<String, Long>,
+)
 
 @Suppress("unused")
 class DauClCommand : CommandLineSubCommand, com.diyigemt.arona.console.ConsoleSubCommand(name = "dau", helpText = "显示当日dau") {

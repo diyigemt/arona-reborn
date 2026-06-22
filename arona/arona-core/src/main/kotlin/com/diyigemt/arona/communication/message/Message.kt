@@ -413,9 +413,20 @@ internal data class TencentFriendMessageAuthorRaw(
 internal data class TencentGroupMessageAuthorRaw(
   @SerialName("member_openid")
   val memberOpenid: String,
+  // 以下为平台扩展的成员资料字段. 旧 payload 不下发, 故全部可空; 仅作展示/权限参考,
+  // 不参与群成员身份判定与缓存 key (身份仍以 memberOpenid 为准).
+  val username: String? = null,
+  val bot: Boolean? = null,
+  @SerialName("member_role")
+  val memberRole: String? = null,
+  // 跨场景统一 id, 群消息里目前常为空串; 暂不参与身份解析, 留待后续统一身份用.
+  @SerialName("union_openid")
+  val unionOpenid: String? = null,
 ) : ContactRaw {
+  // 群成员身份固定取 member_openid (下游用作群成员缓存 key, 须稳定). union_openid 是跨场景统一 id,
+  // 群消息里常为空且语义不同, 不在此处替代成员身份.
   override val id: String
-    get() = memberOpenid // TODO union_id
+    get() = memberOpenid
 }
 
 @Serializable
@@ -448,6 +459,16 @@ internal data class TencentGroupMessageMentionRaw(
   val memberRole: String? = null,
 )
 
+/**
+ * 群消息来源场景. 旧 payload 无此字段, 故整体可空; [ext] 原样保留腾讯下发的扩展参数 (如 msg_idx=...),
+ * 不在此处解析, 交由消费方按需处理.
+ */
+@Serializable
+internal data class TencentGroupMessageSceneRaw(
+  val source: String? = null,
+  val ext: List<String> = emptyList(),
+)
+
 @Serializable
 internal data class TencentGroupMessageRaw(
   override val id: String,
@@ -461,6 +482,20 @@ internal data class TencentGroupMessageRaw(
   val mentions: List<TencentGroupMessageMentionRaw>? = null,
   @SerialName("group_openid")
   val groupId: String,
+  // 平台冗余下发的群 id, 当前与 group_openid 同值. 仅作忠实记录/诊断, 群身份一律以 groupId(group_openid) 为准,
+  // 不可用作 fallback. 旧 payload 无此字段, 故可空.
+  @SerialName("group_id")
+  val rawGroupId: String? = null,
+  /**
+   * 消息来源场景. 旧 payload 无此字段, 故可空.
+   */
+  @SerialName("message_scene")
+  val messageScene: TencentGroupMessageSceneRaw? = null,
+  /**
+   * 腾讯下发的原始消息类型值, 直接保留 Int 以容纳未来新增取值. 旧 payload 无此字段, 故可空.
+   */
+  @SerialName("message_type")
+  val messageType: Int? = null,
 ) : TencentMessageRaw
 
 internal const val EmptyMessageId = ""

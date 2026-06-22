@@ -1,7 +1,9 @@
 package com.diyigemt.arona.plana.command
 
 import com.diyigemt.arona.command.AbstractCommand
-import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.command.GroupCommandSender
+import com.diyigemt.arona.communication.message.image
+import com.diyigemt.arona.communication.message.tencentCustomMarkdown
 import com.diyigemt.arona.plana.PluginMain
 import com.diyigemt.arona.plana.service.ImageAssetService
 
@@ -15,7 +17,16 @@ class PlanaStepCommand : AbstractCommand(
   description = "发送普拉娜图片",
   help = "/普拉娜踩我"
 ) {
-  suspend fun UserCommandSender.planaStep() {
+  suspend fun GroupCommandSender.planaStep() {
+    sendMessage(
+      tencentCustomMarkdown { 
+        image { 
+          w = 1013
+          h = 1847
+          href = "https://arona.cdn.diyigemt.com/image/some/plana.png"
+        }
+      }
+    )
     val image = ImageAssetService.getImage(subject, "plana.jpg")
     sendMessage(image)
   }

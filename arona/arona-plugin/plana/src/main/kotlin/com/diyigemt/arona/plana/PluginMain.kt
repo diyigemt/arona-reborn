@@ -36,21 +36,21 @@ object PluginMain : AronaPlugin(
     }
 
     // 审查开关仅经「色色」菜单的回调按钮触发(按钮已用腾讯原生 MANAGER 权限限定群管理员)。
-    pluginEventChannel().subscribeAlways<TencentCallbackButtonEvent> { ev ->
-      if (!ev.buttonData.startsWith(AUDIT_CALLBACK_PREFIX)) return@subscribeAlways
-      handleAuditSwitchButton(ev)
-    }
-
-    pluginEventChannel().subscribeAlways<TencentGroupMessageEvent> { ev ->
-      if (!AuditSwitchService.isEnabled(ev.subject.id)) return@subscribeAlways
-      val images = ev.message.filterIsInstance<TencentImage>()
-      if (images.isEmpty()) return@subscribeAlways
-      // 审查涉及网络 IO, 放到独立协程, 不阻塞事件分发。
-      launch {
-        runCatching { auditMessage(ev, images) }
-          .onFailure { logger.warn("图片审查处理失败", it) }
-      }
-    }
+//    pluginEventChannel().subscribeAlways<TencentCallbackButtonEvent> { ev ->
+//      if (!ev.buttonData.startsWith(AUDIT_CALLBACK_PREFIX)) return@subscribeAlways
+//      handleAuditSwitchButton(ev)
+//    }
+//
+//    pluginEventChannel().subscribeAlways<TencentGroupMessageEvent> { ev ->
+//      if (!AuditSwitchService.isEnabled(ev.subject.id)) return@subscribeAlways
+//      val images = ev.message.filterIsInstance<TencentImage>()
+//      if (images.isEmpty()) return@subscribeAlways
+//      // 审查涉及网络 IO, 放到独立协程, 不阻塞事件分发。
+//      launch {
+//        runCatching { auditMessage(ev, images) }
+//          .onFailure { logger.warn("图片审查处理失败", it) }
+//      }
+//    }
   }
 
   /**

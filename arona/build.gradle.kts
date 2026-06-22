@@ -38,6 +38,7 @@ val devPlugins = listOf(
   "content-audit",
   "chat-command",
   "arona",
+  "plana",
 )
 
 tasks.register("copyDevPlugins") {

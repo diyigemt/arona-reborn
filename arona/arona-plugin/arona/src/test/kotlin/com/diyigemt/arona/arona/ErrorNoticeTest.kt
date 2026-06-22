@@ -53,8 +53,46 @@ class ErrorNoticeTest {
   }
 
   @Test
+  fun `placeholder 含右方括号仍命中`() {
+    val chain = markdownChain("![角色]泳装 #1px #1px](${PREFIX}some/plana.png)")
+    assertEquals("plana", extractAronaImageName(chain))
+  }
+
+  @Test
+  fun `placeholder 含括号仍命中`() {
+    val chain = markdownChain("![アル(泳装) #1px #1px](${PREFIX}aru.png)")
+    assertEquals("aru", extractAronaImageName(chain))
+  }
+
+  @Test
+  fun `图片长宽可省略`() {
+    val chain = markdownChain("![只有占位](${PREFIX}some/plana.png)")
+    assertEquals("plana", extractAronaImageName(chain))
+  }
+
+  @Test
+  fun `placeholder 带长宽后缀仍命中`() {
+    val chain = markdownChain("![placeholder #1013px #1847px](${PREFIX}some/plana.png)")
+    assertEquals("plana", extractAronaImageName(chain))
+  }
+
+  @Test
+  fun `未闭合 alt 不跨行串联到下一行普通链接`() {
+    // alt 不能越过换行, 故 ![未闭合 在本行无 ']' 收尾; 次行是普通链接(无前导 '!'), 整体不应命中.
+    val chain = markdownChain("第一行 ![未闭合\n[普通链接](${PREFIX}a/甲.png)")
+    assertNull(extractAronaImageName(chain))
+  }
+
+  @Test
   fun `同一 markdown 多图取第一张`() {
     val chain = markdownChain("![img](${PREFIX}a/甲.png) ![img](${PREFIX}b/乙.png)")
+    assertEquals("甲", extractAronaImageName(chain))
+  }
+
+  @Test
+  fun `首图 placeholder 含右方括号时仍取首图`() {
+    // 同时验证「alt 含 ']'」放宽与「多图取第一张」两条语义: 非贪婪须回溯到首图真正的 '](' 边界.
+    val chain = markdownChain("![甲]说明 #1px #1px](${PREFIX}a/甲.png) ![乙](${PREFIX}b/乙.png)")
     assertEquals("甲", extractAronaImageName(chain))
   }
 

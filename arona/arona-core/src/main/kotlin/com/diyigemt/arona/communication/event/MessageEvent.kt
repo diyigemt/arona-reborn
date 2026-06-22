@@ -70,6 +70,11 @@ class TencentGroupMessageEvent internal constructor(
    * 该消息是否 @ 了机器人自身. 来源于群消息 payload 的 mentions.is_you, 与 content 文本无关.
    */
   val isAtBot: Boolean = false,
+  /**
+   * 群消息 payload 中 author.username 提供的发送者平台展示名. 旧 payload 不下发故可空, 仅作展示:
+   * 不参与成员身份判定, 也不写入 [GroupMember] 缓存 (它是逐条消息的瞬态资料, 同一成员不同消息可能不同).
+   */
+  val platformUsername: String? = null,
 ) : TencentGroupEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.group
   override val group get() = sender.group

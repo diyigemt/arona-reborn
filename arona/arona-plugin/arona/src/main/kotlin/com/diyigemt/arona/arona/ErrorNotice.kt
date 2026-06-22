@@ -16,8 +16,14 @@ internal const val ARONA_IMAGE_PREFIX = "https://arona.cdn.diyigemt.com/image/"
 internal const val TUTORIAL_DIRECT_URL = "https://tutorial.arona.diyigemt.com/home?name="
 
 // 仅匹配 markdown 图片语法 ![alt](url) 中的目标 url, 不匹配普通链接 [text](url)——后者按需求不算"包含图片".
+// alt(placeholder)允许任意非控制字符(含 ']', 以及可省略的长宽后缀 "#Wpx #Hpx", 二者都在方括号内);
+// 用非贪婪 [^\p{Cntrl}]*? + 后随 ']\(<arona前缀>' 锚定, 使格式正常的多图内容取第一张, 且 \p{Cntrl}
+// 排除 ASCII 控制字符(含 CR/LF)使 alt 不跨常规换行. 本处理的是 bot 已构造好的发送内容, 接受 alt 含
+// ']'/')' 时极小概率"跨界吞并紧随的普通链接"(或 alt 内自带 '](url)' 字样)的误匹配——最坏只是多给一条
+// 直连提示, 不影响正确性以外的东西.
 // url 段用 [^\s)]+: markdown 构造时英文括号已被转义为 %28/%29, 不含真正的 ')', 故不会被提前截断.
-private val AronaMarkdownImageRegex = Regex("""!\[[^\]]*]\((${Regex.escape(ARONA_IMAGE_PREFIX)}[^\s)]+)\)""")
+private val AronaMarkdownImageRegex =
+  Regex("""!\[[^\p{Cntrl}]*?]\((${Regex.escape(ARONA_IMAGE_PREFIX)}[^\s)]+)\)""")
 
 /**
  * 从 arona 图床直链中提取图片名(去掉路径、查询/锚点与扩展名)。非 arona 图床或提取结果为空时返回 null。

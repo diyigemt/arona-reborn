@@ -51,7 +51,8 @@ interface CommandSender : CoroutineScope {
   companion object {
     fun TencentGuildMessageEvent.toCommandSender() = GuildChannelCommandSender(sender, message.sourceId)
     fun TencentGuildPrivateMessageEvent.toCommandSender() = GuildUserCommandSender(sender, message.sourceId)
-    fun TencentGroupMessageEvent.toCommandSender() = GroupCommandSender(sender, message.sourceId)
+    fun TencentGroupMessageEvent.toCommandSender() =
+      GroupCommandSender(sender, message.sourceId, platformUsername = platformUsername)
     fun TencentFriendMessageEvent.toCommandSender() = FriendUserCommandSender(sender, message.sourceId)
     fun <T : TencentMessageEvent> T.toCommandSender() = when (this) {
       is TencentGuildMessageEvent -> toCommandSender()
@@ -127,6 +128,19 @@ interface UserCommandSender : CommandSender {
   override val subject: Contact
   override val user: User
   override var sourceId: String
+
+  /**
+   * 创建该 sender 的那条消息 payload 携带的发送者平台展示名 (如群消息的 author.username)。
+   *
+   * 与 [userDocument] 里 arona 自有的 [com.diyigemt.arona.database.permission.UserDocument.username]
+   * 不同源: 后者是用户在 arona 侧自定义的名字, 此处是平台逐条消息下发的展示名, 可能缺失, 仅作展示,
+   * 不参与身份判定或缓存 key。默认 null, 目前仅群聊 sender 会填充。
+   *
+   * 注意它是 immutable 快照: [nextMessage] 续读到的新消息有各自的名字, 不会回写本字段——后续消息的
+   * 名字应从那条 [TencentGroupMessageEvent.platformUsername] 取。
+   */
+  val platformUsername: String? get() = null
+
   suspend fun userDocument(): PluginUserDocument
   suspend fun contactDocument(): PluginContactDocument
   suspend fun contactMember(): PluginContactMember
@@ -227,6 +241,8 @@ class GroupCommandSender internal constructor(
   override val user: GroupMember,
   sourceId: String,
   override val eventId: String? = null,
+  // 群消息 author.username 透传而来 (见 TencentGroupMessageEvent.platformUsername); 旧 payload 缺字段时为 null.
+  override val platformUsername: String? = null,
 ) : AbstractUserCommandSender(sourceId), CoroutineScope by user.childScope("GroupCommandSender") {
   override val subject get() = user.group
   val group get() = user.group

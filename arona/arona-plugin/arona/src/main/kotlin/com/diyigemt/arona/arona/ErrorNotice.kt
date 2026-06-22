@@ -5,6 +5,7 @@ import com.diyigemt.arona.communication.message.MessageChain
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.TencentCustomMarkdown
 import com.diyigemt.arona.communication.message.TencentImage
+import io.ktor.http.encodeURLPath
 
 // 腾讯发送接口返回该 code 表示"消息内容违规"(图片/文本被风控). 此时通用的"message: ..."提示对用户无意义,
 // 若违规内容是 arona 图床的图片, 改为引导用户去直连页查看原图.
@@ -71,7 +72,7 @@ internal fun buildErrorNotice(
     if (imageName != null) {
       append("错误发生，消息内容违规，请直接使用直连查看：")
       // 图片名按需求原样拼接, 不做 query 参数编码: 图床命名受控(中文/字母/数字), 直连页按原值匹配。
-      append("$TUTORIAL_DIRECT_URL$imageName")
+      append("$TUTORIAL_DIRECT_URL${imageName.encodeURLPath()}")
     } else {
       append("错误发生")
       append("message: ${source.message}")

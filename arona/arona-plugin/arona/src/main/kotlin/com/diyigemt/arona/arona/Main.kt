@@ -98,10 +98,7 @@ object Arona : AronaPlugin(
           errorNoticeGuard.invalidate(sourceId)
           return@subscribeAlways
         }
-        MessageChainBuilder(sourceId)
-          .append("错误发生")
-          .append("message: ${(it.exception as TencentApiErrorException).source.message}")
-          .build()
+        buildErrorNotice(sourceId, (it.exception as TencentApiErrorException).source, it.message)
           .also { ch ->
             it.target.sendMessage(ch, (100 .. 200).random())
           }

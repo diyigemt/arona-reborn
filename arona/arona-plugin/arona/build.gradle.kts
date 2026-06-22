@@ -31,6 +31,9 @@ dependencies {
   api(libs.skiko.awt.runtime.windows.x64)
   api(libs.thumbnailator)
   testImplementation(kotlin("test"))
+  // 测试源集不继承 main 的 compileOnly(project(":arona-core")) (约定插件只对 main 注入), 单测需直接构造
+  // 消息链/异常等 core 类型, 故显式以 testImplementation 引入 arona-core。
+  testImplementation(project(":arona-core"))
 }
 
 tasks.test {

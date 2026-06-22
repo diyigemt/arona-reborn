@@ -5,6 +5,7 @@ import com.diyigemt.arona.communication.TencentBotClient
 import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.utils.apiLogger
 import com.diyigemt.arona.utils.badRequest
+import com.diyigemt.arona.utils.debugLogger
 import com.diyigemt.arona.utils.success
 import com.diyigemt.arona.utils.unauthorized
 import io.ktor.server.application.ApplicationCall
@@ -117,7 +118,8 @@ object WebhookEndpoint {
     if (declared <= 0L || declared > MaxWebhookBodyBytes) return badRequest()
     val signBytes = parseHexOrNull(sign) ?: return badRequest()
     val body = receiveText()
-    if (body.toByteArray(Charsets.UTF_8).size > MaxWebhookBodyBytes) {
+    val bodyBytes = body.toByteArray(Charsets.UTF_8)
+    if (bodyBytes.size > MaxWebhookBodyBytes) {
       return badRequest()
     }
     val bot = BotManager.getBot() as TencentBotClient
@@ -126,7 +128,22 @@ object WebhookEndpoint {
       apiLogger.warn("webhook signature verify failed.")
       return unauthorized()
     }
+    // debug 模式: 验签通过后完整打印原始 body, 覆盖握手/普通/重复事件; 验签失败的请求不落盘, 避免公开入口被用作任意日志写入.
+    // 放在 envelope 解析之前, 确保即使后续 decode 抛异常 (未知/未来格式) 原始报文也已记录. body 内含换行, 用首尾标记界定完整边界.
+    if (bot.isDebug) {
+      debugLogger.info(
+        "received webhook (timestamp={}, declaredBytes={}, utf8Bytes={})\n----- WEBHOOK BODY BEGIN -----\n{}\n----- WEBHOOK BODY END -----",
+        ts,
+        declared,
+        bodyBytes.size,
+        body,
+      )
+    }
     val preData = json.decodeFromString<TencentWebhookPayload0>(body)
+    if (bot.isDebug) {
+      // envelope 摘要复用已解析的 preData, 不重复 decode; 不打印 signature 等认证材料.
+      debugLogger.info("webhook envelope: op={}, type={}, id={}", preData.operation, preData.type, preData.id)
+    }
     if (preData.operation == TencentWebhookOperationType.WebhookVerify) {
       // 握手路径: 每次都必须算新签名响应, 不做幂等化.
       val data = json.decodeFromString<TencentWebhookPayload<TencentWebhookVerifyReq>>(body)

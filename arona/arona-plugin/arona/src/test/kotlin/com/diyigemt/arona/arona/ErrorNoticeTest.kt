@@ -97,12 +97,12 @@ class ErrorNoticeTest {
     assertEquals(
       listOf(
         "错误发生，消息内容违规，请直接使用直连查看：",
-        "https://tutorial.arona.diyigemt.com/home?name=日服人权",
+        "https://tutorial.arona.diyigemt.com/home?name=%E6%97%A5%E6%9C%8D%E4%BA%BA%E6%9D%83",
       ),
       notice.map { it.toString() },
     )
     assertEquals(
-      "错误发生，消息内容违规，请直接使用直连查看：\nhttps://tutorial.arona.diyigemt.com/home?name=日服人权",
+      "错误发生，消息内容违规，请直接使用直连查看：\nhttps://tutorial.arona.diyigemt.com/home?name=%E6%97%A5%E6%9C%8D%E4%BA%BA%E6%9D%83",
       wireContent(notice),
     )
   }

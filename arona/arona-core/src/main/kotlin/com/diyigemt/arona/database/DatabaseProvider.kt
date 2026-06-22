@@ -3,7 +3,6 @@ package com.diyigemt.arona.database
 import com.diyigemt.arona.utils.MongoConfig.Companion.toConnectionString
 import com.diyigemt.arona.utils.ReflectionUtil
 import com.diyigemt.arona.utils.aronaConfig
-import com.diyigemt.arona.utils.runSuspend
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.ServerApi
@@ -15,6 +14,8 @@ import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import io.github.crackthecodeabhi.kreds.connection.Endpoint
 import io.github.crackthecodeabhi.kreds.connection.KredsClient
 import io.github.crackthecodeabhi.kreds.connection.newClient
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.jetbrains.exposed.v1.core.DatabaseConfig
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -66,13 +67,17 @@ object DatabaseProvider {
       .build()
     MongoClient.create(settings).getDatabase(aronaConfig.mongodb.db)
   }
-  private val redisDatabase: KredsClient by lazy {
-    newClient(Endpoint(aronaConfig.redis.host, aronaConfig.redis.port)).apply {
-      runSuspend {
-        select(aronaConfig.redis.db)
-      }
-    }
-  }
+  /**
+   * 共享 Redis 连接 (单条 TCP), 经 [redisDbQuery] 暴露给实时消息路径等高频调用方。
+   *
+   * 仅在 [select] 成功返回后才发布到此字段: 旧实现用 `by lazy` + fire-and-forget 的 `runSuspend { select }`,
+   * lazy 立即返回连接而 SELECT 在另一协程异步执行且不被 await, 导致首批命令可能在切库前发出、落到错误的 db
+   * (默认 db0)。改为 @Volatile + [sharedRedisInitMutex] 守护的一次性 suspend 初始化 (见 [sharedRedisConnection]),
+   * 消除该库选择竞态。@Volatile 保证发布后的连接对其它线程立即可见。
+   */
+  @Volatile
+  private var sharedRedis: KredsClient? = null
+  private val sharedRedisInitMutex = Mutex()
 
   internal fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
 
@@ -95,7 +100,45 @@ object DatabaseProvider {
   /** 幂等地为 Mongo 集合建立索引; 已存在的同名索引由 driver 静默跳过, 失败仅 log warn. */
   suspend fun ensureMongoIndexes() = MongoIndexes.ensure(noSqlDatabase)
 
-  suspend fun <T> redisDbQuery(block: suspend KredsClient.() -> T) = block.invoke(redisDatabase)
+  /**
+   * 创建一条已切换到配置库的独立 Redis 连接, 供后台批处理 (如 DAU 归档) 独占使用。
+   *
+   * 与 [redisDbQuery] 使用的共享连接隔离: 各自持有独立的回复队列, 批处理协程被取消/超时也只影响自己的连接,
+   * 不会错位实时消息路径的回复 (kreds 单连接靠 per-client mutex 配对"写+读", 一旦某协程在 read 中被取消
+   * 留下孤儿回复, 该连接后续回复会永久偏移)。调用方独占该连接并负责 [KredsClient.close]。
+   */
+  suspend fun newRedisConnection(): KredsClient = connectAndSelect()
+
+  /**
+   * 建立一条 Redis 连接并 await 其 SELECT 到配置库后才返回。初始化失败 (含取消) 时关闭尚未交付的连接,
+   * 并把关闭过程的异常作为 suppressed 附加到原异常上, 避免连接泄漏又不掩盖根因。
+   */
+  private suspend fun connectAndSelect(): KredsClient {
+    val redis = aronaConfig.redis
+    val client = newClient(Endpoint(redis.host, redis.port))
+    return try {
+      client.select(redis.db)
+      client
+    } catch (e: Throwable) {
+      runCatching { client.close() }.exceptionOrNull()?.let(e::addSuppressed)
+      throw e
+    }
+  }
+
+  /**
+   * 获取共享 Redis 连接, 仅初始化一次。快路径直接读已发布的 [sharedRedis]; 慢路径在 [sharedRedisInitMutex]
+   * 内双重检查后 [connectAndSelect], 确保连接在 SELECT 成功前不会被任何调用方看到, 且并发首次调用只建一条连接。
+   * 初始化失败不发布、不缓存, 下次调用自然重试。
+   */
+  private suspend fun sharedRedisConnection(): KredsClient {
+    sharedRedis?.let { return it }
+    return sharedRedisInitMutex.withLock {
+      sharedRedis ?: connectAndSelect().also { sharedRedis = it }
+    }
+  }
+
+  suspend fun <T> redisDbQuery(block: suspend KredsClient.() -> T): T =
+    block.invoke(sharedRedisConnection())
 
 }
 

@@ -44,5 +44,6 @@ val devPlugins = listOf(
 tasks.register("copyDevPlugins") {
   group = "arona"
   description = "复制开发常用插件 (${devPlugins.joinToString(", ")}) 的 shadow jar 到 arona-core/sandbox/plugins"
+  dependsOn(":arona-core:copyToPlugins")
   dependsOn(devPlugins.map { ":arona-plugin:$it:copyToPlugins" })
 }

@@ -15,10 +15,13 @@ import com.diyigemt.arona.webui.plugins.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.util.logging.*
 import kotlinx.coroutines.*
 import kotlin.coroutines.CoroutineContext
 
 object AronaApplication : CoroutineScope {
+  private val logger = KtorSimpleLogger("AronaApplication")
+
   // SupervisorJob 让单个子任务失败不会拉垮整个 app; ApplicationStopping 时统一 cancel.
   override val coroutineContext: CoroutineContext =
     SupervisorJob() + Dispatchers.Default + CoroutineName("AronaApp")
@@ -63,6 +66,14 @@ object AronaApplication : CoroutineScope {
           monitor.subscribe(ApplicationStopping) {
             this@AronaApplication.coroutineContext.cancel()
             closeAronaPools()
+            // 插件协程是独立根 job, 框架层没有统一的在途任务 join 点; 这里在取消 app scope / 关闭线程池之后同步关闭
+            // Redis 池 (置 closed 标志拒绝后续调用), 仍在执行的插件 Redis 命令允许因关池而失败。close 自身失败仅告警,
+            // 不阻断剩余关闭流程。处于非挂起的关闭回调内, 用短生命周期 runBlocking 等待门面的 suspend 关闭完成。
+            try {
+              runBlocking { DatabaseProvider.closeRedisConnection() }
+            } catch (e: Throwable) {
+              logger.warn("关闭 Redis 连接池失败", e)
+            }
           }
           module()
         }

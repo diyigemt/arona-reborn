@@ -1,9 +1,28 @@
 package com.diyigemt.arona.database
 
-import io.github.crackthecodeabhi.kreds.args.SetOption
-import io.github.crackthecodeabhi.kreds.args.ZAddGTOrLT
-import io.github.crackthecodeabhi.kreds.connection.KredsClient
-import io.github.crackthecodeabhi.kreds.pipeline.Pipeline
+import eu.vendeli.rethis.ReThis
+import eu.vendeli.rethis.command.generic.del
+import eu.vendeli.rethis.command.generic.expire
+import eu.vendeli.rethis.command.generic.scan
+import eu.vendeli.rethis.command.hash.hGetAll
+import eu.vendeli.rethis.command.hash.hIncrBy
+import eu.vendeli.rethis.command.hash.hLen
+import eu.vendeli.rethis.command.hash.hSet
+import eu.vendeli.rethis.command.sortedset.zAdd
+import eu.vendeli.rethis.command.sortedset.zRange
+import eu.vendeli.rethis.command.sortedset.zRevRank
+import eu.vendeli.rethis.command.sortedset.zScore
+import eu.vendeli.rethis.command.string.get
+import eu.vendeli.rethis.command.string.incr
+import eu.vendeli.rethis.command.string.set
+import eu.vendeli.rethis.shared.request.common.FieldValue
+import eu.vendeli.rethis.shared.request.common.UpdateStrategyOption
+import eu.vendeli.rethis.shared.request.generic.ScanOption
+import eu.vendeli.rethis.shared.request.string.SetExpire
+import eu.vendeli.rethis.shared.request.string.UpsertMode
+import eu.vendeli.rethis.shared.response.sortedset.ZMember
+import eu.vendeli.rethis.shared.types.RType
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * 框架统一的 Redis 操作门面 —— [DatabaseProvider.redisDbQuery] 的 receiver 类型。
@@ -15,7 +34,7 @@ import io.github.crackthecodeabhi.kreds.pipeline.Pipeline
  * 方法集刻意收窄到代码库**实际用到**的操作, 签名只用 JDK/Kotlin 类型。新增 Redis 用法时在此补方法,
  * 而非在调用点直接触碰客户端。
  *
- * 当前实现为 [KredsAronaRedis] (底层 kreds), 行为与历史一致; 后续可整体替换实现而不动调用点。
+ * 当前实现为 [ReThisAronaRedis] (底层 re.this 池化客户端), 只调用 re.this 的原始命令层 (不经 serde)。
  */
 interface AronaRedis {
   /** GET key。 */
@@ -99,11 +118,14 @@ data class ScanPage(
 )
 
 /**
- * [AronaRedis] 的 kreds 0.9.1 实现。逐方法**等价封装**现有 kreds 调用, 不改变任何线格式与行为;
- * 仅把客户端差异 (hgetAll 扁平列表、zscore 返回字符串、hset 首参必填、Pipeline 句柄等) 收敛在此处。
+ * [AronaRedis] 的 re.this 0.4.3 实现。**只调用原始命令层** (`eu.vendeli.rethis.command.{string,hash,generic,sortedset}`
+ * 的扩展函数), 绝不触碰 serde 层 —— serde 会把 String 值 JSON 序列化 (额外加引号), 破坏与现有 Redis 数据的线格式兼容。
+ *
+ * 客户端形态差异 (hGetAll 的 `Map<String,String?>`、scan 游标为 String、option 的强类型封装等) 收敛在此处一处,
+ * 调用点与门面接口保持不变。底层 re.this 内部连接池化, 单实例对并发命令 / pipeline 安全。
  */
-internal class KredsAronaRedis(
-  private val client: KredsClient,
+internal class ReThisAronaRedis(
+  private val client: ReThis,
 ) : AronaRedis {
 
   override suspend fun get(key: String): String? = client.get(key)
@@ -113,80 +135,94 @@ internal class KredsAronaRedis(
   }
 
   override suspend fun setEx(key: String, value: String, ttlSeconds: Long) {
-    client.set(key, value, SetOption.Builder(exSeconds = ttlSeconds.toULong()).build())
+    client.set(key, value, SetExpire.Ex(ttlSeconds.seconds))
   }
 
   override suspend fun setNxEx(key: String, value: String, ttlSeconds: Long): Boolean =
-    client.set(key, value, SetOption.Builder(nx = true, exSeconds = ttlSeconds.toULong()).build()) == "OK"
+    // 一次往返完成 SET NX EX: 成功占用 (NX 命中) 返回 "OK", key 已存在返回 null。
+    client.set(key, value, UpsertMode.NX, SetExpire.Ex(ttlSeconds.seconds)) == "OK"
 
   override suspend fun del(vararg keys: String): Long = client.del(*keys)
 
   override suspend fun expire(key: String, ttlSeconds: Long): Boolean =
-    client.expire(key, ttlSeconds.toULong()) == 1L
+    client.expire(key, ttlSeconds.seconds)
 
   override suspend fun incr(key: String): Long = client.incr(key)
 
   override suspend fun hIncrBy(key: String, field: String, increment: Long): Long =
-    client.hincrBy(key, field, increment)
+    client.hIncrBy(key, field, increment)
 
   override suspend fun hSet(key: String, vararg fieldValues: Pair<String, String>): Long {
     require(fieldValues.isNotEmpty()) { "HSET 至少需要一对 field/value" }
-    // kreds 0.9.1 的 hset 首个 field/value 对是必选参数, 其余才是 vararg, 不能直接 hset(key, *fieldValues)。
-    return client.hset(key, fieldValues.first(), *fieldValues.copyOfRange(1, fieldValues.size))
+    return client.hSet(key, *fieldValues.toFieldValues())
   }
 
   override suspend fun hGetAll(key: String): Map<String, String> {
-    // kreds hgetAll 返回 [field0, value0, field1, value1, ...] 扁平交替列表, 在此统一成 Map。
-    // 奇数长度意味着回复错位 (如连接回复队列被孤儿回复污染), 直接抛错暴露问题而非静默丢字段。
-    val flat = client.hgetAll(key)
-    require(flat.size % 2 == 0) { "redis hash response has odd element count: ${flat.size}" }
-    return flat.chunked(2).associate { (field, value) -> field to value }
+    // re.this 的 hGetAll 返回 Map<String,String?>; 在此收敛成保序的 Map<String,String>。
+    // HGETALL 的字段值在 Redis 永远是字符串、不会为 null; 一旦出现 null 即视为回复异常, 直接抛错暴露而非静默丢字段。
+    // 用 LinkedHashMap 显式承载: 门面契约承诺保留服务端返回顺序 (keys.first() 等顺序敏感用法依赖此约定)。
+    val source = client.hGetAll(key)
+    val ordered = LinkedHashMap<String, String>(source.size)
+    source.forEach { (field, value) ->
+      ordered[field] = requireNotNull(value) { "redis HGETALL 字段 '$field' (key=$key) 返回 null" }
+    }
+    return ordered
   }
 
-  override suspend fun hLen(key: String): Long = client.hlen(key)
+  override suspend fun hLen(key: String): Long = client.hLen(key)
 
   override suspend fun zAddGt(key: String, score: Double, member: String) {
-    // kreds 0.9.1 的 scoreMember 分数为 Int; 这些分数本就是整数值, 转 Int 保持现有线格式。
-    client.zadd(key, gtOrLt = ZAddGTOrLT.GT, scoreMember = score.toInt() to member)
+    // ZMember 的构造顺序为 (member, score); comparison=GT 表示仅当新分数更大时才更新。返回值 (变更数) 忽略。
+    client.zAdd(key, ZMember(member, score), comparison = UpdateStrategyOption.GT)
   }
 
   override suspend fun zRangeRev(key: String, start: Long, stop: Long, withScores: Boolean): List<String> =
-    client.zrange(key, start, stop, by = null, rev = true, limit = null, withScores = withScores)
+    client.zRange(key, start.toString(), stop.toString(), rev = true, withScores = withScores)
 
-  override suspend fun zScore(key: String, member: String): Double? =
-    // kreds 0.9.1 的 zscore 返回 String?, 门面统一为 Double?。
-    client.zscore(key, member)?.toDouble()
+  override suspend fun zScore(key: String, member: String): Double? = client.zScore(key, member)
 
-  override suspend fun zRevRank(key: String, member: String): Long? = client.zrevrank(key, member)
+  override suspend fun zRevRank(key: String, member: String): Long? = client.zRevRank(key, member)
 
   override suspend fun scan(cursor: String, match: String?, count: Long?): ScanPage {
-    // PR1 维持 kreds 0.9.1 的无选项 plain SCAN (其 MATCH/COUNT 编码有缺陷); match/count 有意不下发,
-    // 由调用方的客户端侧过滤兜底。切换到能正确编码 SCAN 选项的客户端后再恢复 match/count。
-    val page = client.scan(cursor.toLong())
-    return ScanPage(cursor = page.cursor.toString(), keys = page.elements)
+    // re.this 正确编码 SCAN 选项: MATCH 缩小返回量、COUNT 提示批大小。游标输入为 Long、返回为 String。
+    // match/count 为 null 时不下发对应选项。
+    val options = buildList {
+      match?.let { add(ScanOption.Match(it)) }
+      count?.let { add(ScanOption.Count(it)) }
+    }
+    val page = client.scan(cursor.toLong(), *options.toTypedArray())
+    return ScanPage(cursor = page.cursor, keys = page.keys)
   }
 
   override suspend fun pipeline(block: suspend RedisPipeline.() -> Unit) {
-    val pipeline = client.pipelined()
-    KredsRedisPipeline(pipeline).block()
-    pipeline.execute()
+    // pipeline 块的 receiver 仍是 ReThis; 把门面写命令委托到该 receiver 上的原始层扩展函数。
+    val results = client.pipeline {
+      ReThisRedisPipeline(this).block()
+    }
+    // 单条命令的服务端错误被 re.this 作为 RType.Error 收进结果列表 (不抛出, 以免一条失败中断整批)。
+    // "fire-and-forget" 仅指忽略成功返回值, 不等于忽略错误: 显式检查并抛出首个错误, 避免静默吞掉写失败 (如 WRONGTYPE)。
+    results.filterIsInstance<RType.Error>().firstOrNull()?.let { throw it.exception }
   }
 
-  /** 把门面 pipeline 写命令委托到 kreds [Pipeline]; 各命令返回 Response 句柄, 由外层 [Pipeline.execute] 统一提交。 */
-  private class KredsRedisPipeline(
-    private val delegate: Pipeline,
+  /** pipeline 块内的写命令委托: 复用 pipeline receiver [ReThis] 上已导入的原始层扩展函数。 */
+  private class ReThisRedisPipeline(
+    private val delegate: ReThis,
   ) : RedisPipeline {
     override suspend fun incr(key: String) {
       delegate.incr(key)
     }
 
     override suspend fun hIncrBy(key: String, field: String, increment: Long) {
-      delegate.hincrBy(key, field, increment)
+      delegate.hIncrBy(key, field, increment)
     }
 
     override suspend fun hSet(key: String, vararg fieldValues: Pair<String, String>) {
       require(fieldValues.isNotEmpty()) { "HSET 至少需要一对 field/value" }
-      delegate.hset(key, fieldValues.first(), *fieldValues.copyOfRange(1, fieldValues.size))
+      delegate.hSet(key, *fieldValues.toFieldValues())
     }
   }
 }
+
+/** 把门面的 (field, value) 对数组转换成 re.this 原始层 [FieldValue] 数组 (供 HSET vararg 展开)。 */
+private fun Array<out Pair<String, String>>.toFieldValues(): Array<FieldValue> =
+  Array(size) { i -> FieldValue(this[i].first, this[i].second) }

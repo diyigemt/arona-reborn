@@ -1,44 +1,26 @@
 package com.diyigemt.arona.user.recorder
 
+import com.diyigemt.arona.database.AronaRedis
 import com.diyigemt.arona.database.DatabaseProvider
 import com.diyigemt.arona.utils.currentDate
-import io.github.crackthecodeabhi.kreds.connection.KredsClient
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
-import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 归档事务边界与历史读取。
  *
  * 进程内 [archiveMutex] 串行化整个 "扫描 → 读 Redis → 写 Mongo → 删 Redis" 流程, 防止启动归档与每日归档
- * (及未来可能的手动触发) 并发, 否则可能出现一方删 Redis、另一方读到空摘要覆盖 Mongo 的竞态。
+ * (及未来可能的手动触发) 并发, 否则可能出现一方删 Redis、另一方读到空摘要覆盖 Mongo 的竞态。这是**业务级
+ * 事务边界**, 与底层 Redis 是否池化无关, 故保留。
  *
- * 所有 Redis 访问都走 [withArchiveRedis] 申请的**独立短生命周期连接**, 而非框架共享的实时连接:
- * 归档要 SCAN 全库 + 多轮往返, 一旦与实时消息路径共用同一条 kreds 连接的回复队列, 任一方在 read 中被
- * 取消留下孤儿回复, 就会让后续回复永久错位 (表现为 SCAN 读到非法的 *-1 空数组等)。独立连接各自隔离,
- * 用完即关, 取消/异常时连同孤儿回复一并销毁, 互不污染。
+ * 所有 Redis 访问统一走框架门面 [DatabaseProvider.redisDbQuery] (底层 re.this 池化客户端)。归档不再自建独立
+ * 连接: re.this 池化后各命令自行借/还连接, 协程取消只影响自身借用的那条连接, 不会污染其它连接的回复队列;
+ * 且每条 (含重连的) 池连接都应用同一 db 配置, 不存在 kreds 时代 "重连不重做 SELECT 落到 db0" 的隐患。
  */
 internal object DauArchiveService {
   private val archiveMutex = Mutex()
-
-  // 进程内单调递增的连接关联 id 来源。注意这是"客户端侧关联 id", 不是 Redis 服务端的 connection id,
-  // 仅用于把同一条独立连接的 申请/就绪/操作/关闭 日志串起来。
-  private val connectionSeq = AtomicLong()
-
-  /**
-   * 把 SCAN 游标同时按有符号 / 无符号 / 十六进制三种形式展开。Redis 游标是不透明的无符号 64 位整数, 而 kreds
-   * 的 API 用 [Long] 承载: 当游标最高位被置位时在 Kotlin 侧表现为负数, 下一轮可能被编码成"负十进制游标"发给
-   * 服务端。三种形式并列可直接判断失败是否源于游标符号问题 (坏参数) 还是别的原因。
-   */
-  private fun cursorFields(cursor: Long): String {
-    val unsigned = cursor.toULong()
-    return "cursorSigned=$cursor cursorUnsigned=$unsigned cursorHex=${unsigned.toString(16)} cursorNegative=${cursor < 0L}"
-  }
 
   /**
    * 归档所有早于今天且仍在 Redis 的按天数据。
@@ -46,9 +28,7 @@ internal object DauArchiveService {
    */
   suspend fun archivePastDays(run: ArchiveRun) = archiveMutex.withLock {
     val today = LocalDate.parse(currentDate())
-    val dates = withArchiveRedis("scan runId=${run.id} trigger=${run.trigger}") { connId ->
-      scanArchivableDates(run, connId, today)
-    }.sorted()
+    val dates = DatabaseProvider.redisDbQuery { scanArchivableDates(run, today) }.sorted()
     if (dates.isEmpty()) {
       PluginMain.logger.info("DAU 归档检查完成: runId={} trigger={} 无待归档数据", run.id, run.trigger)
       return@withLock
@@ -63,7 +43,7 @@ internal object DauArchiveService {
     var failed = 0
     for (date in dates) {
       try {
-        // archiveOneDay 自管连接 (读、删各一条独立短连接), 单日失败相互隔离, 不复用可能已断连/重连到 db0 的连接。
+        // 单日失败相互隔离: 写 Mongo 成功后才删该日 Redis, 失败则保留该日数据等下一轮重试。
         if (archiveOneDay(run, date.toString())) archived++ else skipped++
       } catch (e: CancellationException) {
         throw e
@@ -94,7 +74,7 @@ internal object DauArchiveService {
   suspend fun readForDisplay(date: String): DauDailySummary? {
     val requested = LocalDate.parse(date)
     val today = LocalDate.parse(currentDate())
-    val redisSide = withArchiveRedis("display date=$date") { connId -> readRedisDay(connId, date) }
+    val redisSide = DatabaseProvider.redisDbQuery { readRedisDay(date) }
 
     if (requested >= today) return redisSide.summary
     if (redisSide.present) return redisSide.summary
@@ -112,84 +92,50 @@ internal object DauArchiveService {
   }
 
   /**
-   * 申请一条独立 Redis 连接执行 [block], 无论成败 (含取消) 都在结束时关闭, 连同其上的孤儿回复一并销毁。
+   * 用服务端 `SCAN MATCH=dau.* COUNT=<scanCount>` 遍历键空间, 再由 [DauArchiveKeys.parseArchivableDate] 在客户端
+   * 严格筛选出 `dau.{date}.{suffix}` 且早于 today 的日期 (按日期去重, 容忍 rehash 重复返回)。
    *
-   * 关闭包在 [NonCancellable] 内: 若 [block] 因协程取消而抛出, 普通 finally 里的挂起调用会被取消立即打断,
-   * 导致 [KredsClient.close] 不执行而泄漏连接; NonCancellable 保证清理一定跑完。再叠加 [Dispatchers.IO]
-   * 是因为 close 内部为阻塞式 runBlocking, 不应占用归档所在的默认调度线程。
+   * MATCH 仅缩小返回量、不替代客户端筛选 (客户端正则比 `dau.*` 更严格); COUNT 是批大小 hint, 只影响往返轮数
+   * 而非结果集。re.this 正确编码 SCAN 选项 —— kreds 0.9.1 曾把 MATCH/COUNT 拼成单个 RESP token 触发
+   * `ERR syntax error`, 迁移后该缺陷消失, 故恢复下发 MATCH/COUNT。
    */
-  private suspend fun <T> withArchiveRedis(op: String, block: suspend KredsClient.(connId: Long) -> T): T {
-    // connId 在申请连接之前生成, 这样即便 newRedisConnection (建连 + SELECT) 自身失败, 也能在日志里关联到具体一次申请。
-    val connId = connectionSeq.incrementAndGet()
-    PluginMain.logger.debug("DAU 归档申请 Redis 连接: connId={} op={}", connId, op)
-    val client = try {
-      DatabaseProvider.newRedisConnection()
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Throwable) {
-      PluginMain.logger.error("DAU 归档 Redis 连接申请失败: connId=$connId op=$op", e)
-      throw e
-    }
-    PluginMain.logger.debug("DAU 归档 Redis 连接就绪: connId={} op={}", connId, op)
-    return try {
-      client.block(connId)
-    } finally {
-      withContext(NonCancellable + Dispatchers.IO) {
-        runCatching { client.close() }
-          .onSuccess { PluginMain.logger.debug("DAU 归档 Redis 连接关闭: connId={} op={}", connId, op) }
-          .onFailure { PluginMain.logger.warn("关闭 DAU 归档 Redis 连接失败: connId=$connId op=$op", it) }
-      }
-    }
-  }
-
-  /**
-   * 用**无选项的 plain SCAN** 遍历整个键空间, 再由 [DauArchiveKeys.parseArchivableDate] 在客户端严格筛选出
-   * `dau.{date}.{suffix}` 且早于 today 的日期 (按日期去重, 容忍 rehash 重复返回)。
-   *
-   * 这里刻意不向 [KredsClient.scan] 传 matchPattern/count: kreds 0.9.1 把 `MATCH`/`COUNT` 选项编码成了
-   * `KeyValueArgument`, 而其 toString() 会把 "键 值" 拼成**单个** RESP 参数 (如 "MATCH dau.*"), Redis 收到这种
-   * 粘连的 option token 直接回 `ERR syntax error` (已用裸 RESP socket 复现证实)。MATCH 仅缩小返回量、不减少服务端遍历,
-   * 客户端正则过滤比 dau.* 更严格, 故去掉 MATCH 结果集完全一致; COUNT 只是批大小 hint, 去掉仅多几轮往返, 对每日
-   * 一次的后台任务可接受。待迁移到能正确编码 SCAN 选项的客户端后即可恢复 MATCH/COUNT。
-   */
-  private suspend fun KredsClient.scanArchivableDates(run: ArchiveRun, connId: Long, today: LocalDate): Set<LocalDate> {
+  private suspend fun AronaRedis.scanArchivableDates(run: ArchiveRun, today: LocalDate): Set<LocalDate> {
     val dates = mutableSetOf<LocalDate>()
-    var cursor = 0L
+    // COUNT 至少为 1: 配置误填 0/负数时退化为合法的最小批提示, 而非把非法值下发给服务端。
+    val count = ArchiveConfig.scanCount.coerceAtLeast(1).toLong()
+    var cursor = "0"
     var round = 0
     var scannedKeyCount = 0L
     do {
       round++
       PluginMain.logger.debug(
-        "DAU 归档 plain SCAN 请求: runId={} connId={} round={} {} clientFilter='dau.<date>.<suffix>'",
-        run.id, connId, round, cursorFields(cursor),
+        "DAU 归档 SCAN 请求: runId={} round={} cursor={} match='dau.*' count={}",
+        run.id, round, cursor, count,
       )
       val page = try {
-        scan(cursor = cursor)
+        scan(cursor = cursor, match = "dau.*", count = count)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Throwable) {
-        // MATCH/COUNT 已去除以规避 kreds 0.9.1 的 option 编码缺陷, 失败不再属于该已知问题。若 round=1、cursorSigned=0
-        // 仍失败, 说明连最基础的 `SCAN <cursor>` 都被拒, 应转向排查服务端/代理、该连接 SELECT 后的回复队列或基础编码。
         PluginMain.logger.error(
-          "DAU 归档 plain SCAN 失败: runId=${run.id} trigger=${run.trigger} connId=$connId round=$round " +
-            "${cursorFields(cursor)} clientFilter='dau.<date>.<suffix>' intendedCommand=\"SCAN $cursor\" " +
-            "completedRounds=${round - 1} scannedKeyCount=$scannedKeyCount candidateDateCount=${dates.size}",
+          "DAU 归档 SCAN 失败: runId=${run.id} trigger=${run.trigger} round=$round cursor=$cursor " +
+            "match='dau.*' count=$count completedRounds=${round - 1} scannedKeyCount=$scannedKeyCount " +
+            "candidateDateCount=${dates.size}",
           e,
         )
         throw e
       }
-      scannedKeyCount += page.elements.size
-      page.elements.forEach { key -> DauArchiveKeys.parseArchivableDate(key, today)?.let(dates::add) }
-      // 同时打印本轮返回的 nextCursor (有符号 + 无符号): 它即为下一轮的输入游标, 据此可核对失败游标是否确为上轮返回值。
+      scannedKeyCount += page.keys.size
+      page.keys.forEach { key -> DauArchiveKeys.parseArchivableDate(key, today)?.let(dates::add) }
       PluginMain.logger.debug(
-        "DAU 归档 plain SCAN 返回: runId={} connId={} round={} nextCursorSigned={} nextCursorUnsigned={} elements={} scannedKeyCount={} candidateDateCount={}",
-        run.id, connId, round, page.cursor, page.cursor.toULong(), page.elements.size, scannedKeyCount, dates.size,
+        "DAU 归档 SCAN 返回: runId={} round={} nextCursor={} keys={} scannedKeyCount={} candidateDateCount={}",
+        run.id, round, page.cursor, page.keys.size, scannedKeyCount, dates.size,
       )
       cursor = page.cursor
-    } while (cursor != 0L)
+    } while (cursor != "0")
     PluginMain.logger.debug(
-      "DAU 归档 plain SCAN 完成: runId={} connId={} completedRounds={} scannedKeyCount={} candidateDateCount={}",
-      run.id, connId, round, scannedKeyCount, dates.size,
+      "DAU 归档 SCAN 完成: runId={} completedRounds={} scannedKeyCount={} candidateDateCount={}",
+      run.id, round, scannedKeyCount, dates.size,
     )
     return dates
   }
@@ -197,79 +143,60 @@ internal object DauArchiveService {
   /**
    * 归档单日: 写 Mongo 成功后才删 Redis。返回 true=已归档, false=该日已无数据 (并发清理 / 早已归档)。
    *
-   * 读与删各用一条独立短连接, 中间的 Mongo upsert 期间不持有任何 Redis 连接。这样连接不会在 Mongo 写期间
-   * 空闲到触发 read-timeout/断线 —— 否则 kreds 下一条 del 会自动重连且**不重做 SELECT**, 可能落到 db0。
-   * 拆开后, "可能在错误 db 上 del"的窗口被压到与框架内任意一条普通 kreds 命令同等量级 (相邻命令间的瞬时断线),
-   * 不再跨越较慢的 Mongo 写。配合幂等 (upsert 成功才 del、del 前判 present、replaceOne 按 date), 残余窗口即便
-   * 踩中也只是该日延后到下一轮, 不重复计数。
+   * 读与删是两个独立的门面调用, 中间的 Mongo upsert 期间不占用任何 Redis 连接 (池化下连接用完即还)。配合幂等
+   * (upsert 成功才 del、del 前判 present、replaceOne 按 date), 即便单日中途失败也只是延后到下一轮重试, 不重复计数。
    */
   private suspend fun archiveOneDay(run: ArchiveRun, date: String): Boolean {
-    val redisSide = withArchiveRedis("read runId=${run.id} date=$date") { connId -> readRedisDay(connId, date) }
+    val redisSide = DatabaseProvider.redisDbQuery { readRedisDay(date) }
     if (!redisSide.present) {
       PluginMain.logger.debug("DAU 单日归档跳过: runId={} date={} reason=redis-not-present", run.id, date)
       return false
     }
     DauArchiveRepository.upsert(redisSide.summary)
     val dailyKeys = DauArchiveKeys.dailyKeys(date)
-    withArchiveRedis("del runId=${run.id} date=$date") { connId ->
-      // 记录 DEL 实际删除数量 (而非仅"已发起删除"): 与 expectedKeys 对比可暴露并发清理 / 落到错误 db 等异常。
+    DatabaseProvider.redisDbQuery {
+      // 记录 DEL 实际删除数量 (而非仅"已发起删除"): 与 expectedKeys 对比可暴露并发清理等异常。
       val deletedKeys = del(*dailyKeys)
       PluginMain.logger.debug(
-        "DAU 单日归档删除: runId={} connId={} date={} expectedKeys={} deletedKeys={}",
-        run.id, connId, date, dailyKeys.size, deletedKeys,
+        "DAU 单日归档删除: runId={} date={} expectedKeys={} deletedKeys={}",
+        run.id, date, dailyKeys.size, deletedKeys,
       )
     }
     return true
   }
 
-  private suspend fun KredsClient.readRedisDay(connId: Long, date: String): RedisDailySummary {
-    // 四条读命令走单次 pipeline: 同一个 execute 内整批发送/接收, 要么取自同一 db 的同一快照, 要么整体抛错。
-    // 避免逐条命令之间被 kreds 透明重连 (重连不重做 SELECT) 拼出"部分目标库 + 部分 db0"的混合摘要,
-    // 进而被误当作有效数据 upsert、随后又用全新连接把目标库真实数据删除而造成数据丢失。
-    val raw = with(pipelined()) {
-      val message = get(dayMessageKey(date))
-      val userCount = hlen(dayDauKey(date))
-      val contactCount = hlen(dayContactKey(date))
-      val commandFlat = hgetAll(dayCommandKey(date))
-      execute()
-      RawRedisDay(
-        message = message.get(),
-        userCount = userCount.get(),
-        contactCount = contactCount.get(),
-        commandFlat = commandFlat.get(),
-      )
-    }
-    // raw 路径仍走 kreds 扁平 hgetAll (未过门面): 显式校验偶数长度, 与门面 hGetAll 的保护对齐——
-    // 奇数意味着回复错位 (如连接回复队列被孤儿回复污染), 直接抛错暴露而非静默丢字段。
-    require(raw.commandFlat.size % 2 == 0) { "redis hash response has odd element count: ${raw.commandFlat.size}" }
-    val present =
-      raw.message != null || raw.userCount > 0L || raw.contactCount > 0L || raw.commandFlat.isNotEmpty()
-    val message = raw.message?.let {
+  /**
+   * 顺序读取某日的四项 Redis 数据 (message / userCount / contactCount / command)。每条命令各借一次池连接,
+   * 比按位置解析 pipeline 的 `List<RType>` 更清晰; 归档每日一次、性能无所谓。
+   *
+   * 注: 这四条读非原子。在**归档路径** (archivePastDays) 下只读早于今天的 key, 而实时写入只写今天的 key, 故归档读
+   * 不会与实时写入交错。但本方法也被 [readForDisplay] 用于读取当天 (date == today) 摘要, 此时实时写入并发进行,
+   * 可能读到"半新半旧"的当日摘要——这只是展示瞬时瑕疵 (详见 [readForDisplay] KDoc), 不影响已归档数据正确性。
+   */
+  private suspend fun AronaRedis.readRedisDay(date: String): RedisDailySummary {
+    val rawMessage = get(dayMessageKey(date))
+    val userCount = hLen(dayDauKey(date))
+    val contactCount = hLen(dayContactKey(date))
+    val command = hGetAll(dayCommandKey(date))
+
+    val present = rawMessage != null || userCount > 0L || contactCount > 0L || command.isNotEmpty()
+    val message = rawMessage?.let {
       it.toLongOrNull() ?: error("non-numeric message count for $date: '$it'")
     } ?: 0L
-    // 只输出聚合计数; 不打印 command 字段名 / 完整 hash, 避免噪音与无谓的明细外泄 (commandFieldCount = 交替列表长度的一半)。
+    // 只输出聚合计数; 不打印 command 字段名 / 完整 hash, 避免噪音与无谓的明细外泄。
     PluginMain.logger.debug(
-      "DAU 归档读取: connId={} date={} present={} message={} userCount={} contactCount={} commandFieldCount={}",
-      connId, date, present, message, raw.userCount, raw.contactCount, raw.commandFlat.size / 2,
+      "DAU 归档读取: date={} present={} message={} userCount={} contactCount={} commandFieldCount={}",
+      date, present, message, userCount, contactCount, command.size,
     )
     return RedisDailySummary(
       present = present,
       summary = DauDailySummary(
         date = date,
         message = message,
-        userCount = raw.userCount,
-        contactCount = raw.contactCount,
-        // PR1 过渡: 本路径仍走 raw kreds 的扁平 hgetAll, 先转成 Map 再喂给 (现已 Map 化的) decodeCountHash;
-        // PR2 readRedisDay 改走门面 hGetAll 后, 此适配即可删除。
-        command = decodeCountHash(raw.commandFlat.chunked(2).associate { (field, value) -> field to value }),
+        userCount = userCount,
+        contactCount = contactCount,
+        command = decodeCountHash(command),
       ),
     )
   }
-
-  private data class RawRedisDay(
-    val message: String?,
-    val userCount: Long,
-    val contactCount: Long,
-    val commandFlat: List<String>,
-  )
 }

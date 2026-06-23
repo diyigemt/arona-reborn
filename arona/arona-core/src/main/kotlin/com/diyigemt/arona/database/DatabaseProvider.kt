@@ -11,9 +11,8 @@ import com.mongodb.client.model.Filters
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import io.github.crackthecodeabhi.kreds.connection.Endpoint
-import io.github.crackthecodeabhi.kreds.connection.KredsClient
-import io.github.crackthecodeabhi.kreds.connection.newClient
+import eu.vendeli.rethis.ReThis
+import eu.vendeli.rethis.types.common.RespVer
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.exposed.v1.core.DatabaseConfig
@@ -68,16 +67,19 @@ object DatabaseProvider {
     MongoClient.create(settings).getDatabase(aronaConfig.mongodb.db)
   }
   /**
-   * 共享 Redis 连接 (单条 TCP), 经 [redisDbQuery] 暴露给实时消息路径等高频调用方。
+   * 共享的池化 Redis 客户端 (re.this 内部维护连接池, 单实例对并发命令与 pipeline 均安全)。
    *
-   * 仅在 [select] 成功返回后才发布到此字段: 旧实现用 `by lazy` + fire-and-forget 的 `runSuspend { select }`,
-   * lazy 立即返回连接而 SELECT 在另一协程异步执行且不被 await, 导致首批命令可能在切库前发出、落到错误的 db
-   * (默认 db0)。改为 @Volatile + [sharedRedisInitMutex] 守护的一次性 suspend 初始化 (见 [sharedRedisConnection]),
-   * 消除该库选择竞态。@Volatile 保证发布后的连接对其它线程立即可见。
+   * 初始化与关闭在 [redisLifecycleMutex] 内线性化: 首个调用方在锁内建池并发布, 后续走 [sharedRedis] 快路径;
+   * 关闭后 [redisClosed] 置位, 任何后续 [redisDbQuery] 直接失败而非重建池 (进程正在退出, 重建无意义且会泄漏)。
+   * 构造失败不发布实例, 下次调用自然重试。@Volatile 保证发布/置位对其它线程立即可见。
    */
   @Volatile
-  private var sharedRedis: KredsClient? = null
-  private val sharedRedisInitMutex = Mutex()
+  private var sharedRedis: ReThis? = null
+
+  @Volatile
+  private var redisClosed: Boolean = false
+
+  private val redisLifecycleMutex = Mutex()
 
   internal fun <T> sqlDbQuery(block: () -> T): T = transaction(sqlDatabase) { block() }
 
@@ -101,48 +103,58 @@ object DatabaseProvider {
   suspend fun ensureMongoIndexes() = MongoIndexes.ensure(noSqlDatabase)
 
   /**
-   * 创建一条已切换到配置库的独立 Redis 连接, 供后台批处理 (如 DAU 归档) 独占使用。
-   *
-   * 与 [redisDbQuery] 使用的共享连接隔离: 各自持有独立的回复队列, 批处理协程被取消/超时也只影响自己的连接,
-   * 不会错位实时消息路径的回复 (kreds 单连接靠 per-client mutex 配对"写+读", 一旦某协程在 read 中被取消
-   * 留下孤儿回复, 该连接后续回复会永久偏移)。调用方独占该连接并负责 [KredsClient.close]。
+   * 获取共享池化客户端: 快路径直接返回已发布的 [sharedRedis]; 慢路径在 [redisLifecycleMutex] 内双重检查后建池,
+   * 保证并发首次调用只建一个池。关闭后 ([redisClosed]) 直接拒绝服务、不重建。构造失败不发布、不缓存, 下次重试。
    */
-  suspend fun newRedisConnection(): KredsClient = connectAndSelect()
-
-  /**
-   * 建立一条 Redis 连接并 await 其 SELECT 到配置库后才返回。初始化失败 (含取消) 时关闭尚未交付的连接,
-   * 并把关闭过程的异常作为 suppressed 附加到原异常上, 避免连接泄漏又不掩盖根因。
-   */
-  private suspend fun connectAndSelect(): KredsClient {
-    val redis = aronaConfig.redis
-    val client = newClient(Endpoint(redis.host, redis.port))
-    return try {
-      client.select(redis.db)
-      client
-    } catch (e: Throwable) {
-      runCatching { client.close() }.exceptionOrNull()?.let(e::addSuppressed)
-      throw e
-    }
-  }
-
-  /**
-   * 获取共享 Redis 连接, 仅初始化一次。快路径直接读已发布的 [sharedRedis]; 慢路径在 [sharedRedisInitMutex]
-   * 内双重检查后 [connectAndSelect], 确保连接在 SELECT 成功前不会被任何调用方看到, 且并发首次调用只建一条连接。
-   * 初始化失败不发布、不缓存, 下次调用自然重试。
-   */
-  private suspend fun sharedRedisConnection(): KredsClient {
+  private suspend fun sharedRedisConnection(): ReThis {
+    check(!redisClosed) { "Redis 客户端已关闭, 不再接受新的查询" }
     sharedRedis?.let { return it }
-    return sharedRedisInitMutex.withLock {
-      sharedRedis ?: connectAndSelect().also { sharedRedis = it }
+    return redisLifecycleMutex.withLock {
+      check(!redisClosed) { "Redis 客户端已关闭, 不再接受新的查询" }
+      sharedRedis ?: createPooledRedis().also { sharedRedis = it }
     }
   }
 
   /**
-   * Redis 统一访问入口, receiver 为框架门面 [AronaRedis], 调用方不再依赖具体客户端类型。
-   * 当前底层仍是 kreds 共享连接 (见 [KredsAronaRedis]); 后续可整体替换实现而不动任何调用点。
+   * 构造一个内部启用连接池的 [ReThis]。显式锁定 [RespVer.V2] (与历史 kreds 行为一致, 且 RESP2 下 HGETALL /
+   * ZRANGE WITHSCORES 维持交替/扁平数组形态, 与门面的解析约定吻合); [db] 在转 Int 前显式做 ULong 范围校验,
+   * 避免 [ULong.toInt] 静默截断到错误库。[maxConnections] 收紧到 64, 远低于 re.this 默认的 5000, 防止压垮
+   * 服务端 maxclients。注: re.this 构造为延迟建连, 启动成功不代表 Redis 可达; 每条 (含重连的) 池连接都会
+   * 应用此处的 db 配置, 不存在 "重连不重做 SELECT" 的问题。
+   */
+  private fun createPooledRedis(): ReThis {
+    val redis = aronaConfig.redis
+    require(redis.db <= Int.MAX_VALUE.toULong()) { "redis.db 超出 Int 范围, 无法作为库索引: ${redis.db}" }
+    return ReThis(host = redis.host, port = redis.port, protocol = RespVer.V2) {
+      db = redis.db.toInt()
+      usePooling = true
+      maxConnections = 64
+    }
+  }
+
+  /**
+   * Redis 统一访问入口, receiver 为框架门面 [AronaRedis], 调用方不依赖具体客户端类型。
+   * 底层为 re.this 池化客户端 (见 [ReThisAronaRedis]), 调用方无需关心连接的获取与归还。
    */
   suspend fun <T> redisDbQuery(block: suspend AronaRedis.() -> T): T =
-    block.invoke(KredsAronaRedis(sharedRedisConnection()))
+    block.invoke(ReThisAronaRedis(sharedRedisConnection()))
+
+  /**
+   * 幂等关闭共享 Redis 池, 由 [com.diyigemt.arona.AronaApplication] 的 ApplicationStopping 调用。
+   * 锁内仅做状态切换 (置 [redisClosed] + 摘除实例), 非挂起的 [ReThis.close] 放到锁外执行, 避免在持锁期间触发
+   * 底层阻塞。置位后任何新的 [redisDbQuery] 会被 [sharedRedisConnection] 直接拒绝, 不会重建池。
+   *
+   * 注: 插件协程是独立根 job (非 app scope 子节点), 框架层没有统一的在途任务 join 点; 故此处不强行等待在途命令——
+   * graceful shutdown 时仍在执行的命令允许因池关闭而失败 (调用方各自记日志, 非致命)。
+   */
+  suspend fun closeRedisConnection() {
+    val client = redisLifecycleMutex.withLock {
+      if (redisClosed) return@withLock null
+      redisClosed = true
+      sharedRedis.also { sharedRedis = null }
+    }
+    client?.close()
+  }
 
 }
 

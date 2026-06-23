@@ -44,10 +44,10 @@ object PluginMain : AronaPlugin(
     // MongoDB 归档: 仅在启用时创建连接并启动后台调度; 关闭时完全不接触 Mongo, 维持纯 Redis 记录路径。
     if (ArchiveConfig.enabled) {
       // 启动期打印一次生效配置, 便于排查归档异常时核对实际参数 (归档时刻等); 不打印任何密码。
-      // scanCount 因 kreds 0.9.1 的 option 编码缺陷暂不下发 (用 plain SCAN), 故标注 scanCountApplied=false。
+      // re.this 正确编码 SCAN 选项, 归档已恢复 `SCAN MATCH=dau.* COUNT=<scanCount>`, 故 scanMode=match、scanCountApplied=true。
       val archiveAt = "%02d:%02d".format(ArchiveConfig.archiveHour.coerceIn(0, 23), ArchiveConfig.archiveMinute.coerceIn(0, 59))
       logger.info(
-        "DAU MongoDB 归档已启用: scanMode=plain scanCountConfigured={} scanCountApplied=false archiveAt={} timezone={} mongoHost={} mongoPort={} mongoDb={} mongoCollection={}",
+        "DAU MongoDB 归档已启用: scanMode=match scanCountConfigured={} scanCountApplied=true archiveAt={} timezone={} mongoHost={} mongoPort={} mongoDb={} mongoCollection={}",
         ArchiveConfig.scanCount, archiveAt, TimeZone.currentSystemDefault(),
         ArchiveConfig.host, ArchiveConfig.port, ArchiveConfig.db, ArchiveConfig.collection,
       )

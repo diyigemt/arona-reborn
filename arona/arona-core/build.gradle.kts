@@ -123,18 +123,13 @@ tasks.register("copyToPlugins") {
 }
 
 dependencies {
-  // Netty BOM: 把所有 io.netty:* 强制对齐到 4.2.x, 解决 lib/ 启动时的跨版本类冲突.
-  // 背景: Ktor 3.4.3 通过 ktor-bom 引入 netty-codec-base/-compression/-http/-http2/-handler 4.2.12 (Netty 4.2 把
-  // 旧 fat netty-codec 拆成多个子模块); 而 kreds 0.9.1 直接依赖 netty-codec-redis 4.1.86, 后者强制要求 fat
-  // netty-codec 4.1.86. Gradle 不把 netty-codec 与 netty-codec-base/-http/... 视为同一 artifact, 默认解析下
-  // 4.1.86 fat jar 与 4.2.12 split jars 共存, io.netty.handler.codec.http.* 等包在 classpath 上出现两份不同版本
-  // 的同名类. Netty pipeline 初始化或写出 HTTP 响应时按运行时实际加载到的混版本类调用方法, 触发
-  // NoSuchMethodError/AbstractMethodError, channel exceptionCaught 关闭连接, 客户端表现为 "Empty reply from
-  // server". IDEA 直跑可能因 classpath 顺序差异恰好规避, 打包后从 lib/ 启动 (manifest Class-Path 顺序不同) 必现.
-  // 加 BOM 后, kreds 传递的 netty-codec-redis / netty-handler 经 Gradle BOM constraint + highest-version-wins
-  // 升到 4.2.12.Final, 旧 fat netty-codec artifact 不再进入最终依赖图, lib/ 不再出现任何 netty-*-4.1.x.jar.
-  // 用 api 而非 implementation: BOM 仅声明版本约束、不暴露代码符号, 通过 api 让下游 plugin 的 compile/runtime
-  // classpath 也共享同一套 Netty 版本对齐, 防止 plugin 侧通过 kreds (api) 透传到 4.1.x Netty 类签名.
+  // Netty BOM: 把所有 io.netty:* 对齐到 4.2.x, 保持 lib/ 启动时 Netty 版本一致.
+  // 背景: Ktor 3.4.3 的 ktor-server-netty 通过 ktor-bom 引入 netty-codec-base/-http/-http2/-handler 4.2.x (Netty 4.2 把
+  // 旧 fat netty-codec 拆成多个子模块). Redis 客户端已从 kreds 迁到 re.this, 后者走 ktor-network (不再引入任何 Netty),
+  // 因此曾经的 "kreds 0.9.1 直接依赖 netty-codec-redis 4.1.86 与 ktor 的 4.2.x split jars 在同一 FQCN 下冲突, 触发
+  // NoSuchMethodError / AbstractMethodError" 的根因已消失. 保留本 BOM 作为防御性版本约束: 一旦未来某传递依赖再次引入
+  // 旧版 Netty, BOM 仍能把它统一升到 4.2.x, 避免 split/fat 子模块混版本同名类共存. 用 api 而非 implementation: BOM 仅
+  // 声明版本约束、不暴露代码符号, 通过 api 让下游 plugin 的 compile/runtime classpath 共享同一套 Netty 版本对齐.
   api(platform("io.netty:netty-bom:4.2.12.Final"))
 
   // kts: kotlin scripting + Ivy 协同支撑 .kts 脚本依赖解析
@@ -151,7 +146,7 @@ dependencies {
   // 不必传递给下游 plugin 的编译 classpath, 故走 implementation.
   implementation(libs.mongodb.bson.kotlinx)
 
-  api(libs.kreds)
+  api(libs.rethis)
 
   implementation(libs.jline)
   implementation(libs.caffeine)

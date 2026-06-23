@@ -9,7 +9,7 @@ kotlinx-serialization-core = "1.6.3"
 kotlinx-datetime = "0.7.1"
 atomicfu = "0.32.1"
 ivy = "2.5.3"
-kreds = "0.9.1"
+rethis = "0.4.3"
 jline = "3.30.9"
 caffeine = "3.2.3"
 bouncycastle = "1.84"
@@ -93,7 +93,7 @@ skiko-awt-runtime-windows-x64 = { module = "org.jetbrains.skiko:skiko-awt-runtim
 
 # Misc
 ivy = { module = "org.apache.ivy:ivy", version.ref = "ivy" }
-kreds = { module = "io.github.crackthecodeabhi:kreds", version.ref = "kreds" }
+rethis = { module = "eu.vendeli:rethis", version.ref = "rethis" }
 jline = { module = "org.jline:jline", version.ref = "jline" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 bcprov-jdk18on = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }

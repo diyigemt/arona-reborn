@@ -8,7 +8,7 @@ import kotlin.test.assertNull
 
 // 锁定归档的两条纯逻辑边界:
 //  1. 仅早于 today 的合法按天 key 才被识别为可归档; 累计键 / 当天 / 未来 / 非法日期 / 未知后缀全部排除。
-//  2. hgetAll 交替列表解析为计数 Map, 奇数长度或非数字值必须抛错而非静默丢数。
+//  2. 计数 hash (field -> value) 解析为 field -> Long, 非数字值必须抛错而非静默丢数。
 class DauArchiveKeysTest {
   private val today = LocalDate.parse("2026-06-22")
 
@@ -47,18 +47,13 @@ class DauArchiveKeysTest {
   }
 
   @Test
-  fun `decodeCountHash 解析交替列表为计数`() {
-    assertEquals(mapOf("gacha" to 3L, "dau" to 1L), decodeCountHash(listOf("gacha", "3", "dau", "1")))
-    assertEquals(emptyMap(), decodeCountHash(emptyList()))
-  }
-
-  @Test
-  fun `decodeCountHash 奇数长度抛错`() {
-    assertFailsWith<IllegalArgumentException> { decodeCountHash(listOf("gacha", "3", "dau")) }
+  fun `decodeCountHash 解析计数 hash`() {
+    assertEquals(mapOf("gacha" to 3L, "dau" to 1L), decodeCountHash(mapOf("gacha" to "3", "dau" to "1")))
+    assertEquals(emptyMap<String, Long>(), decodeCountHash(emptyMap()))
   }
 
   @Test
   fun `decodeCountHash 非数字值抛错`() {
-    assertFailsWith<IllegalStateException> { decodeCountHash(listOf("gacha", "x")) }
+    assertFailsWith<IllegalStateException> { decodeCountHash(mapOf("gacha" to "x")) }
   }
 }

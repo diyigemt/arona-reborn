@@ -185,7 +185,7 @@ class GachaCommand : AbstractCommand(
             key,
             JsonIgnoreUnknownKeys.encodeToString(selfConfig)
           )
-          expire(key, (10u * 60u).toULong())
+          expire(key, 10L * 60L)
         }
         sendResult(pool.name, 10, result, code)
       }

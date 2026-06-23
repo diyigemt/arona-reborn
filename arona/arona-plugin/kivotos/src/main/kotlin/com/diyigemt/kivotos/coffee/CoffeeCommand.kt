@@ -29,7 +29,6 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
-import io.github.crackthecodeabhi.kreds.args.SetOption
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -272,7 +271,7 @@ class CoffeeTouchCommand : AbstractCommand(
       return
     }
     redis {
-      set(key, "1", SetOption.Builder(exSeconds = 3u).build())
+      setEx(key, "1", 3L)
     }
     val targetStudent = StudentSchema.StudentCache.filter {
       it.value.name == studentName
@@ -338,7 +337,7 @@ class CoffeeTouchAllCommand : AbstractCommand(
       return
     }
     redis {
-      set(key, "1", SetOption.Builder(exSeconds = 3u).build())
+      setEx(key, "1", 3L)
     }
     md append tencentCustomMarkdown {
       +"你分别摸了摸学生们"

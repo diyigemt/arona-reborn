@@ -77,7 +77,7 @@ class DeleteCommand : AbstractCommand(
     }
     DatabaseProvider.redisDbQuery {
       set("$REDIS_KEY.${user.id}", code)
-      expire("$REDIS_KEY.${user.id}", 60u)
+      expire("$REDIS_KEY.${user.id}", 60L)
     }
     sendMessage(md + kb)
   }

@@ -82,7 +82,7 @@ object BuiltInCommands : AutoSavePluginDataHolder {
         val documentUser = ContactService.createContactAndUser(subject, user, DEFAULT_MEMBER_CONTACT_ROLE_ID)
         redisDbQuery {
           set(tokenKey, documentUser.id)
-          expire(tokenKey, 100u)
+          expire(tokenKey, 100L)
         }
         sendMessage("认证成功")
       } else {

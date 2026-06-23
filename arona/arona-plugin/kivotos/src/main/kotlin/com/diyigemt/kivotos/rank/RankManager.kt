@@ -1,7 +1,6 @@
 package com.diyigemt.kivotos.rank
 
 import com.diyigemt.kivotos.KivotosRedisKey
-import io.github.crackthecodeabhi.kreds.args.ZAddGTOrLT
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery as redis
 
 private const val RankRedisKey = "$KivotosRedisKey.rank"
@@ -40,14 +39,14 @@ object RankManager {
     val uKey = uFavorKey(uid)
     val score = packFavorScore(favor.first, favor.second)
     redis {
-      zadd(uKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = score to sid.toString())
-      zadd(sKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = score to uid)
+      zAddGt(uKey, score.toDouble(), sid.toString())
+      zAddGt(sKey, score.toDouble(), uid)
       // 获取老师好感最高的学生计入总榜
-      val (id, rank) = zrange(uKey, 0, 0, by = null, rev = true, limit = null, withScores = true).let {
+      val (id, rank) = zRangeRev(uKey, 0, 0, withScores = true).let {
         it[0] to it[1].toInt()
       }
       val suKey = "$uid-$id"
-      zadd(FavorRankKey, gtOrLt = ZAddGTOrLT.GT, scoreMember = rank to suKey)
+      zAddGt(FavorRankKey, rank.toDouble(), suKey)
     }
   }
 
@@ -56,7 +55,7 @@ object RankManager {
    */
   suspend fun getUserFavorStudent(uid: String): Int? {
     return redis {
-      zrange(uFavorKey(uid), 0, 0, by = null, rev = true, limit = null, withScores = false).firstOrNull()?.toInt()
+      zRangeRev(uFavorKey(uid), 0, 0, withScores = false).firstOrNull()?.toInt()
     }
   }
 
@@ -66,7 +65,7 @@ object RankManager {
   suspend fun getUserFavorRank(uid: String): FavorRankData? {
     val sid = getUserFavorStudent(uid) ?: return null
     return redis {
-      zscore(FavorRankKey, "$uid-$sid") to zrevrank(FavorRankKey, "$uid-$sid")
+      zScore(FavorRankKey, "$uid-$sid") to zRevRank(FavorRankKey, "$uid-$sid")
     }.let {
       it.first ?: return null
       FavorRankData(
@@ -83,7 +82,7 @@ object RankManager {
    */
   suspend fun getUserFavorRank(uid: String, sid: Int): FavorRankData? {
     return redis {
-      zscore(sFavorKey(sid), uid) to zrevrank(sFavorKey(sid), uid)
+      zScore(sFavorKey(sid), uid) to zRevRank(sFavorKey(sid), uid)
     }.let {
       it.first ?: return null
       FavorRankData(
@@ -100,7 +99,7 @@ object RankManager {
    */
   suspend fun getUserStudentFavorRank(uid: String): List<FavorRankData> {
     return redis {
-      zrange(uFavorKey(uid), 0, 9, by = null, rev = true, limit = null, withScores = true).let {
+      zRangeRev(uFavorKey(uid), 0, 9, withScores = true).let {
         var rank = 0L
         it.windowed(2, 2, true).map { window ->
           FavorRankData(
@@ -121,13 +120,10 @@ object RankManager {
    */
   suspend fun getFavorRank(sid: Int? = null, offset: Int = 0, limit: Int = 9): List<FavorRankData> {
     return redis {
-      zrange(
+      zRangeRev(
         if (sid == null) FavorRankKey else sFavorKey(sid),
         offset.toLong(),
         offset.toLong() + limit.toLong(),
-        by = null,
-        rev = true,
-        limit = null,
         withScores = true
       )
     }.let {

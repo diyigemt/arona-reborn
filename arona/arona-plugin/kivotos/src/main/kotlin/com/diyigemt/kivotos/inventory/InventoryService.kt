@@ -12,7 +12,6 @@ import com.mongodb.client.model.Filters
 import com.mongodb.client.model.UpdateOneModel
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
-import io.github.crackthecodeabhi.kreds.args.SetOption
 import org.bson.conversions.Bson
 
 /**
@@ -221,10 +220,10 @@ object InventoryService {
   private suspend fun occupyIdempotency(uid: String, ctx: GrantContext): String? {
     val key = ctx.idempotencyKey ?: return null
     val fullKey = idempotencyRedisKey(uid, key)
-    val setResult = redisDbQuery {
-      set(fullKey, ctx.traceId, SetOption.Builder(nx = true, exSeconds = IDEMPOTENCY_TTL_SECONDS).build())
+    val claimed = redisDbQuery {
+      setNxEx(fullKey, ctx.traceId, IDEMPOTENCY_TTL_SECONDS.toLong())
     }
-    if (setResult == "OK") return null
+    if (claimed) return null
     return redisDbQuery { get(fullKey) } ?: "unknown"
   }
 

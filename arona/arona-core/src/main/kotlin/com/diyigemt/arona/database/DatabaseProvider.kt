@@ -137,8 +137,12 @@ object DatabaseProvider {
     }
   }
 
-  suspend fun <T> redisDbQuery(block: suspend KredsClient.() -> T): T =
-    block.invoke(sharedRedisConnection())
+  /**
+   * Redis 统一访问入口, receiver 为框架门面 [AronaRedis], 调用方不再依赖具体客户端类型。
+   * 当前底层仍是 kreds 共享连接 (见 [KredsAronaRedis]); 后续可整体替换实现而不动任何调用点。
+   */
+  suspend fun <T> redisDbQuery(block: suspend AronaRedis.() -> T): T =
+    block.invoke(KredsAronaRedis(sharedRedisConnection()))
 
 }
 

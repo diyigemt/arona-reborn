@@ -14,7 +14,6 @@ import com.diyigemt.kivotos.inventory.GrantContext
 import com.diyigemt.kivotos.inventory.ItemTemplateCache
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
-import io.github.crackthecodeabhi.kreds.args.SetOption
 
 /**
  * 市场命令入口. 与 EquipmentCommand 同构:
@@ -390,7 +389,7 @@ private object MarketSearchShortIdCache {
 
   suspend fun store(uid: String, orderedIds: List<String>) {
     redisDbQuery {
-      set("$PREFIX.$uid", orderedIds.joinToString(SEPARATOR), SetOption.Builder(exSeconds = TTL_SECONDS).build())
+      setEx("$PREFIX.$uid", orderedIds.joinToString(SEPARATOR), TTL_SECONDS.toLong())
     }
   }
 
@@ -410,7 +409,7 @@ private object MarketMineShortIdCache {
 
   suspend fun store(uid: String, orderedIds: List<String>) {
     redisDbQuery {
-      set("$PREFIX.$uid", orderedIds.joinToString(SEPARATOR), SetOption.Builder(exSeconds = TTL_SECONDS).build())
+      setEx("$PREFIX.$uid", orderedIds.joinToString(SEPARATOR), TTL_SECONDS.toLong())
     }
   }
 

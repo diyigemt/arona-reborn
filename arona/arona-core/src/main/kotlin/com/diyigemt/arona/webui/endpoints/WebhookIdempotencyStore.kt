@@ -1,7 +1,6 @@
 package com.diyigemt.arona.webui.endpoints
 
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
-import io.github.crackthecodeabhi.kreds.args.SetOption
 import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.coroutines.CancellationException
 import org.slf4j.Logger
@@ -19,20 +18,13 @@ internal interface IdempotencyClaim {
 }
 
 /**
- * Redis 实现: `SET key "1" EX ttl NX`——NX 条件不满足时 Redis 返回 nil, kreds 映射为 `null`,
- * 满足时返回 "OK". 任何 I/O 或协议异常由调用方 [WebhookIdempotencyStore] 捕获降级.
+ * Redis 实现: 经门面 `setNxEx` 执行 `SET key "1" EX ttl NX` —— key 已存在 (NX 不满足) 时返回 `false`,
+ * 首次占用返回 `true`. 任何 I/O 或协议异常由调用方 [WebhookIdempotencyStore] 捕获降级.
  */
 internal object RedisIdempotencyClaim : IdempotencyClaim {
   override suspend fun tryClaim(key: String, ttlSeconds: UInt): Boolean =
     redisDbQuery {
-      set(
-        key,
-        "1",
-        SetOption.Builder()
-          .exSeconds(ttlSeconds.toULong())
-          .nx(true)
-          .build(),
-      ) == "OK"
+      setNxEx(key, "1", ttlSeconds.toLong())
     }
 }
 

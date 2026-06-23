@@ -72,15 +72,14 @@ object PluginMain : AronaPlugin(
           CommandManager.matchCommandName(commandStr.replace("/", "")) ?: return@launch
         val dayCommandKey = dayCommandKey(today)
         redis {
-          with(pipelined()) {
+          pipeline {
             incr(messageKey)
-            hincrBy(dayCommandKey, command, 1L)
-            hincrBy(CommandKey, command, 1L)
-            hincrBy(dauKey, ev.sender.id, 1L)
-            hincrBy(contactKey, ev.subject.id, 1L)
-            hset(UserKey, ev.sender.id to currentDateTime)
-            hset(ContactKey, ev.subject.id to currentDateTime)
-            execute()
+            hIncrBy(dayCommandKey, command, 1L)
+            hIncrBy(CommandKey, command, 1L)
+            hIncrBy(dauKey, ev.sender.id, 1L)
+            hIncrBy(contactKey, ev.subject.id, 1L)
+            hSet(UserKey, ev.sender.id to currentDateTime)
+            hSet(ContactKey, ev.subject.id to currentDateTime)
           }
         }
       }
@@ -89,10 +88,9 @@ object PluginMain : AronaPlugin(
       PluginMain.launch {
         val currentDateTime = currentDateTime()
         redis {
-          with(pipelined()) {
-            hset(UserKey, ev.user.id to currentDateTime)
-            hset(ContactKey, ev.subject.id to currentDateTime)
-            execute()
+          pipeline {
+            hSet(UserKey, ev.user.id to currentDateTime)
+            hSet(ContactKey, ev.subject.id to currentDateTime)
           }
         }
       }
@@ -107,9 +105,9 @@ suspend fun getDauString(date: String): TencentCustomMarkdown {
   // 累计指标永远只在 Redis: 全时段用户/环境数 + 各命令累计执行次数。
   val cumulative = redis {
     CumulativeDauSnapshot(
-      userCount = hlen(UserKey),
-      contactCount = hlen(ContactKey),
-      command = decodeCountHash(hgetAll(CommandKey)),
+      userCount = hLen(UserKey),
+      contactCount = hLen(ContactKey),
+      command = decodeCountHash(hGetAll(CommandKey)),
     )
   }
   md += "contact: ${cumulative.contactCount}, user: ${cumulative.userCount}"

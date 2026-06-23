@@ -20,7 +20,6 @@ import com.diyigemt.arona.webui.event.isBlock
 import com.diyigemt.arona.webui.plugins.receiveJsonOrNull
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
-import io.github.crackthecodeabhi.kreds.args.SetOption
 import io.ktor.server.application.*
 import kotlinx.serialization.Serializable
 import java.security.SecureRandom
@@ -84,9 +83,9 @@ internal object UserEndpoint {
       val token = generator()
       val key = RedisPrefixKey.buildKey(prefix, token)
       val ok = redisDbQuery {
-        // SetOption.Builder(nx=true, exSeconds=...) 一次往返完成 NX + TTL, 避免 setnx + expire 之间的窗口.
-        set(key, value, SetOption.Builder(nx = true, exSeconds = ttlSeconds.toULong()).build())
-      } == "OK"
+        // setNxEx 一次往返完成 NX + TTL, 避免 setnx + expire 之间的窗口.
+        setNxEx(key, value, ttlSeconds)
+      }
       if (ok) return token
     }
     throw IllegalStateException("failed to allocate unique redis token for $prefix after $IssueRetry retries")

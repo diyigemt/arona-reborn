@@ -67,12 +67,10 @@ internal object DauArchiveKeys {
 }
 
 /**
- * 把 kreds hgetAll 返回的交替列表 [k0, v0, k1, v1, ...] 解析为 field -> Long。
- * 奇数长度或非数字值都视为数据异常抛出, 让归档/读取失败而非静默丢数。
+ * 把门面 hGetAll 返回的计数 hash (field -> value) 解析为 field -> Long。
+ * 非数字值视为数据异常抛出, 让归档/读取失败而非静默丢数。
  */
-internal fun decodeCountHash(flat: List<String>): Map<String, Long> {
-  require(flat.size % 2 == 0) { "redis hash response has odd element count: ${flat.size}" }
-  return flat.chunked(2).associate { (field, value) ->
-    field to (value.toLongOrNull() ?: error("non-numeric hash value for field '$field': '$value'"))
+internal fun decodeCountHash(hash: Map<String, String>): Map<String, Long> =
+  hash.mapValues { (field, value) ->
+    value.toLongOrNull() ?: error("non-numeric hash value for field '$field': '$value'")
   }
-}

@@ -67,13 +67,13 @@ class ArenaMatchCommand : AbstractCommand(
   private val md by requireObject<TencentCustomMarkdown>("md")
   suspend fun UserCommandSender.match() {
     val contactMatch = redisDbQuery {
-      hgetAll(matchContactUserKey(subject.id))
+      hGetAll(matchContactUserKey(subject.id))
     }
     if (contactMatch.isNotEmpty() && contactDocument().readPluginConfigOrDefault(Kivotos, ArenaConfig()).limit) {
       sendMessage(md + tencentCustomMarkdown {
         at()
         +"群配置为同时只能有一场对战"
-        +"<@${contactMatch.first()}>正在对战中"
+        +"<@${contactMatch.keys.first()}>正在对战中"
       })
       return
     }

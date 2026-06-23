@@ -16,7 +16,6 @@ import com.diyigemt.kivotos.inventory.ItemTemplateCache
 import com.diyigemt.kivotos.tools.normalizeStudentName
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
-import io.github.crackthecodeabhi.kreds.args.SetOption
 
 /**
  * 装备子命令入口. clikt 需要 parent 命令暴露 `md`/`kb` 对象给子命令, 这里只做 context 装配.
@@ -301,7 +300,7 @@ private object EquipmentShortIdCache {
   suspend fun store(uid: String, orderedIds: List<String>) {
     val value = orderedIds.joinToString(SEPARATOR)
     redisDbQuery {
-      set("$PREFIX.$uid", value, SetOption.Builder(exSeconds = TTL_SECONDS).build())
+      setEx("$PREFIX.$uid", value, TTL_SECONDS.toLong())
     }
   }
 

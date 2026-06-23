@@ -93,7 +93,7 @@ object LoggerInterceptor {
     }
     val userId = DatabaseProvider.redisDbQuery {
       val key = RedisPrefixKey.buildKey(RedisPrefixKey.WEB_TOKEN, token)
-      expire(key, 3600u)
+      expire(key, 3600L)
       get(key)
     }
     if (userId == null) {

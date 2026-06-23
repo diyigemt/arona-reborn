@@ -239,6 +239,9 @@ internal object DauArchiveService {
         commandFlat = commandFlat.get(),
       )
     }
+    // raw 路径仍走 kreds 扁平 hgetAll (未过门面): 显式校验偶数长度, 与门面 hGetAll 的保护对齐——
+    // 奇数意味着回复错位 (如连接回复队列被孤儿回复污染), 直接抛错暴露而非静默丢字段。
+    require(raw.commandFlat.size % 2 == 0) { "redis hash response has odd element count: ${raw.commandFlat.size}" }
     val present =
       raw.message != null || raw.userCount > 0L || raw.contactCount > 0L || raw.commandFlat.isNotEmpty()
     val message = raw.message?.let {
@@ -256,7 +259,9 @@ internal object DauArchiveService {
         message = message,
         userCount = raw.userCount,
         contactCount = raw.contactCount,
-        command = decodeCountHash(raw.commandFlat),
+        // PR1 过渡: 本路径仍走 raw kreds 的扁平 hgetAll, 先转成 Map 再喂给 (现已 Map 化的) decodeCountHash;
+        // PR2 readRedisDay 改走门面 hGetAll 后, 此适配即可删除。
+        command = decodeCountHash(raw.commandFlat.chunked(2).associate { (field, value) -> field to value }),
       ),
     )
   }

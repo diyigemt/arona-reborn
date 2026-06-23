@@ -22,6 +22,12 @@ const val ContactKey = "dau.contact"
 const val CommandKey = "dau.command"
 
 /**
+ * 单次归档调度的关联上下文。[id] 为本进程内单调递增的 runId, 把一次调度从开始、扫描、单日 read/del 到最终汇总/异常
+ * 的所有日志串成一条链; [trigger] 区分 startup / daily。仅用于日志关联, 不参与归档逻辑。
+ */
+internal data class ArchiveRun(val id: Long, val trigger: String)
+
+/**
  * 某一天的 DAU 聚合摘要 (仅计数, 不含 uid/cid 明细)。既是归档写入单元, 也是历史展示读取单元。
  */
 internal data class DauDailySummary(

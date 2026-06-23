@@ -35,7 +35,12 @@ object ArchiveConfig : AutoSavePluginData("archive") {
   val archiveHour by value(0)
   val archiveMinute by value(10)
 
-  /** SCAN 每批 COUNT 提示。越大批次越少、单次阻塞略增; 对共享 Redis 取中庸默认。 */
+  /**
+   * SCAN 每批 COUNT 提示的预留配置 (越大批次越少、单次阻塞略增)。
+   *
+   * 注意: kreds 0.9.1 会把 `COUNT n` 错误编码成单个 RESP 参数导致 Redis 报 ERR syntax error, 因此归档当前只能用
+   * 无选项的 plain SCAN, 该值**暂不下发**。保留此项是为兼容已有配置, 待迁移到能正确编码 SCAN 选项的客户端后恢复使用。
+   */
   val scanCount by value(200)
 
   /** 实际生效的认证库。 */

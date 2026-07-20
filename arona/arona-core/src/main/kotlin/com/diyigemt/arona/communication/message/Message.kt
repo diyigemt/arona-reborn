@@ -1145,44 +1145,28 @@ data class MessageReceipt<out C : Contact> internal constructor(
 ) {
   val id get() = internalReceipt.id
   val timestamp get() = internalReceipt.timestamp
-  suspend fun recall() {
-    when (target) {
-      is FriendUser -> {
-        target.bot.callOpenapi(
-          TencentEndpoint.DeleteFriendMessage,
-          mapOf("openid" to target.id, "message_id" to id)
-        ) {
-          method = HttpMethod.Delete
-        }
-      }
-
-      is Group -> {
-        target.bot.callOpenapi(
-          TencentEndpoint.DeleteGroupMessage,
-          mapOf("group_openid" to target.id, "message_id" to id)
-        ) {
-          method = HttpMethod.Delete
-        }
-      }
-
-      is GuildMember -> {
-        target.bot.callOpenapi(
-          TencentEndpoint.DeleteGuildMemberMessage,
-          mapOf("channel_id" to target.id, "message_id" to id)
-        ) {
-          method = HttpMethod.Delete
-        }
-      }
-
-      is Guild, is Channel -> {
-        target.bot.callOpenapi(
-          TencentEndpoint.DeleteGuildMessage,
-          mapOf("guild_id" to target.id, "message_id" to id)
-        ) {
-          method = HttpMethod.Delete
-        }
-      }
+  /**
+   * 撤回这条由 Bot 自己发出的消息.
+   *
+   * 群/单聊超过两分钟即不可撤回, 该时限由服务端判定, 本地不做时钟校验.
+   *
+   * @param hideTip 是否隐藏撤回提示小灰条, 仅频道与频道私信端点有效.
+   */
+  suspend fun recall(hideTip: Boolean = false): Result<Unit> {
+    // 不再有 `is Guild` 分支: GuildImpl.sendMessage 恒 throw, 永远产不出 MessageReceipt<Guild>.
+    val destination = when (val contact = target) {
+      is FriendUser -> RecallDestination.Friend(contact.id)
+      is Group -> RecallDestination.GroupChat(contact.id)
+      is Channel -> RecallDestination.GuildChannel(contact.id)
+      is GuildMember -> RecallDestination.GuildDirect(contact.guild.id)
+      // 旧实现在此静默 no-op 并"成功"返回, 调用方无从察觉撤回从未发生.
+      else -> return Result.failure(
+        RecallUnsupportedException(
+          "message receipt target ${contact::class.qualifiedName} has no recall endpoint"
+        )
+      )
     }
+    return target.bot.recallMessage(destination, id, hideTip)
   }
 }
 

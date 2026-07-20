@@ -123,6 +123,49 @@ class TencentBotShadowModeTest {
     assertEquals(TencentEndpoint.PostGroupMessage, cause.endpoint)
   }
 
+  // ---------- resolveEndpointPath 单测 ----------
+
+  @Test
+  fun `占位符全部命中时正常替换 并报告多余 key`() {
+    val resolved = resolveEndpointPath(
+      TencentEndpoint.DeleteGroupMessage,
+      mapOf("group_openid" to "g1", "message_id" to "m1", "unused" to "x"),
+    ).getOrThrow()
+
+    assertEquals("/v2/groups/g1/messages/m1", resolved.path)
+    assertEquals(setOf("unused"), resolved.unusedKeys)
+  }
+
+  @Test
+  fun `占位符 key 写反时失败 而不是发出坏 URL`() {
+    // 历史缺陷原型: 给 /dms/{guild_id} 传了 channel_id.
+    val result = resolveEndpointPath(
+      TencentEndpoint.DeleteGuildMemberMessage,
+      mapOf("channel_id" to "wrong", "message_id" to "m1"),
+    )
+
+    val cause = result.exceptionOrNull()
+    assertTrue(cause is EndpointPlaceholderException, "应为 EndpointPlaceholderException, 实际 $cause")
+    assertEquals(setOf("guild_id"), cause.missingKeys)
+  }
+
+  @Test
+  fun `实参 value 自带花括号时失败 而不是被二次替换`() {
+    // 一条断言同时钉死两件事:
+    //  - 逐 key replace 的旧写法会把 value 里的 {message_id} 再替换成 m1, 拼出看似合法的
+    //    /v2/groups/m1/messages/m1 并 success —— 那样这条测试会失败;
+    //  - 单次扫描不会二次替换, 于是花括号残留, 必须按契约判失败而非放行.
+    val result = resolveEndpointPath(
+      TencentEndpoint.DeleteGroupMessage,
+      mapOf("group_openid" to "{message_id}", "message_id" to "m1"),
+    )
+
+    val cause = result.exceptionOrNull()
+    assertTrue(cause is EndpointPlaceholderException, "应为 EndpointPlaceholderException, 实际 $cause")
+    assertEquals(setOf("message_id"), cause.residualKeys)
+    assertTrue(cause.missingKeys.isEmpty(), "key 都齐全, 问题出在 value 上")
+  }
+
   // ---------- TencentBotClient.callOpenapi 短路集成测 ----------
 
   @Test
@@ -151,6 +194,20 @@ class TencentBotShadowModeTest {
       mapOf("group_openid" to "g1", "message_id" to "m1"),
     ) { method = HttpMethod.Delete }
     assertTrue(result.isSuccess, "Unit 版 forward 到 <T> 版后也应被 shadow 短路")
+  }
+
+  @Test
+  fun `shadow 下占位符错配同样失败 而不是被 stub 掩盖`() = runBlocking {
+    val client = newBot()
+
+    val result = client.callOpenapi(
+      TencentEndpoint.DeleteGuildMemberMessage,
+      mapOf("channel_id" to "wrong", "message_id" to "m1"),
+    ) { method = HttpMethod.Delete }
+
+    // 校验若放在 shadow 短路之后, 灰度演练将永远发现不了路由错配.
+    assertTrue(result.isFailure, "shadow 不该掩盖 placeholder 错配")
+    assertTrue(result.exceptionOrNull() is EndpointPlaceholderException)
   }
 
   @Test

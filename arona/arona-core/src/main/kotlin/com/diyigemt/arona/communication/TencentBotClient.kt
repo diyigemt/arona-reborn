@@ -52,6 +52,70 @@ interface TencentBot : Closeable, Contact, CoroutineScope {
   ): Result<Unit>
 }
 
+private val EndpointPlaceholderRegex = Regex("\\{([^{}]+)}")
+
+/**
+ * 端点路径替换后仍含 `{占位符}`, 即这次调用拼不出一个合法 URL.
+ *
+ * 历史上占位符替换是"有则替换, 无则留着"的字面量 replace, key 拼错 (例如给 `/dms/{guild_id}` 传
+ * `channel_id`) 只会让 `{guild_id}` 原样进入 URL 发出去, 变成一次注定 404 却看不出病因的请求.
+ * 现在这类错配一律在出网前变成本异常.
+ *
+ * @param missingKeys 端点需要但调用方没提供的 key, 绝大多数错配属于这一类.
+ * @param residualKeys 实参 value 自身带进来的花括号片段. 罕见, 通常意味着上游数据被污染.
+ */
+class EndpointPlaceholderException(
+  val endpoint: TencentEndpoint,
+  val missingKeys: Set<String>,
+  val residualKeys: Set<String>,
+) : IllegalArgumentException(
+  buildString {
+    append("endpoint ").append(endpoint).append(" resolved to an url with unresolved placeholder(s)")
+    if (missingKeys.isNotEmpty()) append(", missing: ").append(missingKeys.sorted())
+    if (residualKeys.isNotEmpty()) append(", left by values: ").append(residualKeys.sorted())
+  }
+)
+
+internal data class ResolvedEndpointPath(
+  val path: String,
+  /**
+   * 传入但端点并不需要的 key. 不影响最终 URL, 因此只用于告警而不阻断调用.
+   */
+  val unusedKeys: Set<String>,
+)
+
+/**
+ * 把 [endpoint] 路径里的占位符替换成 [urlPlaceHolder] 中的实参.
+ *
+ * 单次正则扫描完成替换: 逐个 key 做 `String.replace` 会让先替换进去的 value 再被后续 key 二次改写
+ * (value 里恰好含 `{other_key}` 时), 单次扫描从结构上排除这种注入.
+ *
+ * 替换完成后再对结果扫一遍: 单次扫描保证 value 不被二次替换, 但 value 自身若含花括号, 花括号就会
+ * 被原样带进最终 URL. 本函数的契约是"绝不放行仍含占位符的 URL", 因此这种残留同样判失败.
+ */
+internal fun resolveEndpointPath(
+  endpoint: TencentEndpoint,
+  urlPlaceHolder: Map<String, String>,
+): Result<ResolvedEndpointPath> {
+  val missingKeys = mutableSetOf<String>()
+  val usedKeys = mutableSetOf<String>()
+  val path = EndpointPlaceholderRegex.replace(endpoint.path) { match ->
+    val key = match.groupValues[1]
+    when (val value = urlPlaceHolder[key]) {
+      null -> match.value.also { missingKeys += key }
+      else -> value.also { usedKeys += key }
+    }
+  }
+  // 扣掉 missingKeys: 它们留在 path 里是上一步刻意保留的, 单独归类报错更好定位.
+  val residualKeys = EndpointPlaceholderRegex.findAll(path).map { it.groupValues[1] }.toSet() - missingKeys
+  return when {
+    missingKeys.isEmpty() && residualKeys.isEmpty() ->
+      Result.success(ResolvedEndpointPath(path, urlPlaceHolder.keys - usedKeys))
+
+    else -> Result.failure(EndpointPlaceholderException(endpoint, missingKeys, residualKeys))
+  }
+}
+
 internal class TencentBotClient
 private constructor(private val config: TencentBotConfig) : 
   WebhookBot(config.secret), TencentBot, CoroutineScope {
@@ -180,6 +244,15 @@ private constructor(private val config: TencentBotConfig) :
     urlPlaceHolder: Map<String, String>,
     block: HttpRequestBuilder.() -> Unit,
   ): Result<T> {
+    // 必须先于 shadow 短路: shadow 完全不拼 URL, 放到后面等于让灰度演练永远发现不了 placeholder 错配.
+    val resolvedPath = resolveEndpointPath(endpoint, urlPlaceHolder).getOrElse { return Result.failure(it) }
+    if (resolvedPath.unusedKeys.isNotEmpty()) {
+      // 只记 key 名不记 value: 占位符实参里含 openid 这类身份标识, 不该进日志.
+      logger.warn(
+        "call endpoint received unused url placeholder key(s), endpoint={}, keys={}",
+        endpoint, resolvedPath.unusedKeys.sorted()
+      )
+    }
     if (isShadow) {
       // Shadow 必须先于 token snapshot 短路, 让灰度演练完全脱离下行 OpenAPI 网络面;
       // 但仍然在 throwaway builder 上 invoke block, 让 setBody/json.encodeToString/multipart
@@ -216,15 +289,7 @@ private constructor(private val config: TencentBotConfig) :
           append("Authorization", "QQBot ${requestSnapshot.token}")
           append("X-Union-Appid", id)
         }
-        url(
-          "https://${if (isDebug) "sandbox." else ""}api.sgroup.qq.com${endpoint.path}".let {
-            var base = it
-            urlPlaceHolder.forEach { (k, v) ->
-              base = base.replace("{$k}", v)
-            }
-            base
-          }
-        )
+        url("https://${if (isDebug) "sandbox." else ""}api.sgroup.qq.com${resolvedPath.path}")
         block.invoke(this)
       }
       if (isDebug) {

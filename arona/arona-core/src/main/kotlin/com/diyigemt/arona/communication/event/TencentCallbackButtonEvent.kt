@@ -9,6 +9,7 @@ import com.diyigemt.arona.communication.contact.User
 import com.diyigemt.arona.communication.message.TencentWebsocketInteractionNotifyReq
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -64,18 +65,38 @@ data class TencentCallbackButtonEvent(
   override val eventId
     get() = id
 
-  suspend fun accept() {
-    reject(TencentCallbackButtonEventResult.Success)
-  }
+  /**
+   * 回执"接受"(code=0), 语义等价 [reject] 传 [TencentCallbackButtonEventResult.Success].
+   * 返回底层 PUT 调用的 [Result]: 失败以 [Result.failure] 返回而非抛出, 失败日志见 [reject].
+   */
+  suspend fun accept(): Result<Unit> = reject(TencentCallbackButtonEventResult.Success)
 
-  suspend fun reject(reason: TencentCallbackButtonEventResult = TencentCallbackButtonEventResult.Failed) {
-    bot.callOpenapi(
-      TencentEndpoint.Interactions,
-      urlPlaceHolder = mapOf("interaction_id" to id)
-    ) {
-      method = HttpMethod.Put
-      setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(reason)))
-    }
+  /**
+   * 回执互动结果到 PUT /interactions/{interaction_id}.
+   *
+   * 返回底层 OpenAPI 调用的 [Result](与 [bot] 的 callOpenapi 一致): 普通 OpenAPI 失败以 [Result.failure]
+   * 返回而非抛出, 并在此处补一条领域日志(interactionId/type/chatType/回执 ackCode + cause 简述);
+   * 底层 callOpenapi 已记录通用/详细 OpenAPI 错误, 故此处只记简述避免重复刷栈.
+   * 唯一例外是协程取消: [CancellationException] 会被继续抛出以维持协作式取消语义, 不当作普通回执失败吞掉
+   * (底层 runCatching 会把取消也收进 Result.failure, 故必须在此显式重抛).
+   * 调用方可安全忽略返回值(尽力而为回执), 也可据 [Result] 决定重试 / 告警 / 业务补偿.
+   */
+  suspend fun reject(
+    reason: TencentCallbackButtonEventResult = TencentCallbackButtonEventResult.Failed,
+  ): Result<Unit> = bot.callOpenapi(
+    TencentEndpoint.Interactions,
+    urlPlaceHolder = mapOf("interaction_id" to id)
+  ) {
+    method = HttpMethod.Put
+    setBody(bot.json.encodeToString(TencentWebsocketInteractionNotifyReq(reason)))
+  }.onFailure { cause ->
+    // 底层 callOpenapi 用 runCatching 兜住整个 HTTP 调用, 会把 CancellationException 也转成 Result.failure;
+    // 直接当普通失败记录+返回会让取消无法向上传播, 破坏结构化并发, 故先原样重抛.
+    if (cause is CancellationException) throw cause
+    logger.warn(
+      "callback interaction ack failed: interactionId=$id, type=$type, chatType=$chatType, " +
+          "ackCode=${reason.code}($reason), cause=${cause::class.simpleName}: ${cause.message}"
+    )
   }
 }
 

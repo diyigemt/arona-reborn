@@ -80,17 +80,21 @@ object PluginMain : AronaPlugin(
       return
     }
 
-    // 开关已落库即视为成功; 客户端回执与确认消息都尽力而为, 失败只记日志不回滚已生效的开关。
-    runCatching { ev.accept() }.onFailure { logger.warn("回执审查开关按钮事件失败", it) }
+    // 开关已落库即视为成功; 客户端回执与确认消息都尽力而为, 失败不回滚已生效的开关。
+    // 回执失败由 core 的 accept() 统一记录领域日志(interactionId/type/chatType/ackCode/cause), 此处忽略返回的 Result。
+    ev.accept()
     runCatching {
       val reply = if (enabled) "不许色色" else "可以色色"
       ev.contact.sendMessage(MessageChainBuilder(eventId = ev.eventId).append(reply).build())
     }.onFailure { logger.warn("发送审查开关确认消息失败", it) }
   }
 
-  /** 拒绝回调并吞掉拒绝本身的 IO 异常, 仅记日志(与 accept 失败处理一致, 避免静默)。 */
+  /**
+   * 拒绝回调。回执失败由 core 的 reject() 统一记录领域日志, 此处不再本地捕获——旧实现的
+   * `runCatching { ev.reject() }` 捕不到 callOpenapi 内部吞异常后返回的 Result.failure, 是无效兜底。
+   */
   private suspend fun rejectQuietly(ev: TencentCallbackButtonEvent, reason: TencentCallbackButtonEventResult) {
-    runCatching { ev.reject(reason) }.onFailure { logger.warn("拒绝审查开关按钮事件失败, reason=$reason", it) }
+    ev.reject(reason)
   }
 
   /** 审查一条消息内的所有图片; 命中则回复一次 h.jpg 并按命中张数累计排行。 */

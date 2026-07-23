@@ -236,6 +236,9 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
   override suspend fun handle(ctx: TencentDispatchContext, payload: TencentWebsocketCallbackButtonResp, eventId: String) {
     ctx.logger.debug("webhook receive callback btn from server.")
     ctx.logger.debug(payload.toString())
+    // handler 形参 eventId 实为 webhook 信封顶层 id(envelope id), 与事件对象公开的 eventId(#1 已收敛为 d.id)
+    // 不是同一个 JSON 字段. 本 handler 内一律以 envelopeId 称呼, 避免日志里与 d.id 再次混淆.
+    val envelopeId = eventId
     // 仅处理按钮点击(11)/快捷菜单(12); 其余互动类型(反馈/清空会话/授权等)不走本链路回执, 显式短路丢弃.
     // 必须放在这里白名单: button_id 放开可空后, 13~20 会解析成 Unknown 且能解码成功, 若不拦就会被误分类广播.
     if (payload.type != TencentWebsocketCallbackButtonType.MessageButton &&
@@ -243,7 +246,44 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
     ) {
       ctx.logger.warn(
         "skip interaction event: unsupported type=${payload.type}, " +
-            "interactionId=${payload.id}, eventId=$eventId"
+            "interactionId=${payload.id}, envelopeId=$envelopeId"
+      )
+      return
+    }
+    // chat_type fail-closed: fromValue 已把非 0/1/2 收敛为 Unknown, 这里显式白名单短路,
+    // 绝不让它落入下方 Group 路由分支(旧 fromValue 兜底 Group 会误路由并可能误回执).
+    if (payload.chatType == TencentWebsocketCallbackButtonChatType.Unknown) {
+      ctx.logger.warn(
+        "skip interaction event: unsupported chat_type, " +
+            "interactionId=${payload.id}, envelopeId=$envelopeId"
+      )
+      return
+    }
+    // 外层 d.type 与内层 d.data.type 文档要求恒等; 不一致即畸形载荷(平台异常/协议漂移). 文档未赋予外层在
+    // 冲突时的权威性, 继续处理可能对无需 PUT 的类型误回执, 故 fail-closed 丢弃, 不猜测真实意图.
+    if (payload.type != payload.data.type) {
+      ctx.logger.warn(
+        "skip interaction event: type mismatch outer=${payload.type} inner=${payload.data.type}, " +
+            "chatType=${payload.chatType}, interactionId=${payload.id}, envelopeId=$envelopeId"
+      )
+      return
+    }
+    // 按类型校验 resolved 关键字段, 对齐 TencentCallbackButtonEvent 的字段 KDoc 约束: 按钮点击(11)必带
+    // button_id, 快捷菜单(12)必带 feature_id. 缺失即畸形载荷, fail-closed 不广播(避免下游拿到空标识误匹配).
+    val missingResolvedField = when (payload.type) {
+      TencentWebsocketCallbackButtonType.MessageButton ->
+        "resolved.button_id".takeIf { payload.data.resolved.buttonId.isNullOrBlank() }
+      TencentWebsocketCallbackButtonType.QuickMenu ->
+        "resolved.feature_id".takeIf { payload.data.resolved.featureId.isNullOrBlank() }
+      // Unknown 已被上方 type 白名单短路, 此分支仅为编译期穷尽, 合法输入永不可达. 走到即内部契约被破坏,
+      // error() 快速失败暴露 bug——绝不返回 null 让畸形载荷 fail-open 通过校验.
+      TencentWebsocketCallbackButtonType.Unknown ->
+        error("unreachable: Unknown type passed the interaction type whitelist")
+    }
+    if (missingResolvedField != null) {
+      ctx.logger.warn(
+        "skip callback button event: missing $missingResolvedField for type=${payload.type}, " +
+            "interactionId=${payload.id}, envelopeId=$envelopeId"
       )
       return
     }
@@ -252,7 +292,7 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
       // 因此 payload 关键字段缺失直接短路, 不 broadcast, 也不触碰任何 ContactList.
       ctx.logger.warn(
         "skip callback button event: missing $field. " +
-            "chatType=${payload.chatType}, interactionId=${payload.id}, eventId=$eventId"
+            "chatType=${payload.chatType}, interactionId=${payload.id}, envelopeId=$envelopeId"
       )
       return
     }
@@ -278,6 +318,12 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
           it to it
         }
       }
+      // Unknown 已在上方 chat_type guard 短路, 此分支仅为编译期穷尽, 合法输入永不可达. 它排在
+      // missingCallbackRouteField() 之后, 那个纯函数对 Unknown 同样 error(); 二者一致直接 error() 快速失败.
+      // 注: handler 在 dispatch 的 onSuccess 回调内执行, 此异常不会被 decode 的 runCatching 吞掉, 而是逃逸出
+      // handler——但 bot 作用域是 SupervisorJob, 只中止本次 dispatch, 不传染其他任务.
+      TencentWebsocketCallbackButtonChatType.Unknown ->
+        error("unreachable: Unknown chat_type passed the handler guard, interactionId=${payload.id}")
     }
     TencentCallbackButtonEvent(
       id = payload.id,
@@ -318,6 +364,10 @@ internal fun TencentWebsocketCallbackButtonResp.missingCallbackRouteField(): Str
     userOpenId.isNullOrBlank() -> "userOpenId"
     else -> null
   }
+  // 契约: 仅对 handler 白名单放行的 chatType(Guild/Group/Friend)调用. Unknown 已在 handler guard 短路,
+  // 走到这里说明调用契约被破坏——直接 error 暴露 bug, 该纯函数不承担实时事件路径的容错(那是 handler 的职责).
+  TencentWebsocketCallbackButtonChatType.Unknown ->
+    error("missingCallbackRouteField called with Unknown chat_type")
 }
 
 /**

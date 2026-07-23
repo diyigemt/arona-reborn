@@ -7,6 +7,7 @@ import com.diyigemt.arona.communication.message.TencentWebsocketCallbackButtonDa
 import com.diyigemt.arona.communication.message.TencentWebsocketCallbackButtonResp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 // 回归保护:
@@ -125,5 +126,13 @@ class CallbackButtonRouteValidationTest {
       userOpenId = null,
     )
     assertNull(p.missingCallbackRouteField())
+  }
+
+  @Test
+  fun `Unknown chat_type 违反调用契约直接抛异常`() {
+    // 契约: 本纯函数只对 handler 白名单放行的 chatType(Guild/Group/Friend)调用. Unknown 早已在 handler
+    // guard 短路, 直接调用属契约破坏, 必须 error() 暴露 bug 而非静默返回——与 handler 实时路径的 fail-closed 分工不同.
+    val p = payload(TencentWebsocketCallbackButtonChatType.Unknown)
+    assertFailsWith<IllegalStateException> { p.missingCallbackRouteField() }
   }
 }

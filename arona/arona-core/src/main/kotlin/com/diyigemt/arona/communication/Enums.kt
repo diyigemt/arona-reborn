@@ -118,10 +118,14 @@ internal object TencentGuildChannelApplicationTypeIntSerializer : KSerializer<Te
 enum class TencentWebsocketCallbackButtonChatType(val code: Int) {
   Guild(0),
   Group(1),
-  Friend(2);
+  Friend(2),
+  // 文档定义 chat_type 仅 0/1/2. 未知取值一律解析为 Unknown, 由 handler 白名单短路丢弃——绝不能静默兜底成
+  // Group(1): 否则未知场景会被误路由到群链路(getOrCreate 群 Contact / 对不该回执的互动误发 PUT 回执).
+  // code=-1 仅为占位, 该枚举只用于入站解码, 不会被反向编码下发.
+  Unknown(-1);
   companion object {
     private val map = entries.associateBy { it.code }
-    fun fromValue(code: Int) = map[code] ?: Group
+    fun fromValue(code: Int) = map[code] ?: Unknown
   }
 }
 

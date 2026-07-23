@@ -37,19 +37,32 @@ enum class TencentCallbackButtonEventResult(val code: Int) {
 }
 
 data class TencentCallbackButtonEvent(
-  val id: String, // 事件id
-  val internalId: String, // websocket消息id 用于消息回复?
+  /**
+   * 互动事件 ID (对应 INTERACTION_CREATE 事件的 `d.id`). 文档定义此 id "用于被动消息发送和互动回调":
+   * 既是 [accept]/[reject] 调 PUT /interactions/{interaction_id} 的 interaction_id,
+   * 也是被动回复消息时的 event_id, 两处一律同源于本字段.
+   */
+  val id: String,
   val appId: String, // botAppId
+  /**
+   * 按钮 ID. 按钮点击(type=11)必有; 快捷菜单(type=12)不下发 button_id, 此时为空串, 应改用 [featureId] 识别.
+   */
   val buttonId: String,
   val buttonData: String,
+  /**
+   * 快捷菜单(type=12)的 feature ID; 按钮点击(type=11)为 `null`.
+   */
+  val featureId: String?,
   val type: TencentWebsocketCallbackButtonType,
   val chatType: TencentWebsocketCallbackButtonChatType,
   val contact: Contact,
   val user: User,
   override val bot: TencentBot,
 ) : TencentBotEvent, TencentEvent() {
+  // 被动回复(event_id)与 PUT 回执(interaction_id)按文档同源于事件的 id 字段(d.id), 故直接返回 [id].
+  // 早期实现曾用 webhook 信封顶层 id (与 d.id 是不同 JSON 字段), 会让被动消息带上非法 event_id.
   override val eventId
-    get() = internalId
+    get() = id
 
   suspend fun accept() {
     reject(TencentCallbackButtonEventResult.Success)
@@ -68,5 +81,7 @@ data class TencentCallbackButtonEvent(
 
 data class TencentCallbackButtonFilter(
   val buttonId: String,
-  val buttonData: String
+  val buttonData: String,
+  /** 快捷菜单(type=12)的 feature ID; 按钮点击(type=11)为 `null`. */
+  val featureId: String? = null,
 )

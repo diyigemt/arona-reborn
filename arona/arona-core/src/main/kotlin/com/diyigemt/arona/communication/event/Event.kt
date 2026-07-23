@@ -236,6 +236,17 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
   override suspend fun handle(ctx: TencentDispatchContext, payload: TencentWebsocketCallbackButtonResp, eventId: String) {
     ctx.logger.debug("webhook receive callback btn from server.")
     ctx.logger.debug(payload.toString())
+    // 仅处理按钮点击(11)/快捷菜单(12); 其余互动类型(反馈/清空会话/授权等)不走本链路回执, 显式短路丢弃.
+    // 必须放在这里白名单: button_id 放开可空后, 13~20 会解析成 Unknown 且能解码成功, 若不拦就会被误分类广播.
+    if (payload.type != TencentWebsocketCallbackButtonType.MessageButton &&
+      payload.type != TencentWebsocketCallbackButtonType.QuickMenu
+    ) {
+      ctx.logger.warn(
+        "skip interaction event: unsupported type=${payload.type}, " +
+            "interactionId=${payload.id}, eventId=$eventId"
+      )
+      return
+    }
     payload.missingCallbackRouteField()?.let { field ->
       // ContactList 现为真缓存 (Sprint 1.2), 用 id="" 的 Empty 占位会永久驻留并污染后续路由,
       // 因此 payload 关键字段缺失直接短路, 不 broadcast, 也不触碰任何 ContactList.
@@ -270,10 +281,11 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
     }
     TencentCallbackButtonEvent(
       id = payload.id,
-      internalId = eventId,
       appId = payload.applicationId,
-      buttonId = payload.data.resolved.buttonId,
+      // type=12 快捷菜单不下发 button_id, 兜底为空串; 识别改用 featureId.
+      buttonId = payload.data.resolved.buttonId.orEmpty(),
       buttonData = payload.data.resolved.buttonData ?: "",
+      featureId = payload.data.resolved.featureId,
       type = payload.type,
       chatType = payload.chatType,
       contact = contact.first,

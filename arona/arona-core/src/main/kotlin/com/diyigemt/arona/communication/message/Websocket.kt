@@ -68,8 +68,10 @@ data class TencentWebsocketCallbackButtonDataResp(
 data class TencentWebsocketCallbackButtonDataResolvedResp(
   @SerialName("button_data")
   val buttonData: String? = "",
+  // 文档中 button_id 为条件字段: 按钮点击(type=11)必带, 快捷菜单(type=12)以 feature_id 标识而不下发 button_id.
+  // 声明为非空必填时, 合法的 type=12 载荷会因缺字段抛 MissingFieldException, 被 dispatch 的 runCatching 静默丢弃.
   @SerialName("button_id")
-  val buttonId: String,
+  val buttonId: String? = null,
   @SerialName("user_id")
   val userId: String? = null,
   @SerialName("feature_id")

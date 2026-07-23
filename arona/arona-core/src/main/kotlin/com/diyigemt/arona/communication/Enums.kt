@@ -134,10 +134,14 @@ internal object TencentWebsocketCallbackButtonChatTypeIntSerializer : KSerialize
 @Serializable(with = TencentWebsocketCallbackButtonTypeIntSerializer::class)
 enum class TencentWebsocketCallbackButtonType(val code: Int) {
   MessageButton(11),
-  QuickMenu(12);
+  QuickMenu(12),
+  // 文档定义 11~20 (按钮点击/快捷菜单/反馈/清空会话/授权等), 但本链路仅支持 11/12. 其余取值一律解析为 Unknown,
+  // 由 handler 显式白名单短路丢弃——绝不能静默兜底成 MessageButton(11), 否则 13~20 会被误当按钮点击处理
+  // (甚至对无需 PUT 回执的类型发起回执). code=-1 仅为占位, 该枚举只用于入站解码, 不会被反向编码下发.
+  Unknown(-1);
   companion object {
     private val map = entries.associateBy { it.code }
-    fun fromValue(code: Int) = map[code] ?: MessageButton
+    fun fromValue(code: Int) = map[code] ?: Unknown
   }
 }
 

@@ -462,7 +462,7 @@ suspend inline fun <reified C : UserCommandSender> C.nextButtonInteraction(
 ): TencentCallbackButtonEvent {
   val mapper: suspend (TencentCallbackButtonEvent) -> TencentCallbackButtonEvent? = mapper@{ ev ->
     if (!(this.user.id == ev.user.id && this.subject.id == ev.contact.id)) return@mapper null
-    if (!filter(this, TencentCallbackButtonFilter(ev.buttonId, ev.buttonData))) return@mapper null
+    if (!filter(this, TencentCallbackButtonFilter(ev.buttonId, ev.buttonData, ev.featureId))) return@mapper null
     ev
   }
   return (if (timeoutMillis == -1L) {

@@ -4,6 +4,7 @@ import com.diyigemt.arona.communication.TencentWebsocketCallbackButtonChatType
 import com.diyigemt.arona.communication.event.TencentCallbackButtonEvent
 import com.diyigemt.arona.communication.event.TencentCallbackButtonEventResult
 import com.diyigemt.arona.communication.event.TencentGroupMessageEvent
+import com.diyigemt.arona.communication.event.recall
 import com.diyigemt.arona.communication.message.MessageChainBuilder
 import com.diyigemt.arona.communication.message.TencentImage
 import com.diyigemt.arona.plana.db.PlanaDatabase
@@ -36,21 +37,21 @@ object PluginMain : AronaPlugin(
     }
 
     // 审查开关仅经「色色」菜单的回调按钮触发(按钮已用腾讯原生 MANAGER 权限限定群管理员)。
-//    pluginEventChannel().subscribeAlways<TencentCallbackButtonEvent> { ev ->
-//      if (!ev.buttonData.startsWith(AUDIT_CALLBACK_PREFIX)) return@subscribeAlways
-//      handleAuditSwitchButton(ev)
-//    }
-//
-//    pluginEventChannel().subscribeAlways<TencentGroupMessageEvent> { ev ->
-//      if (!AuditSwitchService.isEnabled(ev.subject.id)) return@subscribeAlways
-//      val images = ev.message.filterIsInstance<TencentImage>()
-//      if (images.isEmpty()) return@subscribeAlways
-//      // 审查涉及网络 IO, 放到独立协程, 不阻塞事件分发。
-//      launch {
-//        runCatching { auditMessage(ev, images) }
-//          .onFailure { logger.warn("图片审查处理失败", it) }
-//      }
-//    }
+    pluginEventChannel().subscribeAlways<TencentCallbackButtonEvent> { ev ->
+      if (!ev.buttonData.startsWith(AUDIT_CALLBACK_PREFIX)) return@subscribeAlways
+      handleAuditSwitchButton(ev)
+    }
+
+    pluginEventChannel().subscribeAlways<TencentGroupMessageEvent> { ev ->
+      if (!AuditSwitchService.isEnabled(ev.subject.id)) return@subscribeAlways
+      val images = ev.message.filterIsInstance<TencentImage>()
+      if (images.isEmpty()) return@subscribeAlways
+      // 审查涉及网络 IO, 放到独立协程, 不阻塞事件分发。
+      launch {
+        runCatching { auditMessage(ev, images) }
+          .onFailure { logger.warn("图片审查处理失败", it) }
+      }
+    }
   }
 
   /**
@@ -106,7 +107,8 @@ object PluginMain : AronaPlugin(
     PlanaRepository.incrementRank(ev.sender.id, flagged)
     runCatching {
       val warning = ImageAssetService.getImage(ev.subject, "h.jpg")
-      ev.subject.sendMessage(MessageChainBuilder(ev.message.sourceId).append(warning).build())
+      ev.subject.sendMessage(warning)
+      ev.recall()
     }.onFailure { logger.warn("发送 h.jpg 失败", it) }
   }
 

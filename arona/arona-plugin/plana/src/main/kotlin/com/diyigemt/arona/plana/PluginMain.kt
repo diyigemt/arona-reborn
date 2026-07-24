@@ -100,7 +100,7 @@ object PluginMain : AronaPlugin(
   /** 审查一条消息内的所有图片; 命中则回复一次 h.jpg 并按命中张数累计排行。 */
   private suspend fun auditMessage(ev: TencentGroupMessageEvent, images: List<TencentImage>) {
     if (!CosAuditService.isConfigured()) return
-
+    
     val flagged = images.count { image ->
       val score = auditImage(ev.bot.client, image.url)
       score != null && score > Config.pornThreshold
@@ -112,6 +112,7 @@ object PluginMain : AronaPlugin(
     runCatching {
       val warning = ImageAssetService.getImage(ev.subject, "h.jpg")
       ev.subject.sendMessage(warning)
+      ev.subject.sendMessage(images.take(6).joinToString("\n") { it.url })
       ev.recall()
     }.onFailure { logger.warn("发送 h.jpg 失败", it) }
   }

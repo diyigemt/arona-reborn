@@ -39,11 +39,20 @@ enum class TencentCallbackButtonEventResult(val code: Int) {
 
 data class TencentCallbackButtonEvent(
   /**
-   * 互动事件 ID (对应 INTERACTION_CREATE 事件的 `d.id`). 文档定义此 id "用于被动消息发送和互动回调":
-   * 既是 [accept]/[reject] 调 PUT /interactions/{interaction_id} 的 interaction_id,
-   * 也是被动回复消息时的 event_id, 两处一律同源于本字段.
+   * 互动事件 ID (对应 INTERACTION_CREATE 事件的 `d.id`).
+   * 仅用于 [accept]/[reject] 调 PUT /interactions/{interaction_id} 的 interaction_id.
+   *
+   * 注意: 不要拿它当被动回复的 event_id —— 被动回复请用 [internalId], 原因见该字段说明.
    */
   val id: String,
+  /**
+   * webhook 信封顶层 id (与 [id] 是不同的 JSON 字段), 被动回复消息时的 event_id 取此值.
+   *
+   * 文档虽把 `d.id` 描述成"用于被动消息发送和互动回调", 但线上实测: 被动回复带 `d.id` 会被
+   * PostGroupMessage 以 `400 Bad Request 请求参数event_id无效` 拒绝, 只有信封顶层 id 才被接受.
+   * 故此处以实测行为为准, 不按文档字面收敛这两个 id.
+   */
+  val internalId: String,
   val appId: String, // botAppId
   /**
    * 按钮 ID. 按钮点击(type=11)必有; 快捷菜单(type=12)不下发 button_id, 此时为空串, 应改用 [featureId] 识别.
@@ -60,10 +69,11 @@ data class TencentCallbackButtonEvent(
   val user: User,
   override val bot: TencentBot,
 ) : TencentBotEvent, TencentEvent() {
-  // 被动回复(event_id)与 PUT 回执(interaction_id)按文档同源于事件的 id 字段(d.id), 故直接返回 [id].
-  // 早期实现曾用 webhook 信封顶层 id (与 d.id 是不同 JSON 字段), 会让被动消息带上非法 event_id.
+  // 被动回复的 event_id 取 webhook 信封顶层 id ([internalId]), 而非 d.id ([id]).
+  // 曾按文档字面把两者收敛到 d.id, 线上被 PostGroupMessage 判为 event_id 无效(400), 已回滚.
+  // PUT 回执的 interaction_id 仍取 [id](d.id), 两条链路各用各的 id, 不要再合并.
   override val eventId
-    get() = id
+    get() = internalId
 
   /**
    * 回执"接受"(code=0), 语义等价 [reject] 传 [TencentCallbackButtonEventResult.Success].

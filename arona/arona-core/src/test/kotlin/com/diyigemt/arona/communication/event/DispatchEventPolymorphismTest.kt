@@ -145,7 +145,7 @@ class DispatchEventPolymorphismTest {
   }
 
   @Test
-  fun `INTERACTION_CREATE 快捷菜单(12)缺 button_id 也能解码 broadcast, eventId 同源 d_id`() {
+  fun `INTERACTION_CREATE 快捷菜单(12)缺 button_id 也能解码 broadcast, eventId 取信封顶层 id`() {
     // accept() 的 PUT 用成功结果打桩, 贴近真实回执; 也避免将来 accept() 开始传播失败时无关地打破本测试.
     val bot = StubBot(unitCallOpenapiResult = Result.success(Unit))
     try {
@@ -194,10 +194,11 @@ class DispatchEventPolymorphismTest {
         assertEquals("", event.buttonId, "快捷菜单无 button_id, handler 兜底为空串")
         assertEquals("feat-42", event.featureId, "feature_id 应透传到事件对象")
         assertEquals("menu-data", event.buttonData)
-        assertEquals("interaction-d-id-123", event.id, "id 取 d.id")
-        // 核心回归 (#1): 被动回复用的 eventId 必须同源于 d.id, 不能再取信封顶层 id.
-        assertEquals("interaction-d-id-123", event.eventId, "eventId 应等于 d.id")
-        assertNotEquals("envelope-id-XYZ", event.eventId, "eventId 绝不能取信封顶层 id")
+        assertEquals("interaction-d-id-123", event.id, "id 取 d.id(仅用于 PUT 回执的 interaction_id)")
+        // 核心回归: 被动回复用的 eventId 必须取信封顶层 id. 曾按文档字面改成 d.id, 线上被
+        // PostGroupMessage 判为 `请求参数event_id无效`(400) 后回滚, 这两个 id 不可再合并.
+        assertEquals("envelope-id-XYZ", event.eventId, "eventId 应等于 webhook 信封顶层 id")
+        assertNotEquals("interaction-d-id-123", event.eventId, "eventId 绝不能取 d.id")
 
         // 分发只广播不回执; 唯一一次 openapi 调用应由 accept() 触发, 且走 PUT /interactions/{interaction_id}.
         runBlocking { event.accept() }
@@ -444,8 +445,8 @@ class DispatchEventPolymorphismTest {
         val event = assertNotNull(captured.get(), "合法 type=11 群按钮点击应成功广播")
         assertEquals(TencentWebsocketCallbackButtonType.MessageButton, event.type)
         assertEquals("confirm", event.buttonId, "type=11 的 button_id 应透传")
-        assertEquals("d-btn-group", event.id)
-        assertEquals("d-btn-group", event.eventId, "eventId 同源 d.id")
+        assertEquals("d-btn-group", event.id, "id 取 d.id(仅用于 PUT 回执的 interaction_id)")
+        assertEquals("env-btn-group", event.eventId, "eventId 取信封顶层 id, 与 d.id 分开")
 
         // 回执 PUT 打桩失败: accept() 必须以 Result.failure 返回而非抛出, 且实际发起了一次 PUT.
         val result = runBlocking { event.accept() }

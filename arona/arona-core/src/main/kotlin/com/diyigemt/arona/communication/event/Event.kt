@@ -236,8 +236,9 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
   override suspend fun handle(ctx: TencentDispatchContext, payload: TencentWebsocketCallbackButtonResp, eventId: String) {
     ctx.logger.debug("webhook receive callback btn from server.")
     ctx.logger.debug(payload.toString())
-    // handler 形参 eventId 实为 webhook 信封顶层 id(envelope id), 与事件对象公开的 eventId(#1 已收敛为 d.id)
-    // 不是同一个 JSON 字段. 本 handler 内一律以 envelopeId 称呼, 避免日志里与 d.id 再次混淆.
+    // handler 形参 eventId 实为 webhook 信封顶层 id(envelope id), 与 d.id(payload.id)是不同的 JSON 字段:
+    // 前者用作被动回复的 event_id(即事件对象公开的 eventId), 后者只用作 PUT 回执的 interaction_id.
+    // 本 handler 内一律以 envelopeId 称呼, 避免日志里与 interactionId 混淆.
     val envelopeId = eventId
     // 仅处理按钮点击(11)/快捷菜单(12); 其余互动类型(反馈/清空会话/授权等)不走本链路回执, 显式短路丢弃.
     // 必须放在这里白名单: button_id 放开可空后, 13~20 会解析成 Unknown 且能解码成功, 若不拦就会被误分类广播.
@@ -327,6 +328,8 @@ internal object TencentWebsocketCallbackButtonHandler : TencentWebsocketDispatch
     }
     TencentCallbackButtonEvent(
       id = payload.id,
+      // 被动回复的 event_id 必须用信封顶层 id: 用 d.id 会被 PostGroupMessage 判为 event_id 无效(400).
+      internalId = envelopeId,
       appId = payload.applicationId,
       // type=12 快捷菜单不下发 button_id, 兜底为空串; 识别改用 featureId.
       buttonId = payload.data.resolved.buttonId.orEmpty(),

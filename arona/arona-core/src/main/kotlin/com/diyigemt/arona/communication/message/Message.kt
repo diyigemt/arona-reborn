@@ -15,6 +15,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.ClassDiscriminatorMode
 import kotlinx.serialization.json.Json
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -823,6 +824,15 @@ data class TencentGuildMessage(
   @Transient
   override var messageSequence: Int = 1,
 ) : TencentMessage(content, image, markdown, keyboard, ark, messageId, eventId, messageSequence)
+
+// 出向 wire 专用 Json: 关闭 sealed 多态判别字段. 消息 DTO 与其嵌套的 markdown/keyboard 都是 sealed
+// 层次, 按基类静态类型编码会在顶层和嵌套对象混入 "type":"<FQCN>", 此前隐式依赖服务端容忍未知字段.
+// 仅限编码使用 —— NONE 模式下多态反序列化无法辨识子类, 严禁用来 decode.
+// (classDiscriminatorMode 需 kotlinx-serialization-json >= 1.6.3; 该依赖特意不 pin 版本, 由 Ktor BOM 决议.)
+private val TencentWireJson = Json { classDiscriminatorMode = ClassDiscriminatorMode.NONE }
+
+internal fun encodeTencentMessageForWire(message: TencentMessage): String =
+  TencentWireJson.encodeToString(TencentMessage.serializer(), message)
 
 @Serializable
 data class TencentMessageMediaInfo(

@@ -127,10 +127,12 @@ internal enum class TencentWebsocketEventType(val type: String) {
   FRIEND_DEL("FRIEND_DEL"), // 机器人被删除好友
   C2C_MSG_REJECT("C2C_MSG_REJECT"), // 好友拒绝机器人的主动消息
   C2C_MSG_RECEIVE("C2C_MSG_RECEIVE"), // 好友允许机器人的主动消息
-  INTERACTION_CREATE("INTERACTION_CREATE"), // 回调按钮被点击
-  A("GUILD_CREATE");
+  INTERACTION_CREATE("INTERACTION_CREATE"); // 回调按钮被点击
 
   companion object {
+    // wire 字符串必须全枚举唯一: associateBy 对重复 key 静默保留靠后项, 历史上死枚举 A("GUILD_CREATE")
+    // 曾覆盖正牌 GUILD_CREATE 导致该事件解析失配被 dispatch 静默丢弃 (registry 只登记正牌枚举).
+    // 唯一性由 TencentWebsocketEventTypeTest 钉住.
     private val TypeMap = entries.associateBy { it.type }
     fun fromValue(type: String) = TypeMap[type] ?: NULL
   }

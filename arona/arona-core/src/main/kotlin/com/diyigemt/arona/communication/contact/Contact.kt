@@ -204,7 +204,9 @@ internal abstract class AbstractContact(
           // TODO 支持其他类型消息
           contentType(ContentType.Application.Json)
           setBody(
-            bot.json.encodeToString(
+            // 出向必须走 encodeTencentMessageForWire: 以基类泛型编码会触发 sealed 多态, 顶层与嵌套
+            // markdown/keyboard 混入 "type" 判别字段. 回归由 SendMessageWireBodyTest 钉住.
+            encodeTencentMessageForWire(
               // 把当前发送 bot 的 appId 透传给 builder: 用于补齐 TencentCustomKeyboard 未显式设置的 bot_appid,
               // 同时不污染原 keyboard, 让顶层 lazy 模板能跨 bot 安全复用.
               builder.build(this@AbstractContact is GuildMember, bot.unionOpenidOrId)
@@ -228,7 +230,7 @@ internal abstract class AbstractContact(
           } else {
             contentType(ContentType.Application.Json)
             setBody(
-              bot.json.encodeToString(
+              encodeTencentMessageForWire(
                 builder.build(this@AbstractContact is GuildMember, bot.unionOpenidOrId)
               )
             )

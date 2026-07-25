@@ -147,6 +147,10 @@ enum class TencentEndpoint(val path: String) {
   PostFriendStreamMessage("/v2/users/{openid}/stream_messages"), // 向用户发送流式(分片)私信消息
   PostGroupMessage("/v2/groups/{group_openid}/messages"), // 向群聊发送消息
   PostGroupRichMessage("/v2/groups/{group_openid}/files"), // 向群聊发送消息
+  // TODO: 分片预上传仅预留端点路径 (来自官方富媒体文档, 非猜测), 无 DTO/实现——prepare 超时后服务端
+  // 是否已成功、分片会话能否清理、同片重传幂等性等关键语义未知, 待 sandbox spike 后单独排期.
+  PostFriendUploadPrepare("/v2/users/{openid}/upload_prepare"), // 私信富媒体分片预上传(未实现)
+  PostGroupUploadPrepare("/v2/groups/{group_openid}/upload_prepare"), // 群聊富媒体分片预上传(未实现)
   PostGuildMessage("/channels/{channel_id}/messages"), // 向子频道发送消息
   PostGuildMemberMessage("/dms/{guild_id}/messages"), // 向频道成员发送私聊消息
   GetBotGuildList("/users/@me/guilds"), // 获取机器人/创建者加入的频道列表

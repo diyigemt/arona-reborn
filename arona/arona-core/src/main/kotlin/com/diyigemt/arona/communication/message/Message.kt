@@ -742,12 +742,17 @@ internal object TencentMessageTypeAsIntSerializer : KSerializer<TencentMessageTy
   override fun deserialize(decoder: Decoder) = TencentMessageType.fromValue(decoder.decodeInt())
 }
 
+/**
+ * 出向消息 msg_type. 现行 v2 协议单聊/群聊取值已分叉: 单聊 0/2/6/7, 群聊 0/2/7/8 (2026-07 文档核实),
+ * 共享枚举无法在编译期挡住"场景 × 类型"的非法组合——按场景拆分推迟到首次实现 msg_type 6(输入状态通知)
+ * 或 8(群聊卡片) 时作为其先决任务.
+ */
 enum class TencentMessageType(val code: Int) {
   PLAIN_TEXT(0), // 纯文本
   IMAGE(1), // 图文
   MARKDOWN(2), // markdown
-  ARK(3), // 卡片
-  EMBED(4), // 小程序
+  ARK(3), // 卡片; 已从单聊/群聊 v2 协议移除, 对应消息形态仅存于频道协议 (2026-07 文档核实), 降级不做
+  EMBED(4), // 小程序; 已从单聊/群聊 v2 协议移除, 对应消息形态仅存于频道协议 (2026-07 文档核实), 降级不做
   FILE(7); // 文件
 
   companion object {
@@ -957,7 +962,7 @@ class TencentMessageBuilder private constructor(
       // FILE 只带 media.fileInfo, 没有可逆的 URL 或文件字节表达, 当前 Message 层也没有对应的结构类型;
       // 伪造 image/offlineImage 会让后续 build() 误当 IMAGE 发出, 故直接 skip.
       TencentMessageType.FILE -> Unit
-      // ARK / EMBED 当前 Message 层无对应结构消息, 待后续扩展.
+      // ARK / EMBED 已从单聊/群聊 v2 协议移除, 正常不会再入站; 分支仅为 when 完备性保留, 不做反向解析.
       TencentMessageType.ARK, TencentMessageType.EMBED -> Unit
     }
   }

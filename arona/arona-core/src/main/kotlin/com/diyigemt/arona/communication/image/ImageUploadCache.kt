@@ -53,6 +53,12 @@ enum class ImageCacheScene {
  * - 频道 (Guild / Channel) 及群成员 (GroupMember) 等其它 [Contact] 不参与缓存
  *   ([find] 返回 null, [put] 不写入, [getOrUpload] 直接上传不缓存). 频道图片走 URL 而非上传凭证.
  *
+ * ## 非图片富媒体
+ * 本缓存不得用于 [Contact.uploadMedia] 的凭证: 唯一身份 (namespace/cacheKey/appId/scene) 不含
+ * mediaType, 图片与视频/语音/文件用同一逻辑 key 会互覆并错误复用 file_info.
+ * TODO: 需要缓存非图片凭证时另建 MediaUploadCache 新表并把 mediaType 纳入唯一身份;
+ * 不动现表联合唯一索引 —— SchemaUtils.create 只建表不迁移, 改线上索引风险高.
+ *
  * ## 并发
  * 单进程内 [getOrUpload] 以固定槽位 [Mutex] 做 single-flight 去重; 不同身份哈希碰撞只会短暂串行,
  * 不影响正确性, 也不会让锁容器无界增长. 多实例部署下依赖唯一索引 + upsert 保证最终单条记录,

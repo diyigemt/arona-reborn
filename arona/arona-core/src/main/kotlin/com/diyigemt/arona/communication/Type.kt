@@ -149,6 +149,7 @@ enum class TencentEndpoint(val path: String) {
   PostGuildMessage("/channels/{channel_id}/messages"), // 向子频道发送消息
   PostGuildMemberMessage("/dms/{guild_id}/messages"), // 向频道成员发送私聊消息
   GetBotGuildList("/users/@me/guilds"), // 获取机器人/创建者加入的频道列表
+  GetGroupMemberList("/v2/groups/{group_openid}/members"), // 获取群成员列表(分页)
   GetGuildMemberList("/guilds/{guild_id}/members"), // 获取频道的成员列表
   GetGuildChannelList("/guilds/{guild_id}/channels"), // 获取频道的子频道列表
   DeleteFriendMessage("/v2/users/{openid}/messages/{message_id}"), // 撤回好友消息

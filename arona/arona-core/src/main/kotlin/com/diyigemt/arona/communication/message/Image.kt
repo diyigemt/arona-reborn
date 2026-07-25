@@ -13,6 +13,27 @@ interface TencentImage : TencentResource, Message {
   val url: String
 }
 
+/**
+ * 通过富媒体上传接口 ([com.diyigemt.arona.communication.contact.Contact.uploadMedia]) 得到的
+ * 非图片资源 (视频/语音/文件).
+ *
+ * 刻意不实现 [TencentImage]: 视频/语音不是图片, 不应流入 `filterIsInstance<TencentImage>()`
+ * 的既有路径 (builder 图片槽位、图片上传缓存等), 发送期由 TencentMessageBuilder 显式识别.
+ * 该对象依赖上传态 (file_info), 无法从序列化串复原, 因此与 MessageChainAsStringSerializer 的
+ * lossy 契约一致, 不注册反向解析.
+ */
+data class TencentOfflineMedia(
+  val mediaType: TencentRichMessageType,
+  override val resourceId: String,
+  override val resourceUuid: String,
+  override val ttl: Long,
+  val url: String = "",
+) : TencentResource, Message {
+  override val size: Long = 0L
+  override fun toString() = serialization()
+  override fun serialization() = "[tencent:media:${mediaType.code}:$url]"
+}
+
 // 由客户端通过文件上传接口获取到的image实例
 data class TencentOfflineImage(
   override val resourceId: String,

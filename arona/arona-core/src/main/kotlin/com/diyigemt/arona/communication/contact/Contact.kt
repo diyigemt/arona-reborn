@@ -130,6 +130,26 @@ interface Contact : CoroutineScope {
 
   suspend fun uploadImage(data: ByteArray): TencentImage
 
+  /**
+   * 上传视频/语音/文件等非图片富媒体. Group/FriendUser 支持, GroupMember 按单聊身份委托,
+   * 其余 Contact (频道/bot 聚合体) 抛 [UnsupportedOperationException].
+   *
+   * 与 [uploadImage] 不同, 失败直接透传异常, 不做"回落下载再传 bytes"——那是图片上传的
+   * 专属止血, 对其余类型的跨方式重传语义未经证实. 凭证也不可复用
+   * [com.diyigemt.arona.communication.image.ImageUploadCache] (其唯一键不含 mediaType).
+   *
+   * type 传 [TencentRichMessageType.IMAGE] 也能走通 (wire 形态与图片上传等价), 但享受不到
+   * 图片缓存与失败回落 —— 图片请优先 [uploadImage].
+   *
+   * 接口层给抛异常的默认实现是为了不 break 已编译插件里的 Contact 实现; 真实现在
+   * AbstractContact.
+   */
+  suspend fun uploadMedia(url: String, type: TencentRichMessageType): TencentOfflineMedia =
+    throw UnsupportedOperationException("$this does not support rich media upload. Upload via a concrete Group/Friend contact instead.")
+
+  suspend fun uploadMedia(data: ByteArray, type: TencentRichMessageType): TencentOfflineMedia =
+    throw UnsupportedOperationException("$this does not support rich media upload. Upload via a concrete Group/Friend contact instead.")
+
   companion object {
     internal suspend fun Contact.toContactDocumentOrNull(): ContactDocument? {
       return when (this) {
@@ -261,118 +281,64 @@ internal abstract class AbstractContact(
     return res
   }
 
+  // 富媒体上传的路由: 群/单聊各自的 endpoint 与占位符; 其余 Contact (频道等) 不走该协议.
+  private fun richMediaRouteOrNull(): Pair<TencentEndpoint, Map<String, String>>? = when (this) {
+    is FriendUser -> TencentEndpoint.PostFriendRichMessage to mapOf("openid" to id)
+    is Group -> TencentEndpoint.PostGroupRichMessage to mapOf("group_openid" to id)
+    else -> null
+  }
+
+  private suspend fun postRichMedia(
+    route: Pair<TencentEndpoint, Map<String, String>>,
+    body: TencentRichMessage,
+  ): Result<TencentMessageMediaInfo> = bot.callOpenapi(
+    route.first,
+    TencentMessageMediaInfo.serializer(),
+    route.second,
+  ) {
+    method = HttpMethod.Post
+    setBody(bot.json.encodeToString(body))
+  }
+
   override suspend fun uploadImage(
     url: String,
   ): TencentImage {
-    return when (this) {
-      is FriendUser -> {
-        val cache = bot.callOpenapi(
-          TencentEndpoint.PostFriendRichMessage,
-          TencentMessageMediaInfo.serializer(),
-          mapOf("openid" to this.id)
-        ) {
-          method = HttpMethod.Post
-          setBody(
-            bot.json.encodeToString(
-              TencentRichMessage(
-                url = url,
-                srvSendMsg = false
-              )
-            )
-          )
+    val route = richMediaRouteOrNull() ?: return TencentGuildImage(url)
+    val cache = postRichMedia(route, TencentRichMessage(url = url, srvSendMsg = false))
+    // 图片专属止血: url 上传失败时回落为下载原图再按 bytes 上传.
+    return cache.getOrNull()?.let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) }
+      ?: bot.client.get(url).let {
+        if (it.status == HttpStatusCode.OK) {
+          uploadImage(it.readRawBytes())
+        } else {
+          throw cache.exceptionOrNull()!!
         }
-        cache
-          .getOrNull()?.let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) } ?: bot
-          .client
-          .get(url)
-          .let {
-            if (it.status == HttpStatusCode.OK) {
-              uploadImage(it.readRawBytes())
-            } else {
-              throw cache.exceptionOrNull()!!
-            }
-          }
       }
-
-      is Group -> {
-        val cache = bot.callOpenapi(
-          TencentEndpoint.PostGroupRichMessage,
-          TencentMessageMediaInfo.serializer(),
-          mapOf("group_openid" to this.id)
-        ) {
-          method = HttpMethod.Post
-          setBody(
-            bot.json.encodeToString(
-              TencentRichMessage(
-                url = url,
-                srvSendMsg = false
-              )
-            )
-          )
-        }
-        cache
-          .getOrNull()?.let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) } ?: bot
-          .client
-          .get(url)
-          .let {
-            if (it.status == HttpStatusCode.OK) {
-              uploadImage(it.readRawBytes())
-            } else {
-              throw cache.exceptionOrNull()!!
-            }
-          }
-      }
-
-      else -> TencentGuildImage(url)
-    }
   }
 
   @OptIn(ExperimentalEncodingApi::class)
   override suspend fun uploadImage(
     data: ByteArray,
   ): TencentImage {
-    val base64Encoded = Base64.encode(data)
-    return when (this) {
-      is FriendUser -> {
-        bot.callOpenapi(
-          TencentEndpoint.PostFriendRichMessage,
-          TencentMessageMediaInfo.serializer(),
-          mapOf("openid" to this.id)
-        ) {
-          method = HttpMethod.Post
-          setBody(
-            bot.json.encodeToString(
-              TencentRichMessage(
-                srvSendMsg = false,
-                fileData = base64Encoded
-              )
-            )
-          )
-        }.getOrThrow()
-          .let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }
-      }
+    val route = richMediaRouteOrNull() ?: return TencentGuildLocalImage(raw = data)
+    return postRichMedia(route, TencentRichMessage(srvSendMsg = false, fileData = Base64.encode(data)))
+      .getOrThrow()
+      .let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }
+  }
 
-      is Group -> {
-        bot.callOpenapi(
-          TencentEndpoint.PostGroupRichMessage,
-          TencentMessageMediaInfo.serializer(),
-          mapOf("group_openid" to this.id)
-        ) {
-          method = HttpMethod.Post
-          setBody(
-            bot.json.encodeToString(
-              TencentRichMessage(
-                srvSendMsg = false,
-                fileData = base64Encoded
-              )
-            )
-          )
-        }.getOrThrow()
-          .let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }
-      }
+  override suspend fun uploadMedia(url: String, type: TencentRichMessageType): TencentOfflineMedia {
+    val route = richMediaRouteOrNull() ?: return super.uploadMedia(url, type)
+    return postRichMedia(route, TencentRichMessage(url = url, fileType = type, srvSendMsg = false))
+      .getOrThrow()
+      .let { TencentOfflineMedia(type, it.fileInfo, it.fileUuid, it.ttl, url) }
+  }
 
-      else -> TencentGuildLocalImage(raw = data)
-    }
+  @OptIn(ExperimentalEncodingApi::class)
+  override suspend fun uploadMedia(data: ByteArray, type: TencentRichMessageType): TencentOfflineMedia {
+    val route = richMediaRouteOrNull() ?: return super.uploadMedia(data, type)
+    return postRichMedia(route, TencentRichMessage(fileType = type, srvSendMsg = false, fileData = Base64.encode(data)))
+      .getOrThrow()
+      .let { TencentOfflineMedia(type, it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }
   }
 }
 
@@ -553,6 +519,110 @@ interface Group : Contact {
   val members: ContactList<GroupMember>
 }
 
+/**
+ * 拉取一页群成员. DTO 字段与 query 参数名 (limit/start_index) 未经 sandbox 实测,
+ * 不宜进 public 面, 故 internal; 对外只暴露 [fetchAllMemberOpenIds].
+ */
+internal suspend fun Group.fetchMemberPage(
+  limit: Int = 400,
+  startIndex: Int = 0,
+): Result<TencentGroupMemberListResp> {
+  // 上限刻意不做本地硬校验: 服务端额度未经证实, 本地拦截可能误伤合法值, 交给服务端裁决.
+  require(limit > 0) { "limit must be positive: $limit" }
+  require(startIndex >= 0) { "startIndex must be non-negative: $startIndex" }
+  return bot.callOpenapi(
+    TencentEndpoint.GetGroupMemberList,
+    TencentGroupMemberListResp.serializer(),
+    mapOf("group_openid" to id),
+  ) {
+    method = HttpMethod.Get
+    url {
+      parameters.append("limit", limit.toString())
+      parameters.append("start_index", startIndex.toString())
+    }
+  }
+}
+
+/**
+ * 拉取全部群成员 openid.
+ *
+ * 完整性契约: 只有服务端明确表示"到底了" (空页 / next_index 缺失或 <= 0) 才算成功;
+ * 游标不推进、成员缺 openid (响应 schema 漂移)、翻满 [maxPages] 仍有后续游标, 一律返回
+ * failure —— 函数名承诺"全部", 不把截断结果伪装成完整列表.
+ *
+ * 刻意不回填 [Group.members]: 那是只留近期活跃成员的有界 Caffeine 缓存 (默认上限 3000),
+ * 整群预热会把真正活跃的条目挤掉.
+ */
+suspend fun Group.fetchAllMemberOpenIds(
+  pageLimit: Int = 400,
+  maxPages: Int = 25,
+): Result<List<String>> = aggregateGroupMemberPages(
+  maxPages = maxPages,
+  logger = bot.logger,
+  label = "group $id members",
+) { startIndex -> fetchMemberPage(pageLimit, startIndex) }
+
+/**
+ * 群成员分页聚合器. 独立于网络与 Contact 缓存的纯编排函数, 便于穷举游标边界.
+ * 终止语义见 [fetchAllMemberOpenIds] 的完整性契约.
+ */
+internal suspend fun aggregateGroupMemberPages(
+  maxPages: Int,
+  logger: Logger,
+  label: String,
+  fetchPage: suspend (startIndex: Int) -> Result<TencentGroupMemberListResp>,
+): Result<List<String>> {
+  require(maxPages > 0) { "maxPages must be positive: $maxPages" }
+  // 游标语义未经证实, 用 LinkedHashSet 防跨页重复, 同时保住首现顺序.
+  val memberIds = LinkedHashSet<String>()
+  var startIndex = 0
+  var pageNumber = 0
+  while (true) {
+    pageNumber += 1
+    val page = try {
+      fetchPage(startIndex)
+    } catch (ce: CancellationException) {
+      throw ce
+    } catch (t: Throwable) {
+      Result.failure(t)
+    }.getOrElse {
+      // 生产 callOpenapi 用 runCatching 包 HTTP, 协程取消会以 Result.failure(CE) 形态到达;
+      // 必须还原成抛出, 否则取消被降格为普通业务失败, 破坏协作式取消传播.
+      if (it is CancellationException) throw it
+      return Result.failure(it)
+    }
+
+    if (page.members.isEmpty()) return Result.success(memberIds.toList())
+    val pageIds = page.members.map { it.memberOpenid }
+    if (pageIds.any { it.isBlank() }) {
+      val failure = IllegalStateException(
+        "$label page $pageNumber contains a blank member_openid; response schema may have drifted"
+      )
+      logger.warn(failure.message)
+      return Result.failure(failure)
+    }
+    memberIds.addAll(pageIds)
+
+    val nextIndex = page.nextIndex
+    if (nextIndex == null || nextIndex <= 0) return Result.success(memberIds.toList())
+    if (nextIndex <= startIndex) {
+      val failure = IllegalStateException(
+        "$label pagination cursor did not advance: current=$startIndex, next=$nextIndex"
+      )
+      logger.warn(failure.message)
+      return Result.failure(failure)
+    }
+    if (pageNumber >= maxPages) {
+      val failure = IllegalStateException(
+        "$label pagination exceeded maxPages=$maxPages with pending next_index=$nextIndex"
+      )
+      logger.warn(failure.message)
+      return Result.failure(failure)
+    }
+    startIndex = nextIndex
+  }
+}
+
 internal class GroupImpl(
   bot: TencentBot,
   parentCoroutineContext: CoroutineContext,
@@ -636,6 +706,14 @@ internal class GroupMemberImpl(
   override fun asSingleUser(): FriendUser = bot.friends.getOrCreate(id)
 
   override suspend fun uploadImage(url: String) = asSingleUser().uploadImage(url)
+
+  // 注: uploadImage(ByteArray) 未委托是既有怪癖 (会落到 AbstractContact 的 else 分支返回
+  // TencentGuildLocalImage), 不在本批修; uploadMedia 直接补全委托, 走 C2C 场景上传.
+  override suspend fun uploadMedia(url: String, type: TencentRichMessageType) =
+    asSingleUser().uploadMedia(url, type)
+
+  override suspend fun uploadMedia(data: ByteArray, type: TencentRichMessageType) =
+    asSingleUser().uploadMedia(data, type)
 
   @Suppress("unchecked_cast")
   override suspend fun sendMessage(message: MessageChain, messageSequence: Int): MessageReceipt<FriendUser>? =

@@ -372,6 +372,14 @@ private constructor(private val config: TencentBotConfig) :
     throw UnsupportedOperationException("TencentBot is not a message receiver. Upload image via a concrete Group/Friend contact instead.")
   }
 
+  override suspend fun uploadMedia(url: String, type: TencentRichMessageType): TencentOfflineMedia {
+    throw UnsupportedOperationException("TencentBot is not a message receiver. Upload media via a concrete Group/Friend contact instead.")
+  }
+
+  override suspend fun uploadMedia(data: ByteArray, type: TencentRichMessageType): TencentOfflineMedia {
+    throw UnsupportedOperationException("TencentBot is not a message receiver. Upload media via a concrete Group/Friend contact instead.")
+  }
+
   override fun toString() = "TencentBot($appId)"
 
   override fun close() {

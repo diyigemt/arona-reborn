@@ -255,6 +255,30 @@ internal data class TencentBotFriendEventRaw(
   override val id get() = openid
 }
 
+/**
+ * 群成员列表分页接口的单个成员, 只映射已确认消费的最小字段.
+ *
+ * 官方文档还给出 join_timestamp, 但其 wire 类型 (数字/字符串) 未经 sandbox 实测且当前无人消费;
+ * ignoreUnknownKeys 无法容忍"已知字段类型不匹配", 先固化错误类型会让整页解码失败, 故刻意不映射,
+ * 待实测后再补.
+ */
+@Serializable
+internal data class TencentGroupMemberRaw(
+  @SerialName("member_openid")
+  val memberOpenid: String = "",
+)
+
+/**
+ * 群成员列表分页响应. next_index 的 wire 类型与结束语义 (缺失/0/负数) 待 sandbox 验证,
+ * 全字段带默认值容错.
+ */
+@Serializable
+internal data class TencentGroupMemberListResp(
+  val members: List<TencentGroupMemberRaw> = emptyList(),
+  @SerialName("next_index")
+  val nextIndex: Int? = null,
+)
+
 // Sprint 3.5(b): Java 默认 \s 不覆盖 NBSP (U+00A0) 与全角空格 (U+3000), Kotlin Char.isWhitespace
 // 同样不吞 NBSP. 客户端常见把这两类粘进 @bot 消息, 旧实现 split(" ") 会把整段当 PlainText, at 解析失败.
 // 显式列出字符集, 既不依赖 UNICODE_CHARACTER_CLASS flag, 也不放进所有 unicode 空白避免误伤 ZWSP 之类.
@@ -983,6 +1007,7 @@ class TencentMessageBuilder private constructor(
       .joinToString("\n") { it.toString() }
       .takeIf { it.isNotEmpty() } ?: ""
     val im = container.filterIsInstance<TencentImage>().lastOrNull()
+    val offlineMedia = container.filterIsInstance<TencentOfflineMedia>().lastOrNull()
     val md = container.filterIsInstance<TencentMarkdown>().lastOrNull()?.also {
       if (it is TencentCustomMarkdown) {
         it.content = it.content.replace(lfSimplified, "\n")
@@ -990,6 +1015,7 @@ class TencentMessageBuilder private constructor(
     }
     val kb = container.filterIsInstance<TencentKeyboard>().lastOrNull()?.resolveBotAppIdForSend(botAppId)
     if (isPrivateChannel) {
+      // 频道协议无 media 槽位, TencentOfflineMedia 直接忽略, 不参与下方的冲突检查.
       return TencentGuildMessage(
         content = content,
         image = im?.url?.encodeURLPath(),
@@ -999,6 +1025,11 @@ class TencentMessageBuilder private constructor(
         eventId = eventId,
         messageSequence = messageSequence
       )
+    }
+    // 群/单聊 wire 只有一个富媒体槽位; 图片与非图片富媒体同链是调用方错误, 静默取其一会掩盖它.
+    // (多图/多 media 各自取最后一个的既有语义不变, 只拦跨类型冲突.)
+    require(im == null || offlineMedia == null) {
+      "TencentImage and TencentOfflineMedia cannot share one group/C2C message: wire JSON has only one media slot"
     }
     return TencentGroupMessage(
       content = content,
@@ -1021,6 +1052,12 @@ class TencentMessageBuilder private constructor(
         }
 
         else -> {}
+      }
+      if (offlineMedia != null) {
+        messageType = TencentMessageType.FILE
+        media = TencentMessageMediaInfo(
+          fileInfo = offlineMedia.resourceId
+        )
       }
     }.apply {
       when (md) {

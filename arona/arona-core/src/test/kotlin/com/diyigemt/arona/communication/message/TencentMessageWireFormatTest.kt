@@ -72,6 +72,29 @@ class TencentMessageWireFormatTest {
   }
 
   @Test
+  fun `群语音富媒体消息走 msg_type 7 且携带 media file_info`() {
+    // 非图片富媒体 (TencentOfflineMedia) 与图片共用 FILE(7) + media 槽位的 wire 形态.
+    val wire = wireObjectOf(
+      TencentMessageBuilder("msg-media")
+        .append(
+          TencentOfflineMedia(
+            mediaType = TencentRichMessageType.VOICE,
+            resourceId = "voice-finfo",
+            resourceUuid = "voice-uuid",
+            ttl = 60L,
+          )
+        )
+        .build(isPrivateChannel = false)
+    )
+    assertEquals(
+      setOf("content", "image", "markdown", "keyboard", "ark", "msg_id", "event_id", "msg_seq", "msg_type", "media"),
+      wire.keys,
+    )
+    assertEquals(7, wire["msg_type"]!!.jsonPrimitive.int)
+    assertEquals("voice-finfo", wire["media"]!!.jsonObject["file_info"]!!.jsonPrimitive.content)
+  }
+
+  @Test
   fun `频道私信消息无 msg_type 且无判别字段`() {
     // build(isPrivateChannel=true) 产出的是 GuildMember 私信用的 TencentGuildMessage;
     // 普通子频道消息在生产调用中传 false, 不要把本用例误读成公开频道协议的验证.

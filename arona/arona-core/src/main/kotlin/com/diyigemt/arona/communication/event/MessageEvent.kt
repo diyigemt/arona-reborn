@@ -155,6 +155,74 @@ class TencentGuildDeleteEvent internal constructor(
   override val bot get() = user.bot
 }
 
+/**
+ * 主动消息开关事件的统一标记: 用户在群/单聊侧允许 ([accept]=true) 或拒绝机器人的主动消息推送.
+ *
+ * 刻意不实现 [TencentBotUserChangeEvent] —— 那套接口被 BuiltInCommands 的建档 listener 消费,
+ * 开关事件混进去会被误当作联系人新增建档. [timestamp] 是平台事件时间 (好友侧 wire 是字符串,
+ * 已在 handler 归一化, 解析失败为 0), 持久化侧按它做乱序防回写.
+ */
+interface TencentProactiveMessageSwitchEvent : TencentBotEvent {
+  val subject: Contact
+  val accept: Boolean
+  val timestamp: Long
+  val eventId: String
+}
+
+class TencentGroupMsgRejectEvent internal constructor(
+  val operator: GroupMember,
+  override val timestamp: Long,
+  override val eventId: String,
+) : TencentGroupEvent, TencentProactiveMessageSwitchEvent, TencentEvent() {
+  override val group get() = operator.group
+  override val subject get() = group
+  override val accept get() = false
+  override val bot get() = operator.bot
+  override fun toString(): String {
+    return "TencentGroupMsgRejectEvent(group=${group.id}, operator=${operator.id}, timestamp=$timestamp)"
+  }
+}
+
+class TencentGroupMsgReceiveEvent internal constructor(
+  val operator: GroupMember,
+  override val timestamp: Long,
+  override val eventId: String,
+) : TencentGroupEvent, TencentProactiveMessageSwitchEvent, TencentEvent() {
+  override val group get() = operator.group
+  override val subject get() = group
+  override val accept get() = true
+  override val bot get() = operator.bot
+  override fun toString(): String {
+    return "TencentGroupMsgReceiveEvent(group=${group.id}, operator=${operator.id}, timestamp=$timestamp)"
+  }
+}
+
+class TencentFriendMsgRejectEvent internal constructor(
+  override val friend: FriendUser,
+  override val timestamp: Long,
+  override val eventId: String,
+) : TencentFriendEvent, TencentProactiveMessageSwitchEvent, TencentEvent() {
+  override val subject get() = friend
+  override val accept get() = false
+  override val bot get() = friend.bot
+  override fun toString(): String {
+    return "TencentFriendMsgRejectEvent(friend=${friend.id}, timestamp=$timestamp)"
+  }
+}
+
+class TencentFriendMsgReceiveEvent internal constructor(
+  override val friend: FriendUser,
+  override val timestamp: Long,
+  override val eventId: String,
+) : TencentFriendEvent, TencentProactiveMessageSwitchEvent, TencentEvent() {
+  override val subject get() = friend
+  override val accept get() = true
+  override val bot get() = friend.bot
+  override fun toString(): String {
+    return "TencentFriendMsgReceiveEvent(friend=${friend.id}, timestamp=$timestamp)"
+  }
+}
+
 suspend inline fun <reified P : TencentMessageEvent> P.nextMessage(
   timeoutMillis: Long = -1,
   noinline filter: suspend P.(P) -> Boolean = { true },

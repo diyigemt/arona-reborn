@@ -192,6 +192,61 @@ internal object TencentWebsocketFriendAddBotHandler :
   }
 }
 
+// 主动消息开关 4 事件: 曾"有枚举无 handler"在 dispatch 层静默丢弃. decoder 复用现成的
+// TencentBotGroupEventRaw / TencentBotFriendEventRaw (wire 字段集与增删机器人事件一致).
+// handler 只广播不触 Mongo, 持久化在 BuiltInCommands.registerListeners 的订阅侧完成.
+internal object TencentWebsocketGroupMsgRejectHandler :
+  TencentWebsocketDispatchEventHandler<TencentBotGroupEventRaw>() {
+  override val type = TencentWebsocketEventType.GROUP_MSG_REJECT
+  override val decoder = TencentBotGroupEventRaw.serializer()
+
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotGroupEventRaw, eventId: String) {
+    val operator = ctx.bot.groups.getOrCreate(payload.id).members.getOrCreate(payload.opMemberId)
+    TencentGroupMsgRejectEvent(operator, payload.timestamp, eventId).broadcast()
+  }
+}
+
+internal object TencentWebsocketGroupMsgReceiveHandler :
+  TencentWebsocketDispatchEventHandler<TencentBotGroupEventRaw>() {
+  override val type = TencentWebsocketEventType.GROUP_MSG_RECEIVE
+  override val decoder = TencentBotGroupEventRaw.serializer()
+
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotGroupEventRaw, eventId: String) {
+    val operator = ctx.bot.groups.getOrCreate(payload.id).members.getOrCreate(payload.opMemberId)
+    TencentGroupMsgReceiveEvent(operator, payload.timestamp, eventId).broadcast()
+  }
+}
+
+internal object TencentWebsocketC2CMsgRejectHandler :
+  TencentWebsocketDispatchEventHandler<TencentBotFriendEventRaw>() {
+  override val type = TencentWebsocketEventType.C2C_MSG_REJECT
+  override val decoder = TencentBotFriendEventRaw.serializer()
+
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotFriendEventRaw, eventId: String) {
+    // 好友侧 timestamp 是字符串, 解析失败归一化为 0 —— 0 在持久化的乱序防回写里是"最旧",
+    // 不会覆盖 timestamp > 0 的已有状态; 同为 0 (缺字段或同样归一化过) 时仍按到达顺序覆盖.
+    TencentFriendMsgRejectEvent(
+      ctx.bot.friends.getOrCreate(payload.id),
+      payload.timestamp.toLongOrNull() ?: 0L,
+      eventId,
+    ).broadcast()
+  }
+}
+
+internal object TencentWebsocketC2CMsgReceiveHandler :
+  TencentWebsocketDispatchEventHandler<TencentBotFriendEventRaw>() {
+  override val type = TencentWebsocketEventType.C2C_MSG_RECEIVE
+  override val decoder = TencentBotFriendEventRaw.serializer()
+
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentBotFriendEventRaw, eventId: String) {
+    TencentFriendMsgReceiveEvent(
+      ctx.bot.friends.getOrCreate(payload.id),
+      payload.timestamp.toLongOrNull() ?: 0L,
+      eventId,
+    ).broadcast()
+  }
+}
+
 /**
  * 机器人被踢出群. 广播完再 remove, 取消路径走 finally 兜底, 避免缓存残留.
  */
@@ -419,6 +474,10 @@ internal object TencentWebsocketDispatchEventManager {
     TencentWebsocketFriendAddBotHandler,
     TencentWebsocketGroupDeleteBotHandler,
     TencentWebsocketFriendDeleteBotHandler,
+    TencentWebsocketGroupMsgRejectHandler,
+    TencentWebsocketGroupMsgReceiveHandler,
+    TencentWebsocketC2CMsgRejectHandler,
+    TencentWebsocketC2CMsgReceiveHandler,
     TencentWebsocketCallbackButtonHandler,
   ).associateBy { it.type }
 

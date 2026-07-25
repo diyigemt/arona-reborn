@@ -50,6 +50,9 @@ internal data class MongoContactDocument(
   val roles: List<MongoContactRole> = listOf(),
   val members: List<MongoContactMember> = listOf(),
   val registerTime: String = currentDateTime(),
+  // 解码首先发生在 wrapper 层, 存量文档缺这两个字段时靠此处默认值兜底 (只给 domain 默认值救不了旧 BSON).
+  val proactiveMessageState: ProactiveMessageState = ProactiveMessageState.UNKNOWN,
+  val proactiveMessageStateUpdatedAt: Long = 0L,
   val config: Map<String, Map<String, JsonObject>> = mapOf(),
 )
 
@@ -63,6 +66,8 @@ internal data class MongoUserDocument(
   val uid: List<String> = listOf(),
   val contacts: List<String> = listOf(),
   val policies: List<MongoPolicy> = listOf(),
+  val proactiveMessageState: ProactiveMessageState = ProactiveMessageState.UNKNOWN,
+  val proactiveMessageStateUpdatedAt: Long = 0L,
   val config: Map<String, Map<String, JsonObject>> = mapOf(),
 )
 
@@ -138,6 +143,8 @@ internal fun ContactDocument.toMongo(): MongoContactDocument = MongoContactDocum
   roles = roles.map { it.toMongo() },
   members = members.map { it.toMongo() },
   registerTime = registerTime,
+  proactiveMessageState = proactiveMessageState,
+  proactiveMessageStateUpdatedAt = proactiveMessageStateUpdatedAt,
   config = config,
 )
 
@@ -149,6 +156,8 @@ internal fun MongoContactDocument.toDomain(): ContactDocument = ContactDocument(
   roles = roles.map { it.toDomain() },
   members = members.map { it.toDomain() },
   registerTime = registerTime,
+  proactiveMessageState = proactiveMessageState,
+  proactiveMessageStateUpdatedAt = proactiveMessageStateUpdatedAt,
   config = config,
 )
 
@@ -160,6 +169,8 @@ internal fun UserDocument.toMongo(): MongoUserDocument = MongoUserDocument(
   uid = uid,
   contacts = contacts,
   policies = policies.map { it.toMongo() },
+  proactiveMessageState = proactiveMessageState,
+  proactiveMessageStateUpdatedAt = proactiveMessageStateUpdatedAt,
   config = config,
 )
 
@@ -171,6 +182,8 @@ internal fun MongoUserDocument.toDomain(): UserDocument = UserDocument(
   uid = uid,
   contacts = contacts,
   policies = policies.map { it.toDomain() },
+  proactiveMessageState = proactiveMessageState,
+  proactiveMessageStateUpdatedAt = proactiveMessageStateUpdatedAt,
   config = config,
 )
 

@@ -2,6 +2,8 @@ package com.diyigemt.arona.database.permission
 
 import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.database.DocumentCompanionObject
+import com.diyigemt.arona.database.MongoWriteOutcome
+import com.diyigemt.arona.database.classify
 import com.diyigemt.arona.database.idFilter
 import com.diyigemt.arona.database.dot
 import com.diyigemt.arona.database.matchedOne
@@ -37,6 +39,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import org.bson.Document
+import org.bson.conversions.Bson
 import org.bson.types.ObjectId
 
 @Serializable
@@ -45,6 +48,35 @@ enum class ContactType {
   PrivateGuild,
   Group,
   Guild,
+}
+
+/**
+ * 主动消息开关的持久化三态. [UNKNOWN] 显式表达"从未收到开关事件"的存量态, 不把未知伪装成允许/拒绝.
+ * 枚举名字面值即 Mongo 持久化契约 (经 kotlinx codec 存为字符串), 不可重命名;
+ * 由 ProactiveMessageStateCompatTest 钉住.
+ */
+@Serializable
+enum class ProactiveMessageState {
+  UNKNOWN,
+  ALLOW,
+  REJECT,
+}
+
+/**
+ * 主动消息状态的乱序防回写 filter: 仅当文档"从未更新过 (字段缺失, 即存量文档)"或"已存时间戳
+ * 不晚于本事件"时才允许更新. `$lte` 不匹配缺字段文档, 必须显式 `$exists:false` 兜底, 否则存量
+ * 文档的第一次开关事件会 matched==0 静默丢失. 同时间戳后到覆盖先到 —— 平台事件无序号可依,
+ * 只能 arrival-wins. Contact/User 两集合字段名一致, 共用本 filter.
+ */
+internal fun proactiveMessageFreshnessFilter(id: String, timestamp: Long): Bson {
+  val updatedAt = ContactDocument::proactiveMessageStateUpdatedAt.name
+  return Filters.and(
+    Filters.eq("_id", id),
+    Filters.or(
+      Filters.exists(updatedAt, false),
+      Filters.lte(updatedAt, timestamp),
+    ),
+  )
 }
 
 abstract class PluginContactDocument : PluginVisibleData() {
@@ -201,6 +233,9 @@ internal data class ContactDocument(
   override var roles: List<ContactRole> = listOf(),
   override var members: List<ContactMember> = listOf(),
   val registerTime: String = currentDateTime(),
+  // 主动消息开关状态. 未按 appId 分区 —— 与现有 /webhook 单 bot 路由缺口同级, 多 bot 化时一并演进.
+  val proactiveMessageState: ProactiveMessageState = ProactiveMessageState.UNKNOWN,
+  val proactiveMessageStateUpdatedAt: Long = 0L,
   override val config: Map<String, Map<String, JsonObject>> = mapOf(), // 环境自定义的,插件专有的配置项
 ): PluginContactDocument() {
 
@@ -265,6 +300,27 @@ internal data class ContactDocument(
 
   companion object : DocumentCompanionObject {
     override val documentName = "Contact"
+
+    /**
+     * 按事件时间条件更新主动消息开关状态, filter 语义见 [proactiveMessageFreshnessFilter].
+     * [MongoWriteOutcome.NotMatched] 无法区分"文档不存在"与"已存状态更新", 调用方日志需两说,
+     * 且不得 upsert —— 裸 upsert 会造出缺 roles/policies 的半残文档破坏权限体系.
+     * webhook 是先应答后异步落库, 写失败拿不到腾讯重投, 靠下一次开关事件自愈.
+     */
+    suspend fun updateProactiveMessageState(
+      id: String,
+      state: ProactiveMessageState,
+      timestamp: Long,
+    ): MongoWriteOutcome = withCollection<MongoContactDocument, UpdateResult> {
+      updateOne(
+        filter = proactiveMessageFreshnessFilter(id, timestamp),
+        update = Updates.combine(
+          // 写枚举 name 字符串, 与 kotlinx codec 的 enum wire 形态一致 (CompatTest 有编码侧钉子).
+          Updates.set(ContactDocument::proactiveMessageState.name, state.name),
+          Updates.set(ContactDocument::proactiveMessageStateUpdatedAt.name, timestamp),
+        ),
+      )
+    }.classify()
 
     suspend fun findContactDocumentByIdOrNull(id: String): ContactDocument? =
       withCollection<MongoContactDocument, MongoContactDocument?> {

@@ -9,15 +9,20 @@ import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.config.AutoSavePluginDataHolder
 import com.diyigemt.arona.database.DatabaseProvider.redisDbQuery
+import com.diyigemt.arona.database.MongoWriteOutcome
 import com.diyigemt.arona.database.RedisPrefixKey
+import com.diyigemt.arona.database.permission.ContactDocument
 import com.diyigemt.arona.database.permission.ContactDocument.Companion.findContactDocumentByIdOrNull
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_ADMIN_CONTACT_ROLE_ID
 import com.diyigemt.arona.database.permission.ContactRole.Companion.DEFAULT_MEMBER_CONTACT_ROLE_ID
+import com.diyigemt.arona.database.permission.ProactiveMessageState
+import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.service.ContactService
 import com.diyigemt.arona.permission.PermissionService
 import com.diyigemt.arona.utils.aronaConfig
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfigRecorder
 import com.github.ajalt.clikt.parameters.arguments.argument
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -316,6 +321,44 @@ object BuiltInCommands : AutoSavePluginDataHolder {
         else -> {
           //TODO 删除聊天事件
         }
+      }
+    }
+
+    // 主动消息开关状态持久化. handler 层只广播不触 Mongo; webhook 先应答后异步分发, 这里写失败
+    // 拿不到腾讯重投, 只 warn 等下一次开关事件自愈. 不 upsert: 裸 upsert 会造出缺 roles/policies
+    // 的半残文档破坏权限体系, 未建档的联系人待建档后由后续开关事件补上.
+    GlobalEventChannel.subscribeAlways<TencentProactiveMessageSwitchEvent> { event ->
+      try {
+        val state = if (event.accept) ProactiveMessageState.ALLOW else ProactiveMessageState.REJECT
+        val outcome = when (event) {
+          is TencentGroupEvent ->
+            ContactDocument.updateProactiveMessageState(event.subject.id, state, event.timestamp)
+
+          is TencentFriendEvent ->
+            // 单聊侧 subject.id 是平台 openid, 先经 SQL 映射拿 UserDocument 再按主键更新;
+            // 映射缺失 (用户从未建档) 归一为 null, 与 NotMatched 分开告警.
+            UserDocument.findUserDocumentByUidOrNull(event.subject.id)
+              ?.let { UserDocument.updateProactiveMessageState(it.id, state, event.timestamp) }
+
+          else -> error("unexpected TencentProactiveMessageSwitchEvent impl: ${event::class.qualifiedName}")
+        }
+        when (outcome) {
+          null -> event.bot.logger.warn(
+            "proactive message state not persisted: no user mapping for openid=${event.subject.id}"
+          )
+          // 条件 filter 无法区分"文档不存在"与"已存状态更新", 日志保留两种可能.
+          MongoWriteOutcome.NotMatched -> event.bot.logger.warn(
+            "proactive message state not applied: subject=${event.subject.id}, ts=${event.timestamp} " +
+                "(document missing or holds a newer state)"
+          )
+          else -> Unit
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Throwable) {
+        event.bot.logger.warn(
+          "failed to persist proactive message state: subject=${event.subject.id}, ts=${event.timestamp}", e
+        )
       }
     }
 

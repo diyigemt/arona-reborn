@@ -139,6 +139,10 @@ class DispatchEventPolymorphismTest {
       TencentWebsocketEventType.FRIEND_ADD,
       TencentWebsocketEventType.GROUP_DEL_ROBOT,
       TencentWebsocketEventType.FRIEND_DEL,
+      TencentWebsocketEventType.GROUP_MSG_REJECT,
+      TencentWebsocketEventType.GROUP_MSG_RECEIVE,
+      TencentWebsocketEventType.C2C_MSG_REJECT,
+      TencentWebsocketEventType.C2C_MSG_RECEIVE,
       TencentWebsocketEventType.INTERACTION_CREATE,
     )
     assertEquals(expected, TencentWebsocketDispatchEventManager.registeredEventTypes())

@@ -248,6 +248,9 @@ internal data class UserDocument(
   val uid: List<String> = listOf(), // 藤子给定的不同聊天环境下的id
   val contacts: List<String> = listOf(), // 存在的不同的群/频道的id
   val policies: List<Policy> = listOf(), // 用户自定义的规则
+  // 主动消息开关状态 (单聊侧). 未按 appId 分区, 边界同 ContactDocument 对应字段.
+  val proactiveMessageState: ProactiveMessageState = ProactiveMessageState.UNKNOWN,
+  val proactiveMessageStateUpdatedAt: Long = 0L,
   override val config: Map<String, Map<String, JsonObject>> = mapOf(), // 用户自定义的,插件专有的配置项
 ) : PluginUserDocument() {
   suspend fun updateUserContact(contactId: String) = withCollection<MongoUserDocument, UpdateResult> {
@@ -280,6 +283,25 @@ internal data class UserDocument(
 
   companion object : DocumentCompanionObject, ExposedUserDocument {
     override val documentName = "User"
+
+    /**
+     * 按事件时间条件更新主动消息开关状态; [id] 是 UserDocument 主键 (非平台 openid, 调用方需先经
+     * [findUserDocumentByUidOrNull] 映射). filter 语义与 NotMatched/不 upsert/写失败自愈的边界
+     * 同 [ContactDocument.Companion.updateProactiveMessageState].
+     */
+    suspend fun updateProactiveMessageState(
+      id: String,
+      state: ProactiveMessageState,
+      timestamp: Long,
+    ): MongoWriteOutcome = withCollection<MongoUserDocument, UpdateResult> {
+      updateOne(
+        filter = proactiveMessageFreshnessFilter(id, timestamp),
+        update = Updates.combine(
+          Updates.set(UserDocument::proactiveMessageState.name, state.name),
+          Updates.set(UserDocument::proactiveMessageStateUpdatedAt.name, timestamp),
+        ),
+      )
+    }.classify()
 
     suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? {
       val u = sqlDbQueryReadUncommited {

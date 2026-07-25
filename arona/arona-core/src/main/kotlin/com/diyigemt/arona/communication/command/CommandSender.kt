@@ -235,6 +235,26 @@ class FriendUserCommandSender internal constructor(
 }
 
 /**
+ * 用当前单聊命令上下文发送流式消息: sourceId/eventId 沿用触发本 sender 的入站语境,
+ * msg_seq 与普通发送共享同一原子序列发生器. 语义细节见 [TencentFriendStreamSession].
+ *
+ * 已知边界: TencentFriendMessageEvent.toCommandSender() 目前不接线信封 eventId (本 sender 的
+ * eventId 在真实事件路径恒为 null), 被动流式靠 msg_id 已足够. 接线该字段会让所有单聊普通回复的
+ * wire event_id 从 null 变为实值, msg_id/event_id 并存的服务端语义未经 sandbox 验证, 刻意不在
+ * 本批一并修改 (已记入 sandbox 实测清单).
+ */
+suspend fun FriendUserCommandSender.sendStreamMessage(
+  contentType: TencentStreamContentType = TencentStreamContentType.TEXT,
+  block: suspend TencentFriendStreamSession.() -> Unit,
+): Result<Unit> = user.streamMessage(
+  sourceMessageId = sourceId.takeIf { it.isNotEmpty() },
+  eventId = eventId,
+  messageSequence = nextSequence(),
+  contentType = contentType,
+  block = block,
+)
+
+/**
  * 群聊
  */
 class GroupCommandSender internal constructor(

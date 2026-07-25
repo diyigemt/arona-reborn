@@ -1,9 +1,12 @@
 package com.diyigemt.arona.communication
 
+import com.diyigemt.arona.communication.contact.FriendUserImpl
 import com.diyigemt.arona.communication.message.MessageReceiptImpl
 import com.diyigemt.arona.communication.message.TencentGuildRaw
 import com.diyigemt.arona.communication.message.TencentMessageMediaInfo
+import com.diyigemt.arona.communication.message.TencentStreamMessageResp
 import com.diyigemt.arona.communication.message.getMediaUrlFromMediaInfo
+import com.diyigemt.arona.communication.message.streamMessage
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
@@ -82,6 +85,18 @@ class TencentBotShadowModeTest {
       TencentMessageMediaInfo.serializer(),
     )
     assertEquals(ShadowOpenApiStubKind.MEDIA, stub.kind)
+  }
+
+  @Test
+  fun `PostFriendStreamMessage 必须显式 STREAM stub 返回非空 id`() {
+    // 通用 "{}" 能 decode 但 id="", 会话会按"首片空 id"契约闩锁失败, shadow 演练不了多片状态机.
+    val stub = buildShadowOpenapiStub(
+      json,
+      TencentEndpoint.PostFriendStreamMessage,
+      TencentStreamMessageResp.serializer(),
+    )
+    assertEquals(ShadowOpenApiStubKind.STREAM, stub.kind)
+    assertEquals("shadow-stream-message", stub.result.getOrThrow().id)
   }
 
   @Test
@@ -261,6 +276,19 @@ class TencentBotShadowModeTest {
     // 来包装 TencentOfflineImage; 若此处仍走 protobuf decode 会抛, 整条上传链路在 shadow 下崩溃.
     val url = getMediaUrlFromMediaInfo("")
     assertEquals("shadow://media", url)
+  }
+
+  @Test
+  fun `STREAM stub 让流式会话在 shadow 下跑通多片状态机 (不出网)`() = runBlocking {
+    // 集成边界: 若 stub 返回空 id, 会话会按"首片空 id"契约闩锁失败, 这条链路必须整体成功.
+    val client = newBot()
+    val result = FriendUserImpl(client, client.coroutineContext, "friend-shadow", null)
+      .streamMessage(sourceMessageId = "source-shadow") {
+        emit("第一片").getOrThrow()
+        emit("第二片").getOrThrow()
+        assertEquals("shadow-stream-message", streamMessageId)
+      }
+    assertTrue(result.isSuccess, "shadow 下两片 + 自动终止片应整体成功")
   }
 
   @Test

@@ -144,6 +144,7 @@ enum class TencentEndpoint(val path: String) {
   Interactions("/interactions/{interaction_id}"), // 通知后台接收到推送消息
   PostFriendMessage("/v2/users/{openid}/messages"), // 向用户发送私信消息
   PostFriendRichMessage("/v2/users/{openid}/files"), // 向用户发送私信消息
+  PostFriendStreamMessage("/v2/users/{openid}/stream_messages"), // 向用户发送流式(分片)私信消息
   PostGroupMessage("/v2/groups/{group_openid}/messages"), // 向群聊发送消息
   PostGroupRichMessage("/v2/groups/{group_openid}/files"), // 向群聊发送消息
   PostGuildMessage("/channels/{channel_id}/messages"), // 向子频道发送消息

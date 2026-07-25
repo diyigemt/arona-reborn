@@ -394,7 +394,7 @@ private constructor(private val config: TencentBotConfig) :
 // Shadow 模式 stub 工厂: 灰度演练下让 callOpenapi 看起来"成功"地完成下行调用, 让 send/recall/uploadImage
 // 等链路的后置逻辑 (post-send 事件、TencentOfflineImage 包装、撤回回执) 仍能跑完, 而不是被误当成失败.
 // kind 仅用于诊断日志, 不参与真值判定.
-internal enum class ShadowOpenApiStubKind { UNIT, MEDIA, EMPTY_OBJECT, EMPTY_LIST, UNSUPPORTED }
+internal enum class ShadowOpenApiStubKind { UNIT, MEDIA, STREAM, EMPTY_OBJECT, EMPTY_LIST, UNSUPPORTED }
 
 internal data class ShadowOpenApiStubResult<T>(
   val kind: ShadowOpenApiStubKind,
@@ -431,6 +431,15 @@ internal fun <T> buildShadowOpenapiStub(
         Result.success(TencentMessageMediaInfo(fileInfo = "", fileUuid = "shadow", ttl = 0L) as T),
       )
     }
+  }
+  // 流式会话的首个非终止片必须取得非空响应 id 才能给后续片当 stream_msg_id;
+  // 通用 "{}" 虽能 decode 出 TencentStreamMessageResp, 但 id="" 会让会话按空 id 契约闩锁失败,
+  // shadow 下将永远演练不了多片状态机, 因此显式给一个非空 id 的 stub.
+  if (endpoint == TencentEndpoint.PostFriendStreamMessage && decoder == TencentStreamMessageResp.serializer()) {
+    return ShadowOpenApiStubResult(
+      ShadowOpenApiStubKind.STREAM,
+      Result.success(TencentStreamMessageResp(id = "shadow-stream-message") as T),
+    )
   }
   // 其余 DTO (MessageReceiptImpl 等) 字段都有默认值, "{}" 能 decode; ListSerializer 走 "[]".
   // 顺序: 先尝试空对象, 再尝试空数组, 都不行才认输.

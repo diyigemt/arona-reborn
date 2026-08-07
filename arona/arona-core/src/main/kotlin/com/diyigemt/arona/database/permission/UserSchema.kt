@@ -3,7 +3,7 @@ package com.diyigemt.arona.database.permission
 import com.diyigemt.arona.command.CommandOwner
 import com.diyigemt.arona.database.*
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
-import com.diyigemt.arona.database.DatabaseProvider.sqlDbQueryReadUncommited
+import com.diyigemt.arona.database.DatabaseProvider.sqlDbQueryWithIsolation
 import com.diyigemt.arona.database.pluginConfigPath
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
 import com.diyigemt.arona.utils.currentDateTime
@@ -19,12 +19,17 @@ import com.mongodb.client.model.Projections
 import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
+import io.ktor.util.logging.KtorSimpleLogger
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.bson.Document
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.insertIgnore
+import org.jetbrains.exposed.v1.jdbc.update
 import org.jetbrains.exposed.v1.dao.Entity
 import org.jetbrains.exposed.v1.dao.EntityClass
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
@@ -32,6 +37,7 @@ import org.jetbrains.exposed.v1.core.dao.id.IdTable
 import org.jetbrains.exposed.v1.core.Column
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.sql.Connection
 
 private const val BASE_ID_KEY = "BASE_ID"
 // 旧逻辑首发号是 1_000_001 ((1_000_000L + 1).toString()); 新实现 inc 后输出, 因此 seed=1_000_000.
@@ -48,6 +54,8 @@ private object BaseIdSequenceCompanion : DocumentCompanionObject {
   override val documentName = "SystemSequence"
 }
 
+private val baseIdLogger = KtorSimpleLogger("BaseIdSequence")
+
 // 仅首个并发请求执行 setOnInsert 播种; 其他请求阻塞在 mutex 直到播种完成, 避免 $inc 抢先创建出 seq=1 的文档.
 private val seedMutex = Mutex()
 @Volatile
@@ -57,24 +65,77 @@ private suspend fun ensureBaseIdSeeded() {
   if (baseIdSeeded) return
   seedMutex.withLock {
     if (baseIdSeeded) return
+    // SQL 高水位由 mirrorBaseIdHighWaterMark 持续镜像; 无法解析或低于底线都视为损坏, 熔断而不是照单播种.
     val legacySeed = sqlDbQuery {
-      SystemPropertiesSchema.findById(BASE_ID_KEY)?.value?.toLongOrNull() ?: BASE_ID_DEFAULT_SEED
+      val raw = SystemPropertiesSchema.findById(BASE_ID_KEY)?.value ?: return@sqlDbQuery BASE_ID_DEFAULT_SEED
+      val parsed = raw.toLongOrNull() ?: error("SQL BASE_ID 高水位无法解析: $raw")
+      check(parsed >= BASE_ID_DEFAULT_SEED) { "SQL BASE_ID 高水位 $parsed 低于安全底线 $BASE_ID_DEFAULT_SEED" }
+      parsed
     }
     // setOnInsert 仅在文档不存在时生效, 已迁移过的实例不会被覆盖回旧值.
-    BaseIdSequenceCompanion.withCollection<BaseIdSequence, BaseIdSequence?> {
+    val seeded = BaseIdSequenceCompanion.withCollection<BaseIdSequence, BaseIdSequence?> {
       findOneAndUpdate(
         Filters.eq("_id", BASE_ID_KEY),
         Updates.setOnInsert(BaseIdSequence::seq.name, legacySeed),
         FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER),
       )
+    } ?: error("BASE_ID 序列播种返回 null")
+    // 对比 SQL 高水位而非默认底线: 计数器文档仍存在但数值回退 (被旧备份覆盖/篡改) 时也要熔断.
+    check(seeded.seq >= legacySeed) {
+      "播种后的 BASE_ID 序列 ${seeded.seq} 低于 SQL 高水位 $legacySeed, 计数器疑似回退, 拒绝启用"
     }
     baseIdSeeded = true
+  }
+}
+
+// 高水位 CAS 的跨事务重试轮数; 竞争者只会把值推得更高, 输一轮通常意味着已被更高值覆盖.
+private const val MIRROR_CAS_ATTEMPTS = 3
+
+/**
+ * best-effort 把已发出的最大号镜像回 SQL SystemProperties: 计数器与用户档同库, 一起被清掉时
+ * (清库事故) 重启后 [ensureBaseIdSeeded] 能从 SQL 播种出真实高水位, 而不是陈旧的初始 seed,
+ * 新号才不会与恢复回来的既有档撞 _id.
+ *
+ * 单调性由"按旧字符串值 CAS"保证: 条件更新只在现值未被并发改动时生效, 落败即重读重试,
+ * 因此并发乱序提交不会让高水位倒退. 每轮 CAS 必须是独立事务 —— 同一事务内重读
+ * 受快照隔离与 DAO 缓存影响, 只会看到陈值.
+ *
+ * 镜像失败只告警不阻断发号; 若镜像持续失败后恰好又发生清库, SQL 值仍可能落后, 属已知边界.
+ */
+private suspend fun mirrorBaseIdHighWaterMark(seq: Long) {
+  try {
+    repeat(MIRROR_CAS_ATTEMPTS) {
+      val done = sqlDbQuery {
+        val current = SystemPropertiesSchema.findById(BASE_ID_KEY)?.value
+        when {
+          // insertIgnore 而非 DAO new: DAO 的 INSERT 迟至事务提交才 flush, 并发撞主键会抛出而终止
+          // 整个重试循环; insertIgnore 立即执行, 输给并发创建者时 insertedCount=0, 走下一轮 CAS.
+          current == null -> SystemPropertiesTable.insertIgnore {
+            it[SystemPropertiesTable.id] = BASE_ID_KEY
+            it[SystemPropertiesTable.value] = seq.toString()
+          }.insertedCount == 1
+          (current.toLongOrNull() ?: Long.MIN_VALUE) >= seq -> true
+          else -> SystemPropertiesTable.update({
+            (SystemPropertiesTable.id eq BASE_ID_KEY) and (SystemPropertiesTable.value eq current)
+          }) { it[value] = seq.toString() } == 1
+        }
+      }
+      if (done) return
+    }
+    baseIdLogger.warn("BASE_ID 高水位镜像 CAS 连败 $MIRROR_CAS_ATTEMPTS 轮, 放弃本次镜像: seq=$seq")
+  } catch (e: kotlinx.coroutines.CancellationException) {
+    throw e
+  } catch (t: Throwable) {
+    baseIdLogger.warn("BASE_ID 高水位镜像写入失败: seq=$seq", t)
   }
 }
 
 /**
  * Mongo 单文档原子序列, 替代原 SQL `@Synchronized` JVM 锁; 多实例并发下也能正确发号.
  * 已部署实例首次调用时会读 SQL 旧值播种, 避免 ID 回退.
+ *
+ * 熔断优先于可用性: 计数器文档只允许播种路径创建, 运行中丢失或数值异常时拒绝发号 —
+ * 发出低位垃圾号会覆盖/污染 SQL 指针, 把一次数据事故放大成全量指针损坏, 比注册报错严重得多.
  */
 internal suspend fun nextBaseId(): String {
   ensureBaseIdSeeded()
@@ -82,9 +143,13 @@ internal suspend fun nextBaseId(): String {
     findOneAndUpdate(
       Filters.eq("_id", BASE_ID_KEY),
       Updates.inc(BaseIdSequence::seq.name, 1L),
-      FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER),
+      FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
     )
-  } ?: error("BASE_ID sequence allocation returned null")
+  } ?: error("BASE_ID 序列文档缺失, 疑似数据库被清空, 熔断发号")
+  check(updated.seq > BASE_ID_DEFAULT_SEED) {
+    "发出的 BASE_ID ${updated.seq} 低于安全底线, 计数器疑似被重建/篡改, 熔断发号"
+  }
+  mirrorBaseIdHighWaterMark(updated.seq)
   return updated.seq.toString()
 }
 
@@ -304,16 +369,17 @@ internal data class UserDocument(
     }.classify()
 
     suspend fun findUserDocumentByUidOrNull(uid: String): UserDocument? {
-      val u = sqlDbQueryReadUncommited {
-        UserSchema.findById(uid)
-      }
-      return if (u == null) {
-        null
-      } else {
-        withCollection<MongoUserDocument, MongoUserDocument?> {
-          find(idFilter(u.uid)).limit(1).firstOrNull()
-        }?.toDomain()
-      }
+      // 事务内取出指针字符串, 不把 DAO entity 带出事务. READ_COMMITTED 而非脏读:
+      // 读到未提交且随后回滚的注册指针, 会被上层当成悬空指针触发错误的重建.
+      val pointer = sqlDbQueryWithIsolation(Connection.TRANSACTION_READ_COMMITTED) {
+        UserSchema.findById(uid)?.uid
+      } ?: return null
+      // 空白指针按缺档处理而不是拿去查询: 万一库里存在 _id 为空串的损坏档, 这里会把它当成
+      // 正常身份返回; 映射为 null 后统一流向 UserService 的指针校验熔断点.
+      if (pointer.isBlank()) return null
+      return withCollection<MongoUserDocument, MongoUserDocument?> {
+        find(idFilter(pointer)).limit(1).firstOrNull()
+      }?.toDomain()
     }
 
     suspend fun findUserDocumentByIdOrNull(id: String): UserDocument? =

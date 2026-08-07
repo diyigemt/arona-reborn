@@ -41,16 +41,16 @@ internal object ContactService {
    * 创建/合并群与用户的初始关系.
    * 顺序:
    *  1. 若 contact 不存在 → [ContactDocument.createContactDocument]
-   *  2. 若 user 不存在 → [UserService.createUserTracking]
+   *  2. 若 user 不存在 → [UserService.createUser]
    *  3. [addMember] 双写 Contact.members + User.contacts
    *  4. 角色分配 (如需)
-   * 任意失败按 4 → 3 → 2 → 1 顺序补偿已生效的步骤.
+   * 任意失败按 4 → 3 → 1 顺序补偿已生效的步骤. 第 2 步不补偿: 用户身份一旦发布即视为
+   * 共享且不可回收 (并发请求可能已在复用), 留下的"已注册但未入群"状态幂等, 下次交互自然复用.
    */
   suspend fun createContactAndUser(contact: Contact, user: User, role: String): UserDocument {
     val id = contact.fatherSubjectIdOrSelf
     var createdContact = false
     var createdMember = false
-    var userUndo: (suspend () -> Unit)? = null
 
     val contactDocument = ContactDocument.findContactDocumentByIdOrNull(id)
       ?: ContactDocument.createContactDocument(id, resolveContactType(contact)).also { createdContact = true }
@@ -58,10 +58,7 @@ internal object ContactService {
     var userDocument: UserDocument? = null
     try {
       userDocument = UserDocument.findUserDocumentByUidOrNull(user.id)
-        ?: UserService.createUserTracking(user.id, id).let {
-          userUndo = it.undo
-          it.document
-        }
+        ?: UserService.createUser(user.id, id)
 
       val outcome = addMember(contactDocument, userDocument.id)
       val member = outcome.member
@@ -80,10 +77,6 @@ internal object ContactService {
       if (createdMember && userDocument != null) {
         runCatching { rollbackAddedMember(contactDocument, userDocument.id) }
           .onFailure { t.addSuppressed(it) }
-      }
-      // userUndo 仅在本次真正创建用户时被赋值, 复用既有 user 不触发, 避免误删 SQL 行.
-      userUndo?.let { undo ->
-        runCatching { undo() }.onFailure { t.addSuppressed(it) }
       }
       if (createdContact) {
         runCatching { deleteContactDocument(contactDocument.id) }

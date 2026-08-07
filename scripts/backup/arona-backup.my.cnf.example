@@ -1,0 +1,6 @@
+# mariadb-dump 凭据样例 — 复制到服务器 /etc/arona-backup.my.cnf 后填入真实值, 并:
+#   chown root:root /etc/arona-backup.my.cnf && chmod 600 /etc/arona-backup.my.cnf
+[client]
+host=127.0.0.1
+user=改成备份用账号
+password=改成你的密码

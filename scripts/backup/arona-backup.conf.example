@@ -1,0 +1,23 @@
+# arona 备份配置样例 — 复制到服务器 /etc/arona-backup.conf 后填入真实值, 并:
+#   chown root:root /etc/arona-backup.conf && chmod 600 /etc/arona-backup.conf
+# 此文件含明文密码, 严禁提交真实值到 git.
+
+# 备份落盘目录 (脚本会自动创建 mongodb/ 与 mariadb/ 子目录并 chmod 700)
+BACKUP_DIR=/srv/backups/arona
+
+# 每库各保留最近几份
+KEEP=3
+
+# ---- MongoDB (docker 部署) ----
+MONGO_CONTAINER=mongodb
+# 与恢复流程同款 URI, authSource=admin; mongodump 在容器内执行, 127.0.0.1 指容器自身.
+# 必须用单引号 (密码含 $ 或反引号时双引号会在 source 时展开);
+# 密码含 @ : / ? # % 等 URI 保留字符时需先百分号编码.
+MONGO_URI='mongodb://root:改成你的密码@127.0.0.1:27017/?authSource=admin'
+
+# ---- MariaDB ----
+# 要备份的库名 (arona 主库)
+MARIADB_DB=改成主库名
+# mariadb 凭据单独放 my.cnf 风格文件 (见 arona-backup.my.cnf.example),
+# 通过 --defaults-extra-file 传入, 密码不会出现在进程参数里
+MARIADB_DEFAULTS_FILE=/etc/arona-backup.my.cnf

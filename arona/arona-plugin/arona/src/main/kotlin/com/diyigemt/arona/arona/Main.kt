@@ -76,7 +76,7 @@ object Arona : AronaPlugin(
             }
           }
           delay(2000L)
-          it.subject.sendMessage(kb + md)
+          it.subject.sendMessage(MessageChainBuilder(eventId = eventId).append(kb).append(md).build())
         }
 
         else -> {

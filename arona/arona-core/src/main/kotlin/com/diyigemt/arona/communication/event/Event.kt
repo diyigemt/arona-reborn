@@ -101,6 +101,7 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
       member,
       isAtBot = payload.mentions?.any { it.isYou } == true,
       platformUsername = payload.author.username,
+      timestamp = payload.timestamp,
     ).broadcast()
   }
 }
@@ -119,6 +120,7 @@ internal object TencentWebsocketGroupMessageCreateHandler :
       member,
       isAtBot = payload.mentions?.any { it.isYou } == true,
       platformUsername = payload.author.username,
+      timestamp = payload.timestamp,
     ).broadcast()
   }
 }

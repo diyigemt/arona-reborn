@@ -62,6 +62,8 @@ object PluginMain : AronaPlugin(
             it.message = resp.label
           }
         }
+        // 走到这里说明审核请求已成功返回; 超时/异常会从 withTimeout 抛出, 不会置位 (fail-closed 调用方据此拒绝).
+        it.audited = true
       }
     }
   }

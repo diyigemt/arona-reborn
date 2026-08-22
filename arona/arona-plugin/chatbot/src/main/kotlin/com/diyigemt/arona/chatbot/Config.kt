@@ -1,0 +1,130 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
+package com.diyigemt.arona.chatbot
+
+import com.diyigemt.arona.config.AutoSavePluginData
+import com.diyigemt.arona.config.value
+import com.diyigemt.arona.webui.pluginconfig.ConfigEnumEntry
+import com.diyigemt.arona.webui.pluginconfig.ConfigItem
+import com.diyigemt.arona.webui.pluginconfig.FieldError
+import com.diyigemt.arona.webui.pluginconfig.PluginConfigCheckResult
+import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+
+/**
+ * 进程级配置, 落在 `config/com.diyigemt.arona.chatbot/config.yml`. 不分群: 密钥、模型、时间预算、全局限流.
+ * [apiKey] 为空时整个插件按未启用处理 (观察仍落库, 但不会调模型).
+ */
+object ChatbotSecrets : AutoSavePluginData("config") {
+  /** 总开关. 关闭后两个 listener 直接返回, 不读群配置. */
+  val enabled by value(false)
+  val apiKey by value("")
+  val baseUrl by value("https://api.deepseek.com")
+  val chatModel by value("deepseek-v4-flash-vision-exp")
+
+  /** 单次模型调用超时; 空 content 重试一次时用 [llmRetryTimeoutMillis]. */
+  val llmTimeoutMillis by value(8_000L)
+  val llmRetryTimeoutMillis by value(5_000L)
+  /** 内容审核超时, 超时即判拒 (fail-closed), 不重试. */
+  val auditTimeoutMillis by value(3_000L)
+  /** 发送超时, 不重试 (重试 = 抢同 msg_id 的 5 次被动回复配额). */
+  val sendTimeoutMillis by value(3_000L)
+  /** 整条流水线 (gate → 模型 → 审核 → 发送) 的硬顶. 30s 是体验上限, 不是平台 5 分钟窗口. */
+  val totalBudgetMillis by value(30_000L)
+
+  /** 消息创建时间距今超过此秒数视为陈旧 (重启 / webhook 重投), 直接不回. 同时覆盖 5 分钟被动回复窗口. */
+  val staleSec by value(60L)
+  /** 观察库 `chatContext` 的 TTL (Mongo 过期索引, 改动需手动重建索引). */
+  val contextTtlHours by value(24L)
+  /** 装配 prompt 时取最近多少条群消息. */
+  val historyLimit by value(20)
+
+  /** 全局按群限流: 每群每分钟最多回复条数 (每秒固定 1 条). 按群的节奏控制请用群配置里的 cooldownSec. */
+  val rateLimitPerMinute by value(10L)
+}
+
+enum class ProbabilityMode {
+  /** 抽卡累加: 初始 [ChatbotConfig.pityBase], 每条未中 +[ChatbotConfig.pityStep], 发出后重置. 源项目实际行为. */
+  @ConfigEnumEntry("抽卡累加")
+  PITY,
+
+  /** 每条独立掷骰 [ChatbotConfig.fixedProbability]. 源项目文档描述的行为. */
+  @ConfigEnumEntry("固定概率")
+  FIXED,
+}
+
+/**
+ * 按群配置 (contact 层), webui 表单自动生成. 每个群自己开关、自己的人设.
+ */
+@Serializable
+data class ChatbotConfig(
+  @EncodeDefault
+  @ConfigItem(label = "启用闲聊", group = "基础")
+  val enabled: Boolean = false,
+
+  @EncodeDefault
+  @ConfigItem(label = "人设提示词", group = "基础", widget = "textarea", placeholder = "你是一只猫娘群友……")
+  val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
+
+  @EncodeDefault
+  @ConfigItem(label = "唤起先导词", group = "基础", description = "消息以「先导词+空格」开头必答; @机器人 亦必答")
+  val mustPrefixes: List<String> = listOf("阿罗娜"),
+
+  @EncodeDefault
+  @ConfigItem(label = "概率模式", group = "概率")
+  val probabilityMode: ProbabilityMode = ProbabilityMode.PITY,
+
+  @EncodeDefault
+  @ConfigItem(label = "固定概率", group = "概率", description = "FIXED 模式下每条消息的回复概率 (0~1)")
+  val fixedProbability: Double = 0.1,
+
+  @EncodeDefault
+  @ConfigItem(label = "累加初始概率", group = "概率", description = "PITY 模式初始值 (0~1)")
+  val pityBase: Double = 0.0005,
+
+  @EncodeDefault
+  @ConfigItem(label = "累加步长", group = "概率", description = "PITY 模式每条未中累加 (0~1)")
+  val pityStep: Double = 0.0001,
+
+  @EncodeDefault
+  @ConfigItem(label = "回复冷却(秒)", group = "节奏", description = "两次回复的最小间隔; 必答不受限")
+  val cooldownSec: Int = 10,
+
+  @EncodeDefault
+  @ConfigItem(label = "闭嘴关键词", group = "节奏", description = "消息等于关键词时本群静默一段时间")
+  val muteKeywords: List<String> = listOf("闭嘴"),
+
+  @EncodeDefault
+  @ConfigItem(label = "闭嘴时长(秒)", group = "节奏")
+  val muteDurationSec: Int = 600,
+
+  @EncodeDefault
+  @ConfigItem(label = "单条消息最大字数", group = "节奏", description = "超过不回 (也不计入概率)")
+  val maxUserChars: Int = 500,
+) : PluginWebuiConfig() {
+  override fun check(): PluginConfigCheckResult {
+    val errors = buildList {
+      fun unit(name: String, v: Double) { if (v !in 0.0..1.0) add(FieldError(name, "必须在 0~1 之间")) }
+      fun nonNegative(name: String, v: Int) { if (v < 0) add(FieldError(name, "不能为负")) }
+      unit("fixedProbability", fixedProbability)
+      unit("pityBase", pityBase)
+      unit("pityStep", pityStep)
+      nonNegative("cooldownSec", cooldownSec)
+      nonNegative("muteDurationSec", muteDurationSec)
+      if (maxUserChars !in 1..MAX_USER_CHARS_CEILING) add(FieldError("maxUserChars", "必须在 1~$MAX_USER_CHARS_CEILING 之间"))
+      if (systemPrompt.length > MAX_PROMPT_CHARS) add(FieldError("systemPrompt", "不能超过 $MAX_PROMPT_CHARS 字"))
+    }
+    return if (errors.isEmpty()) PluginConfigCheckResult.PluginConfigCheckAccept()
+    else PluginConfigCheckResult.PluginConfigCheckReject("配置不合法", errors)
+  }
+
+  companion object {
+    const val MAX_USER_CHARS_CEILING = 4_000
+    const val MAX_PROMPT_CHARS = 4_000
+    const val DEFAULT_SYSTEM_PROMPT =
+      "你是群里的一位普通群友, 性格像一只慵懒的猫娘, 说话简短口语化, 偶尔在句尾加“喵”. " +
+        "只回复一句话, 不要复述别人的话, 不要提及自己是 AI."
+  }
+}

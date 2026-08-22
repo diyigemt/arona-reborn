@@ -75,6 +75,11 @@ class TencentGroupMessageEvent internal constructor(
    * 不参与成员身份判定, 也不写入 [GroupMember] 缓存 (它是逐条消息的瞬态资料, 同一成员不同消息可能不同).
    */
   val platformUsername: String? = null,
+  /**
+   * 平台下发的消息创建时间 (ISO8601 字符串, 如 `2023-07-05T15:06:43+08:00`), 原样透传不解析.
+   * 仅真实 webhook 路径填充; mock / 旧路径为 null, 消费方按 "未知" 处理.
+   */
+  val timestamp: String? = null,
 ) : TencentGroupEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.group
   override val group get() = sender.group

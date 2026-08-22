@@ -167,6 +167,14 @@ function isFallback(field: ConfigFieldSchema): boolean {
         <ElOption v-for="opt in field.enumOptions ?? []" :key="opt.value" :value="opt.value" :label="opt.label" />
       </ElSelect>
       <ElInput
+        v-else-if="field.type === 'string' && field.widget === 'textarea'"
+        type="textarea"
+        :rows="6"
+        :model-value="readString(field)"
+        :placeholder="field.placeholder"
+        @update:model-value="(v) => setValue(field, v)"
+      />
+      <ElInput
         v-else-if="field.type === 'string'"
         :model-value="readString(field)"
         :placeholder="field.placeholder"

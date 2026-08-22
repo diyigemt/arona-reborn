@@ -4,6 +4,8 @@ import com.diyigemt.arona.command.CommandExecuteResult
 import com.diyigemt.arona.command.CommandManager
 import com.diyigemt.arona.communication.command.CommandSender.Companion.toCommandSender
 import com.diyigemt.arona.communication.event.TencentMessageEvent
+import com.diyigemt.arona.communication.event.TencentUnresolvedCommandEvent
+import com.diyigemt.arona.communication.event.broadcast
 import com.diyigemt.arona.communication.message.tencentCustomMarkdown
 import com.diyigemt.arona.config.AutoSavePluginData
 import com.diyigemt.arona.config.value
@@ -72,6 +74,10 @@ object PluginMain : AronaPlugin(
           is CommandExecuteResult.PermissionDenied -> {
             commandSender.sendMessage("权限不足")
           }
+
+          // 未命中任何指令: 广播兜底事件, 交给闲聊类插件. 复用本 sender (seq 未消费), 见事件 KDoc.
+          is CommandExecuteResult.UnresolvedCommand ->
+            TencentUnresolvedCommandEvent(commandSender, it.message, it).broadcast()
 
           else -> result.exception?.let { it1 -> logger.error(it1) }
         }

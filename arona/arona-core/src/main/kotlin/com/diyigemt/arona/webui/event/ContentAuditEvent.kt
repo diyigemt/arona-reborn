@@ -11,7 +11,21 @@ data class ContentAuditEvent(
   var pass: Boolean = true,
   var message: String = "Normal",
   val level: Int? = null // 屏蔽等级 越低屏蔽越严格
-) : SerializedEvent
+) : SerializedEvent {
+  /**
+   * 审核是否**成功完成**. 默认 false, 只由审核监听器在审核真正跑完后置 true.
+   * 放在类体而非主构造函数: 保持旧构造函数签名二进制兼容, 已打包的插件 jar 不必随 core 重编.
+   *
+   * [pass] 默认 true, 单看它无法区分 "审核通过" 与 "没装审核插件 (零监听器)" / "监听器超时或抛异常被
+   * [com.diyigemt.arona.communication.event.SafeListener] 吞掉"; fail-closed 的调用方应检查
+   * `audited && !isBlock`.
+   *
+   * 监听器**必须在自身协程内同步置位** (本事件是 [SerializedEvent], broadcast 会等监听器返回).
+   * 若监听器把审核 launch 出去再置位, 调用方在 broadcast 返回时永远看到 false —— 失败方向是 "不放行",
+   * 安全但不可用.
+   */
+  var audited: Boolean = false
+}
 
 inline val ContentAuditEvent.isBlock
   get() = !pass

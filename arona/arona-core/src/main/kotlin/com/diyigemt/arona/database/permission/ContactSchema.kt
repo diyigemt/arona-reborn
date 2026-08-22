@@ -224,6 +224,18 @@ internal data class SimplifiedContactDocument(
   val contactName: String,
   val contactType: ContactType = ContactType.Group,
 )
+/**
+ * 只读查找已存在的 contact 文档 (按 [com.diyigemt.arona.communication.contact.Contact.fatherSubjectIdOrSelf] 的 id),
+ * 不存在返回 null, **不建档**.
+ *
+ * 与 `UserCommandSender.contactDocument()` 的区别: 后者会走 [com.diyigemt.arona.database.service.ContactService.createContactAndUser]
+ * (建群档 / 建用户档 / `$addToSet` 成员 / 补角色), 是"用户主动用指令"场景的建档入口. 订阅全量消息、需要按群读取
+ * [com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig] 做门控的插件必须用本函数, 否则每条群消息都会触发
+ * 一次建档写放大, 并为从未用过指令的成员创建用户档.
+ */
+suspend fun findContactPluginDocumentOrNull(contactId: String): PluginContactDocument? =
+  ContactDocument.findContactDocumentByIdOrNull(contactId)
+
 @Serializable
 internal data class ContactDocument(
   override val id: String,

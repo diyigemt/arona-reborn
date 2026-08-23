@@ -21,15 +21,23 @@
       <el-menu-item index="/config/plugin/arona-preferences">Arona</el-menu-item>
       <el-menu-item index="/config/plugin/arona-gacha">自定义卡池</el-menu-item>
       <el-menu-item index="/config/plugin/chatbot">闲聊</el-menu-item>
-      <el-menu-item index="/config/plugin/chatbot-stickers">表情图库</el-menu-item>
+      <el-menu-item v-if="baseStore.user.superAdmin" index="/config/plugin/chatbot-stickers">表情图库</el-menu-item>
     </el-sub-menu>
     <el-menu-item index="/config/user/profile">个人中心</el-menu-item>
   </el-menu>
 </template>
 
 <script setup lang="ts">
+import useBaseStore from "@/store/base";
+import { UserApi } from "@/api";
+
 const { t } = useI18n();
 const route = useRoute();
+const baseStore = useBaseStore();
+// user 持久化在 localStorage, 主配置 superAdminUid 改了之后靠这一次刷新把菜单项对齐 (权限本身由后端拦)
+onMounted(() => {
+  UserApi.fetchUserProfile().then((user) => baseStore.setUser(user));
+});
 const mapExpand = ["1", "2", "3"];
 const currentActiveMenu = computed(() => route.path);
 </script>

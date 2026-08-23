@@ -27,6 +27,6 @@ class StickerEndpointTest {
   @Test
   fun `summary 截到 200 字, 三个字段都没给拒绝`() {
     assertEquals("a".repeat(200), normalizeStickerEdit(StickerEditRequest(summary = " " + "a".repeat(201)))?.summary)
-    assertNull(normalizeStickerEdit(StickerEditRequest(gid = "g", id = "x")))
+    assertNull(normalizeStickerEdit(StickerEditRequest(id = "x")))
   }
 }

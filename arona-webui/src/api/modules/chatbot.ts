@@ -1,13 +1,14 @@
 import service, { simplifiedApiService } from "@/api/http";
-import type { ChatSticker, ChatStickerEditReq } from "@/interface";
+import type { ChatStickerEditReq, ChatStickerListResp } from "@/interface";
 
+// 仅后端主配置 superAdminUid 里的用户可用, 其它人拿到 601 权限不足
 export const ChatbotApi = {
-  fetchStickers(gid: string) {
+  fetchStickers(gid?: string) {
     return simplifiedApiService(
-      service.raw<ChatSticker[]>({
+      service.raw<ChatStickerListResp>({
         url: "/chatbot/sticker/list",
         method: "GET",
-        params: { gid },
+        params: gid ? { gid } : undefined,
       }),
     );
   },
@@ -20,12 +21,12 @@ export const ChatbotApi = {
       }),
     );
   },
-  deleteSticker(gid: string, id: string) {
+  deleteSticker(id: string) {
     return simplifiedApiService(
       service.raw<void>({
         url: "/chatbot/sticker",
         method: "DELETE",
-        data: { gid, id },
+        data: { id },
       }),
     );
   },

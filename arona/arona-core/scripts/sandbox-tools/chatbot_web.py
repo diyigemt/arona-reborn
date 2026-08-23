@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""打沙箱 webui 后端的 chatbot 图库运营端点 (P3). 直接往 Redis 塞一个 web token 冒充登录用户, 不走 /login.
+"""打沙箱 webui 后端的 chatbot 图库运营端点 (P3, 仅超管). 直接往 Redis 塞一个 web token 冒充登录用户, 不走 /login.
 
-  chatbot_web.py GID list [--probe]                  列表 (--probe 顺带 GET 每个 url, 验证静态映射能读)
-  chatbot_web.py GID update ID [--status S] [--tags a,b] [--summary ...]
-  chatbot_web.py GID delete ID
-  --user UID  冒充的用户 (默认: 该群第一个 role.admin 成员); 用非管理员 / 不存在的群做负向用例.
+  chatbot_web.py list [--gid G] [--probe]     列表 (默认全库, --gid 按来源群过滤; --probe 顺带 GET 每个 url, 验证静态映射能读)
+  chatbot_web.py update ID [--status S] [--tags a,b] [--summary ...]
+  chatbot_web.py delete ID
+  --user UID  冒充的用户 (默认: config.yaml superAdminUid 的第一个); 用普通用户做负向用例.
 退出码: 业务 code != 200 或 HTTP 非 2xx 时为 1, 便于脚本断言.
 """
 import argparse, json, os, re, secrets, socket, sys, urllib.error, urllib.request
@@ -62,30 +62,32 @@ def probe(url):
 
 def main():
   a = argparse.ArgumentParser()
-  a.add_argument("gid"); a.add_argument("cmd", choices=["list", "update", "delete"]); a.add_argument("id", nargs="?")
-  a.add_argument("--user"); a.add_argument("--status"); a.add_argument("--tags"); a.add_argument("--summary"); a.add_argument("--probe", action="store_true")
+  a.add_argument("cmd", choices=["list", "update", "delete"]); a.add_argument("id", nargs="?")
+  a.add_argument("--user"); a.add_argument("--gid"); a.add_argument("--status"); a.add_argument("--tags"); a.add_argument("--summary"); a.add_argument("--probe", action="store_true")
   o = a.parse_args()
   user = o.user
   if not user:
-    doc = mongo()["Contact"].find_one({"_id": o.gid}, {"members": 1}) or {}
-    user = next((m["_id"] for m in doc.get("members", []) if "role.admin" in m.get("roles", [])), None)
-    if not user:
-      sys.exit("群 %s 没有 role.admin 成员, 用 --user 指定" % o.gid)
+    t = open(CFG, encoding="utf-8").read()
+    ids = re.findall(r'"([^"]+)"', re.search(r"^superAdminUid:\s*(\[.*\])", t, re.M).group(1))
+    user = ids[0]
   token = mint_token(user)
   if o.cmd == "list":
-    status, resp = call(token, "GET", "/chatbot/sticker/list", {"gid": o.gid})
+    status, resp = call(token, "GET", "/chatbot/sticker/list", {"gid": o.gid} if o.gid else None)
   elif o.cmd == "update":
-    body = {"gid": o.gid, "id": o.id}
+    body = {"id": o.id}
     if o.status is not None: body["status"] = o.status
     if o.tags is not None: body["tags"] = [t for t in o.tags.split(",")]
     if o.summary is not None: body["summary"] = o.summary
     status, resp = call(token, "POST", "/chatbot/sticker/update", body=body)
   else:
-    status, resp = call(token, "DELETE", "/chatbot/sticker", body={"gid": o.gid, "id": o.id})
+    status, resp = call(token, "DELETE", "/chatbot/sticker", body={"id": o.id})
   print("HTTP %d code=%s message=%s" % (status, resp.get("code"), resp.get("message")))
-  for s in (resp.get("data") or []) if o.cmd == "list" else []:
-    print("  %s %-8s nsfw=%-4s use=%s tags=%s summary=%s url=%s" % (
-      s["id"][:12], s["status"], s["nsfwRisk"], s["useCount"], s["tags"], (s["summary"] or "")[:40], "yes" if s["url"] else "None"))
+  data = resp.get("data") or {}
+  if o.cmd == "list":
+    print("  groups:", [g["name"] for g in data.get("groups", [])])
+  for s in data.get("stickers", []) if o.cmd == "list" else []:
+    print("  %s %-8s nsfw=%-4s use=%s groups=%s hasFile=%s tags=%s summary=%s url=%s" % (
+      s["id"][:12], s["status"], s["nsfwRisk"], s["useCount"], len(s["groupIds"]), str(s["hasFile"]).lower(), s["tags"], (s["summary"] or "")[:40], "yes" if s["url"] else "None"))
     if o.probe and s["url"]:
       print("    GET url ->", probe(s["url"]))
   sys.exit(0 if status < 300 and resp.get("code") == 200 else 1)

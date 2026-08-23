@@ -50,6 +50,10 @@ internal val ApplicationCall.aronaUser: UserDocument
 val ApplicationCall.pluginUser: PluginUserDocument
   get() = aronaUser
 
+/** 当前登录用户是否在主配置 `superAdminUid` 里 (机器人部署者). 插件端点做"仅超管可用"时用. */
+val ApplicationCall.isSuperAdmin: Boolean
+  get() = aronaUser.id in aronaConfig.superAdminUid
+
 /**
  * 解析 RFC 6750 Bearer 令牌.
  * 按 RFC 7235 规定 auth-scheme 不区分大小写, token 自身禁止包含空白字符.

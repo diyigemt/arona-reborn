@@ -35,6 +35,8 @@ internal data class AuthResp(
 internal data class UserProfileResp(
   val id: String,
   val username: String,
+  /** 在主配置 superAdminUid 里; 前端据此显示仅部署者可用的页面 (如 chatbot 表情审核), 真正的拦截在后端. */
+  val superAdmin: Boolean = false,
 )
 
 @Serializable
@@ -137,7 +139,8 @@ internal object UserEndpoint {
     return success(
       UserProfileResp(
         aronaUser.id,
-        aronaUser.username
+        aronaUser.username,
+        isSuperAdmin,
       )
     )
   }

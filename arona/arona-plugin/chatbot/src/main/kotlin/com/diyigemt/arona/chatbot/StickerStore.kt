@@ -3,10 +3,8 @@ package com.diyigemt.arona.chatbot
 import com.diyigemt.arona.database.DatabaseProvider
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Filters
-import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.Projections
-import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.Sorts
 import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
@@ -38,6 +36,7 @@ internal data class StickerEdit(val status: String?, val tags: List<String>?, va
 @Serializable
 internal data class StickerView(
   val id: String,
+  val groupIds: List<String>,
   val status: String,
   val tags: List<String>,
   val summary: String,
@@ -50,6 +49,8 @@ internal data class StickerView(
   val lastUsedAt: Long?,
   val senderId: String?,
   val url: String?,
+  /** 抓取时被模型拒绝的没存文件, 永远不能设为 ready; 运营页据此隐藏「通过」. */
+  val hasFile: Boolean,
 )
 
 /**
@@ -118,7 +119,7 @@ internal object StickerStore {
 
   /** 可用候选: ready 且非 high; 默认限定本群见过的, [shared] 时全库. */
   suspend fun candidates(groupId: String, shared: Boolean): List<StickerCandidate> {
-    val base = Filters.and(Filters.eq("status", StickerStatus.READY), Filters.ne("nsfwRisk", "high"), Filters.exists("fileName"))
+    val base = Filters.and(Filters.eq("status", StickerStatus.READY), Filters.ne("nsfwRisk", "high"), Filters.ne("fileName", null))
     val filter = if (shared) base else Filters.and(base, Filters.eq("groupIds", groupId))
     return stickers().find(filter)
       .projection(Projections.include("tags", "summary", "fileName"))
@@ -134,20 +135,21 @@ internal object StickerStore {
     stickers().updateOne(Filters.eq("_id", id), Updates.combine(Updates.inc("useCount", 1), Updates.set("lastUsedAt", Date())))
   }
 
-  // ---- 运营页 (P3). 管理员只能看/动本群见过的图 (groupIds 含 gid), 但 status/tags/summary 字段本身是全局的, 见 ChatbotEndpoint ----
+  // ---- 运营页 (P3). 只有超管 (主配置 superAdminUid) 能用, 全库可见, 按来源群过滤只是方便审核, 见 ChatbotEndpoint ----
 
   /**
-   * 本群见过且不在分析中的, 新到旧.
-   * ponytail: 上限 1000 不分页, 且 (status, groupIds) 索引不服务这条查询 (全扫 + 内存排序); 群级图库远到不了这个量, 到了再加游标和 (groupIds, createdAt) 索引.
+   * 不在分析中的, 新到旧; [groupId] 非空时只看该群见过的.
+   * ponytail: 上限 1000 不分页, 且现有索引不服务这条查询 (全扫 + 内存排序); 图库远到不了这个量, 到了再加游标和 createdAt 索引.
    */
-  suspend fun list(groupId: String, urlOf: (String) -> String?): List<StickerView> =
-    stickers().find(Filters.and(Filters.eq("groupIds", groupId), Filters.ne("status", StickerStatus.ANALYZING)))
+  suspend fun list(groupId: String?, urlOf: (String) -> String?): List<StickerView> =
+    stickers().find(Filters.and(listOfNotNull(Filters.ne("status", StickerStatus.ANALYZING), groupId?.let { Filters.eq("groupIds", it) })))
       .sort(Sorts.descending("createdAt"))
       .limit(LIST_LIMIT)
       .toList()
       .map { doc ->
         StickerView(
           id = doc.getString("_id"),
+          groupIds = doc.getList("groupIds", String::class.java) ?: emptyList(),
           status = doc.getString("status") ?: "",
           tags = doc.getList("tags", String::class.java) ?: emptyList(),
           summary = doc.getString("summary") ?: "",
@@ -160,40 +162,30 @@ internal object StickerStore {
           lastUsedAt = doc.getDate("lastUsedAt")?.time,
           senderId = doc.getString("senderId"),
           url = doc.getString("fileName")?.let(urlOf),
+          hasFile = doc.getString("fileName") != null,
         )
       }
 
-  /** 只改 [edit] 里非 null 的字段. 返回 false = 不存在 / 不属于本群 / 仍在分析. */
-  suspend fun update(id: String, groupId: String, edit: StickerEdit): Boolean {
+  /** 所有来源群 (不含仅 analyzing 行的), 给运营页做过滤下拉. */
+  suspend fun sourceGroupIds(): List<String> =
+    stickers().distinct("groupIds", Filters.ne("status", StickerStatus.ANALYZING), String::class.java).toList()
+
+  /** 只改 [edit] 里非 null 的字段. 返回 false = 不存在 / 仍在分析 / 想设 ready 但没有文件 (抓取时被拒的). */
+  suspend fun update(id: String, edit: StickerEdit): Boolean {
     val sets = listOfNotNull(
       edit.status?.let { Updates.set("status", it) },
       edit.tags?.let { Updates.set("tags", it) },
       edit.summary?.let { Updates.set("summary", it) },
     )
-    return stickers().updateOne(owned(id, groupId), Updates.combine(sets)).matchedCount == 1L
+    // rejected 行的 fileName 是显式 null, exists() 对 null 也为真, 要用 ne(null).
+    val filter = if (edit.status == StickerStatus.READY) Filters.and(editable(id), Filters.ne("fileName", null)) else editable(id)
+    return stickers().updateOne(filter, Updates.combine(sets)).matchedCount == 1L
   }
 
-  /**
-   * 从本群移除: 只 `$pull` groupIds 里的本群; 没有别的群见过它时才物理删行, 并返回文件名让调用方删文件.
-   * A 群管理员删不掉 B 群还在用的图 (B 再发同图时走 claim 的 E11000 分支, 本群会被重新加回来).
-   * 返回 null = 不存在 / 不属于本群 / 仍在分析.
-   */
-  suspend fun unlink(id: String, groupId: String): Unlinked? {
-    val after = stickers().findOneAndUpdate(
-      owned(id, groupId),
-      Updates.pull("groupIds", groupId),
-      FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
-    ) ?: return null
-    if (!after.getList("groupIds", String::class.java).isNullOrEmpty()) return Unlinked(fileToDelete = null)
-    // 只删仍然没人要的行: pull 与 delete 之间别的群可能刚 addToSet 回来, 那就留着 (文件也留着).
-    val deleted = stickers().deleteOne(Filters.and(Filters.eq("_id", id), Filters.size("groupIds", 0))).deletedCount == 1L
-    return Unlinked(fileToDelete = after.getString("fileName").takeIf { deleted })
-  }
+  /** 物理删行, 返回原文档让调用方删文件; null = 不存在 / 仍在分析. 再见同图会重新走抓取. */
+  suspend fun delete(id: String): Document? = stickers().findOneAndDelete(editable(id))
 
-  class Unlinked(val fileToDelete: String?)
-
-  private fun owned(id: String, groupId: String) =
-    Filters.and(Filters.eq("_id", id), Filters.eq("groupIds", groupId), Filters.ne("status", StickerStatus.ANALYZING))
+  private fun editable(id: String) = Filters.and(Filters.eq("_id", id), Filters.ne("status", StickerStatus.ANALYZING))
 
   private fun Document.int(key: String) = (get(key) as? Number)?.toInt()
 

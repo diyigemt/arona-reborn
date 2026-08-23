@@ -7,7 +7,7 @@ arona {
   id = "com.diyigemt.arona.chat.command"
   name = "chat-command"
   author = "diyigemt"
-  version = "0.1.7"
+  version = "0.1.8"
   description = "chat-command"
   mainClass = "com.diyigemt.arona.chat.command.PluginMain"
 }

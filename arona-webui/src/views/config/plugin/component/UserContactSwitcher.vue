@@ -49,7 +49,7 @@ function onImport() {
         <ElRadioButton label="manage-contact">群默认</ElRadioButton>
       </ElRadioGroup>
     </ElFormItem>
-    <ElFormItem v-if="formData.type !== 'user'">
+    <ElFormItem v-if="formData.type !== 'user'" class="w-240px!">
       <ElSelect v-model="formData.id">
         <ElOption v-for="(e, index) in contacts" :key="index" :label="e.contactName" :value="e.id" />
       </ElSelect>

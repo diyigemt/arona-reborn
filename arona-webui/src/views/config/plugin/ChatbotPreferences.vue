@@ -2,7 +2,6 @@
   <ElAlert
     type="info"
     :closable="false"
-    class="mb-16px"
     title="闲聊只读取「群默认」这一档配置, 自己 / 分群两档保存了也不生效"
   />
   <PluginPreferenceForm
@@ -11,6 +10,7 @@
     :default-form="defaultConfig"
     :p-id="pluginId"
     :p-key="configKey"
+    class="mt-16px"
   >
     <template #default>
       <DynamicConfigForm :schema="schema.fields" :model-value="config" :p-id="pluginId" :p-key="configKey" />

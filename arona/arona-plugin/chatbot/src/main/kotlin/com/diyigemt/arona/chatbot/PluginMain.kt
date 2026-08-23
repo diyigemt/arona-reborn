@@ -21,8 +21,10 @@ object PluginMain : AronaPlugin(
 ) {
   override fun onLoad() {
     launch {
-      runCatchingCancellable { ChatStore.ensureIndexes(ChatbotSecrets.contextTtlHours, ChatbotSecrets.memoryTtlDays) }
-        .onFailure { logger.warn("创建 chatbot 索引失败", it) }
+      runCatchingCancellable {
+        ChatStore.ensureIndexes(ChatbotSecrets.contextTtlHours, ChatbotSecrets.memoryTtlDays)
+        StickerStore.ensureIndexes()
+      }.onFailure { logger.warn("创建 chatbot 索引失败", it) }
     }
 
     // 观察: 启用群的全部消息 (含命中指令的) 落库. listener 立刻 launch 出去, 不拖慢 webhook 分发.
@@ -47,23 +49,30 @@ object PluginMain : AronaPlugin(
   }
 
   private suspend fun observe(ev: TencentGroupMessageEvent) {
-    // P0 不看图: 纯图片消息记占位, 让上下文里"有人发了图"这一轮不缺席; 真看图是 P2.
-    val text = ev.message.plainText().ifEmpty { if (ev.message.any { it is TencentImage }) IMAGE_PLACEHOLDER else return }
-    if (groupConfig(ev.group.id)?.enabled != true) return
+    // 图片先记占位; 表情抓取路径拿到模型描述后异步回写 imageSummary, history 里这一轮就有了图的语义.
+    val images = ev.message.filterIsInstance<TencentImage>()
+    val text = ev.message.plainText()
+    val content = listOf(text, if (images.isNotEmpty()) IMAGE_PLACEHOLDER else "").filter { it.isNotEmpty() }.joinToString(" ")
+    if (content.isEmpty()) return
+    val cfg = groupConfig(ev.group.id)?.takeIf { it.enabled } ?: return
+    val lineId = ev.message.sourceId
     ChatStore.upsert(
       ChatLine(
-        id = ev.message.sourceId,
+        id = lineId,
         groupId = ev.group.id,
         senderId = ev.sender.id,
         senderName = ev.platformUsername,
-        content = text.take(OBSERVE_MAX_CHARS),
+        content = content.take(OBSERVE_MAX_CHARS),
         fromBot = false,
         ts = parseTimestampMillis(ev.timestamp)?.let(::Date) ?: Date(),
       ),
     )
+    if (images.isNotEmpty() && StickerCapture.enabled(cfg)) {
+      launch { StickerCapture.capture(ev.bot.client, lineId, ev.group.id, ev.sender.id, images) }
+    }
   }
 
-  private const val IMAGE_PLACEHOLDER = "[图片]"
+  internal const val IMAGE_PLACEHOLDER = "[图片]"
   /** 观察落库的单条上限: 超长粘贴既撑大 history prompt 也撑大摘要输入, 记忆只需要它的开头. */
   private const val OBSERVE_MAX_CHARS = 1_000
 

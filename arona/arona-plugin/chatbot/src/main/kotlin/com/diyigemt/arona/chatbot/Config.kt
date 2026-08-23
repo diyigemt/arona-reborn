@@ -59,6 +59,38 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   val memoryTimeoutMillis by value(15_000L)
   /** 摘要闲置过期天数 (按 updatedAt 的 TTL 索引, 改动需手动重建索引). raw 只留 24h, 摘要不该永生. */
   val memoryTtlDays by value(7L)
+
+  // ---- 看图 (P2): 当前消息里的图片以 base64 交给视觉模型 ----
+  val visionEnabled by value(true)
+  /** 回复路径单张图片字节上限, 超过的图忽略 (仍按纯文本回复). */
+  val imageMaxBytes by value(4L * 1024 * 1024)
+  /** 回复路径图片下载整批超时 (≤2 张并发). */
+  val imageDownloadTimeoutMillis by value(5_000L)
+  /** 带图的模型调用超时, 比纯文本长. */
+  val visionTimeoutMillis by value(12_000L)
+
+  // ---- 表情库 (P2): 观察路径抓取群里的表情包, 模型打标后存 COS, 回复时可配图 ----
+  val stickerCaptureEnabled by value(true)
+  /** true 时模型判定 nsfw_risk=low 的表情直接 ready; 否则一律 pending 等人工审核 (P3 webui). */
+  val stickerAutoApprove by value(false)
+  /** true 时选图不分来源群; 默认只在本群见过的表情里选, 避免 A 群的图出现在 B 群. */
+  val stickerShared by value(false)
+  /** 抓取的单张上限: 长截图通常更大, 超过直接放弃, 不下载全量. */
+  val stickerMaxBytes by value(2L * 1024 * 1024)
+  /** 最长边超过视为截图/照片, 不入库. */
+  val stickerMaxSide by value(1024)
+  /** 长宽比超过视为长截图, 不入库. */
+  val stickerMaxAspect by value(3.0)
+  /** 全局每小时最多分析多少张候选表情 (视觉模型调用预算). */
+  val stickerCapturePerHour by value(60L)
+
+  // ---- 腾讯云 COS, 表情持久化. 任一为空则表情库整体关闭 (看图不受影响) ----
+  val cosSecretId by value("")
+  val cosSecretKey by value("")
+  val cosRegion by value("ap-shanghai")
+  val cosBucket by value("")
+  /** 对象 key 前缀, 实际 key 形如 `<prefix>/<sha256>.<ext>`. */
+  val cosPathPrefix by value("chatbot/sticker")
 }
 
 enum class ProbabilityMode {
@@ -119,6 +151,14 @@ data class ChatbotConfig(
   @EncodeDefault
   @ConfigItem(label = "单条消息最大字数", group = "节奏", description = "超过不回 (也不计入概率)")
   val maxUserChars: Int = 500,
+
+  @EncodeDefault
+  @ConfigItem(label = "收集表情包", group = "表情", description = "把群里发的表情包存进图库 (需管理员审核后才会被使用)")
+  val stickerCapture: Boolean = true,
+
+  @EncodeDefault
+  @ConfigItem(label = "配图概率", group = "表情", description = "每次回复附带一张表情包的概率 (0~1)")
+  val stickerReplyProbability: Double = 0.3,
 ) : PluginWebuiConfig() {
   override fun check(): PluginConfigCheckResult {
     val errors = buildList {
@@ -127,6 +167,7 @@ data class ChatbotConfig(
       unit("fixedProbability", fixedProbability)
       unit("pityBase", pityBase)
       unit("pityStep", pityStep)
+      unit("stickerReplyProbability", stickerReplyProbability)
       nonNegative("cooldownSec", cooldownSec)
       nonNegative("muteDurationSec", muteDurationSec)
       if (maxUserChars !in 1..MAX_USER_CHARS_CEILING) add(FieldError("maxUserChars", "必须在 1~$MAX_USER_CHARS_CEILING 之间"))

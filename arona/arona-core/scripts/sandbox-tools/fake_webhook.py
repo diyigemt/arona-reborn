@@ -41,7 +41,7 @@ def payload(a, n):
   if a.at:
     d["mentions"] = [{"is_you": True}]
   if a.image:
-    d["attachments"] = [{"url": "https://example.invalid/fake.jpg"}]
+    d["attachments"] = [{"url": a.image_url}]
   return {"id": f"evt-{uuid.uuid4().hex[:12]}", "op": 0, "s": 1,
           "t": "GROUP_AT_MESSAGE_CREATE" if a.at else "GROUP_MESSAGE_CREATE", "d": d}
 
@@ -63,6 +63,7 @@ def main():
   p.add_argument("--content", required=True); p.add_argument("--username", default="测试群友")
   p.add_argument("--at", action="store_true", help="模拟 @ 机器人")
   p.add_argument("--image", action="store_true", help="附带一张图片附件 (content 为空时即纯图片消息)")
+  p.add_argument("--image-url", default="https://example.invalid/fake.jpg", help="图片附件 URL (配合 fake_image.py 给真能下载的图)")
   p.add_argument("--age-sec", type=int, default=0, help="消息创建时间距今秒数")
   p.add_argument("--msg-id", help="指定 d.id (默认随机)")
   p.add_argument("--same-msg-id", action="store_true", help="repeat 时复用同一 d.id (模拟 webhook 重投)")

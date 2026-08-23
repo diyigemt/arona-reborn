@@ -6,6 +6,8 @@ import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.Sorts
+import com.mongodb.client.model.UpdateOptions
+import com.mongodb.client.model.Updates
 import kotlinx.coroutines.flow.toList
 import org.bson.Document
 import java.util.Date
@@ -21,7 +23,12 @@ data class ChatLine(
   val content: String,
   val fromBot: Boolean,
   val ts: Date,
-)
+  /** 表情抓取路径回写的图片描述 (P2), 独立字段: observe 重投的 $set 不会碰它. */
+  val imageSummary: String? = null,
+) {
+  /** 进 prompt 的文本: 有图片描述时拼在正文后. */
+  val promptText: String get() = imageSummary?.takeIf { it.isNotBlank() }?.let { "$content (图片内容: $it)" } ?: content
+}
 
 /** 每群一条滚动摘要: [coveredUntil] 是水位线, `ts > coveredUntil` 的行才进 history. */
 data class ChatMemory(val groupId: String, val summary: String, val coveredUntil: Date)
@@ -51,15 +58,22 @@ internal object ChatStore {
     memory().createIndex(Indexes.ascending("updatedAt"), IndexOptions().expireAfter(memoryTtlDays, TimeUnit.DAYS))
   }
 
+  /** `$set` 而非整行 replace: webhook 重投时不抹掉异步回写的 imageSummary. */
   suspend fun upsert(line: ChatLine) {
-    val doc = Document("_id", line.id)
-      .append("groupId", line.groupId)
-      .append("senderId", line.senderId)
-      .append("senderName", line.senderName)
-      .append("content", line.content)
-      .append("fromBot", line.fromBot)
-      .append("ts", line.ts)
-    context().replaceOne(Filters.eq("_id", line.id), doc, ReplaceOptions().upsert(true))
+    val update = Updates.combine(
+      Updates.set("groupId", line.groupId),
+      Updates.set("senderId", line.senderId),
+      Updates.set("senderName", line.senderName),
+      Updates.set("content", line.content),
+      Updates.set("fromBot", line.fromBot),
+      Updates.set("ts", line.ts),
+    )
+    context().updateOne(Filters.eq("_id", line.id), update, UpdateOptions().upsert(true))
+  }
+
+  /** 一条消息多张图时首个完成的描述生效 (不拼接, 一句描述够用). */
+  suspend fun setImageSummary(id: String, summary: String) {
+    context().updateOne(Filters.and(Filters.eq("_id", id), Filters.exists("imageSummary", false)), Updates.set("imageSummary", summary))
   }
 
   /**
@@ -117,5 +131,6 @@ internal object ChatStore {
     content = getString("content") ?: "",
     fromBot = getBoolean("fromBot", false),
     ts = getDate("ts") ?: Date(0),
+    imageSummary = getString("imageSummary"),
   )
 }

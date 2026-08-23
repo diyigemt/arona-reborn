@@ -19,6 +19,8 @@ dependencies {
   compileOnly(libs.kotlinx.serialization.json)
   compileOnly(libs.ktor.client.core)
   compileOnly(libs.ktor.client.cio)
+  // 腾讯云 COS SDK 不在 arona-core 里, 要打进插件 jar (同 plana).
+  implementation(libs.qcloud.cos.api)
   testImplementation(kotlin("test"))
   // 测试源集不继承 main 的 compileOnly(project(":arona-core")) (约定插件只对 main 注入), 显式引入.
   testImplementation(project(":arona-core"))

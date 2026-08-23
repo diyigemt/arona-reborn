@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""查看沙箱里 chatbot 的 Mongo (chatContext/chatNoop/群配置) 与 Redis noop 计数. 用法: inspect.py GID [--set-config JSON] [--clear]"""
+"""查看沙箱里 chatbot 的 Mongo (chatContext/chatNoop/chatMemory/chatSticker/群配置) 与 Redis noop 计数. 用法: chatbot_state.py GID [--set-config JSON] [--clear]
+--clear 只删 Mongo 行 (含本群来源的 chatSticker), COS 上的对象不删."""
 import argparse, json, os, re, socket, sys
 import pymongo
 CFG = os.environ.get("ARONA_SANDBOX_CONFIG", "/mnt/d/code/java/arona-reborn/arona/arona-core/sandbox/config.yaml")
@@ -24,13 +25,15 @@ o = a.parse_args(); db = mongo()
 if o.set_config:
   r = db["Contact"].update_one({"_id": o.gid}, {"$set": {KEY: json.loads(o.set_config)}}); print("set config matched/modified:", r.matched_count, r.modified_count)
 if o.clear:
-  print("cleared chatContext/chatNoop/chatMemory:", db["chatContext"].delete_many({"groupId": o.gid}).deleted_count, db["chatNoop"].delete_many({"groupId": o.gid}).deleted_count, db["chatMemory"].delete_many({"_id": o.gid}).deleted_count)
+  print("cleared chatContext/chatNoop/chatMemory/chatSticker:", db["chatContext"].delete_many({"groupId": o.gid}).deleted_count, db["chatNoop"].delete_many({"groupId": o.gid}).deleted_count, db["chatMemory"].delete_many({"_id": o.gid}).deleted_count, db["chatSticker"].delete_many({"groupIds": o.gid}).deleted_count)
 doc = db["Contact"].find_one({"_id": o.gid}, {KEY: 1}) or {}
 print("group config:", json.dumps(doc.get("config", {}).get("com·diyigemt·arona·chatbot", {}).get("ChatbotConfig"), ensure_ascii=False))
 m = db["chatMemory"].find_one({"_id": o.gid})
 print("chatMemory:", "none" if not m else f"coveredUntil={m['coveredUntil'].strftime('%H:%M:%S.%f')[:-3]} updatedAt={m['updatedAt'].strftime('%H:%M:%S')} summary={m.get('summary')!r}")
 print("chatContext:")
-for d in db["chatContext"].find({"groupId": o.gid}).sort("ts", 1): print("  ", d["ts"].strftime("%H:%M:%S"), "bot" if d.get("fromBot") else d.get("senderName") or d.get("senderId"), "|", d["_id"], "|", d.get("content"))
+for d in db["chatContext"].find({"groupId": o.gid}).sort("ts", 1): print("  ", d["ts"].strftime("%H:%M:%S"), "bot" if d.get("fromBot") else d.get("senderName") or d.get("senderId"), "|", d["_id"], "|", d.get("content"), ("| 图片: " + d["imageSummary"]) if d.get("imageSummary") else "")
+print("chatSticker (本群来源):")
+for d in db["chatSticker"].find({"groupIds": o.gid}).sort("createdAt", 1): print("  ", d["createdAt"].strftime("%H:%M:%S"), d.get("status"), d["_id"][:12], d.get("mime"), f"{d.get('width')}x{d.get('height')}", d.get("bytes"), "B |", d.get("nsfwRisk"), d.get("tags"), "|", d.get("summary"), "|", d.get("cosKey"), "| used", d.get("useCount"))
 print("chatNoop:")
 for d in db["chatNoop"].find({"groupId": o.gid}).sort("ts", 1): print("  ", d["ts"].strftime("%H:%M:%S"), d["reason"], d.get("messageId"), "|", (d.get("detail") or "")[:160])
 print("redis noop:", redis_hgetall("chatbot.noop." + o.gid))

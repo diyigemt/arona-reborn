@@ -2,6 +2,7 @@ package com.diyigemt.arona.webui.endpoints
 
 import com.diyigemt.arona.database.DatabaseProvider
 import com.diyigemt.arona.database.RedisPrefixKey
+import com.diyigemt.arona.database.permission.PluginUserDocument
 import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.database.permission.UserDocument.Companion.findUserDocumentByIdOrNull
 import com.diyigemt.arona.utils.*
@@ -44,6 +45,10 @@ internal var ApplicationCall._aronaUser: UserDocument?
 
 internal val ApplicationCall.aronaUser: UserDocument
   get() = attributes[ContextUserAttrKey]
+
+/** 插件端点可见的当前登录用户 (根拦截器 [LoggerInterceptor.accessLogging] 注入), 只暴露公开抽象, 不漏 core 的 [UserDocument]. */
+val ApplicationCall.pluginUser: PluginUserDocument
+  get() = aronaUser
 
 /**
  * 解析 RFC 6750 Bearer 令牌.

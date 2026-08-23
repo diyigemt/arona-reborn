@@ -20,6 +20,8 @@
       <el-menu-item index="/config/plugin/base-preferences">通用</el-menu-item>
       <el-menu-item index="/config/plugin/arona-preferences">Arona</el-menu-item>
       <el-menu-item index="/config/plugin/arona-gacha">自定义卡池</el-menu-item>
+      <el-menu-item index="/config/plugin/chatbot">闲聊</el-menu-item>
+      <el-menu-item index="/config/plugin/chatbot-stickers">表情图库</el-menu-item>
     </el-sub-menu>
     <el-menu-item index="/config/user/profile">个人中心</el-menu-item>
   </el-menu>

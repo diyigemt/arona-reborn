@@ -44,6 +44,22 @@ const PluginRouter: Array<RouteRecordRaw> = [
         },
         component: () => import("@/views/config/plugin/CoffeePreferences.vue"),
       },
+      {
+        path: "chatbot",
+        name: "chatbot-preferences",
+        meta: {
+          title: "闲聊设置",
+        },
+        component: () => import("@/views/config/plugin/ChatbotPreferences.vue"),
+      },
+      {
+        path: "chatbot-stickers",
+        name: "chatbot-stickers",
+        meta: {
+          title: "表情图库",
+        },
+        component: () => import("@/views/config/plugin/ChatbotStickerLibrary.vue"),
+      },
     ],
   },
 ];

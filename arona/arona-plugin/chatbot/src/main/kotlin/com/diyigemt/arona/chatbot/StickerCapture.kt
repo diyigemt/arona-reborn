@@ -7,7 +7,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 /**
- * 观察路径的表情抓取: 下载 → 尺寸启发式 → 抢占 hash → 视觉模型打标 → COS 持久化 → 落库.
+ * 观察路径的表情抓取: 下载 → 尺寸启发式 → 抢占 hash → 视觉模型打标 → 写进数据目录 → 落库.
  * 与观察落库解耦 (独立协程), 进程级并发 2 + 全局小时预算, 白名单群刷图也耗不光视觉额度.
  * ponytail: 回复路径看图会再下载一次同一张图, 回复只占图片消息的一小部分, 不做 URL 缓存.
  */
@@ -19,8 +19,7 @@ internal object StickerCapture {
     IpRateLimiter(capacity = n, refillTokens = n, refillSeconds = 3600)
   }
 
-  fun enabled(cfg: ChatbotConfig): Boolean =
-    ChatbotSecrets.stickerCaptureEnabled && cfg.stickerCapture && StickerCos.isConfigured()
+  fun enabled(cfg: ChatbotConfig): Boolean = ChatbotSecrets.stickerCaptureEnabled && cfg.stickerCapture
 
   suspend fun capture(client: HttpClient, lineId: String, groupId: String, senderId: String, images: List<TencentImage>) {
     images.take(MAX_IMAGES_PER_MESSAGE).forEach { image ->
@@ -57,15 +56,15 @@ internal object StickerCapture {
       ChatbotSecrets.stickerAutoApprove && analysis.nsfwRisk == "low" -> StickerStatus.READY
       else -> StickerStatus.PENDING
     }
-    val cosKey = if (status == StickerStatus.REJECTED) null else StickerCos.keyFor(image).also {
+    val fileName = if (status == StickerStatus.REJECTED) null else StickerFiles.nameFor(image).also {
       try {
-        StickerCos.put(it, image)
+        StickerFiles.put(it, image.bytes)
       } catch (t: Throwable) {
         StickerStore.release(image.sha256)
         throw t
       }
     }
-    StickerStore.finish(image.sha256, image, dimensions, analysis, status, cosKey)
+    StickerStore.finish(image.sha256, image, dimensions, analysis, status, fileName)
     PluginMain.logger.info("chatbot 表情入库 $status: ${image.sha256.take(12)} ${analysis.tags.joinToString(" ")}")
   }
 

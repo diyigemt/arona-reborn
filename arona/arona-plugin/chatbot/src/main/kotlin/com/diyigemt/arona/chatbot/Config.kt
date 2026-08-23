@@ -69,7 +69,7 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   /** 带图的模型调用超时, 比纯文本长. */
   val visionTimeoutMillis by value(12_000L)
 
-  // ---- 表情库 (P2): 观察路径抓取群里的表情包, 模型打标后存 COS, 回复时可配图 ----
+  // ---- 表情库 (P2): 观察路径抓取群里的表情包, 模型打标后存进数据目录, 回复时可配图 ----
   val stickerCaptureEnabled by value(true)
   /** true 时模型判定 nsfw_risk=low 的表情直接 ready; 否则一律 pending 等人工审核 (P3 webui). */
   val stickerAutoApprove by value(false)
@@ -84,13 +84,11 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   /** 全局每小时最多分析多少张候选表情 (视觉模型调用预算). */
   val stickerCapturePerHour by value(60L)
 
-  // ---- 腾讯云 COS, 表情持久化. 任一为空则表情库整体关闭 (看图不受影响) ----
-  val cosSecretId by value("")
-  val cosSecretKey by value("")
-  val cosRegion by value("ap-shanghai")
-  val cosBucket by value("")
-  /** 对象 key 前缀, 实际 key 形如 `<prefix>/<sha256>.<ext>`. */
-  val cosPathPrefix by value("chatbot/sticker")
+  /**
+   * 表情文件存在插件数据目录 `data/com.diyigemt.arona.chatbot/sticker/` (见 [StickerFiles]); 这是运营页展示用的公网前缀,
+   * 由运维用 nginx 只把该子目录映射过来 (autoindex off), 如 `https://example.com/chatbot-sticker`. 为空则运营页不显示图, 其它功能不受影响.
+   */
+  val stickerPublicBaseUrl by value("")
 }
 
 enum class ProbabilityMode {

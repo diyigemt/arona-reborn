@@ -18,9 +18,9 @@ dependencies {
   // ClassLoader 可见), 编译期不传递到本模块, 故 compileOnly 声明: 能编译, 且不会被 ShadowJar 打进插件 jar.
   compileOnly(libs.kotlinx.serialization.json)
   compileOnly(libs.ktor.client.core)
+  // webui 端点 (ChatbotEndpoint) 要 ApplicationCall; 与 arona 插件一致, 运行期由 core 提供.
+  compileOnly(libs.ktor.server.core.jvm)
   compileOnly(libs.ktor.client.cio)
-  // 腾讯云 COS SDK 不在 arona-core 里, 要打进插件 jar (同 plana).
-  implementation(libs.qcloud.cos.api)
   testImplementation(kotlin("test"))
   // 测试源集不继承 main 的 compileOnly(project(":arona-core")) (约定插件只对 main 注入), 显式引入.
   testImplementation(project(":arona-core"))

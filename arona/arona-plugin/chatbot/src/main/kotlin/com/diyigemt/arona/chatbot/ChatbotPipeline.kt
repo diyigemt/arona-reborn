@@ -340,7 +340,7 @@ internal object ChatbotPipeline {
       summary = memory?.summary,
       imageCount = images.size,
     )
-    val wantSticker = StickerCos.isConfigured() && ThreadLocalRandom.current().nextDouble() < cfg.stickerReplyProbability
+    val wantSticker = ThreadLocalRandom.current().nextDouble() < cfg.stickerReplyProbability
     val systemPrompt = cfg.systemPrompt + OUTPUT_CONTRACT + if (wantSticker) STICKER_CONTRACT else ""
     val reply = when (val out = DeepSeekClient.chat(systemPrompt, prompt, images)) {
       is LlmOutcome.Noop -> { noop(gid, sourceId, out.reason, out.detail); return Outcome.Skipped }
@@ -381,15 +381,15 @@ internal object ChatbotPipeline {
   private class FetchedSticker(val candidate: StickerCandidate, val image: TencentImage)
 
   /**
-   * 图库粗排 → COS 取字节 → QQ 上传 (core 缓存 15 天凭证, 同一张图只传一次). 失败返回 null.
-   * COS SDK 是阻塞 IO, 协程超时只能让回复先走 (退化纯文本), 线程本身由 SDK 的 socket 超时 (8s) 封顶, 持有的是该表情自己的上传锁.
+   * 图库粗排 → 读数据目录里的文件 → QQ 上传 (core 缓存 15 天凭证, 同一张图只传一次). 失败返回 null.
+   * 协程超时只让回复先走 (退化纯文本); 持有的是该表情自己的上传锁.
    */
   private suspend fun fetchSticker(group: Group, gid: String, query: String): FetchedSticker? =
     withTimeoutOrNull(ChatbotSecrets.imageDownloadTimeoutMillis) {
       runCatchingCancellable {
         val candidate = pickSticker(StickerStore.candidates(gid, ChatbotSecrets.stickerShared), query) { ThreadLocalRandom.current().nextDouble() }
           ?: return@runCatchingCancellable null
-        val image = ImageUploadCache.getOrUpload(group, STICKER_NAMESPACE, candidate.id) { group.uploadImage(StickerCos.get(candidate.cosKey)) }
+        val image = ImageUploadCache.getOrUpload(group, STICKER_NAMESPACE, candidate.id) { group.uploadImage(StickerFiles.get(candidate.fileName)) }
         FetchedSticker(candidate, image)
       }.onFailure { PluginMain.logger.warn("chatbot 取表情失败: $query", it) }.getOrNull()
     }

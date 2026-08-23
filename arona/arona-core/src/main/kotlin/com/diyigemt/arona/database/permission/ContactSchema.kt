@@ -88,6 +88,10 @@ abstract class PluginContactDocument : PluginVisibleData() {
   fun findContactMemberOrNull(memberId: String) = members.firstOrNull { it.id == memberId }
   fun findContactMember(memberId: String) = members.first { it.id == memberId }
 
+  /** 成员是否持有本群的 role.admin. 放在公开抽象上, 插件端点 (如 chatbot 图库运营页) 也能做群管理员鉴权. */
+  fun checkAdminPermission(userId: String) =
+    members.any { it.roles.contains(DEFAULT_ADMIN_CONTACT_ROLE_ID) && it.id == userId }
+
   /**
    * 写入群级插件配置. 仅持久化主 key, 不回写 alias 数据.
    * 该 raw 写入不做 check/audit/canonical, 仅供 endpoint 在自己 prepare 之后落库使用;
@@ -250,12 +254,6 @@ internal data class ContactDocument(
   val proactiveMessageStateUpdatedAt: Long = 0L,
   override val config: Map<String, Map<String, JsonObject>> = mapOf(), // 环境自定义的,插件专有的配置项
 ): PluginContactDocument() {
-
-  /**
-   * 检查member是否拥有这个群的role.admin权限
-   */
-  fun checkAdminPermission(userId: String) =
-    members.any { it.roles.contains(DEFAULT_ADMIN_CONTACT_ROLE_ID) && it.id == userId }
 
   suspend fun updateContactDocumentName(name: String) {
     withCollection<MongoContactDocument, UpdateResult> {

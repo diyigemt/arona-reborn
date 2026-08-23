@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """查看沙箱里 chatbot 的 Mongo (chatContext/chatNoop/chatMemory/chatSticker/群配置) 与 Redis noop 计数. 用法: chatbot_state.py GID [--set-config JSON] [--clear]
---clear 只删 Mongo 行 (含本群来源的 chatSticker), COS 上的对象不删."""
+--clear 只删 Mongo 行 (含本群来源的 chatSticker), 数据目录里的表情文件不删."""
 import argparse, json, os, re, socket, sys
 import pymongo
 CFG = os.environ.get("ARONA_SANDBOX_CONFIG", "/mnt/d/code/java/arona-reborn/arona/arona-core/sandbox/config.yaml")
@@ -33,7 +33,7 @@ print("chatMemory:", "none" if not m else f"coveredUntil={m['coveredUntil'].strf
 print("chatContext:")
 for d in db["chatContext"].find({"groupId": o.gid}).sort("ts", 1): print("  ", d["ts"].strftime("%H:%M:%S"), "bot" if d.get("fromBot") else d.get("senderName") or d.get("senderId"), "|", d["_id"], "|", d.get("content"), ("| 图片: " + d["imageSummary"]) if d.get("imageSummary") else "")
 print("chatSticker (本群来源):")
-for d in db["chatSticker"].find({"groupIds": o.gid}).sort("createdAt", 1): print("  ", d["createdAt"].strftime("%H:%M:%S"), d.get("status"), d["_id"][:12], d.get("mime"), f"{d.get('width')}x{d.get('height')}", d.get("bytes"), "B |", d.get("nsfwRisk"), d.get("tags"), "|", d.get("summary"), "|", d.get("cosKey"), "| used", d.get("useCount"))
+for d in db["chatSticker"].find({"groupIds": o.gid}).sort("createdAt", 1): print("  ", d["createdAt"].strftime("%H:%M:%S"), d.get("status"), d["_id"][:12], d.get("mime"), f"{d.get('width')}x{d.get('height')}", d.get("bytes"), "B |", d.get("nsfwRisk"), d.get("tags"), "|", d.get("summary"), "|", d.get("fileName"), "| used", d.get("useCount"))
 print("chatNoop:")
 for d in db["chatNoop"].find({"groupId": o.gid}).sort("ts", 1): print("  ", d["ts"].strftime("%H:%M:%S"), d["reason"], d.get("messageId"), "|", (d.get("detail") or "")[:160])
 print("redis noop:", redis_hgetall("chatbot.noop." + o.gid))

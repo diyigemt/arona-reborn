@@ -28,12 +28,9 @@ const importButtonText = computed(() => {
   }
   return "从个人/其他群导入";
 });
+// 非 user 档的默认群由父组件挑: 这里的 contacts prop 随 type 变, 但重渲染在本回调之后, 此刻拿到的还是旧列表.
 function onTypeChange() {
-  if (isUser.value) {
-    formData.value.id = baseStore.userId;
-  } else {
-    formData.value.id = props.contacts[0]?.id || "";
-  }
+  formData.value.id = isUser.value ? baseStore.userId : "";
 }
 function onImport() {
   emit("import");

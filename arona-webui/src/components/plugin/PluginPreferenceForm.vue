@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ContactApi, PluginPreferenceApi } from "@/api";
-import { errorMessage, IWarningConfirm, successMessage } from "@/utils/message";
+import { errorMessage, IWarningConfirm, successMessage, warningMessage } from "@/utils/message";
 import UserContactSwitcher from "@/views/config/plugin/component/UserContactSwitcher.vue";
 import useBaseStore from "@/store/base";
 import { Contact } from "@/interface";
@@ -13,20 +13,21 @@ defineOptions({
 const fieldErrors = ref<FieldError[]>([]);
 provide("fieldErrors", fieldErrors);
 
-function reportSaveError(err: unknown) {
+function reportError(err: unknown, fallback = "保存失败") {
   // simplifiedApiService 现在 reject 一个结构化 BusinessError; 同时兼容老的裸字符串/Error.
   if (err && typeof err === "object" && "message" in err) {
     const be = err as BusinessError;
-    errorMessage(be.message || "保存失败");
+    errorMessage(be.message || fallback);
     fieldErrors.value = be.fieldErrors ?? [];
     return;
   }
-  errorMessage(typeof err === "string" ? err || "保存失败" : "保存失败");
+  errorMessage(typeof err === "string" ? err || fallback : fallback);
   fieldErrors.value = [];
 }
+type ProfileSource = "user" | "contact" | "manage-contact";
 interface ProfileType {
   id: string;
-  type: "user" | "contact" | "manage-contact";
+  type: ProfileSource;
 }
 const props = withDefaults(
   defineProps<{
@@ -64,7 +65,6 @@ const manageContacts = computed(() => {
 const contactSelect = computed(() => {
   return editType.value.type === "contact" ? contacts.value : manageContacts.value;
 });
-const contact = computed(() => contacts.value.find((it) => it.id === editType.value.id));
 const editType = ref<ProfileType>({
   id: baseStore.userId,
   type: "user",
@@ -72,14 +72,10 @@ const editType = ref<ProfileType>({
 const showImportForm = ref(false);
 interface ImportForm {
   id: string;
-  source: "user" | "contact" | "manage-contact";
+  source: ProfileSource;
 }
 const importForm = ref<ImportForm>({ source: "contact", id: "" });
 const formEl = ref<{ resetFields(): void }>();
-// 后端 wire 已切结构化 JsonObject, 缓存改为对象副本而非字符串. 字符串时代是后端把对象 JSON.stringify
-// 进 wire / 前端再 JSON.parse 兜出来, 缓存只能存字符串. 现在直接存对象, 避免反复 parse/stringify.
-let cacheProfileData: Record<string, unknown> | undefined;
-const cacheMemberProfileData: Record<string, Record<string, unknown>> = {};
 
 // 深拷贝快照: 表单 v-model 直接写到响应式对象上, 若 cache 持有同引用则下一次"取消编辑"会拿到已脏数据.
 // 配置 JSON 不会含 undefined / 函数 / 循环, 用 JSON 深拷贝最朴素够用.
@@ -88,74 +84,61 @@ function cloneConfig(data: object): Record<string, unknown> {
 }
 
 // "无数据" 判定: null / undefined / 空对象都视为没有持久化, 走 defaultForm. 历史用 "" / "{}" 哨兵已下线.
-function hasConfigData(data: Record<string, unknown> | null | undefined): data is Record<string, unknown> {
+function hasConfigData(data: unknown): data is Record<string, unknown> {
   return data != null && typeof data === "object" && Object.keys(data).length > 0;
 }
 
-// 字符串时代 form / cache 都是字符串, 天然 immutable; 切对象 wire 后, fetch 出的对象若直接进 cache
-// 再 emit 给父表单, v-model 的原地 mutate 会反向污染 cache. 入 cache 时存独立快照, emit 时给 form
-// 独立副本, 双方互不污染.
+// 三档配置各一份独立快照, key = `${type}:${id}`. fetch 出的对象若直接进 cache 再 emit 给父表单,
+// v-model 的原地 mutate 会反向污染 cache, 所以入 cache 与 emit 各给一份副本.
+const cache: Record<string, Record<string, unknown>> = {};
+function cacheKey(type: ProfileSource, id: string) {
+  return `${type}:${id}`;
+}
+async function load(type: ProfileSource, id: string): Promise<Record<string, unknown>> {
+  const key = cacheKey(type, id);
+  // 没有可选的群 (非管理员点了群默认 / 列表还没回来): 给默认表单, 不缓存.
+  if (type !== "user" && !id) return cloneConfig(props.defaultForm);
+  if (!cache[key]) {
+    const data =
+      type === "user"
+        ? await PluginPreferenceApi.fetchPluginPreference(props.pId, props.pKey)
+        : type === "contact"
+          ? await ContactApi.fetchMemberPluginPreference(id, props.pId, props.pKey)
+          : // 列表接口 /contact/contacts 出于安全不再下发 config, 群默认要单独走管理员门控的 /contact/contact?id=
+            (await ContactApi.fetchContact(id)).config?.[props.pId]?.[props.pKey];
+    cache[key] = cloneConfig(hasConfigData(data) ? data : props.defaultForm);
+  }
+  return cache[key];
+}
 function emitForm(data: object) {
   emits("update:form", props.dataProcessor(cloneConfig(data)));
 }
 const updateTrigger = computed(() => [editType.value.type, editType.value.id]);
 provide("updateTrigger", updateTrigger);
+// loadedKey 挡住"列表晚到"这种 type/id 没变的重跑 (不然会把用户正在编辑的表单重置); seq 挡住先发后到的旧响应.
+let loadedKey = "";
+let seq = 0;
 watch(
-  () => editType.value.type,
-  (cur, prv) => {
-    switch (cur) {
-      case "contact": {
-        if (prv === "manage-contact") {
-          const { id } = editType.value;
-          const cached = cacheMemberProfileData[id];
-          if (cached) {
-            emitForm(cached);
-          } else {
-            ContactApi.fetchMemberPluginPreference(id, props.pId, props.pKey).then((data) => {
-              if (hasConfigData(data)) {
-                cacheMemberProfileData[id] = cloneConfig(data);
-              }
-              emitForm(hasConfigData(data) ? data : props.defaultForm);
-            });
-          }
-        }
-        break;
-      }
-      case "manage-contact": {
-        const leaf = contact.value?.config?.[props.pId]?.[props.pKey];
-        emitForm(hasConfigData(leaf) ? leaf : props.defaultForm);
-        break;
-      }
-      case "user": {
-        emitForm(cacheProfileData ?? props.defaultForm);
-        break;
-      }
-      default: {
-        break;
+  () => [editType.value.type, editType.value.id, contactSelect.value] as const,
+  ([type, id, list]) => {
+    // 子组件改 type 时手里的 contacts prop 还是旧列表 (contactSelect 随 type 变, 重渲染在后), 这里纠正, 会再触发一次.
+    // 列表还没加载完时 id 先落空, 等 fetchContacts 回来 contactSelect 变化也会走到这里补上.
+    if (type !== "user" && !list.some((c) => c.id === id)) {
+      const first = list[0]?.id ?? "";
+      if (first !== id) {
+        editType.value.id = first;
+        return;
       }
     }
+    const key = cacheKey(type, id);
+    if (key === loadedKey) return;
+    loadedKey = key;
+    const mine = ++seq;
+    load(type, id)
+      .then((data) => mine === seq && emitForm(data))
+      .catch((err) => reportError(err, "读取配置失败"));
   },
-);
-watch(
-  () => editType.value.id,
-  (cur) => {
-    if (editType.value.type === "contact") {
-      const cached = cacheMemberProfileData[cur];
-      if (cached) {
-        emitForm(cached);
-      } else {
-        ContactApi.fetchMemberPluginPreference(cur, props.pId, props.pKey).then((data) => {
-          if (hasConfigData(data)) {
-            cacheMemberProfileData[cur] = cloneConfig(data);
-          }
-          emitForm(hasConfigData(data) ? data : props.defaultForm);
-        });
-      }
-    } else if (editType.value.type === "manage-contact") {
-      const leaf = contact.value?.config?.[props.pId]?.[props.pKey];
-      emitForm(hasConfigData(leaf) ? leaf : props.defaultForm);
-    }
-  },
+  { immediate: true },
 );
 function onCancel() {
   formEl.value?.resetFields();
@@ -164,41 +147,21 @@ function onConfirm() {
   emits("confirm");
   fieldErrors.value = [];
   const data = props.postDataProcessor(props.form);
-  switch (editType.value.type) {
-    case "contact": {
-      ContactApi.updateMemberPluginPreference(editType.value.id, props.pId, props.pKey, data)
-        .then(() => {
-          cacheMemberProfileData[editType.value.id] = cloneConfig(props.form);
-          successMessage("保存成功");
-        })
-        .catch(reportSaveError);
-      break;
-    }
-    case "user": {
-      PluginPreferenceApi.updatePluginPreference(props.pId, props.pKey, data)
-        .then(() => {
-          cacheProfileData = cloneConfig(props.form);
-          successMessage("保存成功");
-        })
-        .catch(reportSaveError);
-      break;
-    }
-    case "manage-contact": {
-      ContactApi.updatePluginPreference(editType.value.id, props.pId, props.pKey, data)
-        .then(() => {
-          const tmp = contact.value?.config?.[props.pId];
-          if (tmp) {
-            tmp[props.pKey] = cloneConfig(props.form);
-          }
-          successMessage("保存成功");
-        })
-        .catch(reportSaveError);
-      break;
-    }
-    default: {
-      break;
-    }
-  }
+  const { type, id } = editType.value;
+  // 请求往返期间用户可能已切到别的档位, 回写 cache 要用发请求那一刻的快照.
+  const snapshot = cloneConfig(props.form);
+  const save =
+    type === "user"
+      ? PluginPreferenceApi.updatePluginPreference(props.pId, props.pKey, data)
+      : type === "contact"
+        ? ContactApi.updateMemberPluginPreference(id, props.pId, props.pKey, data)
+        : ContactApi.updatePluginPreference(id, props.pId, props.pKey, data);
+  save
+    .then(() => {
+      cache[cacheKey(type, id)] = snapshot;
+      successMessage("保存成功");
+    })
+    .catch(reportError);
 }
 function onImport() {
   showImportForm.value = true;
@@ -206,38 +169,20 @@ function onImport() {
 function onConfirmImport() {
   IWarningConfirm("警告", "已有内容将会被覆盖, 是否继续?").then(() => {
     const { id, source } = importForm.value;
-    if (source === "user") {
-      emitForm(cacheProfileData ?? props.defaultForm);
-    } else if (source === "contact") {
-      const cached = cacheMemberProfileData[id];
-      if (cached) {
-        emitForm(cached);
-      } else {
-        ContactApi.fetchMemberPluginPreference(id, props.pId, props.pKey).then((data) => {
-          if (hasConfigData(data)) {
-            cacheMemberProfileData[id] = cloneConfig(data);
-          }
-          emitForm(hasConfigData(data) ? data : props.defaultForm);
-        });
-      }
-    } else {
-      const leaf = contact.value?.config?.[props.pId]?.[props.pKey];
-      emitForm(hasConfigData(leaf) ? leaf : props.defaultForm);
+    if (source !== "user" && !id) {
+      warningMessage("请先选择群");
+      return;
     }
+    const mine = seq;
+    load(source, source === "user" ? baseStore.userId : id)
+      // 等待期间切了档位就作废, 别把导入的内容盖到另一档上.
+      .then((data) => mine === seq && emitForm(data))
+      .catch((err) => reportError(err, "读取配置失败"));
   });
 }
 onMounted(() => {
   ContactApi.fetchContacts().then((data) => {
     contacts.value = data;
-  });
-  PluginPreferenceApi.fetchPluginPreference(props.pId, props.pKey).then((data) => {
-    if (hasConfigData(data)) {
-      cacheProfileData = cloneConfig(data);
-      emitForm(data);
-    } else {
-      // 没持久化过, 缓存一份 defaultForm 的快照, 之后跨 type 切换时 "user" 分支能直接用上.
-      cacheProfileData = cloneConfig(props.defaultForm);
-    }
   });
 });
 </script>
@@ -254,7 +199,7 @@ onMounted(() => {
   <CancelConfirmDialog v-model:show="showImportForm" title="导入" width="600" @confirm="onConfirmImport">
     <ElForm :model="importForm" label-width="120" label-position="left">
       <ElFormItem label="来源">
-        <ElRadioGroup v-model="importForm.source">
+        <ElRadioGroup v-model="importForm.source" @change="importForm.id = ''">
           <ElRadioButton v-if="editType.type !== 'user'" label="user">自己</ElRadioButton>
           <ElRadioButton v-if="editType.type !== 'contact'" label="contact">群</ElRadioButton>
           <ElRadioButton v-if="editType.type !== 'manage-contact'" label="manage-contact">群默认</ElRadioButton>
@@ -262,7 +207,12 @@ onMounted(() => {
       </ElFormItem>
       <ElFormItem v-if="importForm.source !== 'user'" label="群">
         <ElSelect v-model="importForm.id" default-first-option>
-          <ElOption v-for="(e, index) in contacts" :key="index" :label="e.contactName" :value="e.id" />
+          <ElOption
+            v-for="(e, index) in importForm.source === 'manage-contact' ? manageContacts : contacts"
+            :key="index"
+            :label="e.contactName"
+            :value="e.id"
+          />
         </ElSelect>
       </ElFormItem>
     </ElForm>

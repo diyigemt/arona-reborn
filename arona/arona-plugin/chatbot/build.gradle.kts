@@ -8,7 +8,7 @@ arona {
   id = "com.diyigemt.arona.chatbot"
   name = "chatbot"
   author = "diyigemt"
-  version = "0.1.0"
+  version = "0.1.1"
   description = "群聊被动 AI 闲聊"
   mainClass = "com.diyigemt.arona.chatbot.PluginMain"
 }

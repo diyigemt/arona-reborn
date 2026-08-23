@@ -23,8 +23,11 @@ data class ChatLine(
   val ts: Date,
 )
 
+/** 每群一条滚动摘要: [coveredUntil] 是水位线, `ts > coveredUntil` 的行才进 history. */
+data class ChatMemory(val groupId: String, val summary: String, val coveredUntil: Date)
+
 /**
- * 观察库 `chatContext` 与异常 noop 库 `chatNoop`.
+ * 观察库 `chatContext`, 异常 noop 库 `chatNoop`, 记忆库 `chatMemory`.
  *
  * 刻意用 [Document] + 驱动默认 codec 而非 kotlinx 数据类: TTL 索引只认 BSON Date, 而 bson-kotlinx 的
  * `InstantAsBsonDateTime` 绑定的是 kotlinx-datetime 0.7 已改为 typealias 的 `kotlinx.datetime.Instant`,
@@ -33,16 +36,19 @@ data class ChatLine(
 internal object ChatStore {
   private const val CONTEXT = "chatContext"
   private const val NOOP = "chatNoop"
+  private const val MEMORY = "chatMemory"
   private const val NOOP_TTL_DAYS = 7L
 
   private fun context() = DatabaseProvider.defaultMongoDatabase.getCollection<Document>(CONTEXT)
   private fun noop() = DatabaseProvider.defaultMongoDatabase.getCollection<Document>(NOOP)
+  private fun memory() = DatabaseProvider.defaultMongoDatabase.getCollection<Document>(MEMORY)
 
-  /** 幂等建索引: (groupId, ts) 供 history 查询, ts 上挂 TTL. 已存在同名同选项的索引驱动会跳过. */
-  suspend fun ensureIndexes(contextTtlHours: Long) {
+  /** 幂等建索引: (groupId, ts) 供 history 查询, ts 上挂 TTL; 摘要按 updatedAt 闲置过期. 已存在同名同选项的索引驱动会跳过. */
+  suspend fun ensureIndexes(contextTtlHours: Long, memoryTtlDays: Long) {
     context().createIndex(Indexes.compoundIndex(Indexes.ascending("groupId"), Indexes.descending("ts")))
     context().createIndex(Indexes.ascending("ts"), IndexOptions().expireAfter(contextTtlHours, TimeUnit.HOURS))
     noop().createIndex(Indexes.ascending("ts"), IndexOptions().expireAfter(NOOP_TTL_DAYS, TimeUnit.DAYS))
+    memory().createIndex(Indexes.ascending("updatedAt"), IndexOptions().expireAfter(memoryTtlDays, TimeUnit.DAYS))
   }
 
   suspend fun upsert(line: ChatLine) {
@@ -58,16 +64,39 @@ internal object ChatStore {
 
   /**
    * 最近 [limit] 条, 按时间正序返回. 排除 [excludeId]: observe 与回复两个 listener 并发, 当前消息可能已落库,
-   * 它会作为 currentText 单独进 prompt, 不能在 history 里再出现一次.
+   * 它会作为 currentText 单独进 prompt, 不能在 history 里再出现一次. [since] 为摘要水位线, 已压缩的行不再出现.
    */
-  suspend fun history(groupId: String, excludeId: String, limit: Int): List<ChatLine> =
+  suspend fun history(groupId: String, excludeId: String, limit: Int, since: Date? = null): List<ChatLine> =
     context()
-      .find(Filters.and(Filters.eq("groupId", groupId), Filters.ne("_id", excludeId)))
+      .find(Filters.and(uncoveredFilter(groupId, since), Filters.ne("_id", excludeId)))
       .sort(Sorts.descending("ts"))
       .limit(limit)
       .toList()
       .asReversed()
       .map { it.toChatLine() }
+
+  suspend fun uncoveredCount(groupId: String, since: Date?): Long = context().countDocuments(uncoveredFilter(groupId, since))
+
+  /** 水位线之后最旧的 [limit] 行, 按时间正序, 供压缩规划. */
+  suspend fun uncovered(groupId: String, since: Date?, limit: Int): List<ChatLine> =
+    context().find(uncoveredFilter(groupId, since)).sort(Sorts.ascending("ts")).limit(limit).toList().map { it.toChatLine() }
+
+  private fun uncoveredFilter(groupId: String, since: Date?) =
+    if (since == null) Filters.eq("groupId", groupId) else Filters.and(Filters.eq("groupId", groupId), Filters.gt("ts", since))
+
+  suspend fun memory(groupId: String): ChatMemory? =
+    memory().find(Filters.eq("_id", groupId)).limit(1).toList().firstOrNull()?.let {
+      ChatMemory(groupId, it.getString("summary") ?: "", it.getDate("coveredUntil") ?: Date(0))
+    }
+
+  /** 单次 replaceOne 即原子提交: 水位线与摘要一起落, 中途崩溃下次重做 (输入不变, 幂等). */
+  suspend fun saveMemory(memory: ChatMemory) {
+    val doc = Document("_id", memory.groupId)
+      .append("summary", memory.summary)
+      .append("coveredUntil", memory.coveredUntil)
+      .append("updatedAt", Date())
+    memory().replaceOne(Filters.eq("_id", memory.groupId), doc, ReplaceOptions().upsert(true))
+  }
 
   /** 只记异常类 noop (模型/审核/发送/预算), 常规类走 Redis 计数, 见 [NoopReason.persistToMongo]. */
   suspend fun recordNoop(groupId: String, messageId: String, reason: NoopReason, detail: String?) {

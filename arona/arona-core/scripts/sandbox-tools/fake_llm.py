@@ -12,6 +12,8 @@
   block   -> 回复里带 BLOCKME 标记 (配合 audit-stub 插件验证 AUDIT_BLOCK)
   noaudit -> 回复里带 NOAUDIT (audit-stub 不置位 -> AUDIT_UNAVAILABLE)
   slowaudit -> 回复里带 SLOWME (audit-stub 睡 5s -> 审核超时 AUDIT_UNAVAILABLE)
+  bigusage -> 正常回复但 usage.prompt_tokens=9999 (逼出记忆压缩的 token 触发条件)
+摘要请求 (无 response_format 且 user 内容含 "新摘要") 一律返回纯文本 "假摘要: ...", 与模式无关.
 把 chatbot config.yml 的 baseUrl 指到 http://127.0.0.1:18080 后重启 arona 即可.
 """
 import json, os, sys, time
@@ -43,6 +45,8 @@ class H(BaseHTTPRequestHandler):
       time.sleep(12)
     if m == "hang":
       time.sleep(40)
+    if "response_format" not in body and "新摘要" in body:
+      return self.completion("假摘要: 群友们一直在刷测试消息, 机器人偶尔回一句喵.", 1)
     content = {
       "reply": json.dumps({"reply": "假模型的回复喵", "silent": False}, ensure_ascii=False),
       "empty": "",
@@ -52,9 +56,12 @@ class H(BaseHTTPRequestHandler):
       "noaudit": json.dumps({"reply": "NOAUDIT 没人审这句", "silent": False}, ensure_ascii=False),
       "slowaudit": json.dumps({"reply": "SLOWME 审核会超时", "silent": False}, ensure_ascii=False),
     }.get(m, json.dumps({"reply": f"模式 {m} 的回复喵", "silent": False}, ensure_ascii=False))
+    self.completion(content, 9999 if m == "bigusage" else 1)
+
+  def completion(self, content, prompt_tokens):
     self.reply(200, {"id": "fake", "object": "chat.completion", "model": "fake",
                      "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
-                     "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}})
+                     "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": 1, "total_tokens": prompt_tokens + 1}})
 
   def reply(self, code, obj):
     data = json.dumps(obj, ensure_ascii=False).encode("utf-8")

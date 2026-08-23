@@ -24,9 +24,11 @@ o = a.parse_args(); db = mongo()
 if o.set_config:
   r = db["Contact"].update_one({"_id": o.gid}, {"$set": {KEY: json.loads(o.set_config)}}); print("set config matched/modified:", r.matched_count, r.modified_count)
 if o.clear:
-  print("cleared chatContext/chatNoop:", db["chatContext"].delete_many({"groupId": o.gid}).deleted_count, db["chatNoop"].delete_many({"groupId": o.gid}).deleted_count)
+  print("cleared chatContext/chatNoop/chatMemory:", db["chatContext"].delete_many({"groupId": o.gid}).deleted_count, db["chatNoop"].delete_many({"groupId": o.gid}).deleted_count, db["chatMemory"].delete_many({"_id": o.gid}).deleted_count)
 doc = db["Contact"].find_one({"_id": o.gid}, {KEY: 1}) or {}
 print("group config:", json.dumps(doc.get("config", {}).get("com·diyigemt·arona·chatbot", {}).get("ChatbotConfig"), ensure_ascii=False))
+m = db["chatMemory"].find_one({"_id": o.gid})
+print("chatMemory:", "none" if not m else f"coveredUntil={m['coveredUntil'].strftime('%H:%M:%S.%f')[:-3]} updatedAt={m['updatedAt'].strftime('%H:%M:%S')} summary={m.get('summary')!r}")
 print("chatContext:")
 for d in db["chatContext"].find({"groupId": o.gid}).sort("ts", 1): print("  ", d["ts"].strftime("%H:%M:%S"), "bot" if d.get("fromBot") else d.get("senderName") or d.get("senderId"), "|", d["_id"], "|", d.get("content"))
 print("chatNoop:")

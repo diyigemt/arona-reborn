@@ -18,6 +18,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -32,7 +33,8 @@ internal data class BotAction(
 )
 
 internal sealed interface LlmOutcome {
-  data class Reply(val text: String) : LlmOutcome
+  /** [promptTokens] 来自响应 usage, 供记忆压缩的 token 条件; 响应不带 usage 时为 null. */
+  data class Reply(val text: String, val promptTokens: Int? = null) : LlmOutcome
   data class Noop(val reason: NoopReason, val detail: String? = null) : LlmOutcome
 }
 
@@ -67,21 +69,28 @@ internal object DeepSeekClient {
     }
     return when (resp) {
       is Response.Error -> LlmOutcome.Noop(NoopReason.MODEL_ERROR, resp.detail)
-      is Response.Content -> classify(resp.text)
+      is Response.Content -> classify(resp.text, resp.promptTokens)
     }
   }
 
+  /** 纯文本补全 (不走 json_object), 用于生成聊天摘要. 失败 / 空输出返回 null, 调用方决定日志. */
+  suspend fun summarize(systemPrompt: String, userPrompt: String): String? =
+    when (val resp = request(systemPrompt, userPrompt, jsonMode = false, timeoutMillis = ChatbotSecrets.memoryTimeoutMillis)) {
+      is Response.Error -> { PluginMain.logger.warn("chatbot 摘要模型调用失败: ${resp.detail}"); null }
+      is Response.Content -> resp.text.trim().ifEmpty { null }
+    }
+
   /** 模型 content → 结果 (纯函数). 空 content 是 JSON_EMPTY, 模型明确 silent 才是 MODEL_SILENT, 两者不能混. */
-  internal fun classify(content: String): LlmOutcome {
+  internal fun classify(content: String, promptTokens: Int? = null): LlmOutcome {
     if (content.isBlank()) return LlmOutcome.Noop(NoopReason.JSON_EMPTY)
     val action = parseBotAction(content) ?: return LlmOutcome.Noop(NoopReason.JSON_INVALID, content.take(200))
     val reply = action.reply?.trim().orEmpty()
     if (action.silent || reply.isEmpty()) return LlmOutcome.Noop(NoopReason.MODEL_SILENT)
-    return LlmOutcome.Reply(reply)
+    return LlmOutcome.Reply(reply, promptTokens)
   }
 
-  private sealed interface Response {
-    data class Content(val text: String) : Response
+  internal sealed interface Response {
+    data class Content(val text: String, val promptTokens: Int? = null) : Response
     data class Error(val detail: String) : Response
   }
 
@@ -105,12 +114,13 @@ internal object DeepSeekClient {
     return extractContent(raw)
   }
 
-  /** OpenAI 形态: `choices[0].message.content`; 带 `error` 对象的响应按错误处理. */
-  private fun extractContent(raw: String): Response = runCatching {
+  /** OpenAI 形态: `choices[0].message.content` + `usage.prompt_tokens`; 带 `error` 对象的响应按错误处理. */
+  internal fun extractContent(raw: String): Response = runCatching {
     val root = LENIENT_JSON.parseToJsonElement(raw).jsonObject
     root["error"]?.takeIf { it !is JsonNull }?.let { return Response.Error(it.toString().take(300)) }
     val content = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
       ?.get("message")?.jsonObject?.get("content")
-    Response.Content((content as? JsonPrimitive)?.contentOrNull.orEmpty())
+    val promptTokens = (root["usage"] as? JsonObject)?.get("prompt_tokens")?.jsonPrimitive?.intOrNull
+    Response.Content((content as? JsonPrimitive)?.contentOrNull.orEmpty(), promptTokens)
   }.getOrElse { Response.Error("unexpected response: ${raw.take(300)}") }
 }

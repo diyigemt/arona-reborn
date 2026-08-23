@@ -36,6 +36,25 @@ class DeepSeekParsingTest {
   }
 
   @Test
+  fun `响应解析带 usage prompt_tokens, 缺失为 null`() {
+    val withUsage = DeepSeekClient.extractContent("""{"choices":[{"message":{"content":"hi"}}],"usage":{"prompt_tokens":321,"completion_tokens":5}}""")
+    assertEquals(DeepSeekClient.Response.Content("hi", 321), withUsage)
+    val noUsage = DeepSeekClient.extractContent("""{"choices":[{"message":{"content":"hi"}}]}""")
+    assertEquals(DeepSeekClient.Response.Content("hi", null), noUsage)
+    assertTrue(DeepSeekClient.extractContent("""{"error":{"message":"boom"}}""") is DeepSeekClient.Response.Error)
+    assertEquals(321, (DeepSeekClient.classify("{\"reply\": \"喵\"}", 321) as LlmOutcome.Reply).promptTokens)
+  }
+
+  @Test
+  fun `摘要进入 user prompt 最前面, 空摘要等价无摘要`() {
+    val prompt = buildUserPrompt(emptyList(), "小红", "你好", summary = "小明爱吃鱼")
+    assertTrue(prompt.startsWith("更早的聊天摘要"))
+    assertTrue(prompt.contains("小明爱吃鱼"))
+    assertTrue(prompt.endsWith("现在 小红 说: 你好"))
+    assertEquals("现在 小红 说: 你好", buildUserPrompt(emptyList(), "小红", "你好", summary = "  "))
+  }
+
+  @Test
   fun `prompt 装配 - bot 自己的话标为我 空历史只有当前句`() {
     val history = listOf(
       ChatLine("1", "g", "u1", "小明", "今天吃啥", fromBot = false, ts = java.util.Date(0)),

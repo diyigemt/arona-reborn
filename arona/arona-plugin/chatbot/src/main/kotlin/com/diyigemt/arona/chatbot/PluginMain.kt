@@ -21,7 +21,7 @@ object PluginMain : AronaPlugin(
 ) {
   override fun onLoad() {
     launch {
-      runCatchingCancellable { ChatStore.ensureIndexes(ChatbotSecrets.contextTtlHours) }
+      runCatchingCancellable { ChatStore.ensureIndexes(ChatbotSecrets.contextTtlHours, ChatbotSecrets.memoryTtlDays) }
         .onFailure { logger.warn("创建 chatbot 索引失败", it) }
     }
 
@@ -56,7 +56,7 @@ object PluginMain : AronaPlugin(
         groupId = ev.group.id,
         senderId = ev.sender.id,
         senderName = ev.platformUsername,
-        content = text,
+        content = text.take(OBSERVE_MAX_CHARS),
         fromBot = false,
         ts = parseTimestampMillis(ev.timestamp)?.let(::Date) ?: Date(),
       ),
@@ -64,6 +64,8 @@ object PluginMain : AronaPlugin(
   }
 
   private const val IMAGE_PLACEHOLDER = "[图片]"
+  /** 观察落库的单条上限: 超长粘贴既撑大 history prompt 也撑大摘要输入, 记忆只需要它的开头. */
+  private const val OBSERVE_MAX_CHARS = 1_000
 
   // ponytail: 每条消息一次 Mongo 读; 全量消息下若成瓶颈, 加 30s 的 ConcurrentHashMap 缓存即可.
   private suspend fun groupConfig(groupId: String): ChatbotConfig? =

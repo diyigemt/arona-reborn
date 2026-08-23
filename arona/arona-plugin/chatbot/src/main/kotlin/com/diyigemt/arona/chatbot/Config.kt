@@ -43,6 +43,22 @@ object ChatbotSecrets : AutoSavePluginData("config") {
 
   /** 全局按群限流: 每群每分钟最多回复条数 (每秒固定 1 条). 按群的节奏控制请用群配置里的 cooldownSec. */
   val rateLimitPerMinute by value(10L)
+
+  // ---- 记忆压缩 (P1): 每群一条滚动摘要, 回复成功后评估, 条数 OR usage 任一达标即压缩 ----
+  /** 记忆总开关. 关闭后不读摘要也不压缩, 只剩 historyLimit 时间窗. */
+  val memoryEnabled by value(true)
+  /** 未压缩行数达到此值即压缩. */
+  val memoryCompressAfterLines by value(60)
+  /** 本轮对话响应的 usage.prompt_tokens 达到此值即压缩 (含人设; usage 缺失时只看条数). */
+  val memoryCompressPromptTokens by value(6_000)
+  /** 摘要最大字数: 提示模型, 落库前也硬截断. */
+  val memoryMaxChars by value(600)
+  /** 单次压缩最多吃多少行, 其余留到下次回复后. */
+  val memoryBatchLimit by value(200)
+  /** 摘要模型调用超时, 独立于对话超时 (输入更长, 且不占回复的 30s 预算). */
+  val memoryTimeoutMillis by value(15_000L)
+  /** 摘要闲置过期天数 (按 updatedAt 的 TTL 索引, 改动需手动重建索引). raw 只留 24h, 摘要不该永生. */
+  val memoryTtlDays by value(7L)
 }
 
 enum class ProbabilityMode {

@@ -88,6 +88,11 @@ suspend fun mockGroupMessage(gid: String, uid: String, content: String, eid: Str
   TencentGroupMessageEvent(PlainText(content).toMessageChain(), eid, member).broadcast()
 }
 
+// 取第一个有正文的内联元素作为引用原文; 空白正文视同未引用, 不凭 message_type=103 单独构造空引用.
+private fun TencentGroupMessageRaw.quotedOrNull(): QuotedMessage? = msgElements?.firstNotNullOfOrNull { el ->
+  el.content?.trim()?.takeIf { it.isNotEmpty() }?.let { QuotedMessage(it, el.msgIdx) }
+}
+
 internal object TencentWebsocketGroupAtMessageCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentGroupMessageRaw>() {
   override val type = TencentWebsocketEventType.GROUP_AT_MESSAGE_CREATE
@@ -102,6 +107,7 @@ internal object TencentWebsocketGroupAtMessageCreateHandler :
       isAtBot = payload.mentions?.any { it.isYou } == true,
       platformUsername = payload.author.username,
       timestamp = payload.timestamp,
+      quoted = payload.quotedOrNull(),
     ).broadcast()
   }
 }
@@ -121,6 +127,7 @@ internal object TencentWebsocketGroupMessageCreateHandler :
       isAtBot = payload.mentions?.any { it.isYou } == true,
       platformUsername = payload.author.username,
       timestamp = payload.timestamp,
+      quoted = payload.quotedOrNull(),
     ).broadcast()
   }
 }

@@ -485,6 +485,19 @@ internal data class TencentGroupMessageMentionRaw(
 )
 
 /**
+ * 引用消息内联下发的被引用元素 (2026-08 真机样本: `message_type=103` 时 `msg_elements[0]` 即被引用原文,
+ * 其 `msg_idx` 等于 `message_scene.ext` 里的 `ref_msg_idx`). 文档未载, 字段全部可空以容忍 payload 变动.
+ */
+@Serializable
+internal data class TencentGroupMessageElementRaw(
+  @SerialName("msg_idx")
+  val msgIdx: String? = null,
+  @SerialName("message_type")
+  val messageType: Int? = null,
+  val content: String? = null,
+)
+
+/**
  * 群消息来源场景. 旧 payload 无此字段, 故整体可空; [ext] 原样保留腾讯下发的扩展参数 (如 msg_idx=...),
  * 不在此处解析, 交由消费方按需处理.
  */
@@ -517,10 +530,15 @@ internal data class TencentGroupMessageRaw(
   @SerialName("message_scene")
   val messageScene: TencentGroupMessageSceneRaw? = null,
   /**
-   * 腾讯下发的原始消息类型值, 直接保留 Int 以容纳未来新增取值. 旧 payload 无此字段, 故可空.
+   * 腾讯下发的原始消息类型值, 直接保留 Int 以容纳未来新增取值 (已观测: 0 普通, 103 引用消息). 旧 payload 无此字段, 故可空.
    */
   @SerialName("message_type")
   val messageType: Int? = null,
+  /**
+   * 引用消息携带的被引用原文, 见 [TencentGroupMessageElementRaw]. 非引用消息与旧 payload 无此字段, 故可空.
+   */
+  @SerialName("msg_elements")
+  val msgElements: List<TencentGroupMessageElementRaw>? = null,
 ) : TencentMessageRaw
 
 internal const val EmptyMessageId = ""

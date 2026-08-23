@@ -90,6 +90,55 @@ class TencentGroupMessageExtendedRawTest {
     assertNull(raw.rawGroupId)
     assertNull(raw.messageScene)
     assertNull(raw.messageType)
+    assertNull(raw.msgElements)
+  }
+
+  // 2026-08-23 真机引用消息样本 (脱敏): message_type=103, msg_elements 内联被引用原文, 另有未建模的 parallel_message.
+  @Test
+  fun `引用消息解析 msg_elements 且未建模的 parallel_message 不抛`() {
+    val raw = json.decodeFromString(
+      TencentGroupMessageRaw.serializer(),
+      """
+      {
+        "id": "msg-quote",
+        "content": " <@BOT> 你能做些什么",
+        "timestamp": "2026-08-23T11:57:23+08:00",
+        "author": { "member_openid": "u-1", "username": "第一个mt" },
+        "mentions": [ { "member_openid": "BOT", "is_you": true } ],
+        "group_openid": "g-1",
+        "message_scene": { "source": "default", "ext": [ "ref_msg_idx=REFIDX_ref", "msg_idx=REFIDX_self" ] },
+        "message_type": 103,
+        "parallel_message": { "msg_nodes": [ { "message_type": 0, "content": "在喵～" } ] },
+        "msg_elements": [ { "msg_idx": "REFIDX_ref", "message_type": 103, "content": "在喵～" } ]
+      }
+      """.trimIndent(),
+    )
+    assertEquals(103, raw.messageType)
+    val element = assertNotNull(raw.msgElements).single()
+    assertEquals("REFIDX_ref", element.msgIdx)
+    assertEquals(103, element.messageType)
+    assertEquals("在喵～", element.content)
+  }
+
+  @Test
+  fun `msg_elements 元素缺字段时全部为 null 不抛`() {
+    val raw = json.decodeFromString(
+      TencentGroupMessageRaw.serializer(),
+      """
+      {
+        "id": "msg-3",
+        "author": { "member_openid": "u-3" },
+        "content": "hi",
+        "timestamp": "2026-06-19T18:42:16+08:00",
+        "group_openid": "g-3",
+        "msg_elements": [ {} ]
+      }
+      """.trimIndent(),
+    )
+    val element = assertNotNull(raw.msgElements).single()
+    assertNull(element.msgIdx)
+    assertNull(element.messageType)
+    assertNull(element.content)
   }
 
   @Test

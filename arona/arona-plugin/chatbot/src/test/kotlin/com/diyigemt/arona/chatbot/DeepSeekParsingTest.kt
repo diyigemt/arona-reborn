@@ -47,4 +47,20 @@ class DeepSeekParsingTest {
     assertTrue(prompt.endsWith("现在 小红 说: 我也想吃"))
     assertEquals("现在 小红 说: 你好", buildUserPrompt(emptyList(), "小红", "你好"))
   }
+
+  @Test
+  fun `引用原文进入 prompt 且按 history 判定是否 bot 所说`() {
+    val history = listOf(ChatLine("1", "g", BOT_SENDER_ID, null, "在喵～", fromBot = true, ts = java.util.Date(0)))
+    val mine = buildUserPrompt(history, "小红", "你能做些什么", quoted = "在喵～")
+    assertTrue(mine.contains("对方引用了我之前说的话"))
+    assertTrue(mine.contains("「在喵～」"))
+    assertTrue(mine.endsWith("现在 小红 说: 你能做些什么"))
+
+    val other = buildUserPrompt(history, "小红", "真的吗", quoted = "今天吃鱼")
+    assertTrue(other.contains("对方引用了群里的一条消息"))
+    assertTrue(other.contains("「今天吃鱼」"))
+
+    // 空白引用与无引用等价.
+    assertEquals("现在 小红 说: hi", buildUserPrompt(emptyList(), "小红", "hi", quoted = "  "))
+  }
 }

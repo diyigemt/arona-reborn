@@ -62,6 +62,16 @@ class TencentFriendMessageEvent internal constructor(
   }
 }
 
+/**
+ * 群消息引用的原文. 平台在引用消息 (`message_type=103`) 里把被引用内容内联下发, 这里只保留文本与其 idx,
+ * 不解析 `message_scene.ext`, 也不做出站 idx 配对 —— "引用了什么" 靠原文即可回答.
+ */
+data class QuotedMessage(
+  val content: String,
+  /** 被引用消息的平台 idx (`REFIDX_…`), 不透明, 仅作诊断/去重参考. */
+  val msgIdx: String?,
+)
+
 class TencentGroupMessageEvent internal constructor(
   message: MessageChain,
   override val eventId: String,
@@ -80,6 +90,11 @@ class TencentGroupMessageEvent internal constructor(
    * 仅真实 webhook 路径填充; mock / 旧路径为 null, 消费方按 "未知" 处理.
    */
   val timestamp: String? = null,
+  /**
+   * 本条消息引用的原文; 非引用消息 / 平台未内联原文 / mock 路径为 null. 引用 bot 自身消息时平台还会自动 @ bot
+   * (体现在 [isAtBot]), 两者互不推导.
+   */
+  val quoted: QuotedMessage? = null,
 ) : TencentGroupEvent, TencentMessageEvent(sender.bot, message) {
   override val subject get() = sender.group
   override val group get() = sender.group

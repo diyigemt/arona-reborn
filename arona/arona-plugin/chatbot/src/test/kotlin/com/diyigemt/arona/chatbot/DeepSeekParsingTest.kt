@@ -36,6 +36,26 @@ class DeepSeekParsingTest {
   }
 
   @Test
+  fun `tool arguments 优先于 content, usage 与 sticker 语义不变`() {
+    val respond = DeepSeekClient.FunctionCall(DeepSeekClient.RESPOND_TOOL_NAME, """{"reply":" 喵 ","silent":false,"sticker":" 无语 猫 "}""")
+    assertEquals(
+      LlmOutcome.Reply("喵", promptTokens = 321, sticker = "无语 猫"),
+      DeepSeekClient.classify("""{"reply":"不应采用 content"}""", 321, listOf(respond)),
+    )
+    val silent = DeepSeekClient.FunctionCall(DeepSeekClient.RESPOND_TOOL_NAME, """{"silent":true}""")
+    assertEquals(LlmOutcome.Noop(NoopReason.MODEL_SILENT), DeepSeekClient.classify("""{"reply":"不应采用 content"}""", functionCalls = listOf(silent)))
+  }
+
+  @Test
+  fun `tool arguments 空白-非法-错误函数名都不回退 content`() {
+    val fallback = """{"reply":"不应回退"}"""
+    fun classify(call: DeepSeekClient.FunctionCall) = DeepSeekClient.classify(fallback, functionCalls = listOf(call)) as LlmOutcome.Noop
+    assertEquals(NoopReason.JSON_EMPTY, classify(DeepSeekClient.FunctionCall(DeepSeekClient.RESPOND_TOOL_NAME, "  ")).reason)
+    assertEquals(NoopReason.JSON_INVALID, classify(DeepSeekClient.FunctionCall(DeepSeekClient.RESPOND_TOOL_NAME, "不是 JSON")).reason)
+    assertEquals(NoopReason.JSON_INVALID, classify(DeepSeekClient.FunctionCall("other", """{"reply":"错误函数"}""")).reason)
+  }
+
+  @Test
   fun `响应解析带 usage prompt_tokens, 缺失为 null`() {
     val withUsage = DeepSeekClient.extractContent("""{"choices":[{"message":{"content":"hi"}}],"usage":{"prompt_tokens":321,"completion_tokens":5}}""")
     assertEquals(DeepSeekClient.Response.Content("hi", 321), withUsage)
@@ -43,6 +63,25 @@ class DeepSeekParsingTest {
     assertEquals(DeepSeekClient.Response.Content("hi", null), noUsage)
     assertTrue(DeepSeekClient.extractContent("""{"error":{"message":"boom"}}""") is DeepSeekClient.Response.Error)
     assertEquals(321, (DeepSeekClient.classify("{\"reply\": \"喵\"}", 321) as LlmOutcome.Reply).promptTokens)
+  }
+
+  @Test
+  fun `残缺 tool_call 端到端 - 缺 name 判 JSON_INVALID, 缺 arguments 判 JSON_EMPTY`() {
+    fun endToEnd(raw: String): NoopReason {
+      val resp = DeepSeekClient.extractContent(raw) as DeepSeekClient.Response.Content
+      return (DeepSeekClient.classify(resp.text, functionCalls = resp.functionCalls) as LlmOutcome.Noop).reason
+    }
+    assertEquals(NoopReason.JSON_INVALID, endToEnd("""{"choices":[{"message":{"content":null,"tool_calls":[{"type":"function","function":{"arguments":"{}"}}]}}]}"""))
+    assertEquals(NoopReason.JSON_EMPTY, endToEnd("""{"choices":[{"message":{"content":null,"tool_calls":[{"type":"function","function":{"name":"respond"}}]}}]}"""))
+  }
+
+  @Test
+  fun `响应解析 tool_calls - content 为 null 时 arguments 原样透出`() {
+    val raw = """{"choices":[{"message":{"content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"respond","arguments":"{\"reply\":\"喵\",\"silent\":false}"}}]}}],"usage":{"prompt_tokens":321}}"""
+    assertEquals(
+      DeepSeekClient.Response.Content("", 321, listOf(DeepSeekClient.FunctionCall("respond", """{"reply":"喵","silent":false}"""))),
+      DeepSeekClient.extractContent(raw),
+    )
   }
 
   @Test

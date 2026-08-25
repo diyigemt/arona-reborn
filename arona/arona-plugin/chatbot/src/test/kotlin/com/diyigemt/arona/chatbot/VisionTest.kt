@@ -1,5 +1,6 @@
 package com.diyigemt.arona.chatbot
 
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -16,8 +17,8 @@ class VisionTest {
   private val image = DownloadedImage(byteArrayOf(1, 2, 3), "image/png")
 
   @Test
-  fun `带图请求 - user content 为数组, 不带 response_format`() {
-    val body = DeepSeekClient.buildRequestBody("m", "sys", "看图", jsonMode = false, images = listOf(image, image))
+  fun `带图聊天请求 - user content 为数组, 强制 respond 工具且关 thinking`() {
+    val body = DeepSeekClient.buildRequestBody("m", "sys", "看图", DeepSeekClient.RequestMode.Respond(allowSticker = false), images = listOf(image, image))
     val user = body["messages"]!!.jsonArray[1].jsonObject
     val content = user["content"]!!.jsonArray
     assertEquals(3, content.size)
@@ -25,14 +26,42 @@ class VisionTest {
     assertEquals("看图", content[0].jsonObject["text"]!!.jsonPrimitive.content)
     assertEquals("image_url", content[1].jsonObject["type"]!!.jsonPrimitive.content)
     assertEquals("data:image/png;base64,AQID", content[1].jsonObject["image_url"]!!.jsonObject["url"]!!.jsonPrimitive.content)
+
+    val tool = body["tools"]!!.jsonArray.single().jsonObject
+    assertEquals("function", tool["type"]!!.jsonPrimitive.content)
+    val function = tool["function"]!!.jsonObject
+    assertEquals(DeepSeekClient.RESPOND_TOOL_NAME, function["name"]!!.jsonPrimitive.content)
+    val parameters = function["parameters"]!!.jsonObject
+    val properties = parameters["properties"]!!.jsonObject
+    assertEquals("string", properties["reply"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+    assertEquals("boolean", properties["silent"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+    assertNull(properties["sticker"], "未掷中配图的轮次 schema 不能暴露 sticker")
+    assertEquals(listOf("silent"), parameters["required"]!!.jsonArray.map { it.jsonPrimitive.content })
+    assertFalse(parameters["additionalProperties"]!!.jsonPrimitive.boolean)
+    assertEquals("function", body["tool_choice"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+    assertEquals(DeepSeekClient.RESPOND_TOOL_NAME, body["tool_choice"]!!.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+    assertEquals("disabled", body["thinking"]!!.jsonObject["type"]!!.jsonPrimitive.content)
     assertNull(body["response_format"])
   }
 
   @Test
-  fun `纯文本请求 - content 仍是字符串, 带 response_format`() {
-    val body = DeepSeekClient.buildRequestBody("m", "sys", "hi", jsonMode = true, images = emptyList())
+  fun `纯文本聊天请求 - content 仍是字符串, 掷中配图时 schema 才有 sticker`() {
+    val body = DeepSeekClient.buildRequestBody("m", "sys", "hi", DeepSeekClient.RequestMode.Respond(allowSticker = true), images = emptyList())
     assertEquals("hi", body["messages"]!!.jsonArray[1].jsonObject["content"]!!.jsonPrimitive.content)
-    assertEquals("json_object", body["response_format"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+    val properties = body["tools"]!!.jsonArray.single().jsonObject["function"]!!.jsonObject["parameters"]!!.jsonObject["properties"]!!.jsonObject
+    assertEquals("string", properties["sticker"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+    assertTrue(properties["sticker"]!!.jsonObject["description"]!!.jsonPrimitive.content.contains("2~4 个关键词"))
+    assertNull(body["response_format"])
+  }
+
+  @Test
+  fun `普通补全请求 - 摘要与打标不带 tools tool_choice thinking response_format`() {
+    val body = DeepSeekClient.buildRequestBody("m", "sys", "hi", DeepSeekClient.RequestMode.Plain, images = emptyList())
+    assertEquals("hi", body["messages"]!!.jsonArray[1].jsonObject["content"]!!.jsonPrimitive.content)
+    assertNull(body["tools"])
+    assertNull(body["tool_choice"])
+    assertNull(body["thinking"])
+    assertNull(body["response_format"])
   }
 
   @Test

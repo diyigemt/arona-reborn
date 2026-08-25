@@ -127,14 +127,6 @@ internal const val RATE_LIMIT_HINT = "说太快了, 让我喘口气"
 internal const val MUTE_HINT = "好, 我安静一会"
 internal const val BOT_SENDER_ID = "bot"
 
-/** 人设之外固定追加的输出约定, 不暴露给 webui 编辑. */
-internal const val OUTPUT_CONTRACT =
-  "\n\n输出必须是 JSON 对象: {\"reply\": \"你要说的一句话\", \"silent\": false}; 这轮不想说话就输出 {\"silent\": true}. 不要输出其它内容."
-
-/** 掷中配图概率的轮次才追加: 模型给关键词, 我们在图库里挑. 不掷中的轮次模型根本不知道有这回事. */
-internal const val STICKER_CONTRACT =
-  " 这轮可以配一张表情包: 想配就在 JSON 里加 \"sticker\": \"描述表情的 2~4 个关键词, 空格分隔\", 不想配就不加."
-
 /** 回复路径最多看几张图. */
 internal const val VISION_MAX_IMAGES = 2
 
@@ -341,8 +333,7 @@ internal object ChatbotPipeline {
       imageCount = images.size,
     )
     val wantSticker = ThreadLocalRandom.current().nextDouble() < cfg.stickerReplyProbability
-    val systemPrompt = cfg.systemPrompt + OUTPUT_CONTRACT + if (wantSticker) STICKER_CONTRACT else ""
-    val reply = when (val out = DeepSeekClient.chat(systemPrompt, prompt, images)) {
+    val reply = when (val out = DeepSeekClient.chat(cfg.systemPrompt, prompt, images, allowSticker = wantSticker)) {
       is LlmOutcome.Noop -> { noop(gid, sourceId, out.reason, out.detail); return Outcome.Skipped }
       is LlmOutcome.Reply -> out
     }

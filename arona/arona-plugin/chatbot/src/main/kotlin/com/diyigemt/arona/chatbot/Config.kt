@@ -24,9 +24,8 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   val baseUrl by value("https://api.deepseek.com")
   val chatModel by value("deepseek-v4-flash-vision-exp")
 
-  /** 单次模型调用超时; 空 content 重试一次时用 [llmRetryTimeoutMillis]. */
+  /** 单次聊天模型调用超时, 不重试. */
   val llmTimeoutMillis by value(8_000L)
-  val llmRetryTimeoutMillis by value(5_000L)
   /** 内容审核超时, 超时即判拒 (fail-closed), 不重试. */
   val auditTimeoutMillis by value(3_000L)
   /** 发送超时, 不重试 (重试 = 抢同 msg_id 的 5 次被动回复配额). */

@@ -16,8 +16,36 @@
       </ElFormItem>
       <ElFormItem>
         <ElButton :loading="loading" @click="reload">刷新</ElButton>
+        <ElButton :type="batch ? 'primary' : 'default'" @click="batch = !batch">批量</ElButton>
       </ElFormItem>
     </ElForm>
+    <div v-if="batch" class="batch-bar">
+      <span>已选 {{ selected.size }} / {{ visible.length }}</span>
+      <ElButton size="small" :disabled="busy" @click="selectAll">全选本档</ElButton>
+      <ElButton size="small" :disabled="selected.size === 0 || busy" @click="selected.clear()">清空</ElButton>
+      <ElButton
+        size="small"
+        type="success"
+        :disabled="selected.size === 0"
+        :loading="busy"
+        @click="batchStatus('ready')"
+        >通过</ElButton
+      >
+      <ElButton size="small" :disabled="selected.size === 0" :loading="busy" @click="batchStatus('hidden')"
+        >隐藏</ElButton
+      >
+      <ElButton
+        size="small"
+        type="warning"
+        :disabled="selected.size === 0"
+        :loading="busy"
+        @click="batchStatus('rejected')"
+        >拒绝</ElButton
+      >
+      <ElButton size="small" type="danger" :disabled="selected.size === 0" :loading="busy" @click="batchRemove"
+        >删除</ElButton
+      >
+    </div>
     <ElAlert
       v-if="stickers.length >= LIST_LIMIT"
       type="warning"
@@ -28,7 +56,14 @@
 
     <ElEmpty v-if="!loading && visible.length === 0" description="这一档没有表情" />
     <div v-else class="sticker-grid">
-      <ElCard v-for="s in visible" :key="s.id" shadow="hover" :body-style="{ padding: '8px' }">
+      <ElCard
+        v-for="s in visible"
+        :key="s.id"
+        shadow="hover"
+        :body-style="{ padding: '8px' }"
+        :class="{ 'sticker-selected': selected.has(s.id), 'sticker-selectable': batch }"
+        @click="toggle(s)"
+      >
         <!-- 公开静态链接, 不把后台地址当 referrer 带出去 -->
         <img v-if="s.url" :src="s.url" class="sticker-img" loading="lazy" referrerpolicy="no-referrer" alt="" />
         <div v-else class="sticker-img sticker-missing">无图</div>
@@ -43,7 +78,7 @@
           <span v-if="s.width && s.height">{{ s.width }}×{{ s.height }}</span>
         </div>
         <div class="sticker-groups" :title="groupNames(s)">来源: {{ groupNames(s) }}</div>
-        <div class="sticker-actions">
+        <div v-if="!batch" class="sticker-actions">
           <ElButton v-if="s.status !== 'ready' && s.hasFile" size="small" type="success" @click="setStatus(s, 'ready')"
             >通过</ElButton
           >
@@ -87,7 +122,7 @@
 <script setup lang="ts">
 import { ChatbotApi } from "@/api";
 import type { ChatSticker, ChatStickerGroup, ChatStickerStatus } from "@/interface";
-import { IWarningConfirm, successMessage } from "@/utils/message";
+import { IWarningConfirm, successMessage, warningMessage } from "@/utils/message";
 import useBaseStore from "@/store/base";
 
 defineOptions({
@@ -113,7 +148,13 @@ const loading = ref(false);
 const showEdit = ref(false);
 const editForm = ref<{ id: string; tags: string[]; summary: string }>({ id: "", tags: [], summary: "" });
 
+const batch = ref(false);
+// 一次只跑一个批量操作: 防双击/中途改选被结尾的 clear 吞掉
+const busy = ref(false);
+const selected = ref(new Set<string>());
 const visible = computed(() => stickers.value.filter((s) => s.status === status.value));
+// 换档/切群/刷新/退出批量后, 选中的卡片可能已不在视野里, 一律清空重选
+watch([status, groupId, batch], () => selected.value.clear());
 const groupNameById = computed(() => new Map(groups.value.map((g) => [g.id, g.name])));
 function countOf(value: ChatStickerStatus) {
   return stickers.value.filter((s) => s.status === value).length;
@@ -122,7 +163,64 @@ function groupNames(s: ChatSticker) {
   return s.groupIds.map((id) => groupNameById.value.get(id) ?? id).join(", ");
 }
 
+function toggle(s: ChatSticker) {
+  if (!batch.value || busy.value) return;
+  if (!selected.value.delete(s.id)) selected.value.add(s.id);
+}
+function selectAll() {
+  if (busy.value) return;
+  visible.value.forEach((s) => selected.value.add(s.id));
+}
+const selectedList = computed(() => visible.value.filter((s) => selected.value.has(s.id)));
+// 批量就是循环单个接口 (每个是一次很轻的 Mongo 更新), 不值得为此加后端批量端点; 20 个一批串行, 全选 1000 张也不会瞬间打满后端
+async function inChunks(items: ChatSticker[], run: (s: ChatSticker) => Promise<unknown>) {
+  const results: PromiseSettledResult<unknown>[] = [];
+  for (let i = 0; i < items.length; i += 20) {
+    results.push(...(await Promise.allSettled(items.slice(i, i + 20).map(run))));
+  }
+  return results;
+}
+async function batchStatus(next: ChatStickerStatus) {
+  if (busy.value) return;
+  const pending = selectedList.value.filter((s) => s.status !== next);
+  const targets = next === "ready" ? pending.filter((s) => s.hasFile) : pending;
+  const skipped = pending.length - targets.length;
+  busy.value = true;
+  try {
+    const results = await inChunks(targets, (s) =>
+      ChatbotApi.updateSticker({ id: s.id, status: next }).then(() => (s.status = next)),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    selected.value.clear();
+    report(targets.length - failed, failed, skipped ? `, 跳过无图 ${skipped} 张` : "");
+  } finally {
+    busy.value = false;
+  }
+}
+function batchRemove() {
+  if (busy.value) return;
+  IWarningConfirm("删除", `连图片文件一起删除 ${selected.value.size} 张, 所有来源群都会失去它们, 是否继续?`).then(
+    async () => {
+      const targets = selectedList.value;
+      busy.value = true;
+      try {
+        const results = await inChunks(targets, (s) => ChatbotApi.deleteSticker(s.id));
+        const removed = new Set(targets.filter((_, i) => results[i].status === "fulfilled").map((s) => s.id));
+        stickers.value = stickers.value.filter((s) => !removed.has(s.id));
+        selected.value.clear();
+        report(removed.size, targets.length - removed.size, "");
+      } finally {
+        busy.value = false;
+      }
+    },
+  );
+}
+function report(ok: number, failed: number, extra: string) {
+  if (failed) warningMessage(`成功 ${ok} 张, 失败 ${failed} 张${extra}`);
+  else successMessage(`已处理 ${ok} 张${extra}`);
+}
 function reload() {
+  selected.value.clear();
   loading.value = true;
   ChatbotApi.fetchStickers(groupId.value || undefined)
     .then((data) => {
@@ -163,6 +261,24 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+.batch-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  .el-button + .el-button {
+    margin-left: 0;
+  }
+}
+.sticker-selectable {
+  cursor: pointer;
+  user-select: none;
+}
+.sticker-selected {
+  outline: 2px solid var(--el-color-primary);
+}
 .sticker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

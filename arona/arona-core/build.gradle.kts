@@ -11,7 +11,7 @@ kotlin {
   }
   jvmToolchain(17)
 }
-version = "2.2.0"
+version = "2.3.0"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 
@@ -116,8 +116,8 @@ tasks.register("copyToPlugins") {
       file(pluginDir)
         .listFiles { it -> it.isFile && it.name.startsWith(project.name) }
         ?.forEach { it.delete() }
-      buildJar.copyTo(file(pluginDir + "./" + buildJar.name), true)
-      logger.error("copy ${buildJar.name} to sanbox folder")
+      buildJar.copyTo(file(pluginDir).resolve(buildJar.name), true)
+      logger.error("copy ${buildJar.name} to sandbox folder")
     }
   }
 }

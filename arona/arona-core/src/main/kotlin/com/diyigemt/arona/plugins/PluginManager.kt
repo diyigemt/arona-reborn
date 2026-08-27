@@ -44,18 +44,25 @@ object PluginManager {
   private val pluginsFolder by lazy {
     rootPath.resolve("plugins").apply { mkdir() }.toFile()
   }
+
+  // 插件共享库目录: 薄包插件的外部依赖由构建期 syncPluginLibraries 预置于此, 运行时不联网
+  private val librariesFolder = rootPath.resolve("libraries").toFile()
+
+  private fun File.jarFiles() = listFiles { file -> file.isFile && file.extension == "jar" }
+    ?.sortedBy { it.name }
+    .orEmpty()
+
+  // 插件 jar 在前: 同路径资源命中插件自身而非共享库, 保持 fat jar 时代 shadow 项目资源优先的语义
   private val classLoader = URLClassLoader(
-    pluginsFolder
-      .listFiles { file -> !file.isDirectory && file.extension == "jar" }
-      ?.map { it.toURI().toURL() }?.toTypedArray() ?: arrayOf(),
+    (pluginsFolder.jarFiles() + librariesFolder.jarFiles())
+      .map { it.toURI().toURL() }
+      .toTypedArray(),
     Application::class.java.classLoader
   )
   val pluginsDataPath: Path = rootPath.resolve("data").apply { mkdir() }
   val pluginsConfigPath: Path = rootPath.resolve("config").apply { mkdir() }
   fun loadPluginFromPluginDirectory() {
-    pluginsFolder
-      .listFiles { file -> !file.isDirectory && file.extension == "jar" }
-      ?.forEach { loadPluginFromFile(it) }
+    pluginsFolder.jarFiles().forEach { loadPluginFromFile(it) }
   }
 
   fun initPlugin() {

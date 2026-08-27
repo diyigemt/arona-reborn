@@ -30,8 +30,14 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   val auditTimeoutMillis by value(3_000L)
   /** 发送超时, 不重试 (重试 = 抢同 msg_id 的 5 次被动回复配额). */
   val sendTimeoutMillis by value(3_000L)
-  /** 整条流水线 (gate → 模型 → 审核 → 发送) 的硬顶. 30s 是体验上限, 不是平台 5 分钟窗口. */
+  /** 等待类步骤 (gate → 模型 → 审核 → 配图) 的硬顶. 发送阶段每步有独立超时, 在预算之外. 30s 是体验上限, 不是平台 5 分钟窗口. */
   val totalBudgetMillis by value(30_000L)
+
+  // ---- 分段回复: 进程级打字速度调参; 是否启用与最大段数是群配置 ----
+  /** 段间延迟按上一段字数模拟打字: 中日韩每字毫秒数, 其它字符减半. */
+  val segmentPerCharDelayMillis by value(300L)
+  val segmentMinDelayMillis by value(500L)
+  val segmentMaxDelayMillis by value(3_000L)
 
   /** 消息创建时间距今超过此秒数视为陈旧 (重启 / webhook 重投), 直接不回. 同时覆盖 5 分钟被动回复窗口. */
   val staleSec by value(60L)
@@ -40,7 +46,7 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   /** 装配 prompt 时取最近多少条群消息. */
   val historyLimit by value(20)
 
-  /** 全局按群限流: 每群每分钟最多回复条数 (每秒固定 1 条). 按群的节奏控制请用群配置里的 cooldownSec. */
+  /** 全局按群限流: 每群每分钟最多开始多少轮回复 (每秒 1 轮); 分段回复一轮只消耗一次令牌, 底层消息数可达轮数 × 段数. */
   val rateLimitPerMinute by value(10L)
 
   // ---- 记忆压缩 (P1): 每群一条滚动摘要, 回复成功后评估, 条数 OR usage 任一达标即压缩 ----
@@ -150,6 +156,14 @@ data class ChatbotConfig(
   val maxUserChars: Int = 500,
 
   @EncodeDefault
+  @ConfigItem(label = "分段回复", group = "分段", description = "把回复按语义标点拆成多条依次发送, 模拟真人打字; 会消耗更多被动回复配额. 默认人设只要求一句话, 想稳定多段请同步放宽人设")
+  val segmentReply: Boolean = false,
+
+  @EncodeDefault
+  @ConfigItem(label = "最大分段数", group = "分段", description = "2~4; 上限 4 是为同一条消息的 5 次被动回复配额留余量")
+  val segmentMaxCount: Int = 3,
+
+  @EncodeDefault
   @ConfigItem(label = "收集表情包", group = "表情", description = "把群里发的表情包存进图库 (需管理员审核后才会被使用)")
   val stickerCapture: Boolean = true,
 
@@ -168,6 +182,7 @@ data class ChatbotConfig(
       nonNegative("cooldownSec", cooldownSec)
       nonNegative("muteDurationSec", muteDurationSec)
       if (maxUserChars !in 1..MAX_USER_CHARS_CEILING) add(FieldError("maxUserChars", "必须在 1~$MAX_USER_CHARS_CEILING 之间"))
+      if (segmentMaxCount !in 2..4) add(FieldError("segmentMaxCount", "必须在 2~4 之间"))
       if (systemPrompt.length > MAX_PROMPT_CHARS) add(FieldError("systemPrompt", "不能超过 $MAX_PROMPT_CHARS 字"))
     }
     return if (errors.isEmpty()) PluginConfigCheckResult.PluginConfigCheckAccept()

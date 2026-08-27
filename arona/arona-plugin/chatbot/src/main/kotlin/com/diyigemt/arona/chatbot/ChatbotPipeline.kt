@@ -18,6 +18,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.OffsetDateTime
 import java.util.Date
@@ -220,7 +221,7 @@ private fun ChatLine.displayName() = if (fromBot) "我" else senderName?.takeIf 
 internal fun MessageChain.plainText(): String = filterIsInstance<PlainText>().joinToString(" ") { it.toString() }.trim()
 
 /**
- * 回复流水线: 忙位 → gate → history → 模型 → 审核 → 发送一次 → 记出站行.
+ * 回复流水线: 忙位 → gate → history → 模型 → 整段审核 → 发送 (可分段, 预算外) → 记一条出站行.
  * 全程只用事件携带的 [UserCommandSender] (seq 未消费), 任何分支都不自己再造 sender.
  */
 internal object ChatbotPipeline {
@@ -235,8 +236,13 @@ internal object ChatbotPipeline {
 
   private sealed interface Outcome {
     data object Skipped : Outcome
-    data class Sent(val receiptId: String, val text: String, val promptTokens: Int?) : Outcome
+
+    /** 审核通过、待发送的回复. 发送在总预算之外执行 (每步有独立超时), 避免发到一半被取消导致已发消息漏记出站. */
+    data class Ready(val segments: List<String>, val sticker: FetchedSticker?, val promptTokens: Int?, val state: GroupState) : Outcome
   }
+
+  /** 发送成功后的出站记账信息; [text] 只含实际发出的段. */
+  private data class Delivered(val receiptId: String, val text: String, val promptTokens: Int?)
 
   private const val STICKER_NAMESPACE = "chatbot"
 
@@ -249,20 +255,21 @@ internal object ChatbotPipeline {
     }
     try {
       // 只取消协程: ktor 是 suspend IO 能响应取消, 网络层另有 HttpTimeout 双保险.
+      // 预算只包住等待类步骤; 发送与记账放在预算之外 —— send/delay 各有超时上限, 存储类记账 (noop/markUsed/upsert)
+      // 与既有路径同级信任 (无超时), 全局取消在这里只会制造 "发了一半却漏记出站" 的坏结局.
       val outcome = withTimeoutOrNull(ChatbotSecrets.totalBudgetMillis) { locked(sender, event, cfg, gid, sourceId) }
         ?: return noop(gid, sourceId, NoopReason.BUDGET_EXCEEDED)
-      // 发送后的记账 (出站行 + 压缩) 放在回复预算之外: 消息已发出, 不能再记 BUDGET_EXCEEDED. 仍在忙位之内, 忙位就是压缩的群锁,
-      // 所以压缩自己也要有超时, 否则 Mongo 一卡这个群就一直 LOCK_BUSY.
-      if (outcome is Outcome.Sent) {
+      if (outcome !is Outcome.Ready) return
+      val delivered = deliver(sender, outcome, cfg, gid, sourceId) ?: return
+      // 记账 (出站行 + 压缩) 仍在忙位之内, 忙位就是压缩的群锁, 所以压缩自己也要有超时, 否则 Mongo 一卡这个群就一直 LOCK_BUSY.
+      runCatchingCancellable {
+        ChatStore.upsert(ChatLine(delivered.receiptId, gid, BOT_SENDER_ID, null, delivered.text, fromBot = true, ts = Date()))
+      }.onFailure { PluginMain.logger.warn("记录出站消息失败", it) }
+      if (ChatbotSecrets.memoryEnabled) {
         runCatchingCancellable {
-          ChatStore.upsert(ChatLine(outcome.receiptId, gid, BOT_SENDER_ID, null, outcome.text, fromBot = true, ts = Date()))
-        }.onFailure { PluginMain.logger.warn("记录出站消息失败", it) }
-        if (ChatbotSecrets.memoryEnabled) {
-          runCatchingCancellable {
-            withTimeoutOrNull(ChatbotSecrets.memoryTimeoutMillis) { compress(gid, outcome.promptTokens) }
-              ?: PluginMain.logger.warn("chatbot 压缩上下文超时 (${ChatbotSecrets.memoryTimeoutMillis}ms), 下次回复后重试")
-          }.onFailure { PluginMain.logger.warn("chatbot 压缩上下文失败", it) }
-        }
+          withTimeoutOrNull(ChatbotSecrets.memoryTimeoutMillis) { compress(gid, delivered.promptTokens) }
+            ?: PluginMain.logger.warn("chatbot 压缩上下文超时 (${ChatbotSecrets.memoryTimeoutMillis}ms), 下次回复后重试")
+        }.onFailure { PluginMain.logger.warn("chatbot 压缩上下文失败", it) }
       }
     } finally {
       busy.remove(gid)
@@ -341,15 +348,51 @@ internal object ChatbotPipeline {
     val audit = withTimeoutOrNull(ChatbotSecrets.auditTimeoutMillis) { ContentAuditEvent(reply.text, level = 80).broadcast() }
     auditVerdict(audit)?.let { noop(gid, sourceId, it, audit?.message); return Outcome.Skipped }
 
+    // 审核对象始终是模型完整回复; 分段只做切分与剥离安全标点, 不产生未审核的新文本.
+    val segments = (if (cfg.segmentReply) Segmenter.split(reply.text, cfg.segmentMaxCount) else listOf(reply.text))
+      .ifEmpty { listOf(reply.text) }
     // 配图任一步失败都退化为纯文本, 不记 noop: 文字才是回复, 图只是点缀.
     val sticker = reply.sticker?.takeIf { wantSticker }?.let { fetchSticker(event.group, gid, it) }
-    val message: Message = sticker?.let { MessageChainBuilder(PlainText(reply.text), it.image).build() } ?: PlainText(reply.text)
-    val receipt = send(sender, message) ?: run { noop(gid, sourceId, NoopReason.SEND_FAILED); return Outcome.Skipped }
-    sticker?.let { s -> runCatchingCancellable { StickerStore.markUsed(s.candidate.id) }.onFailure { PluginMain.logger.warn("表情计数失败", it) } }
-    state.lastReplyAt = System.currentTimeMillis()
-    if (cfg.probabilityMode == ProbabilityMode.PITY) state.pity = cfg.pityBase
-    val outboundText = if (sticker == null) reply.text else "${reply.text} ${PluginMain.IMAGE_PLACEHOLDER}"
-    return Outcome.Sent(receipt.id.ifBlank { "out:$sourceId" }, outboundText, reply.promptTokens)
+    return Outcome.Ready(segments, sticker, reply.promptTokens, state)
+  }
+
+  /**
+   * 逐段发送, 表情跟最后一段同链; 第 2 段起发送前按上一段字数延迟, 模拟打字.
+   * 首段失败记 SEND_FAILED (与单段时代语义一致); 后续段失败只停发不记 noop —— 已经开口, 不算没回复.
+   * 概率/冷却状态在首段成功后立即落定, 后续段失败不回滚.
+   */
+  private suspend fun deliver(sender: UserCommandSender, ready: Outcome.Ready, cfg: ChatbotConfig, gid: String, sourceId: String): Delivered? {
+    var receiptId: String? = null
+    val sentTexts = mutableListOf<String>()
+    var stickerAttached = false
+    for ((index, segment) in ready.segments.withIndex()) {
+      if (index > 0) {
+        delay(Segmenter.delayMillis(ready.segments[index - 1], ChatbotSecrets.segmentPerCharDelayMillis, ChatbotSecrets.segmentMinDelayMillis, ChatbotSecrets.segmentMaxDelayMillis))
+      }
+      val sticker = ready.sticker?.takeIf { index == ready.segments.lastIndex }
+      val message: Message = sticker?.let { MessageChainBuilder(PlainText(segment), it.image).build() } ?: PlainText(segment)
+      val receipt = send(sender, message)
+      if (receipt == null) {
+        if (index == 0) {
+          noop(gid, sourceId, NoopReason.SEND_FAILED)
+          return null
+        }
+        PluginMain.logger.warn("chatbot 分段回复第 ${index + 1}/${ready.segments.size} 段发送失败, 停止后续发送")
+        break
+      }
+      if (index == 0) {
+        receiptId = receipt.id.ifBlank { "out:$sourceId" }
+        ready.state.lastReplyAt = System.currentTimeMillis()
+        if (cfg.probabilityMode == ProbabilityMode.PITY) ready.state.pity = cfg.pityBase
+      }
+      sentTexts.add(segment)
+      sticker?.let { s ->
+        stickerAttached = true
+        runCatchingCancellable { StickerStore.markUsed(s.candidate.id) }.onFailure { PluginMain.logger.warn("表情计数失败", it) }
+      }
+    }
+    val text = sentTexts.joinToString("\n").let { if (stickerAttached) "$it ${PluginMain.IMAGE_PLACEHOLDER}" else it }
+    return receiptId?.let { Delivered(it, text, ready.promptTokens) }
   }
 
   /** 最多 [VISION_MAX_IMAGES] 张并发下载, 整批一个超时; 下载失败的图忽略 (退化为少看一张). */

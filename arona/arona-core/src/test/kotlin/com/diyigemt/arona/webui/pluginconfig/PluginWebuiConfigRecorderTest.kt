@@ -65,6 +65,16 @@ class PluginWebuiConfigRecorderTest {
   @PluginConfigId(id = "dup", aliases = ["dup"])
   private class CfgSelfCollision : PluginWebuiConfig()
 
+  @Serializable
+  @PluginConfigId(id = "admin_v2", aliases = ["admin_v1"])
+  @SuperAdminOnly("仅限超管")
+  private class CfgSuperAdminOnly : PluginWebuiConfig()
+
+  @Serializable
+  @PluginConfigId(id = "admin_blank")
+  @SuperAdminOnly("  ")
+  private class CfgBlankSuperAdminMessage : PluginWebuiConfig()
+
   // 与 CfgPrimaryWithAlias 在同 namespace 下重新注册时, primary "config_v2" 撞 primary.
   @Serializable
   @PluginConfigId(id = "config_v2", aliases = ["other"])
@@ -214,7 +224,27 @@ class PluginWebuiConfigRecorderTest {
     assertEquals(emptyList(), PluginWebuiConfigRecorder.siblingKeysFor("ghost.plugin", "anykey"))
   }
 
-  // --- 4. checkDataSafety canonical 化 ---
+  // --- 4. SuperAdminOnly ---
+
+  @Test
+  fun `SuperAdminOnly 消息可查, 主 key 与 alias 均命中, 未标注返回 null`() {
+    val owner = freshOwner()
+    PluginWebuiConfigRecorder.register(owner, CfgSuperAdminOnly.serializer())
+    PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
+    val ns = namespaceOf(owner)
+    assertEquals("仅限超管", PluginWebuiConfigRecorder.superAdminMessageOrNull(ns, "admin_v2"))
+    assertEquals("仅限超管", PluginWebuiConfigRecorder.superAdminMessageOrNull(ns, "admin_v1"))
+    assertEquals(null, PluginWebuiConfigRecorder.superAdminMessageOrNull(ns, "config_v2"))
+  }
+
+  @Test
+  fun `SuperAdminOnly message 为空白时注册抛出`() {
+    assertFailsWith<IllegalArgumentException> {
+      PluginWebuiConfigRecorder.register(freshOwner(), CfgBlankSuperAdminMessage.serializer())
+    }
+  }
+
+  // --- 5. checkDataSafety canonical 化 ---
 
   @Test
   fun `checkDataSafety 收到 alias key 时返回主 key`() {

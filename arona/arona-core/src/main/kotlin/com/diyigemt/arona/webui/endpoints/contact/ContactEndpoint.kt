@@ -20,6 +20,7 @@ import com.diyigemt.arona.permission.abac.cache.PolicyCompileCache
 import com.diyigemt.arona.utils.*
 import com.diyigemt.arona.webui.endpoints.*
 import com.diyigemt.arona.webui.endpoints.plugin.PluginPreferenceResp
+import com.diyigemt.arona.webui.endpoints.plugin.rejectSuperAdminOnly
 import com.diyigemt.arona.webui.endpoints.plugin.toPayloadOrNull
 import com.diyigemt.arona.webui.event.auditOrAllow
 import com.diyigemt.arona.webui.event.isBlock
@@ -396,6 +397,7 @@ internal object ContactEndpoint {
     }.onFailure {
       return badRequest()
     }.getOrThrow()
+    rejectSuperAdminOnly(obj)?.let { return errorMessage(it) }
     val checked = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
       is DataSafetyResult.Ok -> result
       is DataSafetyResult.Err ->
@@ -434,6 +436,7 @@ internal object ContactEndpoint {
   @AronaBackendEndpointPost("/{id}/member/plugin/member-preference")
   suspend fun ApplicationCall.saveMemberPreference() {
     val obj = kotlin.runCatching { receive<PluginPreferenceResp>() }.getOrNull() ?: return badRequest()
+    rejectSuperAdminOnly(obj)?.let { return errorMessage(it) }
     val checked = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
       is DataSafetyResult.Ok -> result
       is DataSafetyResult.Err ->

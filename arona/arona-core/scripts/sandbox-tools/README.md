@@ -13,6 +13,6 @@
 | `round2.sh` / `round3.sh` / `round4.sh` / `round5.sh` / `round6.sh` | 2026-08-23 验证用的场景脚本 (round4 = P1 记忆压缩; round5 = P2 看图 + 表情库: 抓取/去重/尺寸拦截/rejected/看图回复/配图发送; round6 = P3 运营端点: pending→审核→配图→隐藏→删除与鉴权负向), 作范例 |
 
 第五轮 (P2) 还需要 `stickerAutoApprove: true` 并启动 `fake_image.py`; 表情文件落在 `sandbox/data/com.diyigemt.arona.chatbot/sticker/`, `chatbot_state.py --clear` 只删 Mongo 行, 文件手动清.
-第六轮 (P3) 在第五轮基础上改 `stickerAutoApprove: false` (走人工审核), chatbot `config.yml` 填 `stickerPublicBaseUrl: http://127.0.0.1:18082` 并用 `python3 -m http.server 18082 --directory <sticker 目录>` 冒充 nginx (`--probe` 才 GET 得到), 沙箱 core jar 也要是含 `pluginUser` 的新版 (`:arona-core:jar` 后复制到 `sandbox/arona-core-<版本>.jar`; 2026-08-27 起须 ≥2.3.0, 薄插件依赖 `sandbox/plugin-libraries/`); `superAdminUid` 第一个要有 User 文档 (webui 鉴权会查).
+第六轮 (P3) 在第五轮基础上改 `stickerAutoApprove: false` (走人工审核), chatbot `config.yml` 填 `stickerPublicBaseUrl: http://127.0.0.1:18082` 并用 `python3 -m http.server 18082 --directory <sticker 目录>` 冒充 nginx (`--probe` 才 GET 得到), 沙箱 core jar 也要是含 `pluginUser` 的新版 (`:arona-core:jar` 后复制到 `sandbox/arona-core-<版本>.jar`; 2026-08-27 起须 ≥2.3.0, 2026-08-28 起 chatbot 0.1.4 须 ≥2.4.0 (@SuperAdminOnly 注解在 core), 薄插件依赖 `sandbox/plugin-libraries/`); `superAdminUid` 第一个要有 User 文档 (webui 鉴权会查).
 第二/三轮 (模型异常、审核、限流) 需要: `config.yaml` `shadow: true`、chatbot `baseUrl` 指向假模型、用 `arona-plugin/audit-stub` 替换 content-audit.
 **注意**: `AutoSavePluginData` 会定时回写插件 `config.yml`, 运行中改文件会被覆盖, 必须停机后改. chat-command `debugging: true` 时只处理 `ignoreGroup` 里的群.

@@ -6,6 +6,18 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialInfo
 
 /**
+ * 标注仅允许主配置 `superAdminUid` 中的用户 (机器人部署者) 通过 webui 写入的配置类.
+ * 三条写路径 (群默认/成员/用户级) 统一拦截, 非超管收到 [message]; 读与 schema 不拦.
+ * 与 [PluginConfigId] 同型: 类级 [SerialInfo] 注解, 注册期从 SerialDescriptor 读取.
+ */
+@SerialInfo
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.BINARY)
+annotation class SuperAdminOnly(
+  val message: String,
+)
+
+/**
  * 标注 [PluginWebuiConfig] 子类中的可配置字段, 由 [SchemaGenerator] 在生成 schema 时读取.
  *
  * 必须用 [SerialInfo] 让 kotlinx.serialization 把注解附加到 SerialDescriptor 上,

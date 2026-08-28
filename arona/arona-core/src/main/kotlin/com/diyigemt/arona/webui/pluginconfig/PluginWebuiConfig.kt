@@ -48,6 +48,8 @@ object PluginWebuiConfigRecorder {
     val defaultProvider: (() -> PluginWebuiConfig)? = null,
     /** 主 key 的历史别名, 仅供读路径回退使用; 见 [PluginConfigId.aliases]. */
     val aliases: List<String> = emptyList(),
+    /** 非 null 时该配置的写端点仅超管可用, 非超管以此消息拒绝; 见 [SuperAdminOnly]. */
+    val superAdminMessage: String? = null,
   )
 
   /** 任意 lookup key 命中后返回的归一化结果: 写路径用 [primaryKey] 落库, 读路径用 [entry.aliases] 续查. */
@@ -160,6 +162,10 @@ object PluginWebuiConfigRecorder {
     return (listOf(matched.primaryKey) + matched.entry.aliases).filter { it != anyKey }
   }
 
+  /** 配置声明的超管专属拒绝消息; 主 key 与 alias 均可命中, 未注册或未标注返回 null. */
+  fun superAdminMessageOrNull(pluginId: String, key: String): String? =
+    findMatched(pluginId, key)?.entry?.superAdminMessage
+
   @OptIn(ExperimentalSerializationApi::class)
   @Suppress("UNCHECKED_CAST")
   fun checkDataSafety(obj: PluginPreferenceResp): DataSafetyResult {
@@ -246,7 +252,11 @@ object PluginWebuiConfigRecorder {
     validateConfigKey(primaryKey, namespace, role = "primary key")
     aliases.forEach { alias -> validateConfigKey(alias, namespace, role = "alias") }
     assertNoCollision(namespace, primaryKey, aliases)
-    map.getOrPut(namespace) { mutableMapOf() }[primaryKey] = ConfigEntry(serializer, defaultProvider, aliases)
+    val superAdminMessage = serializer.descriptor.annotations.filterIsInstance<SuperAdminOnly>().firstOrNull()?.message
+    require(superAdminMessage == null || superAdminMessage.isNotBlank()) {
+      "Invalid @SuperAdminOnly in $namespace/$primaryKey: message is blank"
+    }
+    map.getOrPut(namespace) { mutableMapOf() }[primaryKey] = ConfigEntry(serializer, defaultProvider, aliases, superAdminMessage)
   }
 
   /**

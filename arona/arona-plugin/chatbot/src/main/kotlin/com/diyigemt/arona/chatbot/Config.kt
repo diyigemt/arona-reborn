@@ -9,6 +9,7 @@ import com.diyigemt.arona.webui.pluginconfig.ConfigItem
 import com.diyigemt.arona.webui.pluginconfig.FieldError
 import com.diyigemt.arona.webui.pluginconfig.PluginConfigCheckResult
 import com.diyigemt.arona.webui.pluginconfig.PluginWebuiConfig
+import com.diyigemt.arona.webui.pluginconfig.SuperAdminOnly
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -113,6 +114,7 @@ enum class ProbabilityMode {
  * 按群配置 (contact 层), webui 表单自动生成. 每个群自己开关、自己的人设.
  */
 @Serializable
+@SuperAdminOnly("请联系管理员(QQ:1355247243)")
 data class ChatbotConfig(
   @EncodeDefault
   @ConfigItem(label = "启用闲聊", group = "基础")

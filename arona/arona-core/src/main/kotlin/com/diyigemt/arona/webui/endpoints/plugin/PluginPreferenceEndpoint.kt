@@ -7,6 +7,7 @@ import com.diyigemt.arona.webui.endpoints.AronaBackendEndpoint
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointGet
 import com.diyigemt.arona.webui.endpoints.AronaBackendEndpointPost
 import com.diyigemt.arona.webui.endpoints.aronaUser
+import com.diyigemt.arona.webui.endpoints.isSuperAdmin
 import com.diyigemt.arona.webui.event.auditOrAllow
 import com.diyigemt.arona.webui.event.isBlock
 import com.diyigemt.arona.webui.pluginconfig.FieldError
@@ -34,6 +35,13 @@ data class PluginPreferenceResp(
   val key: String,
   val value: JsonObject,
 )
+
+/**
+ * 标了 [com.diyigemt.arona.webui.pluginconfig.SuperAdminOnly] 的配置只允许超管写入:
+ * 非超管返回拒绝消息, 放行返回 null. 三条写路径 (群默认/成员/用户级) 共用, 读与 schema 不拦.
+ */
+internal fun ApplicationCall.rejectSuperAdminOnly(obj: PluginPreferenceResp): String? =
+  if (isSuperAdmin) null else PluginWebuiConfigRecorder.superAdminMessageOrNull(obj.id, obj.key)
 
 internal data class PreferenceQuery(val id: String, val key: String?)
 
@@ -73,6 +81,7 @@ object PluginPreferenceEndpoint {
     }.onFailure {
       return badRequest()
     }.getOrNull() ?: return badRequest()
+    rejectSuperAdminOnly(obj)?.let { return errorMessage(it) }
     val checked = when (val result = PluginWebuiConfigRecorder.checkDataSafety(obj)) {
       is DataSafetyResult.Ok -> result
       is DataSafetyResult.Err ->

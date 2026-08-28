@@ -29,11 +29,10 @@ dependencies {
   compileOnly(libs.ktor.client.content.negotiation)
   compileOnly(libs.ktor.serialization.kotlinx.json.jvm)
 
-  // bson-kotlinx 提供 KotlinSerializerCodecProvider, host (arona-core) 未引入此模块。
-  // implementation 让 shadowJar 把 org.bson.codecs.kotlinx.* 打进 kivotos 插件 jar,
-  // 通过 PluginManager 的 parent-first URLClassLoader 让 kivotos 单独可见, 不污染 arona-core。
-  // 当前仅"运行时可见", 实际接入 codecRegistry 在后续步骤完成。
-  implementation(libs.mongodb.bson.kotlinx)
+  // bson-kotlinx 提供 KotlinSerializerCodecProvider; host (arona-core) 已以 implementation 持有,
+  // 运行期经父 ClassLoader 可见, 此处仅需编译期可见。compileOnly 还能避免它 POM 里固定的
+  // kotlin-reflect/stdlib-jdk8 1.8.10 进入 runtimeClasspath 触发 syncPluginLibraries 版本告警。
+  compileOnly(libs.mongodb.bson.kotlinx)
 
   testImplementation(kotlin("test"))
   testImplementation(libs.mongodb.driver.kotlin.coroutine)

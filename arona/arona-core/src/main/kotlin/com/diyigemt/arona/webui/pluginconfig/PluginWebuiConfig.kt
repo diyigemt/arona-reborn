@@ -98,8 +98,7 @@ object PluginWebuiConfigRecorder {
    * 也不能以 `$` 开头 (操作符前缀, 老版 Mongo 直接拒收, 新版接受但破坏路径路由).
    *
    * 配置叶子原本是 JSON 文本时, 这些字符只是字面值; 改成原生 BSON 子文档后, kotlinx codec
-   * 把 JSON 对象 key 直接当 BSON 字段名写入, 不做转义. 详见预飞测试
-   * `PluginConfigCodecRoundTripTest.JsonElementCodec passes dot and dollar field names through`.
+   * 把 JSON 对象 key 直接当 BSON 字段名写入, 不做转义, 所以必须在写入前拦截.
    *
    * 命中即抛 [IllegalArgumentException], 由 prepare / endpoint 层各自转 [PluginConfigWriteRejectedException.Kind.InvalidKey]
    * 或 [DataSafetyResult.Err]. [path] 用于 fail 时定位 leaf 位置 (形如 `$.nested.bad.key`).

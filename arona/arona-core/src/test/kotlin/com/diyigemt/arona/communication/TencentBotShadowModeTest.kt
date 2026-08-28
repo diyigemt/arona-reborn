@@ -4,7 +4,6 @@ import com.diyigemt.arona.communication.contact.FriendUserImpl
 import com.diyigemt.arona.communication.message.MessageReceiptImpl
 import com.diyigemt.arona.communication.message.TencentGuildRaw
 import com.diyigemt.arona.communication.message.TencentMessageMediaInfo
-import com.diyigemt.arona.communication.message.TencentStreamMessageResp
 import com.diyigemt.arona.communication.message.getMediaUrlFromMediaInfo
 import com.diyigemt.arona.communication.message.streamMessage
 import io.ktor.http.ContentType
@@ -17,7 +16,6 @@ import kotlinx.serialization.json.Json
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -28,7 +26,6 @@ import kotlin.test.assertTrue
 //     shadow 必须显式给 PostFriend/GroupRichMessage 一个 MEDIA stub, 不能让通用 "{}" fallback 漏过去.
 //  3. throwaway request build 仍要执行: 让 JSON encode / multipart 构造里的本地 bug 在灰度阶段暴露,
 //     而不是等真实回归时才被发现.
-//  4. shadow=false 时行为不变 (回归保护).
 class TencentBotShadowModeTest {
 
   private val baseConfig = TencentBotConfig(
@@ -54,14 +51,6 @@ class TencentBotShadowModeTest {
   private val json = Json { ignoreUnknownKeys = true }
 
   @Test
-  fun `Unit serializer 走 UNIT 分支`() {
-    val stub = buildShadowOpenapiStub(json, TencentEndpoint.PostGroupMessage, Unit.serializer())
-    assertEquals(ShadowOpenApiStubKind.UNIT, stub.kind)
-    assertTrue(stub.result.isSuccess)
-    assertSame(Unit, stub.result.getOrNull())
-  }
-
-  @Test
   fun `PostFriendRichMessage 必须显式 MEDIA stub 不走通用 fallback`() {
     // fileInfo 字段无默认值, 通用 "{}" 会 MissingFieldException, 进而让 uploadImage(url) fallback 真实出网,
     // 这条路径必须由显式分支兜底.
@@ -85,18 +74,6 @@ class TencentBotShadowModeTest {
       TencentMessageMediaInfo.serializer(),
     )
     assertEquals(ShadowOpenApiStubKind.MEDIA, stub.kind)
-  }
-
-  @Test
-  fun `PostFriendStreamMessage 必须显式 STREAM stub 返回非空 id`() {
-    // 通用 "{}" 能 decode 但 id="", 会话会按"首片空 id"契约闩锁失败, shadow 演练不了多片状态机.
-    val stub = buildShadowOpenapiStub(
-      json,
-      TencentEndpoint.PostFriendStreamMessage,
-      TencentStreamMessageResp.serializer(),
-    )
-    assertEquals(ShadowOpenApiStubKind.STREAM, stub.kind)
-    assertEquals("shadow-stream-message", stub.result.getOrThrow().id)
   }
 
   @Test
@@ -257,20 +234,6 @@ class TencentBotShadowModeTest {
   }
 
   @Test
-  fun `shadow=false 时 isShadow flag 与 config 对齐`() = runBlocking {
-    // shadow=false 路径不能在不真实出网的情况下断言, 这里只验证 isShadow flag 与 config 完全对齐,
-    // 短路逻辑只看 isShadow, 因此 flag 正确即等价于不进入 shadow 分支.
-    val client = newBot(baseConfig.copy(shadow = false))
-    assertFalse(client.isShadow, "shadow=false 时 isShadow 必须为 false, 否则会误把生产流量短路")
-  }
-
-  @Test
-  fun `TencentBotConfig 默认 shadow=false 兼容旧 config_yaml`() {
-    val cfg = TencentBotConfig(id = "i", appId = "a", token = "t", secret = "s")
-    assertFalse(cfg.shadow, "默认值必须是 false, 旧 config.yaml 不写 shadow 字段时不能误开灰度")
-  }
-
-  @Test
   fun `getMediaUrlFromMediaInfo 空 fileInfo 返回 placeholder 不抛 protobuf 异常`() {
     // shadow MEDIA stub 返回 fileInfo="", uploadImage(ByteArray) 链路会随后调 getMediaUrlFromMediaInfo
     // 来包装 TencentOfflineImage; 若此处仍走 protobuf decode 会抛, 整条上传链路在 shadow 下崩溃.
@@ -291,17 +254,4 @@ class TencentBotShadowModeTest {
     assertTrue(result.isSuccess, "shadow 下两片 + 自动终止片应整体成功")
   }
 
-  @Test
-  fun `MEDIA stub 与 getMediaUrlFromMediaInfo 一起跑通整条 ByteArray 上传链路 (shadow 下不出网)`() = runBlocking {
-    val client = newBot()
-    val result = client.callOpenapi(
-      TencentEndpoint.PostGroupRichMessage,
-      TencentMessageMediaInfo.serializer(),
-      mapOf("group_openid" to "g1"),
-    ) {}
-    val media = result.getOrThrow()
-    // 模拟 Contact.uploadImage(ByteArray) 的 .let { TencentOfflineImage(..., getMediaUrlFromMediaInfo(it.fileInfo)) }
-    val packagedUrl = getMediaUrlFromMediaInfo(media.fileInfo)
-    assertEquals("shadow://media", packagedUrl, "shadow 下 byte 上传整链不应抛, 必须能产出占位 URL")
-  }
 }

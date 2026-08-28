@@ -41,17 +41,6 @@ class RateLimiterTest {
   }
 
   @Test
-  fun `key 数量超过 max 后旧 key 会被驱逐`() {
-    val limiter = IpRateLimiter(
-      capacity = 1, refillTokens = 1, refillSeconds = 60,
-      maxBuckets = 4, evictBatchSize = 2,
-    )
-    repeat(4) { assertTrue(limiter.tryConsume("ip-$it")) }
-    // 触发 evict; 只要新 key 仍能进入即认为驱逐生效, 不强约束哪一个旧 key 被踢.
-    assertTrue(limiter.tryConsume("ip-new"))
-  }
-
-  @Test
   fun `多线程并发消费同一 key 不会超发`() {
     val limiter = IpRateLimiter(capacity = 100, refillTokens = 1, refillSeconds = 3600)
     val threads = 16

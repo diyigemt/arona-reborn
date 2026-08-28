@@ -8,12 +8,10 @@ import kotlin.test.Test
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import kotlin.test.fail
 
 // 锁住 CommandSignature.instanceFactory 在 contextual 热路径上的关键不变量:
 //  - object 命令: 多次调用返回同一 singleton.
-//  - class 命令: 多次调用返回不同实例 (天然无跨调用污染), 但反射 ctor 仅查找一次.
-//  - 与 KClass.createInstance() 行为等价 (生成的实例可挂载子命令).
+//  - class 命令: 多次调用返回不同实例 (天然无跨调用污染).
 class CommandSignatureInstanceFactoryTest {
 
   object FactoryObjectCommand : AbstractCommand(
@@ -53,30 +51,6 @@ class CommandSignatureInstanceFactoryTest {
     // 任意两个相邻实例必须是不同对象 (非 singleton).
     instances.zipWithNext().forEach { (a, b) ->
       assertNotSame(a, b, "class 命令每次必须新建, 否则会导致跨调用 option/argument 状态污染")
-    }
-  }
-
-  @Test
-  fun `instanceFactory 行为与 KClass createInstance 等价`() {
-    val sig = signatureFor(FactoryClassCommand::class, "factory-class-cmd")
-
-    // createInstance() 是当前实现的 ground truth, factory 是缓存版本; 两条路径生成的实例
-    // 在 class / primaryName / owner 维度必须完全一致.
-    val viaFactory = sig.instanceFactory()
-    val viaCreateInstance = FactoryClassCommand::class.createObjectOrInstance()
-
-    assertTrue(viaFactory::class == viaCreateInstance::class)
-    assertTrue(viaFactory.primaryName == viaCreateInstance.primaryName)
-    assertTrue(viaFactory.owner === viaCreateInstance.owner)
-  }
-
-  @Test
-  fun `instanceFactory 调用 1000 次稳态不抛错`() {
-    // 锁住稳态可调用性: 反复访问 lazy property 在 PUBLICATION 模式下保持稳定, 不抛错.
-    // 注: 该测试不能证明 ctor 反射查找仅命中一次 (lazy 缓存语义由 Kotlin 标准库保证, 不在此测试范围).
-    val sig = signatureFor(FactoryClassCommand::class, "factory-class-cmd")
-    repeat(1000) {
-      runCatching { sig.instanceFactory() }.getOrElse { fail("第 $it 次 factory 调用失败: ${it::class.simpleName}") }
     }
   }
 

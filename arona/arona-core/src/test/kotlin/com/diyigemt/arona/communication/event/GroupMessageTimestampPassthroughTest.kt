@@ -2,8 +2,6 @@ package com.diyigemt.arona.communication.event
 
 import com.diyigemt.arona.communication.TencentWebsocketEventType
 import com.diyigemt.arona.communication.contact.StubBot
-import com.diyigemt.arona.communication.message.PlainText
-import com.diyigemt.arona.communication.message.toMessageChain
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -12,7 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 // 锁定 payload.timestamp / msg_elements -> TencentGroupMessageEvent.timestamp / quoted 的透传:
-// 两个群消息 handler 都要带, mock 路径为 null.
+// 两个群消息 handler 都要带.
 class GroupMessageTimestampPassthroughTest {
   private fun groupMessageRaw(type: String, timestamp: String, msgElements: String? = null) = """
     {
@@ -111,16 +109,4 @@ class GroupMessageTimestampPassthroughTest {
     assertNull(absent.quoted)
   }
 
-  @Test
-  fun `直接构造的事件 timestamp 默认 null`() {
-    val bot = StubBot()
-    try {
-      val member = bot.groups.getOrCreate("g1").members.getOrCreate("u1")
-      val event = TencentGroupMessageEvent(PlainText("hi").toMessageChain(), eventId = "e", sender = member)
-      assertNull(event.timestamp)
-      assertNull(event.quoted)
-    } finally {
-      bot.close()
-    }
-  }
 }

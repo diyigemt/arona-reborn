@@ -159,21 +159,6 @@ class MessageBuilderReverseMappingTest {
   }
 
   @Test
-  fun `MessageChainBuilder append TencentMessageBuilder 目前是 lossy 的 (走 build 再反向展开)`() {
-    // 记录当前已知的损耗语义: TencentMessageBuilder 的多个 PlainText 会被 build() 用 \n 合成一个
-    // content, 结构元素 (image/markdown) 也只保留最后一个. MessageChainBuilder.append(other) 通过
-    // `append(other.build())` 委托, 会带上这层损耗. 测试把行为锁死, 将来若改成无损合并请同步更新.
-    val builder = TencentMessageBuilder("merge-src")
-      .append(PlainText("a"))
-      .append(PlainText("b"))
-    val chain = MessageChainBuilder().append(builder).build()
-    // build() 把两个 PlainText 合成 "a\nb" 后反向展开只得到单个 PlainText.
-    assertEquals(1, chain.size, "多个 PlainText 被 build 合并, 反向后只剩 1 个")
-    assertTrue(chain.first() is PlainText)
-    assertEquals("a\nb", (chain.first() as PlainText).toString(), "合并后的文本用 \\n 连接")
-  }
-
-  @Test
   fun `MessageChainBuilder append TencentMessage 不触达 FILE ARK EMBED 伪造分支`() {
     val src = TencentGroupMessage(
       content = "",

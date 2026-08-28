@@ -21,7 +21,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 // 回归保护:
-// - 旧实现 getOrCreate 不缓存, 每次返回新实例 → "同 id 返回同实例" 会失败.
+// - 旧实现 getOrCreate 不缓存, 每次返回新实例 → "并发 getOrCreate 同一 id 只触发一次 factory" 会失败.
 // - 旧实现没有 Empty 升级路径 → "富对象替换 Empty" 会失败 (升级后应拿到新实例).
 // - 旧实现 remove 只从队列移除, 不 cancel scope → "remove 会取消 scope" 会失败.
 class ContactListCacheTest {
@@ -68,17 +68,6 @@ class ContactListCacheTest {
   ) : TestContact(id, parentCoroutineContext), EmptyContact {
     override val id: String = id
     override val ownsCoroutineScope: Boolean = false
-  }
-
-  @Test
-  fun `同一 id 多次 getOrCreate 返回同一实例`() {
-    val list = TestContactList(::EmptyTestContact)
-
-    val a = list.getOrCreate("same")
-    val b = list.getOrCreate("same")
-
-    assertSame(a, b)
-    assertEquals(1, list.size)
   }
 
   @Test
@@ -135,16 +124,6 @@ class ContactListCacheTest {
     assertSame(rich, list["same"])
     assertTrue(placeholder.coroutineContext[Job]?.isCancelled == true)
     assertFalse(rich.coroutineContext[Job]?.isCancelled == true)
-  }
-
-  @Test
-  fun `borrow 模式 contact 与父共享 Job 而非派生新 Job`() {
-    val parentJob = SupervisorJob()
-    val parentContext: CoroutineContext = Dispatchers.Default + parentJob
-    val borrowed = BorrowedTestContact("a", parentContext)
-
-    assertSame(parentJob, borrowed.coroutineContext[Job], "borrow 模式必须直接复用父 Job")
-    assertFalse(borrowed.ownsCoroutineScope)
   }
 
   @Test

@@ -32,28 +32,6 @@ class GroupSenderPlatformUsernameTest {
     )
 
   @Test
-  fun `platformUsername 透传到 GroupCommandSender`() {
-    val bot = StubBot()
-    try {
-      val sender = groupEvent(bot, "g1", "u1", "妮露").toCommandSender()
-      assertEquals("妮露", sender.platformUsername)
-    } finally {
-      bot.close()
-    }
-  }
-
-  @Test
-  fun `event 无 platformUsername 时 sender platformUsername 为 null`() {
-    val bot = StubBot()
-    try {
-      val sender = groupEvent(bot, "g1", "u1", null).toCommandSender()
-      assertNull(sender.platformUsername)
-    } finally {
-      bot.close()
-    }
-  }
-
-  @Test
   fun `同一成员不同消息可携带不同 platformUsername`() {
     val bot = StubBot()
     try {

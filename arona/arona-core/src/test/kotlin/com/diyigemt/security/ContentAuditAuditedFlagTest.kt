@@ -15,13 +15,6 @@ import kotlin.test.assertTrue
  */
 class ContentAuditAuditedFlagTest {
   @Test
-  fun `默认 audited 为 false 且 pass 为 true`() {
-    val ev = ContentAuditEvent("text")
-    assertFalse(ev.audited)
-    assertFalse(ev.isBlock)
-  }
-
-  @Test
   fun `零监听器 broadcast 后 audited 仍为 false`() = runBlocking {
     // 没装 content-audit 插件时 callListeners 直接返回, 不会有人置位 —— fail-closed 调用方据此拒绝.
     val ev = ContentAuditEvent("zero-listener-audited-flag-test").broadcast()

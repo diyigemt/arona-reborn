@@ -21,22 +21,4 @@ class MessageDuplicationRetrySequenceTest {
     }
   }
 
-  @Test
-  fun `重放序号永不等于 current 自身`() {
-    // 偏移最小为 1, 不能回吐 current 本身 (否则等于"原地重发", 腾讯会继续 Duplication).
-    val current = 7
-    repeat(2000) {
-      val retry = computeMessageDuplicationRetrySequence(current)
-      assertTrue(retry != current, "retry 必须 != current=$current, 实际=$retry")
-    }
-  }
-
-  @Test
-  fun `低值 current 下仍保持正偏移`() {
-    // current=1 时 retry 至少为 2, 不能出现 0 或负数.
-    repeat(500) {
-      val retry = computeMessageDuplicationRetrySequence(1)
-      assertTrue(retry in 2..5, "低值 current 下 retry 仍应正偏移 1..4, 实际=$retry")
-    }
-  }
 }

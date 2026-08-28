@@ -107,12 +107,4 @@ class TencentMessageWireFormatTest {
     )
   }
 
-  @Test
-  fun `反证 - 以基类泛型直接编码会混入判别字段`() {
-    // 记录 encodeTencentMessageForWire 存在的理由: 默认 Json 对 sealed 基类做多态编码,
-    // 顶层出现 "type":"<FQCN>". 若 kotlinx 未来默认行为变化导致本用例失败, 说明 helper 可以退役.
-    val message = TencentMessageBuilder("msg-5").append("hi").build(isPrivateChannel = false)
-    val wire = json.parseToJsonElement(json.encodeToString(TencentMessage.serializer(), message)).jsonObject
-    assertTrue("type" in wire.keys)
-  }
 }

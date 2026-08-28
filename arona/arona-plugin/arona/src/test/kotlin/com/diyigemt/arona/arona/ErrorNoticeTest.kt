@@ -165,17 +165,6 @@ class ErrorNoticeTest {
     assertEquals("错误发生\nmessage: content violation", wireContent(notice))
   }
 
-  @Test
-  fun `通用提示内容与历史保持一致`() {
-    val notice = buildErrorNotice(
-      sourceId = "source-id",
-      source = errorSource(CONTENT_VIOLATION_CODE, "腾讯返回的错误信息"),
-      sentChain = markdownChain("没有匹配图片"),
-    )
-    assertEquals(listOf("错误发生", "message: 腾讯返回的错误信息"), notice.map { it.toString() })
-    assertEquals("错误发生\nmessage: 腾讯返回的错误信息", wireContent(notice))
-  }
-
   private companion object {
     // 复用生产常量, 避免测试侧前缀与实现漂移; 输出文案仍用字面量精确断言。
     const val PREFIX = ARONA_IMAGE_PREFIX

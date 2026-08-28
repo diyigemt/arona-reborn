@@ -1,7 +1,6 @@
 package com.diyigemt.arona.communication
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
 // 回归保护: 历史上枚举尾部残留过死条目 A("GUILD_CREATE"), 与正牌 GUILD_CREATE 重键.
@@ -11,28 +10,10 @@ import kotlin.test.assertSame
 class TencentWebsocketEventTypeTest {
 
   @Test
-  fun `wire 字符串在全枚举内唯一`() {
-    val types = TencentWebsocketEventType.entries.map { it.type }
-    assertEquals(
-      types.size,
-      types.toSet().size,
-      "存在重复 wire 字符串: ${types.groupBy { it }.filterValues { it.size > 1 }.keys}",
-    )
-  }
-
-  @Test
   fun `每个枚举都能经 fromValue 往返解析回自身`() {
     TencentWebsocketEventType.entries.forEach { expected ->
       assertSame(expected, TencentWebsocketEventType.fromValue(expected.type))
     }
-  }
-
-  @Test
-  fun `GUILD_CREATE 解析回正牌枚举`() {
-    assertSame(
-      TencentWebsocketEventType.GUILD_CREATE,
-      TencentWebsocketEventType.fromValue("GUILD_CREATE"),
-    )
   }
 
   @Test

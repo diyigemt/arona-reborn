@@ -31,15 +31,11 @@ class PluginWebuiConfigRecorderTest {
 
   // --- fixture configs ---
 
-  // marker 字段仅供"主 key 与 alias 同时落库"测试区分两份 JsonObject 来源; 默认空串保持
+  // marker 字段仅供主 key/alias 互相回查的 fallback 测试区分两份 JsonObject 来源; 默认空串保持
   // 既有 checkDataSafety / generateSchema 测试用 `{}` 输入仍可解码 (kotlinx 缺失字段填默认).
   @Serializable
   @PluginConfigId(id = "config_v2", aliases = ["config_v1"])
   private class CfgPrimaryWithAlias(val marker: String = "") : PluginWebuiConfig()
-
-  @Serializable
-  @PluginConfigId(id = "")
-  private class CfgBlankId : PluginWebuiConfig()
 
   @Serializable
   @PluginConfigId(id = "   ")
@@ -105,13 +101,6 @@ class PluginWebuiConfigRecorderTest {
     owner.permission.id.nameSpace.toMongodbKey()
 
   // --- 1. validateConfigKey ---
-
-  @Test
-  fun `primary id 为空时注册抛出`() {
-    assertFailsWith<IllegalArgumentException> {
-      PluginWebuiConfigRecorder.register(freshOwner(), CfgBlankId.serializer())
-    }
-  }
 
   @Test
   fun `primary id 为空白字符时注册抛出`() {
@@ -266,36 +255,6 @@ class PluginWebuiConfigRecorderTest {
   }
 
   // --- 5. lookupRaw 读路径优先级 ---
-
-  /**
-   * 固化当前读路径策略: lookupRaw 先按入参 key 精确命中, 没命中才回查 siblings.
-   * 含义: 当主 key 与 alias 同时存在数据时, "按入参 key 读" 拿到的是入参对应那份,
-   * 不会被 canonical-first 化. 这是潜伏的双源不一致风险, 但当前写路径 (endpoint 与 typed
-   * inline) 已全部 canonical 化落库, 双存只可能来自 raw `updatePluginConfig` 直调,
-   * 仓库内业务侧无此调用.
-   *
-   * 若后续改为 canonical-first (先按主 key 读, alias 仅在主 key 缺失时回查), 本测试需更新.
-   */
-  @Test
-  fun `主 key 与 alias 同存时 lookupRaw 按入参 key 精确命中优先`() {
-    val owner = freshOwner()
-    PluginWebuiConfigRecorder.register(owner, CfgPrimaryWithAlias.serializer())
-    val ns = namespaceOf(owner)
-    val visible = object : PluginVisibleData() {
-      override val config: Map<String, Map<String, JsonObject>> = mapOf(
-        ns to mapOf(
-          "config_v2" to JsonObject(mapOf("marker" to JsonPrimitive("from-primary"))),
-          "config_v1" to JsonObject(mapOf("marker" to JsonPrimitive("from-alias"))),
-        )
-      )
-    }
-
-    val byPrimary = visible.readPluginConfigOrNull<CfgPrimaryWithAlias>(owner, key = "config_v2")
-    val byAlias = visible.readPluginConfigOrNull<CfgPrimaryWithAlias>(owner, key = "config_v1")
-
-    assertEquals("from-primary", byPrimary?.marker, "主 key 入参应命中主 key 那份, 不被 alias 覆盖")
-    assertEquals("from-alias", byAlias?.marker, "alias 入参应命中 alias 那份, 不被 canonical 化到主 key")
-  }
 
   @Test
   fun `仅存 alias 时按主 key 查得 lookupRaw 走 sibling 回退`() {

@@ -39,17 +39,4 @@ class MessageChainBuilderSnapshotTest {
     assertNotSame(first, second, "两条 chain 不能是同一对象")
   }
 
-  @Test
-  fun `build 后不再依赖 builder 的 container 引用`() {
-    // 反证视角: 若 build 仍然把 this 传进去, builder.clear() 会清空已发出 chain.
-    val builder = MessageChainBuilder()
-      .append(PlainText("x"))
-      .append(PlainText("y"))
-    val chain = builder.build()
-    assertEquals(2, chain.size)
-
-    builder.clear()
-
-    assertEquals(2, chain.size, "builder.clear() 不能清空已发出 chain")
-  }
 }

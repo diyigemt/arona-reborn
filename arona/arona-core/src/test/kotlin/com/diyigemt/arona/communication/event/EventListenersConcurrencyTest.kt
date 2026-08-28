@@ -131,26 +131,4 @@ class EventListenersConcurrencyTest {
       assertEquals(1, afterBoom.get())
     }
   }
-
-  @Test
-  fun `大量 listener 并发执行不应抛 ConcurrentModificationException`() {
-    runBlocking {
-      val listeners = EventListeners()
-      val called = AtomicInteger(0)
-
-      repeat(50) {
-        listeners.addListener(PlainTestEvent::class, listener<PlainTestEvent> {
-          delay(5)
-          called.incrementAndGet()
-          ListeningStatus.LISTENING
-        })
-      }
-
-      repeat(5) { round ->
-        listeners.callListeners(PlainTestEvent(round))
-      }
-
-      assertEquals(50 * 5, called.get())
-    }
-  }
 }

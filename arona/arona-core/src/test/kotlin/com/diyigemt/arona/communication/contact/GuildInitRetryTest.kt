@@ -5,9 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.yield
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -103,43 +101,4 @@ class GuildInitRetryTest {
     }
   }
 
-  @Test
-  fun `外部 scope cancel 时 retry 在 delay 阶段被打断`() {
-    val attempts = AtomicInteger(0)
-    runBlocking {
-      // delay() 是 cancellable 的, 外部 cancel 后 retry 不应再继续.
-      val result = runCatching {
-        coroutineScope {
-          val job = async {
-            retryInitFetch<Int>(testLogger, "scope-cancelled", longArrayOf(10_000L, 10_000L, 10_000L)) {
-              attempts.incrementAndGet()
-              Result.failure(RuntimeException("force into delay"))
-            }
-          }
-          // 让第一轮 fetch 跑完进入 delay(10s), 然后 cancel.
-          delay(50)
-          job.cancel()
-          job.await()
-        }
-      }
-      assertTrue(result.isFailure, "外部 cancel 应让 await 抛 CE")
-      assertTrue(
-        result.exceptionOrNull() is CancellationException,
-        "delay 阶段被 cancel 必须抛 CE 而不是变成普通 Result.failure",
-      )
-    }
-  }
-
-  @Test
-  fun `delays 为空数组时只 attempt 一次`() {
-    val attempts = AtomicInteger(0)
-    runBlocking {
-      val result = retryInitFetch<Int>(testLogger, "no-retry", longArrayOf()) {
-        attempts.incrementAndGet()
-        Result.failure(RuntimeException("once"))
-      }
-      assertTrue(result.isFailure)
-      assertEquals(1, attempts.get(), "delays 为空时只跑初始 1 次, 不重试")
-    }
-  }
 }

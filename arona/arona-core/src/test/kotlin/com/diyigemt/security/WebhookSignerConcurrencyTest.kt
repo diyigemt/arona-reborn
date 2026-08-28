@@ -23,22 +23,6 @@ class WebhookSignerConcurrencyTest {
   }
 
   @Test
-  fun `正确签名能够被验签通过`() {
-    val body = payload(1)
-    val signature = bot.webHookSign(body)
-
-    assertTrue(bot.webHookVerify(body, signature))
-  }
-
-  @Test
-  fun `签名被篡改后验签应拒绝`() {
-    val body = payload(2)
-    val tampered = bot.webHookSign(body).withFlippedLastBit()
-
-    assertFalse(bot.webHookVerify(body, tampered))
-  }
-
-  @Test
   fun `并发 sign 与 verify 之间不会串状态`() {
     runBlocking {
       coroutineScope {

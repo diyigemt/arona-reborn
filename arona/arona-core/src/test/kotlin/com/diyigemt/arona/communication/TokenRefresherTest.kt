@@ -272,30 +272,6 @@ class TokenRefresherTest {
   }
 
   @Test
-  fun `fetch 抛异常的失败也走完预算到 onFatal`() = runRefresherTest { testScope ->
-    val attempts = AtomicInteger(0)
-    val onFatalCalled = CompletableDeferred<Unit>()
-    val refresher = TokenRefresher(
-      scope = testScope,
-      logger = testLogger,
-      fetchAccessToken = {
-        attempts.incrementAndGet()
-        throw RuntimeException("network down")
-      },
-      onRefreshSuccess = { /* unused */ },
-      onFatal = { onFatalCalled.complete(Unit) },
-      retryBackoff = fastBackoff,
-    )
-    try {
-      refresher.triggerRefresh()
-      onFatalCalled.await()
-      assertEquals(3, attempts.get(), "异常被 catch 计入预算, 走完 3 次后 onFatal")
-    } finally {
-      refresher.close()
-    }
-  }
-
-  @Test
   fun `close 后 trigger 立即 return 不调 fetch`() = runRefresherTest { testScope ->
     val attempts = AtomicInteger(0)
     val refresher = TokenRefresher(

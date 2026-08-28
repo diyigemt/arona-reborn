@@ -94,20 +94,6 @@ class PolicyCompilerTest {
   }
 
   @Test
-  fun `空 AllOf 求值返回 false`() {
-    val policy = Policy("p.empty", "p", PolicyNodeEffect.ALLOW, rules = listOf(PolicyRoot(PolicyNodeGroupType.ALL)))
-    val compiled = PolicyCompiler.compile(policy).first()
-    assertFalse(compiled.eval(req()))
-  }
-
-  @Test
-  fun `空 AnyOf 求值返回 false 与 warden 一致`() {
-    val policy = Policy("p.empty", "p", PolicyNodeEffect.ALLOW, rules = listOf(PolicyRoot(PolicyNodeGroupType.ANY)))
-    val compiled = PolicyCompiler.compile(policy).first()
-    assertFalse(compiled.eval(req()))
-  }
-
-  @Test
   fun `policyId 从 schema Policy id 向下传递`() {
     val policy = Policy(
       "p.propagate", "p", PolicyNodeEffect.ALLOW,

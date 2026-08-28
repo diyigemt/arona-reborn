@@ -7,13 +7,13 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-// 薄包部署冒烟检查: 复刻 PluginManager 的扁平 URLClassLoader (libraries/*.jar + plugins/*.jar,
+// 薄包部署冒烟检查: 复刻 PluginManager 的扁平 URLClassLoader (plugin-libraries/*.jar + plugins/*.jar,
 // parent = app classloader), 对每个插件 jar 的全部类做 Class.forName(initialize=false):
 // 加载即解析父类/接口, 共享库缺 jar 会立刻抛 NoClassDefFoundError, 不必真的把 bot 跑起来。
 //
-// 用法 (在部署目录, 即含 libraries/ 与 plugins/ 的目录下):
+// 用法 (在部署目录, 即含 plugin-libraries/ 与 plugins/ 的目录下):
 //   javac -d /tmp tools/load-check/LoadCheck.java
-//   java -cp "/tmp:arona-core-<version>.jar" LoadCheck libraries plugins
+//   java -cp "/tmp:arona-core-<version>.jar" LoadCheck plugin-libraries plugins
 public class LoadCheck {
   public static void main(String[] args) throws Exception {
     if (args.length != 2) {

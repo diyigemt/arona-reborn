@@ -46,7 +46,7 @@ object PluginManager {
   }
 
   // 插件共享库目录: 薄包插件的外部依赖由构建期 syncPluginLibraries 预置于此, 运行时不联网
-  private val librariesFolder = rootPath.resolve("libraries").toFile()
+  private val librariesFolder = rootPath.resolve("plugin-libraries").toFile()
 
   private fun File.jarFiles() = listFiles { file -> file.isFile && file.extension == "jar" }
     ?.sortedBy { it.name }

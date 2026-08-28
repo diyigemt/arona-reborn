@@ -51,7 +51,7 @@ class AronaPluginConventionPlugin : Plugin<Project> {
     // 声明式控制 ShadowJar 命名: <baseName>-<version>.jar (无 -all 后缀)。
     // baseName 默认就是 project.name; classifier 清空; version 直接绑定到 DSL Property。
     // 薄包模式: 不合并任何依赖, 插件 jar 仅含自身 classes/resources。外部依赖由根项目
-    // syncPluginLibraries 统一同步到 sandbox/libraries, 运行时经同一 URLClassLoader 提供。
+    // syncPluginLibraries 统一同步到 sandbox/plugin-libraries, 运行时经同一 URLClassLoader 提供。
     project.tasks.withType(ShadowJar::class.java).configureEach {
       configurations.set(emptySet())
       archiveClassifier.set("")
@@ -78,7 +78,7 @@ class AronaPluginConventionPlugin : Plugin<Project> {
       group = "arona"
       description = "Copy the shadow jar into arona-core/sandbox/plugins, replacing prior versions."
       dependsOn(shadowJar)
-      // 薄 jar 离开共享库跑不起来, 单插件部署也必须顺带同步 sandbox/libraries
+      // 薄 jar 离开共享库跑不起来, 单插件部署也必须顺带同步 sandbox/plugin-libraries
       dependsOn(":syncPluginLibraries")
       doLast {
         val pluginDir = project.rootProject.project(":arona-core")

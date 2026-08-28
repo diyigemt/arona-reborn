@@ -46,12 +46,12 @@ val devPlugins = listOf(
 data class PluginLib(val ga: String, val version: String, val file: File, val plugin: String)
 
 // 静态共享库同步: 插件 jar 是薄包 (shadow 不再合并依赖), 各插件的外部运行时依赖统一
-// 落到 arona-core/sandbox/libraries, core 启动时与 plugins/ 一起装入同一 URLClassLoader。
+// 落到 arona-core/sandbox/plugin-libraries, core 启动时与 plugins/ 一起装入同一 URLClassLoader。
 // core runtimeClasspath 已有的 GA 一律不进共享库: 扁平 ClassLoader parent-first, core 的
 // 版本必然胜出, 再同步只是死重; 插件声明了不同版本时告警提醒对齐 core。
 tasks.register("syncPluginLibraries") {
   group = "arona"
-  description = "同步所有插件的非 core 运行时依赖到 arona-core/sandbox/libraries"
+  description = "同步所有插件的非 core 运行时依赖到 arona-core/sandbox/plugin-libraries"
   doLast {
     val core = project(":arona-core")
     val coreVersions = core.configurations.getByName("runtimeClasspath")
@@ -104,7 +104,7 @@ tasks.register("syncPluginLibraries") {
       }
 
     // 经上两道检查后文件名与 GAV 一一对应 (classifier 已含在文件名里), 按文件名去重/增量/清理
-    val dir = core.projectDir.resolve("sandbox").resolve("libraries").apply { mkdirs() }
+    val dir = core.projectDir.resolve("sandbox").resolve("plugin-libraries").apply { mkdirs() }
     val wanted = libs.associateBy { it.file.name }
     wanted.values.sortedBy { it.file.name }.forEach { lib ->
       val target = dir.resolve(lib.file.name)

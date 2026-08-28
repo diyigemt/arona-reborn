@@ -44,18 +44,21 @@ internal object ChatStore {
   private const val CONTEXT = "chatContext"
   private const val NOOP = "chatNoop"
   private const val MEMORY = "chatMemory"
+  private const val ROUND = "chatRound"
   private const val NOOP_TTL_DAYS = 7L
 
   private fun context() = DatabaseProvider.defaultMongoDatabase.getCollection<Document>(CONTEXT)
   private fun noop() = DatabaseProvider.defaultMongoDatabase.getCollection<Document>(NOOP)
   private fun memory() = DatabaseProvider.defaultMongoDatabase.getCollection<Document>(MEMORY)
+  private fun round() = DatabaseProvider.defaultMongoDatabase.getCollection<Document>(ROUND)
 
   /** 幂等建索引: (groupId, ts) 供 history 查询, ts 上挂 TTL; 摘要按 updatedAt 闲置过期. 已存在同名同选项的索引驱动会跳过. */
-  suspend fun ensureIndexes(contextTtlHours: Long, memoryTtlDays: Long) {
+  suspend fun ensureIndexes(contextTtlHours: Long, memoryTtlDays: Long, roundLogTtlDays: Long) {
     context().createIndex(Indexes.compoundIndex(Indexes.ascending("groupId"), Indexes.descending("ts")))
     context().createIndex(Indexes.ascending("ts"), IndexOptions().expireAfter(contextTtlHours, TimeUnit.HOURS))
     noop().createIndex(Indexes.ascending("ts"), IndexOptions().expireAfter(NOOP_TTL_DAYS, TimeUnit.DAYS))
     memory().createIndex(Indexes.ascending("updatedAt"), IndexOptions().expireAfter(memoryTtlDays, TimeUnit.DAYS))
+    round().createIndex(Indexes.ascending("ts"), IndexOptions().expireAfter(roundLogTtlDays, TimeUnit.DAYS))
   }
 
   /** `$set` 而非整行 replace: webhook 重投时不抹掉异步回写的 imageSummary. */
@@ -110,6 +113,17 @@ internal object ChatStore {
       .append("coveredUntil", memory.coveredUntil)
       .append("updatedAt", Date())
     memory().replaceOne(Filters.eq("_id", memory.groupId), doc, ReplaceOptions().upsert(true))
+  }
+
+  /** 每轮成功对话记一条: 装配好的完整 user prompt 与实际发出的回复 (system prompt 是群配置, 不重复落). */
+  suspend fun recordRound(groupId: String, messageId: String, prompt: String, reply: String) {
+    round().insertOne(
+      Document("groupId", groupId)
+        .append("messageId", messageId)
+        .append("prompt", prompt)
+        .append("reply", reply)
+        .append("ts", Date()),
+    )
   }
 
   /** 只记异常类 noop (模型/审核/发送/预算), 常规类走 Redis 计数, 见 [NoopReason.persistToMongo]. */

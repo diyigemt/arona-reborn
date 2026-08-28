@@ -46,6 +46,9 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   /** 装配 prompt 时取最近多少条群消息. */
   val historyLimit by value(20)
 
+  /** 对话轮次日志 `chatRound` (每轮的完整 prompt 与实际发出的回复) 的 TTL (按 ts 的 TTL 索引, 改动需手动重建索引). */
+  val roundLogTtlDays by value(30L)
+
   /** 全局按群限流: 每群每分钟最多开始多少轮回复 (每秒 1 轮); 分段回复一轮只消耗一次令牌, 底层消息数可达轮数 × 段数. */
   val rateLimitPerMinute by value(10L)
 

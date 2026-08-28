@@ -22,7 +22,7 @@ object PluginMain : AronaPlugin(
   override fun onLoad() {
     launch {
       runCatchingCancellable {
-        ChatStore.ensureIndexes(ChatbotSecrets.contextTtlHours, ChatbotSecrets.memoryTtlDays)
+        ChatStore.ensureIndexes(ChatbotSecrets.contextTtlHours, ChatbotSecrets.memoryTtlDays, ChatbotSecrets.roundLogTtlDays)
         StickerStore.ensureIndexes()
       }.onFailure { logger.warn("创建 chatbot 索引失败", it) }
     }

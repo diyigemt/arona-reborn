@@ -238,7 +238,7 @@ internal object ChatbotPipeline {
     data object Skipped : Outcome
 
     /** 审核通过、待发送的回复. 发送在总预算之外执行 (每步有独立超时), 避免发到一半被取消导致已发消息漏记出站. */
-    data class Ready(val segments: List<String>, val sticker: FetchedSticker?, val promptTokens: Int?, val state: GroupState) : Outcome
+    data class Ready(val segments: List<String>, val sticker: FetchedSticker?, val prompt: String, val promptTokens: Int?, val state: GroupState) : Outcome
   }
 
   /** 发送成功后的出站记账信息; [text] 只含实际发出的段. */
@@ -265,6 +265,9 @@ internal object ChatbotPipeline {
       runCatchingCancellable {
         ChatStore.upsert(ChatLine(delivered.receiptId, gid, BOT_SENDER_ID, null, delivered.text, fromBot = true, ts = Date()))
       }.onFailure { PluginMain.logger.warn("记录出站消息失败", it) }
+      runCatchingCancellable {
+        ChatStore.recordRound(gid, sourceId, outcome.prompt, delivered.text)
+      }.onFailure { PluginMain.logger.warn("记录对话轮次失败", it) }
       if (ChatbotSecrets.memoryEnabled) {
         runCatchingCancellable {
           withTimeoutOrNull(ChatbotSecrets.memoryTimeoutMillis) { compress(gid, delivered.promptTokens) }
@@ -353,7 +356,7 @@ internal object ChatbotPipeline {
       .ifEmpty { listOf(reply.text) }
     // 配图任一步失败都退化为纯文本, 不记 noop: 文字才是回复, 图只是点缀.
     val sticker = reply.sticker?.takeIf { wantSticker }?.let { fetchSticker(event.group, gid, it) }
-    return Outcome.Ready(segments, sticker, reply.promptTokens, state)
+    return Outcome.Ready(segments, sticker, prompt, reply.promptTokens, state)
   }
 
   /**

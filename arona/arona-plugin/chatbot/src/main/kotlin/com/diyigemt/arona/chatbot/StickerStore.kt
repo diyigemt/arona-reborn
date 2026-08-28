@@ -16,6 +16,8 @@ import java.util.Date
 /**
  * 表情状态机: analyzing (已抢占, 分析中) → pending (等人工审核) / ready (可用) / rejected (不是表情或 nsfw) / hidden (曾可用, 管理员下架).
  * 四个终态之间由运营页 ([ChatbotEndpoint]) 自由切换; 选图只取 ready.
+ * deleted 是运营页删除留下的墓碑: 文件已删, 记录永留 (占住 hash 让 [StickerStore.claim] 跳过, 同图不再送模型/入库),
+ * 不进列表也不可再编辑, 只能经删除端点到达.
  */
 internal object StickerStatus {
   const val ANALYZING = "analyzing"
@@ -23,6 +25,7 @@ internal object StickerStatus {
   const val READY = "ready"
   const val REJECTED = "rejected"
   const val HIDDEN = "hidden"
+  const val DELETED = "deleted"
   val TERMINAL = setOf(PENDING, READY, REJECTED, HIDDEN)
 }
 
@@ -142,7 +145,7 @@ internal object StickerStore {
    * ponytail: 上限 1000 不分页, 且现有索引不服务这条查询 (全扫 + 内存排序); 图库远到不了这个量, 到了再加游标和 createdAt 索引.
    */
   suspend fun list(groupId: String?, urlOf: (String) -> String?): List<StickerView> =
-    stickers().find(Filters.and(listOfNotNull(Filters.ne("status", StickerStatus.ANALYZING), groupId?.let { Filters.eq("groupIds", it) })))
+    stickers().find(Filters.and(listOfNotNull(operable(), groupId?.let { Filters.eq("groupIds", it) })))
       .sort(Sorts.descending("createdAt"))
       .limit(LIST_LIMIT)
       .toList()
@@ -166,9 +169,12 @@ internal object StickerStore {
         )
       }
 
-  /** 所有来源群 (不含仅 analyzing 行的), 给运营页做过滤下拉. */
+  /** 所有来源群 (不含仅 analyzing / deleted 行的), 给运营页做过滤下拉. */
   suspend fun sourceGroupIds(): List<String> =
-    stickers().distinct("groupIds", Filters.ne("status", StickerStatus.ANALYZING), String::class.java).toList()
+    stickers().distinct("groupIds", operable(), String::class.java).toList()
+
+  /** 运营页可见范围: 排除分析中与墓碑. */
+  private fun operable() = Filters.nin("status", StickerStatus.ANALYZING, StickerStatus.DELETED)
 
   /** 只改 [edit] 里非 null 的字段. 返回 false = 不存在 / 仍在分析 / 想设 ready 但没有文件 (抓取时被拒的). */
   suspend fun update(id: String, edit: StickerEdit): Boolean {
@@ -182,10 +188,17 @@ internal object StickerStore {
     return stickers().updateOne(filter, Updates.combine(sets)).matchedCount == 1L
   }
 
-  /** 物理删行, 返回原文档让调用方删文件; null = 不存在 / 仍在分析. 再见同图会重新走抓取. */
-  suspend fun delete(id: String): Document? = stickers().findOneAndDelete(editable(id))
+  /**
+   * 软删除: 状态置 deleted, 返回改前文档让调用方删文件; null = 不存在 / 仍在分析 / 已删过.
+   * 记录永留占住 hash, 同图再见时 [claim] 走 DuplicateKey 跳过, 不再消耗视觉额度也不会重新入库.
+   * fileName 留在墓碑里: 没有读路径会用它 (选图只看 ready, 墓碑不进列表), 删文件失败时它是孤儿文件的唯一线索.
+   */
+  suspend fun delete(id: String): Document? =
+    stickers().findOneAndUpdate(editable(id), Updates.set("status", StickerStatus.DELETED))
 
-  private fun editable(id: String) = Filters.and(Filters.eq("_id", id), Filters.ne("status", StickerStatus.ANALYZING))
+  /** 墓碑 (deleted) 与分析中的都不可运营: 不列出、不可编辑、不可再删. */
+  private fun editable(id: String) =
+    Filters.and(Filters.eq("_id", id), Filters.nin("status", StickerStatus.ANALYZING, StickerStatus.DELETED))
 
   private fun Document.int(key: String) = (get(key) as? Number)?.toInt()
 

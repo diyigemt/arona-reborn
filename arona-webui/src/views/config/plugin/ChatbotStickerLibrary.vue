@@ -199,21 +199,22 @@ async function batchStatus(next: ChatStickerStatus) {
 }
 function batchRemove() {
   if (busy.value) return;
-  IWarningConfirm("删除", `连图片文件一起删除 ${selected.value.size} 张, 所有来源群都会失去它们, 是否继续?`).then(
-    async () => {
-      const targets = selectedList.value;
-      busy.value = true;
-      try {
-        const results = await inChunks(targets, (s) => ChatbotApi.deleteSticker(s.id));
-        const removed = new Set(targets.filter((_, i) => results[i].status === "fulfilled").map((s) => s.id));
-        stickers.value = stickers.value.filter((s) => !removed.has(s.id));
-        selected.value.clear();
-        report(removed.size, targets.length - removed.size, "");
-      } finally {
-        busy.value = false;
-      }
-    },
-  );
+  IWarningConfirm(
+    "删除",
+    `连图片文件一起删除 ${selected.value.size} 张, 所有来源群都会失去它们, 相同的图以后也不会再入库, 是否继续?`,
+  ).then(async () => {
+    const targets = selectedList.value;
+    busy.value = true;
+    try {
+      const results = await inChunks(targets, (s) => ChatbotApi.deleteSticker(s.id));
+      const removed = new Set(targets.filter((_, i) => results[i].status === "fulfilled").map((s) => s.id));
+      stickers.value = stickers.value.filter((s) => !removed.has(s.id));
+      selected.value.clear();
+      report(removed.size, targets.length - removed.size, "");
+    } finally {
+      busy.value = false;
+    }
+  });
 }
 function report(ok: number, failed: number, extra: string) {
   if (failed) warningMessage(`成功 ${ok} 张, 失败 ${failed} 张${extra}`);
@@ -247,7 +248,7 @@ function saveEdit() {
   });
 }
 function remove(s: ChatSticker) {
-  IWarningConfirm("删除", "连图片文件一起删除, 所有来源群都会失去它, 是否继续?").then(() => {
+  IWarningConfirm("删除", "连图片文件一起删除, 所有来源群都会失去它, 相同的图以后也不会再入库, 是否继续?").then(() => {
     ChatbotApi.deleteSticker(s.id).then(() => {
       stickers.value = stickers.value.filter((it) => it.id !== s.id);
       successMessage("已删除");

@@ -54,7 +54,8 @@ private const val MAX_SUMMARY_CHARS = 200
  * 图库运营页 (webui) 的后端, **只有主配置 `superAdminUid` 里的用户能用** (登录态由 core 根拦截器注入, [isSuperAdmin] 是 core 公开的判断).
  * 插件拿不到 core 的 HaltPipeline 做不了拦截器, 所以每个 handler 自己 [requireSuperAdmin], 不通过时已写响应, 直接 return.
  *
- * 表情是全局的 (`_id` = 内容哈希, 多群共见只累加 groupIds), 运营也是全局的: 列表默认全库, `gid` 只是过滤; 删除是物理删行 + 删文件.
+ * 表情是全局的 (`_id` = 内容哈希, 多群共见只累加 groupIds), 运营也是全局的: 列表默认全库, `gid` 只是过滤;
+ * 删除只删文件, 记录留成 deleted 墓碑占住 hash, 同图永不再送模型/入库 (见 [StickerStatus]).
  * tags/summary 只进选图打分, 不出站给用户, 不过内容审核.
  */
 @Suppress("unused")
@@ -86,7 +87,7 @@ object ChatbotEndpoint {
     val req = receiveJsonOrNull<StickerIdRequest>() ?: return badRequest()
     if (req.id.isBlank()) return badRequest()
     val doc = StickerStore.delete(req.id) ?: return errorMessage("表情不存在或仍在分析")
-    // Mongo 行已删再删文件: 删失败只留一个孤儿文件, 同图再入库会覆盖同名, 不影响功能.
+    // 墓碑已落再删文件: 删失败只留一个孤儿文件, 墓碑保留 fileName 当清理线索, 任何读路径都不会再引用它.
     doc.getString("fileName")?.let { name ->
       runCatchingCancellable { StickerFiles.delete(name) }.onFailure { PluginMain.logger.warn("chatbot 删表情文件失败: $name", it) }
     }

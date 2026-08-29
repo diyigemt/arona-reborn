@@ -8,7 +8,7 @@ arona {
   id = "com.diyigemt.arona.content.audit"
   name = "content-audit"
   author = "diyigemt"
-  version = "0.1.4"
+  version = "0.1.5"
   description = "内容审核"
   mainClass = "com.diyigemt.arona.content.audit.PluginMain"
 }

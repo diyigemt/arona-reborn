@@ -9,14 +9,11 @@ import com.diyigemt.arona.console.ConsoleSubCommand
 import com.diyigemt.arona.magic.PluginMain.emit
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
+import com.diyigemt.arona.utils.aronaHttpClient
 import com.github.ajalt.clikt.core.CliktCommand
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
 
 private var Open = false
 
@@ -27,14 +24,7 @@ object PluginMain : AronaPlugin(AronaPluginDescription(
   version = BuildConfig.VERSION,
   description = BuildConfig.DESCRIPTION
 )) {
-  private val json = Json {
-    ignoreUnknownKeys = true
-  }
-  private val httpClient = HttpClient(CIO) {
-    install(ContentNegotiation) {
-      json
-    }
-  }
+  private val httpClient = aronaHttpClient()
   suspend fun emit() {
     val text = httpClient.get(Config.url) {
       url {

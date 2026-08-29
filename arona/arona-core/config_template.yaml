@@ -67,5 +67,9 @@ web:
   allowedOrigins: []
   # 仅在确实部署在 nginx 等反向代理之后时设为 true, 否则 X-Forwarded-* / X-Real-IP 会被任意伪造.
   behindProxy: false
+# 出站 HTTP 正向代理 (需支持 CONNECT 隧道, 仅 http, 不支持 socks). 整段注释掉 = 直连.
+# httpProxy:
+#   host: "10.0.0.2"
+#   port: 3128
 superAdminUid: []
 debug: false

@@ -8,7 +8,7 @@ arona {
   id = "com.diyigemt.kivotos"
   name = "kivotos"
   author = "diyigemt"
-  version = "0.1.16"
+  version = "0.1.17"
   description = "hello world"
   mainClass = "com.diyigemt.kivotos.Kivotos"
 }

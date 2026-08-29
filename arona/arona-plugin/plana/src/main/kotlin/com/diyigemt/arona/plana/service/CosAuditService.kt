@@ -2,6 +2,7 @@ package com.diyigemt.arona.plana.service
 
 import com.diyigemt.arona.plana.Config
 import com.diyigemt.arona.plana.PluginMain
+import com.diyigemt.arona.utils.aronaHttpProxy
 import com.qcloud.cos.COSClient
 import com.qcloud.cos.ClientConfig
 import com.qcloud.cos.auth.BasicCOSCredentials
@@ -32,6 +33,10 @@ internal object CosAuditService {
       // 否则坏网络会长期占住 IO 线程。
       setConnectionTimeout(3000)
       setSocketTimeout(Config.auditTimeoutMillis.toInt())
+      aronaHttpProxy?.let {
+        setHttpProxyIp(it.host)
+        setHttpProxyPort(it.port)
+      }
     }
     COSClient(BasicCOSCredentials(Config.cosSecretId, Config.cosSecretKey), clientConfig)
   }

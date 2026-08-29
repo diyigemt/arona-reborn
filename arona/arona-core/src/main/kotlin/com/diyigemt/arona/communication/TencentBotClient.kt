@@ -4,8 +4,8 @@ import com.diyigemt.arona.communication.contact.*
 import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.utils.JsonIgnoreUnknownKeys
+import com.diyigemt.arona.utils.aronaHttpClient
 import io.ktor.client.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -123,7 +123,7 @@ private constructor(private val config: TencentBotConfig) :
   override val json = Json {
     ignoreUnknownKeys = true
   }
-  override val client = HttpClient(CIO) {
+  override val client = aronaHttpClient {
     install(ContentNegotiation) {
       json(json)
     }

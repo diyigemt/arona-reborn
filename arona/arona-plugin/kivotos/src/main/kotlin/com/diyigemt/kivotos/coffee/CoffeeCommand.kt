@@ -29,9 +29,6 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.mongodb.client.model.Updates
 import com.mongodb.client.result.UpdateResult
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.DateTimeUnit
@@ -39,7 +36,6 @@ import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.math.min
 
 
@@ -390,14 +386,6 @@ class CoffeeInviteCommand : AbstractCommand(
       /${KivotosCommand.primaryName} 咖啡厅 邀请 日奈
     """.trimIndent()
 ) {
-  private val json = Json {
-    ignoreUnknownKeys = true
-  }
-  private val httpClient = HttpClient(CIO) {
-    install(ContentNegotiation) {
-      json
-    }
-  }
   private val md by requireObject<TencentCustomMarkdown>("md")
   private val kb by requireObject<TencentCustomKeyboard>("kb")
   private val coffee by requireObject<CoffeeDocument>("coffee")

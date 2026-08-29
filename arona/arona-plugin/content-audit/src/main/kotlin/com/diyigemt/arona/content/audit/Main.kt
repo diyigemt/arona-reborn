@@ -6,6 +6,7 @@ import com.diyigemt.arona.console.CommandLineSubCommand
 import com.diyigemt.arona.console.ConsoleSubCommand
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
+import com.diyigemt.arona.utils.aronaHttpProxy
 import com.diyigemt.arona.webui.event.ContentAuditEvent
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -32,7 +33,15 @@ object PluginMain : AronaPlugin(
   private val tencentClient by lazy {
     COSClient(
       BasicCOSCredentials(AuditConfig.secretId, AuditConfig.secretKey),
-      ClientConfig(Region("ap-shanghai"))
+      ClientConfig(Region("ap-shanghai")).apply {
+        // 阻塞式 SDK 无法被 withTimeout 真正打断, 必须在 SDK 层设硬超时, 否则坏网络会长期占住线程.
+        setConnectionTimeout(3000)
+        setSocketTimeout(AuditConfig.auditTimeout.toInt())
+        aronaHttpProxy?.let {
+          setHttpProxyIp(it.host)
+          setHttpProxyPort(it.port)
+        }
+      }
     )
   }
 

@@ -8,7 +8,7 @@ arona {
   id = "com.diyigemt.arona.plana"
   name = "plana"
   author = "diyigemt"
-  version = "0.2.0"
+  version = "0.2.1"
   description = "普拉娜踩我与图片审查"
   mainClass = "com.diyigemt.arona.plana.PluginMain"
 }

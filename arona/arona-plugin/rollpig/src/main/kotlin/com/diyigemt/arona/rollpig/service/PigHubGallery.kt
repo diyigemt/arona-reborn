@@ -1,8 +1,8 @@
 package com.diyigemt.arona.rollpig.service
 
 import com.diyigemt.arona.rollpig.PluginMain
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import com.diyigemt.arona.utils.aronaHttpClient
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.encodeURLPath
@@ -33,9 +33,9 @@ internal object PigHubGallery {
   private val TTL = 1.hours
   private val RETRY_BACKOFF = 1.minutes // 拉取失败/空后的短退避, 避免 pighub 不可用时每次指令都联网阻塞
 
-  private val client = HttpClient(CIO) {
-    engine {
-      requestTimeout = 10_000 // ms; 兜底 pighub 慢响应/不可用, 避免 mutex 后调用排队累积
+  private val client = aronaHttpClient {
+    install(HttpTimeout) {
+      requestTimeoutMillis = 10_000 // 兜底 pighub 慢响应/不可用, 避免 mutex 后调用排队累积
     }
   }
   private val json = Json { ignoreUnknownKeys = true }

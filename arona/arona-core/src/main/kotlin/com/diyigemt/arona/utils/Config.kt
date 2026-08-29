@@ -47,6 +47,21 @@ data class WebConfig(
   val behindProxy: Boolean = false,
 )
 
+/**
+ * 出站 HTTP 正向代理 (需支持 CONNECT 隧道, CIO 不支持 socks).
+ * 整段省略 = 不施加代理 (遵循 CIO/JVM 默认策略, 部署环境无系统代理时即直连).
+ */
+@Serializable
+data class HttpProxyConfig(
+  val host: String,
+  val port: Int,
+) {
+  init {
+    require(host.isNotBlank()) { "httpProxy.host 不能为空" }
+    require(port in 1..65535) { "httpProxy.port 超出范围: $port" }
+  }
+}
+
 @Serializable
 data class AronaConfig(
   val bot: TencentBotConfig,
@@ -57,6 +72,7 @@ data class AronaConfig(
   val web: WebConfig,
   val superAdminUid : List<String>,
   val debug: Boolean = false,
+  val httpProxy: HttpProxyConfig? = null,
 ) {
   val superAdminUidAsString by lazy {
     superAdminUid.joinToString(",")

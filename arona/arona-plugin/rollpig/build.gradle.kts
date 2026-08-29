@@ -8,7 +8,7 @@ arona {
   id = "com.diyigemt.arona.rollpig"
   name = "rollpig"
   author = "diyigemt"
-  version = "0.3.0"
+  version = "0.3.1"
   description = "今日小猪"
   mainClass = "com.diyigemt.arona.rollpig.PluginMain"
 }

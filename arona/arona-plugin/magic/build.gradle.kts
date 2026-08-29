@@ -7,7 +7,7 @@ arona {
   id = "com.diyigemt.arona.magic"
   name = "magic"
   author = "diyigemt"
-  version = "0.0.1"
+  version = "0.0.2"
   description = "hello magic"
   mainClass = "com.diyigemt.arona.magic.PluginMain"
 }

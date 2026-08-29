@@ -4,9 +4,7 @@ import com.diyigemt.arona.arona.command.ImageQueryData
 import com.diyigemt.arona.arona.database.student.StudentSchema
 import com.diyigemt.arona.utils.BusinessCode
 import com.diyigemt.arona.utils.ServerResponse
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
+import com.diyigemt.arona.utils.aronaHttpClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -15,11 +13,7 @@ import kotlinx.serialization.json.Json
 private val json = Json {
   ignoreUnknownKeys = true
 }
-private val httpClient = HttpClient(CIO) {
-  install(ContentNegotiation) {
-    json
-  }
-}
+private val httpClient = aronaHttpClient()
 
 suspend fun normalizeStudentName(name: String): String? {
   return StudentSchema.StudentCache.values

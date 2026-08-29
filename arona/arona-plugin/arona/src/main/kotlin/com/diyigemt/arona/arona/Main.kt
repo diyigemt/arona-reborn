@@ -5,13 +5,10 @@ import com.diyigemt.arona.communication.event.*
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.plugins.AronaPlugin
 import com.diyigemt.arona.plugins.AronaPluginDescription
+import com.diyigemt.arona.utils.aronaHttpClient
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
 import kotlinx.coroutines.delay
-import kotlinx.serialization.json.Json
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
@@ -24,14 +21,7 @@ object Arona : AronaPlugin(
     description = BuildConfig.DESCRIPTION
   )
 ) {
-  private val json = Json {
-    ignoreUnknownKeys = true
-  }
-  val httpClient = HttpClient(CIO) {
-    install(ContentNegotiation) {
-      json
-    }
-  }
+  val httpClient = aronaHttpClient()
   // 已发送过"错误发生"通知的 sourceId 哨兵: 防止错误通知本身再次失败时陷入重发死循环.
   // sourceId 是腾讯每条入站消息的唯一 id, 旧实现用无界 List 记录, 移除仅发生在"通知本身又失败"这一
   // 罕见分支; 通知发送成功时条目永久滞留 -> 单调内存泄漏(且 List 的 in/remove 还是 O(n) 扫描).

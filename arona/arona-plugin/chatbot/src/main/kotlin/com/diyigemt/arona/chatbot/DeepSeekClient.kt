@@ -1,7 +1,6 @@
 package com.diyigemt.arona.chatbot
 
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import com.diyigemt.arona.utils.aronaHttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.bearerAuth
@@ -82,7 +81,7 @@ internal const val STICKER_SYSTEM_PROMPT =
 internal object DeepSeekClient {
   internal const val RESPOND_TOOL_NAME = "respond"
 
-  private val client = HttpClient(CIO) {
+  private val client = aronaHttpClient {
     install(HttpTimeout)
   }
 

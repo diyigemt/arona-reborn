@@ -67,8 +67,8 @@ object PluginMain : AronaPlugin(
         ts = parseTimestampMillis(ev.timestamp)?.let(::Date) ?: Date(),
       ),
     )
-    if (images.isNotEmpty() && StickerCapture.enabled(cfg)) {
-      launch { StickerCapture.capture(ev.bot.client, lineId, ev.group.id, ev.sender.id, images) }
+    if (images.isNotEmpty() && StickerCapture.captureEnabled(cfg)) {
+      launch { StickerCapture.capture(ev.bot.client, lineId, ev.group.id, ev.sender.id, cfg, images) }
     }
   }
 

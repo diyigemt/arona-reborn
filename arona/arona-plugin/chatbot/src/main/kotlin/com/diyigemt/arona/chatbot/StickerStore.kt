@@ -14,13 +14,17 @@ import org.bson.Document
 import java.util.Date
 
 /**
- * 表情状态机: analyzing (已抢占, 分析中) → pending (等人工审核) / ready (可用) / rejected (不是表情或 nsfw) / hidden (曾可用, 管理员下架).
+ * 图片状态机: analyzing (已抢占, 分析中) → captioned (打过标但不入库) / pending (等人工审核) / ready (可用).
+ * rejected (不是表情或 nsfw, 抓取路径已不再产出, 旧行与运营操作仍在) / hidden (曾可用, 管理员下架).
  * 四个终态之间由运营页 ([ChatbotEndpoint]) 自由切换; 选图只取 ready.
+ * captioned 是看图打标留下的仅摘要记录 (非表情 / 超尺寸 / nsfw 高 / 该群未开收集), 无文件, 不进运营页,
+ * 永久占住 hash 供 [ChatStore.setImageSummary] 回填复用; 之后群再开收集这些图也不会自动进库 (与墓碑同款语义).
  * deleted 是运营页删除留下的墓碑: 文件已删, 记录永留 (占住 hash 让 [StickerStore.claim] 跳过, 同图不再送模型/入库),
  * 不进列表也不可再编辑, 只能经删除端点到达.
  */
 internal object StickerStatus {
   const val ANALYZING = "analyzing"
+  const val CAPTIONED = "captioned"
   const val PENDING = "pending"
   const val READY = "ready"
   const val REJECTED = "rejected"
@@ -52,13 +56,13 @@ internal data class StickerView(
   val lastUsedAt: Long?,
   val senderId: String?,
   val url: String?,
-  /** 抓取时被模型拒绝的没存文件, 永远不能设为 ready; 运营页据此隐藏「通过」. */
+  /** 无文件的 (旧版抓取时被拒的 rejected 行) 永远不能设为 ready; 运营页据此隐藏「通过」. */
   val hasFile: Boolean,
 )
 
 /**
  * 图库 `chatSticker`, `_id` = 内容 SHA-256 (全局去重). 一张图在多个群出现时 `groupIds` 累加, 选图默认只选本群见过的.
- * 字段: groupIds, senderId (首见), mime, width, height, bytes, summary, tags, nsfwRisk, status, fileName (数据目录里的文件, rejected 无), createdAt, useCount, lastUsedAt.
+ * 字段: groupIds, senderId (首见), mime, width, height, bytes, summary, tags, nsfwRisk, status, fileName (数据目录里的文件, captioned/rejected 无), createdAt, useCount, lastUsedAt.
  */
 internal object StickerStore {
   private const val COLLECTION = "chatSticker"
@@ -99,6 +103,15 @@ internal object StickerStore {
     }
   }
 
+  /** 按内容 hash 取已有摘要, 供重复图零成本回填; analyzing / 被 release 的行没有 summary, 自然返回 null. */
+  suspend fun findSummary(hash: String): String? =
+    stickers().find(Filters.eq("_id", hash))
+      .projection(Projections.include("summary"))
+      .limit(1)
+      .toList()
+      .firstOrNull()
+      ?.getString("summary")?.trim()?.takeIf { it.isNotEmpty() }
+
   suspend fun finish(hash: String, image: DownloadedImage, dimensions: Pair<Int, Int>?, analysis: StickerAnalysis, status: String, fileName: String?) {
     val update = Updates.combine(
       Updates.set("status", status),
@@ -111,7 +124,8 @@ internal object StickerStore {
       Updates.set("nsfwRisk", analysis.nsfwRisk),
       Updates.set("fileName", fileName),
     )
-    // 只写仍由自己持有的 analyzing 行: 过期接管与原协程迟到的 finish 不会互相覆盖.
+    // 只写 analyzing 行, 终态不会被打回. 过期接管与原协程迟到的 finish 理论上可交错 (无 owner token),
+    // 但 _id 即内容 hash, 双方写的是同一张图的分析结果, 实害为零, 不值得为此加租约.
     stickers().updateOne(Filters.and(Filters.eq("_id", hash), Filters.eq("status", StickerStatus.ANALYZING)), update)
   }
 
@@ -173,10 +187,10 @@ internal object StickerStore {
   suspend fun sourceGroupIds(): List<String> =
     stickers().distinct("groupIds", operable(), String::class.java).toList()
 
-  /** 运营页可见范围: 排除分析中与墓碑. */
-  private fun operable() = Filters.nin("status", StickerStatus.ANALYZING, StickerStatus.DELETED)
+  /** 运营页可见范围: 排除分析中、仅摘要 (captioned) 与墓碑. */
+  private fun operable() = Filters.nin("status", StickerStatus.ANALYZING, StickerStatus.CAPTIONED, StickerStatus.DELETED)
 
-  /** 只改 [edit] 里非 null 的字段. 返回 false = 不存在 / 仍在分析 / 想设 ready 但没有文件 (抓取时被拒的). */
+  /** 只改 [edit] 里非 null 的字段. 返回 false = 不存在 / 仍在分析 / 仅摘要 (captioned) / 想设 ready 但没有文件 (旧版被拒行). */
   suspend fun update(id: String, edit: StickerEdit): Boolean {
     val sets = listOfNotNull(
       edit.status?.let { Updates.set("status", it) },
@@ -196,9 +210,9 @@ internal object StickerStore {
   suspend fun delete(id: String): Document? =
     stickers().findOneAndUpdate(editable(id), Updates.set("status", StickerStatus.DELETED))
 
-  /** 墓碑 (deleted) 与分析中的都不可运营: 不列出、不可编辑、不可再删. */
+  /** 墓碑 (deleted)、仅摘要 (captioned) 与分析中的都不可运营: 不列出、不可编辑、不可删. */
   private fun editable(id: String) =
-    Filters.and(Filters.eq("_id", id), Filters.nin("status", StickerStatus.ANALYZING, StickerStatus.DELETED))
+    Filters.and(Filters.eq("_id", id), Filters.nin("status", StickerStatus.ANALYZING, StickerStatus.CAPTIONED, StickerStatus.DELETED))
 
   private fun Document.int(key: String) = (get(key) as? Number)?.toInt()
 

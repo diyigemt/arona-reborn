@@ -52,7 +52,7 @@ internal fun probeDimensions(bytes: ByteArray): Pair<Int, Int>? = runCatching {
   }
 }.getOrNull()
 
-/** 表情包启发式: 最长边与长宽比都在阈值内. 尺寸未知 (null) 时放行, 交给模型判 is_meme. */
+/** 表情入库启发式: 最长边与长宽比都在阈值内. 尺寸未知 (null) 时放行, 交给模型判 is_meme. 只决定进不进图库, 不决定是否打标. */
 internal fun looksLikeSticker(dimensions: Pair<Int, Int>?, maxSide: Int, maxAspect: Double): Boolean {
   val (w, h) = dimensions ?: return true
   if (w <= 0 || h <= 0) return false

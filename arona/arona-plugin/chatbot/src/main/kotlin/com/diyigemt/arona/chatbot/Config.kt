@@ -77,6 +77,8 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   val imageDownloadTimeoutMillis by value(5_000L)
   /** 带图的模型调用超时, 比纯文本长. */
   val visionTimeoutMillis by value(12_000L)
+  /** 看图打标总开关: 观察路径给群里出现的图片生成描述并回写聊天上下文 (走表情抓取管线, 与收集共用小时预算). */
+  val imageCaptionEnabled by value(true)
 
   // ---- 表情库 (P2): 观察路径抓取群里的表情包, 模型打标后存进数据目录, 回复时可配图 ----
   val stickerCaptureEnabled by value(true)
@@ -90,7 +92,7 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   val stickerMaxSide by value(1024)
   /** 长宽比超过视为长截图, 不入库. */
   val stickerMaxAspect by value(3.0)
-  /** 全局每小时最多分析多少张候选表情 (视觉模型调用预算). */
+  /** 全局每小时的视觉打标预算, 表情收集与看图打标共用 (照片/截图与表情竞争同一额度). */
   val stickerCapturePerHour by value(60L)
 
   /**
@@ -171,6 +173,10 @@ data class ChatbotConfig(
   @EncodeDefault
   @ConfigItem(label = "收集表情包", group = "表情", description = "把群里发的表情包存进图库 (需管理员审核后才会被使用)")
   val stickerCapture: Boolean = true,
+
+  @EncodeDefault
+  @ConfigItem(label = "记住图片内容", group = "表情", description = "用视觉模型描述群里出现的图片并写进聊天上下文, 之后回复时知道图里是什么; 关闭后图片在上下文里只是「[图片]」")
+  val imageCaption: Boolean = true,
 
   @EncodeDefault
   @ConfigItem(label = "配图概率", group = "表情", description = "每次回复附带一张表情包的概率 (0~1)")

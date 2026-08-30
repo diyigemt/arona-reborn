@@ -18,7 +18,10 @@ import com.github.ajalt.mordant.terminal.PrintRequest
 import com.github.ajalt.mordant.terminal.StandardTerminalInterface
 import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.util.logging.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import org.jline.reader.EndOfFileException
+import org.jline.reader.UserInterruptException
 import kotlin.system.exitProcess
 
 interface CommandLineSubCommand
@@ -69,6 +72,8 @@ class CommandMain : CliktCommand(name = "cli") {
         instance.parse(argv)
       }.onFailure {
         when {
+          // 取消必须透传, 否则控制台循环感知不到关停.
+          it is CancellationException -> throw it
           it is CliktError -> instance.echo(instance.getFormattedHelp(it))
           else -> commandLineLogger.error(it)
         }
@@ -156,5 +161,12 @@ class JLineTerminalInterface : StandardTerminalInterface() {
     }
   }
 
-  override fun readLineOrNull(hideInput: Boolean): String? = lineReader.readLine(">")
+  // Mordant 契约: 无输入返回 null. Ctrl+C / EOF 不能把 JLine 异常泄漏给 Mordant prompt.
+  override fun readLineOrNull(hideInput: Boolean): String? = try {
+    lineReader.readLine(">")
+  } catch (_: UserInterruptException) {
+    null
+  } catch (_: EndOfFileException) {
+    null
+  }
 }

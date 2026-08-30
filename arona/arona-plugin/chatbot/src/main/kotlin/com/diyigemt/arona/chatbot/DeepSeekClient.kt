@@ -82,8 +82,11 @@ internal const val STICKER_SYSTEM_PROMPT =
 internal object DeepSeekClient {
   internal const val RESPOND_TOOL_NAME = "respond"
 
-  private val client = aronaHttpClient {
-    install(HttpTimeout)
+  // lazy: 工厂读全局 config.yaml, 单测只用 classify/buildRequestBody 等纯逻辑, 不应要求配置文件存在.
+  private val client by lazy {
+    aronaHttpClient {
+      install(HttpTimeout)
+    }
   }
 
   suspend fun chat(systemPrompt: String, userPrompt: String, images: List<DownloadedImage> = emptyList(), allowSticker: Boolean = false): LlmOutcome {

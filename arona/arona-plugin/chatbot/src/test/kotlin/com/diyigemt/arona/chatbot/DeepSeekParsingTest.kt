@@ -85,9 +85,15 @@ class DeepSeekParsingTest {
   }
 
   @Test
+  fun `护栏拼在人设之后, 空人设只剩护栏`() {
+    assertEquals("persona\n\n$CHAT_GUARD_PROMPT", buildSystemPrompt(" \n persona \r\n"))
+    assertEquals(CHAT_GUARD_PROMPT, buildSystemPrompt(" \t"))
+  }
+
+  @Test
   fun `摘要进入 user prompt 最前面, 空摘要等价无摘要`() {
     val prompt = buildUserPrompt(emptyList(), "小红", "你好", summary = "小明爱吃鱼")
-    assertTrue(prompt.startsWith("更早的聊天摘要"))
+    assertTrue(prompt.startsWith("你更早的记忆"))
     assertTrue(prompt.contains("小明爱吃鱼"))
     assertTrue(prompt.endsWith("现在 小红 说: 你好"))
     assertEquals("现在 小红 说: 你好", buildUserPrompt(emptyList(), "小红", "你好", summary = "  "))

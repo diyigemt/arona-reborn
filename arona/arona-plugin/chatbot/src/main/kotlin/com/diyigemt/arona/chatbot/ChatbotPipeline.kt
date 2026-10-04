@@ -358,16 +358,28 @@ internal object ChatbotPipeline {
       .getOrDefault(emptyList())
     val speaker = event.platformUsername?.takeIf { it.isNotBlank() } ?: "群友${event.sender.id.takeLast(4)}"
     val images = if (ChatbotSecrets.visionEnabled) downloadInbound(event, inboundImages) else emptyList()
-    val prompt = buildUserPrompt(
+    var prompt = buildUserPrompt(
       history, speaker, proceed.text,
       quoted = event.quoted?.content?.take(cfg.maxUserChars),
       summary = memory?.summary,
       imageCount = images.size,
     )
+    val system = buildSystemPrompt(cfg.systemPrompt)
     val wantSticker = ThreadLocalRandom.current().nextDouble() < cfg.stickerReplyProbability
-    val reply = when (val out = DeepSeekClient.chat(buildSystemPrompt(cfg.systemPrompt), prompt, images, allowSticker = wantSticker)) {
+    // 只有必答轮次给搜索工具: 概率触发的插话不值得多一次搜索 + 一次模型调用的钱和延迟.
+    // ponytail: 带图轮次不给搜索 —— 两次视觉调用 (12s×2) + 下载 + 搜索 + 审核会超出 30s 总预算; 要支持就按剩余预算动态收紧各阶段超时.
+    val allowSearch = proceed.must && images.isEmpty() && cfg.webSearch && WebSearch.enabled
+    var out = DeepSeekClient.chat(system, prompt, images, allowSticker = wantSticker, allowSearch = allowSearch)
+    if (out is LlmOutcome.Search) {
+      // 最多查一次: 资料 (或 "没查到") 拼在 prompt 末尾, 第二次不再给搜索工具; 落 chatRound 的也是带资料的 prompt.
+      // 查过资料的轮次不配图: 最坏耗时 8 (首轮) + 5 (搜索) + 5 (整理) + 8 (次轮) + 3 (审核) 已贴着 30s 预算, 再取表情就超了.
+      prompt = "$prompt\n\n${buildSearchBlock(out.question, WebSearch.research(gid, out.question, out.queries))}"
+      out = DeepSeekClient.chat(system, prompt, images)
+    }
+    val reply = when (out) {
       is LlmOutcome.Noop -> { noop(gid, sourceId, out.reason, out.detail); return Outcome.Skipped }
       is LlmOutcome.Reply -> out
+      is LlmOutcome.Search -> { noop(gid, sourceId, NoopReason.JSON_INVALID, "search without tool: ${out.question}"); return Outcome.Skipped }
     }
 
     val audit = withTimeoutOrNull(ChatbotSecrets.auditTimeoutMillis) { ContentAuditEvent(reply.text, level = 80).broadcast() }

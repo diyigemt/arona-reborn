@@ -48,7 +48,19 @@ internal sealed interface LlmOutcome {
   /** [promptTokens] 来自响应 usage, 供记忆压缩的 token 条件; 响应不带 usage 时为 null. [sticker] 为模型想配的表情关键词. */
   data class Reply(val text: String, val promptTokens: Int? = null, val sticker: String? = null) : LlmOutcome
   data class Noop(val reason: NoopReason, val detail: String? = null) : LlmOutcome
+  /** 模型想先联网查一下再回答 (仅在提供了搜索工具的轮次出现): [question] 是要查清的问题, [queries] 是 1~[SEARCH_MAX_QUERIES] 组搜索词. */
+  data class Search(val question: String, val queries: List<String>) : LlmOutcome
 }
+
+/** [queries] 是 `|` 分隔的字符串而不是数组: 实测模型对数组参数会吐出不带引号的非法 JSON, 整轮必答就被判 JSON_INVALID 吞掉. */
+@Serializable
+private data class SearchArgs(val question: String = "", val queries: String = "")
+
+/** 单组搜索词上限: 正常查询远短于此, 超长多半是模型把整段聊天塞了进来. */
+internal const val SEARCH_QUERY_MAX_CHARS = 100
+internal const val SEARCH_QUESTION_MAX_CHARS = 200
+/** 一轮最多几组搜索词; 每组会对每家服务商各发一次请求. */
+internal const val SEARCH_MAX_QUERIES = 3
 
 /**
  * 把模型输出文本解析成 [BotAction]. 容错: 去掉 ``` 围栏、取首个 `{` 到末个 `}`、lenient 解析.
@@ -78,9 +90,11 @@ internal const val STICKER_SYSTEM_PROMPT =
  * DeepSeek (OpenAI 兼容) chat/completions 最小客户端. 聊天回复用 tools + tool_choice 强制调用 [RESPOND_TOOL_NAME],
  * 输出契约由工具 schema 表达, 不再靠 prompt 约定; 表情打标与摘要仍是普通补全. tool_choice 只保证调工具,
  * 不保证 arguments 是合法 JSON (官方要求应用自行校验), 所以 [parseBotAction] 容错链保留.
+ * 允许搜索的轮次多给一个 [SEARCH_TOOL_NAME] 工具, tool_choice 放宽成 required (二选一); 搜索、资料整理 ([WebSearch.research]) 与第二次请求由流水线驱动.
  */
 internal object DeepSeekClient {
   internal const val RESPOND_TOOL_NAME = "respond"
+  internal const val SEARCH_TOOL_NAME = "web_search"
 
   // lazy: 工厂读全局 config.yaml, 单测只用 classify/buildRequestBody 等纯逻辑, 不应要求配置文件存在.
   private val client by lazy {
@@ -89,11 +103,19 @@ internal object DeepSeekClient {
     }
   }
 
-  suspend fun chat(systemPrompt: String, userPrompt: String, images: List<DownloadedImage> = emptyList(), allowSticker: Boolean = false): LlmOutcome {
+  /** [allowSearch] 为 true 时模型可以改为返回 [LlmOutcome.Search]; 调用方搜完把结果拼进 prompt, 再以 false 调一次. */
+  suspend fun chat(
+    systemPrompt: String,
+    userPrompt: String,
+    images: List<DownloadedImage> = emptyList(),
+    allowSticker: Boolean = false,
+    allowSearch: Boolean = false,
+  ): LlmOutcome {
     val timeoutMillis = if (images.isEmpty()) ChatbotSecrets.llmTimeoutMillis else ChatbotSecrets.visionTimeoutMillis
-    return when (val resp = request(systemPrompt, userPrompt, RequestMode.Respond(allowSticker), timeoutMillis, images)) {
+    val mode = RequestMode.Respond(allowSticker, searchToday = if (allowSearch) searchToday() else null)
+    return when (val resp = request(systemPrompt, userPrompt, mode, timeoutMillis, images)) {
       is Response.Error -> LlmOutcome.Noop(NoopReason.MODEL_ERROR, resp.detail)
-      is Response.Content -> classify(resp.text, resp.promptTokens, resp.functionCalls)
+      is Response.Content -> classify(resp.text, resp.promptTokens, resp.functionCalls, allowSearch)
     }
   }
 
@@ -106,8 +128,15 @@ internal object DeepSeekClient {
 
   /** 纯文本补全, 用于生成聊天摘要. 失败 / 空输出返回 null, 调用方决定日志. */
   suspend fun summarize(systemPrompt: String, userPrompt: String): String? =
-    when (val resp = request(systemPrompt, userPrompt, RequestMode.Plain, ChatbotSecrets.memoryTimeoutMillis)) {
-      is Response.Error -> { PluginMain.logger.warn("chatbot 摘要模型调用失败: ${resp.detail}"); null }
+    complete(systemPrompt, userPrompt, RequestMode.Plain, ChatbotSecrets.memoryTimeoutMillis, "摘要")
+
+  /** 纯文本补全, 用于把搜索结果整理成要点. 在回复的等待预算之内, 所以关 thinking (实测同一输入 8s → 1s). 失败 / 空输出返回 null. */
+  suspend fun digest(systemPrompt: String, userPrompt: String): String? =
+    complete(systemPrompt, userPrompt, RequestMode.PlainFast, ChatbotSecrets.searchDigestTimeoutMillis, "资料整理")
+
+  private suspend fun complete(systemPrompt: String, userPrompt: String, mode: RequestMode, timeoutMillis: Long, what: String): String? =
+    when (val resp = request(systemPrompt, userPrompt, mode, timeoutMillis)) {
+      is Response.Error -> { PluginMain.logger.warn("chatbot ${what}模型调用失败: ${resp.detail}"); null }
       is Response.Content -> resp.text.trim().ifEmpty { null }
     }
 
@@ -115,9 +144,18 @@ internal object DeepSeekClient {
    * 模型输出 → 结果 (纯函数). 有 tool call 时只认 [RESPOND_TOOL_NAME] 的 arguments —— 调错工具是协议违约,
    * 记 JSON_INVALID 而不回退 content, 否则会掩盖矛盾输出; 完全没有 tool call 才回退 content 容错链 (网关兜底).
    * 空输出是 JSON_EMPTY, 模型明确 silent 才是 MODEL_SILENT, 两者不能混, 否则必答消息会被静默吞掉.
+   * [SEARCH_TOOL_NAME] 只在 [allowSearch] 的轮次合法; 没提供搜索工具却调了它, 照旧按调错工具处理.
    */
-  internal fun classify(content: String, promptTokens: Int? = null, functionCalls: List<FunctionCall> = emptyList()): LlmOutcome {
+  internal fun classify(content: String, promptTokens: Int? = null, functionCalls: List<FunctionCall> = emptyList(), allowSearch: Boolean = false): LlmOutcome {
     val call = functionCalls.firstOrNull()
+    if (call != null && allowSearch && call.name == SEARCH_TOOL_NAME) {
+      val args = parseJsonObject(call.arguments, SearchArgs.serializer()) ?: return LlmOutcome.Noop(NoopReason.JSON_INVALID, call.arguments.take(200))
+      // question / queries 缺一个就拿另一个顶: 少一个字段不值得吞掉一轮必答.
+      val queries = args.queries.split('|', '\n').map { it.trim().take(SEARCH_QUERY_MAX_CHARS) }.filter { it.isNotEmpty() }.distinct().take(SEARCH_MAX_QUERIES)
+      val question = args.question.trim().take(SEARCH_QUESTION_MAX_CHARS).ifEmpty { queries.firstOrNull().orEmpty() }
+      if (question.isEmpty()) return LlmOutcome.Noop(NoopReason.JSON_INVALID, call.arguments.take(200))
+      return LlmOutcome.Search(question, queries.ifEmpty { listOf(question.take(SEARCH_QUERY_MAX_CHARS)) })
+    }
     if (call != null && call.name != RESPOND_TOOL_NAME) return LlmOutcome.Noop(NoopReason.JSON_INVALID, "unexpected function: ${call.name}".take(200))
     val payload = call?.arguments ?: content
     if (payload.isBlank()) return LlmOutcome.Noop(NoopReason.JSON_EMPTY)
@@ -135,10 +173,14 @@ internal object DeepSeekClient {
     data class Error(val detail: String) : Response
   }
 
-  /** [Plain] 普通补全 (摘要 / 表情打标); [Respond] 聊天回复, 带 respond 工具并强制调用. */
+  /**
+   * [Plain] 普通补全 (摘要 / 表情打标); [PlainFast] 普通补全但关 thinking (搜索资料整理); [Respond] 聊天回复, 带 respond 工具并强制调用.
+   * [Respond.searchToday] 非 null 时额外提供搜索工具, 值是今天的日期 (写进工具描述: 模型不知道"现在"是哪天, 拼不出带时间的搜索词).
+   */
   internal sealed interface RequestMode {
     data object Plain : RequestMode
-    data class Respond(val allowSticker: Boolean) : RequestMode
+    data object PlainFast : RequestMode
+    data class Respond(val allowSticker: Boolean, val searchToday: String? = null) : RequestMode
   }
 
   private suspend fun request(system: String, user: String, mode: RequestMode, timeoutMillis: Long, images: List<DownloadedImage> = emptyList()): Response {
@@ -175,6 +217,26 @@ internal object DeepSeekClient {
     }
   }
 
+  internal fun buildSearchTool(today: String): JsonObject = buildJsonObject {
+    put("type", "function")
+    putJsonObject("function") {
+      put("name", SEARCH_TOOL_NAME)
+      put("description", "联网查资料. 只在回答需要你不知道或可能已过时的信息时用 (新闻、近期活动、具体数据等), 普通闲聊直接 respond. 今天是 $today (只用来判断信息是否过时, 不要把日期写进关键词).")
+      putJsonObject("parameters") {
+        put("type", "object")
+        putJsonObject("properties") {
+          putJsonObject("question") { put("type", "string"); put("description", "要查清楚的问题, 完整的一句话 (补全聊天里省略的主语和指代).") }
+          putJsonObject("queries") {
+            put("type", "string")
+            put("description", "1~$SEARCH_MAX_QUERIES 组搜索关键词, 用 | 分隔; 每组像在搜索引擎里输入的那样简短. 涉及海外的游戏、作品、产品时, 加一组英文或日文原名的关键词.")
+          }
+        }
+        put("required", buildJsonArray { add(JsonPrimitive("question")); add(JsonPrimitive("queries")) })
+        put("additionalProperties", false)
+      }
+    }
+  }
+
   /** 图片只能出现在 user 消息里, 以 data URL 内联 (QQ 直链带签名且对模型服务端的可达性未知). 纯函数便于测请求体结构. */
   internal fun buildRequestBody(model: String, system: String, user: String, mode: RequestMode, images: List<DownloadedImage>): JsonObject = buildJsonObject {
     put("model", model)
@@ -192,10 +254,18 @@ internal object DeepSeekClient {
     })
     when (mode) {
       RequestMode.Plain -> Unit
+      RequestMode.PlainFast -> putJsonObject("thinking") { put("type", "disabled") }
       is RequestMode.Respond -> {
-        put("tools", buildJsonArray { add(buildRespondTool(mode.allowSticker)) })
-        putJsonObject("tool_choice") { put("type", "function"); putJsonObject("function") { put("name", RESPOND_TOOL_NAME) } }
-        // DeepSeek V4 默认开 thinking, 而 thinking mode 拒绝强制 tool_choice, 必须显式关闭.
+        put("tools", buildJsonArray {
+          add(buildRespondTool(mode.allowSticker))
+          mode.searchToday?.let { add(buildSearchTool(it)) }
+        })
+        if (mode.searchToday == null) {
+          putJsonObject("tool_choice") { put("type", "function"); putJsonObject("function") { put("name", RESPOND_TOOL_NAME) } }
+        } else {
+          put("tool_choice", "required")
+        }
+        // DeepSeek V4 默认开 thinking, 而 thinking mode 拒绝强制 tool_choice (指定函数与 required 都拒), 必须显式关闭.
         // 这是 DeepSeek 扩展字段; 换非 DeepSeek 端点时若对方拒绝未知字段, 需去掉这行.
         putJsonObject("thinking") { put("type", "disabled") }
       }

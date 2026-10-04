@@ -100,6 +100,19 @@ object ChatbotSecrets : AutoSavePluginData("config") {
    * 由运维用 nginx 只把该子目录映射过来 (autoindex off), 如 `https://example.com/chatbot-sticker`. 为空则运营页不显示图, 其它功能不受影响.
    */
   val stickerPublicBaseUrl by value("")
+
+  // ---- 联网搜索: 必答轮次里模型可先查一次资料 (多组搜索词 × 两家服务商并发, 结果交替合并, 再由一轮无人设的模型调用整理成要点),
+  // 要点拼进 prompt 再出回复. 两个 key 都为空则全局不提供搜索工具 ----
+  /** 博查 API Key (https://open.bochaai.com): 国内中文站与时效新闻强, 0.5s 级. */
+  val bochaApiKey by value("")
+  /** Tavily API Key (https://tavily.com): 海外站与日英文内容强 (游戏 wiki 等), 2~5s; 海外服务, 部署机需能连通. */
+  val tavilyApiKey by value("")
+  /** 每家搜索的请求超时; 超时的那家按失败处理, 另一家的结果照用. */
+  val searchTimeoutMillis by value(5_000L)
+  /** 每组搜索词向每家要几条结果. */
+  val searchCount by value(5)
+  /** 资料整理那次模型调用的超时; 超时则退化为把前几条原始结果直接给聊天模型. */
+  val searchDigestTimeoutMillis by value(5_000L)
 }
 
 enum class ProbabilityMode {
@@ -129,6 +142,10 @@ data class ChatbotConfig(
   @EncodeDefault
   @ConfigItem(label = "唤起先导词", group = "基础", description = "消息以「先导词+空格」开头必答; @机器人 亦必答")
   val mustPrefixes: List<String> = listOf("阿罗娜"),
+
+  @EncodeDefault
+  @ConfigItem(label = "联网搜索", group = "基础", description = "被 @ 或先导词唤起时, 允许先联网搜索再回答 (回复会慢几秒; 需管理员已配置搜索服务)")
+  val webSearch: Boolean = true,
 
   @EncodeDefault
   @ConfigItem(label = "概率模式", group = "概率")

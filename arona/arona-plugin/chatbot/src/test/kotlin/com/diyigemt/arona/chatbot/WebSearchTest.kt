@@ -55,6 +55,32 @@ class WebSearchTest {
   }
 
   @Test
+  fun `原生搜索请求体 - Anthropic 格式, 声明 web_search 服务端工具, 关 thinking`() {
+    val body = buildNativeSearchBody("m", "2026-10-04", "现在开什么活动", listOf("a", "b"))
+    assertEquals("m", body["model"]!!.jsonPrimitive.content)
+    assertTrue(body["system"]!!.jsonPrimitive.content.contains("2026-10-04"))
+    assertEquals("问题: 现在开什么活动\n可参考的搜索词: a | b", body["messages"]!!.jsonArray.single().jsonObject["content"]!!.jsonPrimitive.content)
+    val tool = body["tools"]!!.jsonArray.single().jsonObject
+    assertEquals(listOf("web_search_20250305", "web_search"), listOf(tool["type"], tool["name"]).map { it!!.jsonPrimitive.content })
+    assertEquals("disabled", body["thinking"]!!.jsonObject["type"]!!.jsonPrimitive.content)
+    assertTrue(body["max_tokens"]!!.jsonPrimitive.content.toInt() > 0, "Anthropic 格式必填")
+  }
+
+  @Test
+  fun `原生搜索响应解析 - 只取末尾连续的 text 块, 截断在搜索中途与错误响应为 null`() {
+    val raw = """{"content":[
+      {"type":"text","text":"I'll search for this information now."},
+      {"type":"server_tool_use","id":"s1","name":"web_search","input":{"query":"q"}},
+      {"type":"web_search_tool_result","tool_use_id":"s1","content":[{"type":"web_search_result","title":"t","url":"u","encrypted_content":"x"}]},
+      {"type":"text","text":"答案前半, "},
+      {"type":"text","text":"答案后半\n"}
+    ],"stop_reason":"end_turn","usage":{"input_tokens":13099,"server_tool_use":{"web_search_requests":2}}}"""
+    assertEquals("答案前半, 答案后半", parseNativeSearchAnswer(raw))
+    assertNull(parseNativeSearchAnswer("""{"content":[{"type":"thinking","thinking":"..."},{"type":"server_tool_use","id":"s1","name":"web_search","input":{}}],"stop_reason":"max_tokens"}"""))
+    assertNull(parseNativeSearchAnswer("""{"error":{"message":"Authentication Fails","type":"authentication_error"}}"""))
+  }
+
+  @Test
   fun `允许搜索的请求体 - 两个工具, tool_choice 为 required, 仍关 thinking, 搜索参数全是字符串`() {
     val body = DeepSeekClient.buildRequestBody("m", "sys", "hi", DeepSeekClient.RequestMode.Respond(allowSticker = false, searchToday = "2026-10-04"), images = emptyList())
     val functions = body["tools"]!!.jsonArray.map { it.jsonObject["function"]!!.jsonObject }

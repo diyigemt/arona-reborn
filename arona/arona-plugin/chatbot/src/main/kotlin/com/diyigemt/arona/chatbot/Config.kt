@@ -102,7 +102,7 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   val stickerPublicBaseUrl by value("")
 
   // ---- 联网搜索: 必答轮次里模型可先查一次资料 (多组搜索词 × 两家服务商并发, 结果交替合并, 再由一轮无人设的模型调用整理成要点),
-  // 要点拼进 prompt 再出回复. 两个 key 都为空则全局不提供搜索工具 ----
+  // 要点拼进 prompt 再出回复. 两个 key 都为空且没开原生搜索则全局不提供搜索工具 ----
   /** 博查 API Key (https://open.bochaai.com): 国内中文站与时效新闻强, 0.5s 级. */
   val bochaApiKey by value("")
   /** Tavily API Key (https://tavily.com): 海外站与日英文内容强 (游戏 wiki 等), 2~5s; 海外服务, 部署机需能连通. */
@@ -113,6 +113,16 @@ object ChatbotSecrets : AutoSavePluginData("config") {
   val searchCount by value(5)
   /** 资料整理那次模型调用的超时; 超时则退化为把前几条原始结果直接给聊天模型. */
   val searchDigestTimeoutMillis by value(5_000L)
+
+  /**
+   * true 时查资料改走 DeepSeek 原生联网搜索 (Anthropic 兼容端点的 web_search 服务端工具: 一次请求里由 DeepSeek 服务端搜索并作答, 用 [apiKey]),
+   * 不再用博查 / Tavily. 实测游戏类问题更对题、2~4s; 但每次约 1~1.5 万输入 token (另一条路合计约 3 千), 且官方文档没有这个功能的说明与计费.
+   */
+  val nativeSearchEnabled by value(false)
+  /** Anthropic 兼容端点; [baseUrl] 换成非 DeepSeek 网关时原生搜索多半不可用, 关掉 [nativeSearchEnabled]. */
+  val nativeSearchBaseUrl by value("https://api.deepseek.com/anthropic")
+  /** 原生搜索整次请求的超时: 8 (首轮) + 10 + 8 (次轮) + 3 (审核) 贴着 30s 总预算, 调大要同步调 [totalBudgetMillis]. */
+  val nativeSearchTimeoutMillis by value(10_000L)
 }
 
 enum class ProbabilityMode {

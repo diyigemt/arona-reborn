@@ -24,4 +24,5 @@ include("arona-plugin:pressure-test")
 include("arona-plugin:maintain-notifier")
 include("arona-plugin:rollpig")
 include("arona-plugin:chatbot")
+include("arona-plugin:webhook-notifier")
 include("arona-plugin:audit-stub") // sandbox 联调专用审核桩, 不部署

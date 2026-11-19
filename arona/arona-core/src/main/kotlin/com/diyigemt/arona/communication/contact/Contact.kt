@@ -6,6 +6,9 @@ import com.diyigemt.arona.communication.TencentEndpoint
 import com.diyigemt.arona.communication.contact.Guild.Companion.batchResolveMemberPrivateChannels
 import com.diyigemt.arona.communication.contact.Guild.Companion.findOrCreateMemberPrivateChannel
 import com.diyigemt.arona.communication.event.*
+import com.diyigemt.arona.communication.inject.GroupInjections
+import com.diyigemt.arona.communication.inject.InjectionRejectedException
+import com.diyigemt.arona.communication.inject.InjectionRoute
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.database.DatabaseProvider.sqlDbQuery
 import com.diyigemt.arona.database.guild.GuildMemberSchema
@@ -16,6 +19,7 @@ import com.diyigemt.arona.database.permission.UserDocument
 import com.diyigemt.arona.utils.childScopeContext
 import com.diyigemt.arona.utils.commandLineLogger
 import com.diyigemt.arona.utils.error
+import com.diyigemt.arona.utils.uuid
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.RemovalListener
 import io.ktor.client.request.*
@@ -33,7 +37,9 @@ import kotlinx.serialization.encodeToString
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
+import java.time.OffsetDateTime
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
@@ -167,6 +173,10 @@ interface Contact : CoroutineScope {
   }
 }
 
+// capture 窗口内富媒体上传的占位: 不是平台真实凭证, 只用来让 capture 结果看得出"这里本来有一个媒体".
+private const val CapturedResourceUuid = "arona-capture-media"
+private const val CapturedBytesUrl = "capture://bytes"
+
 internal abstract class AbstractContact(
   final override val bot: TencentBot,
   parentCoroutineContext: CoroutineContext,
@@ -212,8 +222,8 @@ internal abstract class AbstractContact(
       return null
     }
 
-    suspend fun send(messageSequence: Int): Result<MessageReceiptImpl> {
-      val builder = TencentMessageBuilder(messageSequence = messageSequence).append(chain)
+    suspend fun send(outgoing: MessageChain, messageSequence: Int): Result<MessageReceiptImpl> {
+      val builder = TencentMessageBuilder(messageSequence = messageSequence).append(outgoing)
       return if (this is Group || this is FriendUser) {
         bot.callOpenapi(
           endpoint,
@@ -242,7 +252,7 @@ internal abstract class AbstractContact(
           method = HttpMethod.Post
           // TODO 支持其他类型消息
           // 包含本地图片 改用 form-data 发送
-          if (chain.any { it is TencentGuildLocalImage }) {
+          if (outgoing.any { it is TencentGuildLocalImage }) {
             contentType(ContentType.MultiPart.FormData)
             setBody(
               builder.buildMultipart()
@@ -258,11 +268,29 @@ internal abstract class AbstractContact(
         }
       }
     }
-    var result = send(messageSequence)
-    if (result.exceptionOrNull() is MessageDuplicationException) {
-      // 止血式重放: 腾讯 msg_seq 空间较小, 旧实现的 +100..1000 偏移极易越界或撞到别的合法序列.
-      // 真正避免与同 sender 的并发序列冲突, 要把 retry 序列分配器从上层透传下来 (待后续任务).
-      result = send(computeMessageDuplicationRetrySequence(messageSequence))
+    suspend fun sendWithRetry(outgoing: MessageChain): Result<MessageReceiptImpl> {
+      var sent = send(outgoing, messageSequence)
+      if (sent.exceptionOrNull() is MessageDuplicationException) {
+        // 止血式重放: 腾讯 msg_seq 空间较小, 旧实现的 +100..1000 偏移极易越界或撞到别的合法序列.
+        // 真正避免与同 sender 的并发序列冲突, 要把 retry 序列分配器从上层透传下来 (待后续任务).
+        sent = send(outgoing, computeMessageDuplicationRetrySequence(messageSequence))
+      }
+      return sent
+    }
+
+    // 注入测试窗口 (见 GroupInjections) 只改出站方式; PreSend/PostSend 照常成对广播, PostSend 拿到的仍是带注入 id 的 chain,
+    // 便于收集方关联.
+    val result = when (val route = GroupInjections.route(target, body, chain)) {
+      InjectionRoute.Normal -> sendWithRetry(chain)
+      // 去掉伪 msg_id/event_id, 与 webhook-notifier 等主动发送同一条 wire 路径.
+      InjectionRoute.Send -> sendWithRetry(MessageChainImpl(EmptyMessageId, null, ConcurrentLinkedQueue(chain)))
+      // 仍在本地构造一次 wire 消息, 让 builder 的校验 (如图片与富媒体同链) 在 capture 下也能暴露.
+      InjectionRoute.Capture -> runCatching {
+        TencentMessageBuilder(messageSequence = messageSequence).append(chain)
+          .build(this is GuildMember, bot.unionOpenidOrId)
+        MessageReceiptImpl(GroupInjections.CAPTURE_RECEIPT_PREFIX + uuid(), OffsetDateTime.now().toString())
+      }
+      is InjectionRoute.Reject -> Result.failure(InjectionRejectedException(route.reason))
     }
     val res = result.getOrNull()?.toMessageReceipt() as MessageReceipt<C>?
     // 成功与失败统一 broadcast post-send; 广播自身异常仅记录, 不污染 send 主语义的返回值; 取消例外透传.
@@ -304,6 +332,8 @@ internal abstract class AbstractContact(
     url: String,
   ): TencentImage {
     val route = richMediaRouteOrNull() ?: return TencentGuildImage(url)
+    // capture 窗口: 必须早于下方失败回落 (bot.client.get(url)), 否则仍会出网. 空 resourceId 也不会写入图片上传缓存.
+    if (GroupInjections.capturesUploads(this)) return TencentOfflineImage("", CapturedResourceUuid, 0L, url)
     val cache = postRichMedia(route, TencentRichMessage(url = url, srvSendMsg = false))
     // 图片专属止血: url 上传失败时回落为下载原图再按 bytes 上传.
     return cache.getOrNull()?.let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, url) }
@@ -321,6 +351,7 @@ internal abstract class AbstractContact(
     data: ByteArray,
   ): TencentImage {
     val route = richMediaRouteOrNull() ?: return TencentGuildLocalImage(raw = data)
+    if (GroupInjections.capturesUploads(this)) return TencentOfflineImage("", CapturedResourceUuid, 0L, CapturedBytesUrl)
     return postRichMedia(route, TencentRichMessage(srvSendMsg = false, fileData = Base64.encode(data)))
       .getOrThrow()
       .let { TencentOfflineImage(it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }
@@ -328,6 +359,7 @@ internal abstract class AbstractContact(
 
   override suspend fun uploadMedia(url: String, type: TencentRichMessageType): TencentOfflineMedia {
     val route = richMediaRouteOrNull() ?: return super.uploadMedia(url, type)
+    if (GroupInjections.capturesUploads(this)) return TencentOfflineMedia(type, "", CapturedResourceUuid, 0L, url)
     return postRichMedia(route, TencentRichMessage(url = url, fileType = type, srvSendMsg = false))
       .getOrThrow()
       .let { TencentOfflineMedia(type, it.fileInfo, it.fileUuid, it.ttl, url) }
@@ -336,6 +368,7 @@ internal abstract class AbstractContact(
   @OptIn(ExperimentalEncodingApi::class)
   override suspend fun uploadMedia(data: ByteArray, type: TencentRichMessageType): TencentOfflineMedia {
     val route = richMediaRouteOrNull() ?: return super.uploadMedia(data, type)
+    if (GroupInjections.capturesUploads(this)) return TencentOfflineMedia(type, "", CapturedResourceUuid, 0L, CapturedBytesUrl)
     return postRichMedia(route, TencentRichMessage(fileType = type, srvSendMsg = false, fileData = Base64.encode(data)))
       .getOrThrow()
       .let { TencentOfflineMedia(type, it.fileInfo, it.fileUuid, it.ttl, getMediaUrlFromMediaInfo(it.fileInfo)) }

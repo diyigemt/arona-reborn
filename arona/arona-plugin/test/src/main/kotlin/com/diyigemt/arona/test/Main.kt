@@ -3,6 +3,7 @@ package com.diyigemt.arona.test
 import com.diyigemt.arona.command.AbstractCommand
 import com.diyigemt.arona.command.nextButtonInteraction
 import com.diyigemt.arona.communication.command.UserCommandSender
+import com.diyigemt.arona.communication.event.GroupMessagePostSendEvent
 import com.diyigemt.arona.communication.message.*
 import com.diyigemt.arona.kts.host.evalFile
 import com.diyigemt.arona.plugins.AronaPlugin
@@ -26,7 +27,8 @@ object PluginMain : AronaPlugin(
   )
 ) {
   override fun onLoad() {
-
+    // agent 真群测试: 把发往测试群的出站投递给进行中的注入收集器 (见 AgentTestEndpoint).
+    pluginEventChannel().subscribeAlways<GroupMessagePostSendEvent> { InjectionCollectors.offer(it) }
   }
 }
 

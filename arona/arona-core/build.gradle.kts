@@ -11,7 +11,7 @@ kotlin {
   }
   jvmToolchain(17)
 }
-version = "2.5.1"
+version = "2.6.0"
 application {
   mainClass = "com.diyigemt.arona.ApplicationKt"
 

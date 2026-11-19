@@ -93,23 +93,30 @@ private fun TencentGroupMessageRaw.quotedOrNull(): QuotedMessage? = msgElements?
   el.content?.trim()?.takeIf { it.isNotEmpty() }?.let { QuotedMessage(it, el.msgIdx) }
 }
 
+/**
+ * 群消息 payload → [TencentGroupMessageEvent] 的唯一映射. 两个真实 handler 与注入
+ * ([com.diyigemt.arona.communication.inject.GroupInjectionWindow.dispatch]) 共用, 保证注入事件与真实事件字段一致.
+ */
+internal suspend fun TencentGroupMessageRaw.broadcastAsGroupMessageEvent(bot: TencentBot, eventId: String) {
+  val member = bot.groups.getOrCreate(groupId).members.getOrCreate(author.id)
+  TencentGroupMessageEvent(
+    toMessageChain(),
+    eventId,
+    member,
+    isAtBot = mentions?.any { it.isYou } == true,
+    platformUsername = author.username,
+    timestamp = timestamp,
+    quoted = quotedOrNull(),
+  ).broadcast()
+}
+
 internal object TencentWebsocketGroupAtMessageCreateHandler :
   TencentWebsocketDispatchEventHandler<TencentGroupMessageRaw>() {
   override val type = TencentWebsocketEventType.GROUP_AT_MESSAGE_CREATE
   override val decoder = TencentGroupMessageRaw.serializer()
 
-  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGroupMessageRaw, eventId: String) {
-    val member = ctx.bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
-    TencentGroupMessageEvent(
-      payload.toMessageChain(),
-      eventId,
-      member,
-      isAtBot = payload.mentions?.any { it.isYou } == true,
-      platformUsername = payload.author.username,
-      timestamp = payload.timestamp,
-      quoted = payload.quotedOrNull(),
-    ).broadcast()
-  }
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGroupMessageRaw, eventId: String) =
+    payload.broadcastAsGroupMessageEvent(ctx.bot, eventId)
 }
 
 // 群全量消息 (公域 intent). payload schema 与 GROUP_AT_MESSAGE_CREATE 一致, 仅 type 不同, 故 handler 逻辑等价.
@@ -118,18 +125,8 @@ internal object TencentWebsocketGroupMessageCreateHandler :
   override val type = TencentWebsocketEventType.GROUP_MESSAGE_CREATE
   override val decoder = TencentGroupMessageRaw.serializer()
 
-  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGroupMessageRaw, eventId: String) {
-    val member = ctx.bot.groups.getOrCreate(payload.groupId).members.getOrCreate(payload.author.id)
-    TencentGroupMessageEvent(
-      payload.toMessageChain(),
-      eventId,
-      member,
-      isAtBot = payload.mentions?.any { it.isYou } == true,
-      platformUsername = payload.author.username,
-      timestamp = payload.timestamp,
-      quoted = payload.quotedOrNull(),
-    ).broadcast()
-  }
+  override suspend fun handle(ctx: TencentDispatchContext, payload: TencentGroupMessageRaw, eventId: String) =
+    payload.broadcastAsGroupMessageEvent(ctx.bot, eventId)
 }
 
 internal object TencentWebsocketC2CMessageCreateHandler :

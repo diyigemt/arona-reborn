@@ -2,6 +2,8 @@ package com.diyigemt.arona.communication.message
 
 import com.diyigemt.arona.communication.TencentBot
 import com.diyigemt.arona.communication.TencentEndpoint
+import com.diyigemt.arona.communication.inject.GroupInjections
+import com.diyigemt.arona.communication.inject.InjectionRejectedException
 import io.ktor.http.HttpMethod
 
 /**
@@ -96,6 +98,12 @@ internal suspend fun TencentBot.recallMessage(
     // 只带 endpoint 不带 destination: 后者的 toString 含 openid/guild id 这类身份标识, 异常常被直接打日志.
     return Result.failure(
       IllegalArgumentException("messageId must not be blank, endpoint=${destination.endpoint}")
+    )
+  }
+  // 注入测试的伪 msg_id 与 capture 本地回执都不是平台 id, 撤回它们只会得到平台报错, 本地直接拒绝.
+  if (GroupInjections.isReservedId(messageId)) {
+    return Result.failure(
+      InjectionRejectedException("injected or captured message cannot be recalled, endpoint=${destination.endpoint}")
     )
   }
   if (destination.privateDomainOnly && isPublic) {

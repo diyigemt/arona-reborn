@@ -24,8 +24,14 @@ class TruncatedBodyTest {
         }
       },
     ) {
-      webhookModule(TOKEN, 1024, IpRateLimiter(10, 10, 60)) {
-        sent += it
+      webhookModule(
+        targets = mapOf("t" to ResolvedTarget("g", "", TOKEN, null, IpRateLimiter(10, 10, 60))),
+        maxBodyBytes = 1024,
+        maxContentChars = 1024,
+        globalLimiter = IpRateLimiter(10, 10, 60),
+        resolveClientIp = { null },
+      ) { _, message ->
+        sent += message.content
         true
       }
     }.start(wait = false)
@@ -38,7 +44,7 @@ class TruncatedBodyTest {
 
   private fun sendRaw(port: Int, framing: String, body: String) {
     Socket("127.0.0.1", port).use {
-      val head = "POST $WEBHOOK_PATH HTTP/1.1\r\nHost: x\r\nAuthorization: $TOKEN\r\n$framing\r\n\r\n"
+      val head = "POST $WEBHOOK_PATH/t HTTP/1.1\r\nHost: x\r\nAuthorization: $TOKEN\r\n$framing\r\n\r\n"
       it.getOutputStream().write((head + body).toByteArray())
       it.getOutputStream().flush()
       // 给服务端时间读到这部分内容, 再断开连接.
@@ -50,7 +56,7 @@ class TruncatedBodyTest {
   /** 同一个服务上再发一条完整请求: 证明路由是通的, 否则"没有转发"可能只是服务根本没工作. */
   private fun assertOnlyCompleteRequestForwarded(port: Int) {
     Socket("127.0.0.1", port).use {
-      val head = "POST $WEBHOOK_PATH HTTP/1.1\r\nHost: x\r\nAuthorization: $TOKEN\r\nContent-Length: 8\r\n\r\n"
+      val head = "POST $WEBHOOK_PATH/t HTTP/1.1\r\nHost: x\r\nAuthorization: $TOKEN\r\nContent-Length: 8\r\n\r\n"
       it.getOutputStream().write((head + "complete").toByteArray())
       it.getOutputStream().flush()
       assertEquals("HTTP/1.1 200 OK", it.getInputStream().bufferedReader().readLine())

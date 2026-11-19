@@ -1,18 +1,19 @@
 plugins {
   id("arona-plugin")
+  alias(libs.plugins.kotlin.serialization)
 }
 
 arona {
   id = "com.diyigemt.arona.webhook.notifier"
   name = "webhook-notifier"
   author = "diyigemt"
-  version = "0.1.2"
-  description = "接收 webhook 并转发到固定群"
+  version = "0.2.0"
+  description = "接收 webhook 并转发到配置的群"
   mainClass = "com.diyigemt.arona.webhook.notifier.PluginMain"
 }
 
 dependencies {
-  // Ktor server 和 kotlinx-serialization-json 由 arona-core 以 implementation 持有 (运行期经父 ClassLoader 可见), 编译期不传递到本模块, 故 compileOnly 声明.
+  // Ktor server 和 kotlinx-serialization (WebhookTarget 的 @Serializable 要用) 由 arona-core 以 implementation 持有 (运行期经父 ClassLoader 可见), 编译期不传递到本模块, 故 compileOnly 声明.
   compileOnly(libs.ktor.server.core.jvm)
   compileOnly(libs.ktor.server.netty.jvm)
   compileOnly(libs.kotlinx.serialization.json)

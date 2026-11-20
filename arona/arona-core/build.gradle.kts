@@ -104,11 +104,11 @@ tasks.register<Copy>("copyDep") {
 //  archiveFileName.set("${project.name}-${project.version}.jar")
 //}
 tasks.register("copyToPlugins") {
+  // 显式依赖 jar 并取其产物: 按版本号扫 build/libs 既不保证顺序 (首次构建必然找不到), 也可能拷到旧 jar 或 -all.jar
+  dependsOn(tasks.jar)
   doLast {
     val pluginDir = rootProject.subprojects.first { it.name == "arona-core" }.projectDir.path + "/sandbox"
-    val buildJar = project.layout.buildDirectory.dir("libs").get().asFile
-      .listFiles { it -> it.isFile && it.name.contains(version.toString()) }
-      ?.firstOrNull()
+    val buildJar = tasks.jar.get().archiveFile.get().asFile.takeIf { it.isFile }
     if (buildJar == null) {
       logger.error("build file not found: ${project.name}")
     } else {
